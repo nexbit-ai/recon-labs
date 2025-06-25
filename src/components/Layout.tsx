@@ -62,6 +62,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setSettingsAnchorEl(null);
     if (option === 'Security') {
       navigate('/security');
+    } else if (option === 'Pricing') {
+      navigate('/pricing');
     }
     // Example: navigate(`/settings/${option.toLowerCase()}`);
   };

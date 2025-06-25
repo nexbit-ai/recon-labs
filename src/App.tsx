@@ -10,6 +10,7 @@ import Reports from './pages/Reports';
 import AIWorkflows from './pages/AIWorkflows';
 import AIReconciliation from './pages/AIReconciliation';
 import Security from './pages/Security';
+import Pricing from './pages/Pricing';
 
 const theme = createTheme({
   palette: {
@@ -207,6 +208,7 @@ function App() {
             <Route path="/ai-workflows" element={<AIWorkflows />} />
             <Route path="/ai-reconciliation" element={<AIReconciliation />} />
             <Route path="/security" element={<Security />} />
+            <Route path="/pricing" element={<Pricing />} />
           </Routes>
         </Layout>
       </Router>
