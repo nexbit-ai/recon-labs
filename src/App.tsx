@@ -9,6 +9,7 @@ import Reconciliation from './pages/Reconciliation';
 import Reports from './pages/Reports';
 import AIWorkflows from './pages/AIWorkflows';
 import AIReconciliation from './pages/AIReconciliation';
+import Security from './pages/Security';
 
 const theme = createTheme({
   palette: {
@@ -205,6 +206,7 @@ function App() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/ai-workflows" element={<AIWorkflows />} />
             <Route path="/ai-reconciliation" element={<AIReconciliation />} />
+            <Route path="/security" element={<Security />} />
           </Routes>
         </Layout>
       </Router>

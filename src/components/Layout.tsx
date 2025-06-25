@@ -13,6 +13,8 @@ import {
   Typography,
   useTheme,
   Avatar,
+  Menu,
+  MenuItem,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -21,6 +23,7 @@ import {
   Edit as EditIcon,
   CompareArrows as CompareArrowsIcon,
   Assessment as AssessmentIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
 // @ts-ignore
 import logo from '../assets/logo.png';
@@ -41,13 +44,30 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [settingsAnchorEl, setSettingsAnchorEl] = React.useState<null | HTMLElement>(null);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
+  const handleSettingsClick = (event: React.MouseEvent<HTMLElement>) => {
+    setSettingsAnchorEl(event.currentTarget);
+  };
+
+  const handleSettingsClose = () => {
+    setSettingsAnchorEl(null);
+  };
+
+  const handleMenuOption = (option: string) => {
+    setSettingsAnchorEl(null);
+    if (option === 'Security') {
+      navigate('/security');
+    }
+    // Example: navigate(`/settings/${option.toLowerCase()}`);
+  };
+
   const drawer = (
-    <Box>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Toolbar sx={{ flexDirection: 'column', alignItems: 'flex-start', pt: 2 }}>
         <img
           src={logo}
@@ -55,7 +75,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           style={{ width: 48, height: 48, marginBottom: 16, display: 'block' }}
         />
       </Toolbar>
-      <List>
+      <List sx={{ flex: 1 }}>
         {menuItems.map((item) => (
           <ListItem key={item.text} disablePadding>
             <ListItemButton
@@ -89,6 +109,26 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </ListItem>
         ))}
       </List>
+      <Box sx={{ mb: 2 }}>
+        <ListItem disablePadding>
+          <ListItemButton onClick={handleSettingsClick} sx={{ borderRadius: '0 24px 24px 0', mr: 2 }}>
+            <ListItemIcon>
+              <SettingsIcon />
+            </ListItemIcon>
+            <ListItemText primary="Settings" />
+          </ListItemButton>
+        </ListItem>
+        <Menu
+          anchorEl={settingsAnchorEl}
+          open={Boolean(settingsAnchorEl)}
+          onClose={handleSettingsClose}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+          <MenuItem onClick={() => handleMenuOption('Security')}>Security</MenuItem>
+          <MenuItem onClick={() => handleMenuOption('Pricing')}>Pricing</MenuItem>
+        </Menu>
+      </Box>
     </Box>
   );
 
