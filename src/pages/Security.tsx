@@ -34,7 +34,7 @@ const securityFeatures = [
     icon: VerifiedUserIcon,
     iconProps: { sx: { fontSize: 32, color: 'primary.main' } },
     title: 'Regulatory Compliance',
-    desc: 'We are committed to meeting industry standards such as SOC 2 and ISO 27001, and we ensure GDPR compliance is always top of mind.',
+    desc: 'We are committed to meeting industry standards such as SOC 2 and ISO 27001, and we ensure GDPR compliance is always top of mind. Additionally, we adhere to all guidelines of the Digital Personal Data Protection (DPDP) Act, 2023, ensuring your data is handled with the highest standards of privacy and protection.',
   },
 ];
 
