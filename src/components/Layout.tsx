@@ -24,6 +24,8 @@ import {
   CompareArrows as CompareArrowsIcon,
   Assessment as AssessmentIcon,
   Settings as SettingsIcon,
+  AttachMoney as AttachMoneyIcon,
+  Storage as StorageIcon,
 } from '@mui/icons-material';
 // @ts-ignore
 import logo from '../assets/logo.png';
@@ -36,6 +38,8 @@ const menuItems = [
   { text: 'Recent Activities', icon: <EditIcon />, path: '/recent-activities' },
   { text: 'Reconciliation', icon: <CompareArrowsIcon />, path: '/reconciliation' },
   { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
+  { text: 'Connect Data Sources', icon: <StorageIcon />, path: '/connect-data-sources' },
+  { text: 'Finance Intelligence Dashboard', icon: <AttachMoneyIcon />, path: '/finance-dashboard' },
   { text: 'AI Workflows', icon: <AssessmentIcon />, path: '/ai-workflows' },
 ];
 

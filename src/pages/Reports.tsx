@@ -15,6 +15,14 @@ import {
   Chip,
   Stack,
   TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Switch,
+  FormControlLabel,
+  Divider,
+  IconButton,
 } from '@mui/material';
 import {
   PictureAsPdf as PdfIcon,
@@ -24,6 +32,8 @@ import {
   Description as DescriptionIcon,
   AutoAwesome as AutoAwesomeIcon,
   CalendarToday as CalendarTodayIcon,
+  Close as CloseIcon,
+  Schedule as ScheduleIcon,
 } from '@mui/icons-material';
 import CircularProgress from '@mui/material/CircularProgress';
 
@@ -39,6 +49,10 @@ const Reports: React.FC = () => {
   const [customPrompt, setCustomPrompt] = useState('');
   const [customLoading, setCustomLoading] = useState(false);
   const [customResult, setCustomResult] = useState<string | null>(null);
+  const [slackDialogOpen, setSlackDialogOpen] = useState(false);
+  const [slackChannel, setSlackChannel] = useState('');
+  const [slackFrequency, setSlackFrequency] = useState('weekly');
+  const [slackEnabled, setSlackEnabled] = useState(false);
 
   const expenseData: ReportData[] = [
     { category: 'Operating Expenses', amount: 45000, percentage: 45 },
@@ -152,7 +166,7 @@ const Reports: React.FC = () => {
       {/* Second Header Row: Report Type, Time Range with Generate Button */}
       <Paper sx={{ p: 3, mb: 4 }}>
         <Grid container spacing={3} alignItems="center">
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <FormControl fullWidth>
               <InputLabel>Report Type</InputLabel>
               <Select
@@ -166,7 +180,7 @@ const Reports: React.FC = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <FormControl fullWidth>
               <InputLabel>Time Range</InputLabel>
               <Select
@@ -181,7 +195,7 @@ const Reports: React.FC = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={3}>
             <Button
               variant="contained"
               color="primary"
@@ -190,6 +204,18 @@ const Reports: React.FC = () => {
               sx={{ borderRadius: 2, py: 1.5 }}
             >
               Generate
+            </Button>
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <Button
+              variant="outlined"
+              color="secondary"
+              startIcon={<ScheduleIcon />}
+              fullWidth
+              sx={{ borderRadius: 2, py: 1.5 }}
+              onClick={() => setSlackDialogOpen(true)}
+            >
+              Send Reports Periodically to Slack
             </Button>
           </Grid>
         </Grid>
@@ -256,6 +282,156 @@ const Reports: React.FC = () => {
           ))}
         </Grid>
       </Box>
+
+      {/* Slack Connector Dialog */}
+      <Dialog
+        open={slackDialogOpen}
+        onClose={() => setSlackDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3 }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2, pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 2,
+                background: 'linear-gradient(45deg, #4A154B 30%, #36C5F0 90%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                color: 'white',
+              }}
+            >
+              💬
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 0 }}>
+                Connect to Slack
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Schedule periodic reports to your Slack channels
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            onClick={() => setSlackDialogOpen(false)}
+            sx={{ ml: 'auto' }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        
+        <DialogContent sx={{ pt: 2 }}>
+          <Stack spacing={3}>
+            {/* Enable/Disable Toggle */}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={slackEnabled}
+                  onChange={(e) => setSlackEnabled(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label="Enable periodic reports to Slack"
+            />
+            
+            <Divider />
+            
+            {/* Channel Selector */}
+            <FormControl fullWidth disabled={!slackEnabled}>
+              <InputLabel>Slack Channel</InputLabel>
+              <Select
+                value={slackChannel}
+                label="Slack Channel"
+                onChange={(e) => setSlackChannel(e.target.value)}
+              >
+                <MenuItem value="general"># general</MenuItem>
+                <MenuItem value="finance"># finance</MenuItem>
+                <MenuItem value="accounting"># accounting</MenuItem>
+                <MenuItem value="management"># management</MenuItem>
+                <MenuItem value="reports"># reports</MenuItem>
+              </Select>
+            </FormControl>
+            
+            {/* Frequency Selector */}
+            <FormControl fullWidth disabled={!slackEnabled}>
+              <InputLabel>Frequency</InputLabel>
+              <Select
+                value={slackFrequency}
+                label="Frequency"
+                onChange={(e) => setSlackFrequency(e.target.value)}
+              >
+                <MenuItem value="daily">Daily</MenuItem>
+                <MenuItem value="weekly">Weekly</MenuItem>
+                <MenuItem value="monthly">Monthly</MenuItem>
+                <MenuItem value="quarterly">Quarterly</MenuItem>
+              </Select>
+            </FormControl>
+            
+            {/* Report Type for Slack */}
+            <FormControl fullWidth disabled={!slackEnabled}>
+              <InputLabel>Report Type</InputLabel>
+              <Select
+                value={reportType}
+                label="Report Type"
+                onChange={(e) => setReportType(e.target.value)}
+              >
+                {reportTypes.map((rt) => (
+                  <MenuItem key={rt.value} value={rt.value}>{rt.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            {slackEnabled && slackChannel && (
+              <Box sx={{ 
+                p: 2, 
+                bgcolor: 'primary.50', 
+                borderRadius: 2, 
+                border: '1px solid', 
+                borderColor: 'primary.200' 
+              }}>
+                <Typography variant="body2" color="primary.main" sx={{ fontWeight: 600 }}>
+                  📅 Schedule Preview
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  {reportTypes.find(rt => rt.value === reportType)?.label} will be sent to{' '}
+                  <strong>#{slackChannel}</strong> every{' '}
+                  <strong>{slackFrequency.replace('ly', '')}</strong>
+                </Typography>
+              </Box>
+            )}
+          </Stack>
+        </DialogContent>
+        
+        <DialogActions sx={{ p: 3, pt: 2 }}>
+          <Button
+            onClick={() => setSlackDialogOpen(false)}
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              // Handle save logic here
+              setSlackDialogOpen(false);
+              // Show success message or handle the integration
+            }}
+            variant="contained"
+            disabled={!slackEnabled || !slackChannel}
+            sx={{ borderRadius: 2 }}
+          >
+            Save Integration
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

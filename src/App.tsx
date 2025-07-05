@@ -11,6 +11,8 @@ import AIWorkflows from './pages/AIWorkflows';
 import AIReconciliation from './pages/AIReconciliation';
 import Security from './pages/Security';
 import Pricing from './pages/Pricing';
+import FinanceDashboard from './pages/FinanceDashboard';
+import ConnectDataSources from './pages/ConnectDataSources';
 
 const theme = createTheme({
   palette: {
@@ -205,6 +207,8 @@ function App() {
             <Route path="/recent-activities" element={<RecentActivities />} />
             <Route path="/reconciliation" element={<Reconciliation />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/finance-dashboard" element={<FinanceDashboard />} />
+            <Route path="/connect-data-sources" element={<ConnectDataSources />} />
             <Route path="/ai-workflows" element={<AIWorkflows />} />
             <Route path="/ai-reconciliation" element={<AIReconciliation />} />
             <Route path="/security" element={<Security />} />
