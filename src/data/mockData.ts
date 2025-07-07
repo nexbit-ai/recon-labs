@@ -33,6 +33,8 @@ export interface SalesRow {
   customer: string;
   items: number;
   total: number;
+  shippingFees: number;
+  marketplaceCommission: number;
   status: string;
 }
 
@@ -49,6 +51,8 @@ export interface ProductRow {
 export interface FinanceMockData {
   kpis: KPI[];
   sales_over_time: SalesDataPoint[];
+  marketplace_commissions_over_time: SalesDataPoint[];
+  shipping_fees_over_time: SalesDataPoint[];
   sales_by_channel: ChannelBreakdown[];
   top_products: TopProduct[];
   anomalies: Anomaly[];
@@ -56,6 +60,20 @@ export interface FinanceMockData {
   products_table: ProductRow[];
   returns_table: SalesRow[];
 }
+
+export type Platform = 'shopify' | 'amazon' | 'flipkart' | 'myntra';
+
+export interface PlatformData {
+  [key: string]: FinanceMockData;
+}
+
+// Platform distribution weights (unequal distribution)
+const PLATFORM_WEIGHTS: Record<Platform, number> = {
+  shopify: 0.35,    // 35% - highest
+  amazon: 0.28,     // 28% - second highest  
+  flipkart: 0.22,   // 22% - third
+  myntra: 0.15,     // 15% - lowest
+};
 
 // Helper function to get number of days from date range string
 const getDaysFromRange = (dateRange: string): number => {
@@ -104,8 +122,8 @@ const getTimeFormat = (days: number, date: Date): string => {
   return date.toISOString().slice(0, 10); // Just date for multiple days
 };
 
-// Dynamic data generation function
-export const generateMockData = (dateRange: string): FinanceMockData => {
+// Dynamic data generation function with platform filtering
+export const generateMockData = (dateRange: string, selectedPlatforms: Platform[] = ['shopify', 'amazon', 'flipkart', 'myntra']): FinanceMockData => {
   const days = getDaysFromRange(dateRange);
   const scaleFactor = getDataScaleFactor(days);
   const timeInterval = getTimeInterval(days);
@@ -116,13 +134,17 @@ export const generateMockData = (dateRange: string): FinanceMockData => {
   const baseAOV = 71.6;
   const baseReturns = 314;
   
-  // Scale values based on time range
-  const scaledRevenue = Math.floor(baseRevenue * scaleFactor);
-  const scaledOrders = Math.floor(baseOrders * scaleFactor);
+  // Calculate total weight for selected platforms
+  const totalWeight = selectedPlatforms.reduce((sum, platform) => sum + PLATFORM_WEIGHTS[platform], 0);
+  
+  // Scale values based on time range and filter by selected platforms
+  const fullScaledRevenue = Math.floor(baseRevenue * scaleFactor);
+  const scaledRevenue = Math.floor(fullScaledRevenue * totalWeight); // Revenue for selected platforms only
+  const scaledOrders = Math.floor(baseOrders * scaleFactor * totalWeight);
   const scaledAOV = baseAOV * (1 + (scaleFactor - 1) * 0.1); // AOV grows slightly with scale
-  const scaledReturns = Math.floor(baseReturns * scaleFactor);
+  const scaledReturns = Math.floor(baseReturns * scaleFactor * totalWeight);
 
-  // Generate KPIs with scaled values
+  // Generate KPIs with scaled values for selected platforms
   const kpis: KPI[] = [
     {
       id: 'totalRevenue',
@@ -152,6 +174,8 @@ export const generateMockData = (dateRange: string): FinanceMockData => {
 
   // Generate sales_over_time data with appropriate data points
   const sales_over_time: SalesDataPoint[] = [];
+  const marketplace_commissions_over_time: SalesDataPoint[] = [];
+  const shipping_fees_over_time: SalesDataPoint[] = [];
   const numDataPoints = days <= 1 ? 48 : Math.max(days / timeInterval, 7); // 48 half-hour intervals for 1 day
   
   for (let i = 0; i < numDataPoints; i++) {
@@ -180,20 +204,45 @@ export const generateMockData = (dateRange: string): FinanceMockData => {
     const variation = 0.3; // 30% variation
     const revenue = Math.floor(baseRevenue * (1 + (Math.random() - 0.5) * variation));
     
+    // Marketplace commissions (typically 8-15% of revenue, varying by platform)
+    const commissionRate = 0.08 + (Math.random() * 0.07); // 8-15% range
+    const baseCommission = baseRevenue * commissionRate;
+    const commission = Math.floor(baseCommission * (1 + (Math.random() - 0.5) * variation));
+    
+    // Shipping fees (typically 3-8% of revenue)
+    const shippingRate = 0.03 + (Math.random() * 0.05); // 3-8% range
+    const baseShipping = baseRevenue * shippingRate;
+    const shipping = Math.floor(baseShipping * (1 + (Math.random() - 0.5) * variation));
+    
+    const dateStr = getTimeFormat(days, date);
+    
     sales_over_time.push({
-      date: getTimeFormat(days, date),
+      date: dateStr,
       revenue: Math.max(revenue, 0),
+    });
+    
+    marketplace_commissions_over_time.push({
+      date: dateStr,
+      revenue: Math.max(commission, 0),
+    });
+    
+    shipping_fees_over_time.push({
+      date: dateStr,
+      revenue: Math.max(shipping, 0),
     });
   }
 
-  // Generate channel data with scaled values
-  const sales_by_channel: ChannelBreakdown[] = [
-    { channel: 'Shopify', revenue: Math.floor(scaledRevenue * 0.49) },
-    { channel: 'Amazon', revenue: Math.floor(scaledRevenue * 0.31) },
-    { channel: 'Flipkart', revenue: Math.floor(scaledRevenue * 0.20) },
-  ];
+  // Generate channel data with scaled values for selected platforms only
+  const sales_by_channel: ChannelBreakdown[] = selectedPlatforms.map(platform => {
+    const weight = PLATFORM_WEIGHTS[platform] / totalWeight; // Normalize weight
+    const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
+    return {
+      channel: platformName,
+      revenue: Math.floor(scaledRevenue * weight),
+    };
+  });
 
-  // Generate top products with scaled values
+  // Generate top products with scaled values based on selected platforms
   const top_products: TopProduct[] = [
     { product: 'Product A', revenue: Math.floor(scaledRevenue * 0.143) },
     { product: 'Product B', revenue: Math.floor(scaledRevenue * 0.118) },
@@ -202,13 +251,16 @@ export const generateMockData = (dateRange: string): FinanceMockData => {
     { product: 'Product E', revenue: Math.floor(scaledRevenue * 0.078) },
   ];
 
-  // Generate anomalies based on time range
+  // Prepare selected channels for reuse
+  const selectedChannels = selectedPlatforms.map(p => p.charAt(0).toUpperCase() + p.slice(1));
+
+  // Generate anomalies based on time range and selected platforms
   const anomalies: Anomaly[] = [];
   const numAnomalies = Math.max(1, Math.floor(days / 10)); // More anomalies for longer periods
   
   for (let i = 0; i < numAnomalies; i++) {
     const products = ['Product A', 'Product B', 'Product C', 'Product D', 'Product E'];
-    const channels = ['Shopify', 'Amazon', 'Flipkart'];
+    const channels = selectedChannels;
     const types = [
       `Spike in sales detected for ${products[i % products.length]}`,
       `Return rate increased for ${products[i % products.length]}`,
@@ -226,29 +278,45 @@ export const generateMockData = (dateRange: string): FinanceMockData => {
     });
   }
 
-  // Generate sales table data
+  // Generate sales table data for selected platforms only
   const numSalesRows = Math.min(Math.max(days, 10), 100); // Between 10 and 100 rows
   const sales_table: SalesRow[] = Array.from({ length: numSalesRows }, (_, i) => {
     const date = new Date();
     date.setDate(date.getDate() - Math.floor(Math.random() * days));
     
+    const channel = selectedChannels[i % selectedChannels.length];
+    const total = parseFloat((20 + Math.random() * 300).toFixed(2));
+    
+    // Calculate shipping fees (3-8% of total)
+    const shippingRate = 0.03 + (Math.random() * 0.05);
+    const shippingFees = parseFloat((total * shippingRate).toFixed(2));
+    
+    // Calculate marketplace commission (0% for Shopify, 8-15% for others)
+    let marketplaceCommission = 0;
+    if (channel !== 'Shopify') {
+      const commissionRate = 0.08 + (Math.random() * 0.07); // 8-15% for marketplaces
+      marketplaceCommission = parseFloat((total * commissionRate).toFixed(2));
+    }
+    
     return {
       id: `order-${i + 1}`,
       orderId: `#${10000 + i + 1}`,
       date: date.toISOString().slice(0, 10),
-      channel: ['Shopify', 'Amazon', 'Flipkart'][i % 3],
+      channel,
       customer: ['John Doe', 'Jane Smith', 'Alice Johnson', 'Bob Wilson', 'Carol Brown'][i % 5],
       items: Math.floor(1 + Math.random() * 5),
-      total: parseFloat((20 + Math.random() * 300).toFixed(2)),
+      total,
+      shippingFees,
+      marketplaceCommission,
       status: ['Shipped', 'Processing', 'Delivered', 'Cancelled'][i % 4],
     };
   });
 
-  // Generate products table data
+  // Generate products table data based on selected platforms
   const numProductRows = Math.min(Math.max(Math.floor(days / 3), 5), 20); // Between 5 and 20 products
   const products_table: ProductRow[] = Array.from({ length: numProductRows }, (_, i) => {
-    const baseUnits = Math.floor(100 * scaleFactor);
-    const baseRevenue = Math.floor(10000 * scaleFactor);
+    const baseUnits = Math.floor(100 * scaleFactor * totalWeight);
+    const baseRevenue = Math.floor(10000 * scaleFactor * totalWeight);
     
     return {
       id: `prod-${i + 1}`,
@@ -256,7 +324,7 @@ export const generateMockData = (dateRange: string): FinanceMockData => {
       sku: `SKU-${i + 1}`,
       unitsSold: Math.floor(baseUnits + Math.random() * baseUnits),
       revenue: Math.floor(baseRevenue + Math.random() * baseRevenue),
-      returns: Math.floor(1 + Math.random() * Math.max(50 * scaleFactor, 10)),
+      returns: Math.floor(1 + Math.random() * Math.max(50 * scaleFactor * totalWeight, 10)),
       returnRate: parseFloat((Math.random() * 5).toFixed(1)),
     };
   });
@@ -264,6 +332,8 @@ export const generateMockData = (dateRange: string): FinanceMockData => {
   return {
     kpis,
     sales_over_time,
+    marketplace_commissions_over_time,
+    shipping_fees_over_time,
     sales_by_channel,
     top_products,
     anomalies,
