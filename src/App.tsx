@@ -13,6 +13,7 @@ import Security from './pages/Security';
 import Pricing from './pages/Pricing';
 import FinanceDashboard from './pages/FinanceDashboard';
 import ConnectDataSources from './pages/ConnectDataSources';
+import Assistant from './pages/Assistant';
 
 const theme = createTheme({
   palette: {
@@ -53,15 +54,15 @@ const theme = createTheme({
   spacing: 8,
   typography: {
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-    h1: { fontWeight: 800, fontSize: 40, letterSpacing: -1 },
-    h2: { fontWeight: 800, fontSize: 32, letterSpacing: -1 },
-    h3: { fontWeight: 800, fontSize: 28, letterSpacing: -0.5 },
-    h4: { fontWeight: 700, fontSize: 22 },
-    h5: { fontWeight: 700, fontSize: 18 },
-    h6: { fontWeight: 700, fontSize: 16 },
-    body1: { fontSize: 16 },
-    body2: { fontSize: 15 },
-    button: { fontWeight: 600, fontSize: 15, textTransform: 'none' },
+    h1: { fontWeight: 800, fontSize: 32, letterSpacing: -1 },
+    h2: { fontWeight: 800, fontSize: 25.6, letterSpacing: -1 },
+    h3: { fontWeight: 800, fontSize: 22.4, letterSpacing: -0.5 },
+    h4: { fontWeight: 700, fontSize: 17.6 },
+    h5: { fontWeight: 700, fontSize: 14.4 },
+    h6: { fontWeight: 700, fontSize: 12.8 },
+    body1: { fontSize: 12.8 },
+    body2: { fontSize: 12 },
+    button: { fontWeight: 600, fontSize: 12, textTransform: 'none' },
   },
   components: {
     MuiCssBaseline: {
@@ -92,7 +93,7 @@ const theme = createTheme({
           borderRadius: 8,
           textTransform: 'none',
           fontWeight: 600,
-          fontSize: 15,
+          fontSize: 12,
           padding: '10px 22px',
           transition: 'background 0.2s cubic-bezier(.4,0,.2,1), color 0.2s cubic-bezier(.4,0,.2,1), box-shadow 0.2s cubic-bezier(.4,0,.2,1)',
         },
@@ -103,7 +104,7 @@ const theme = createTheme({
         root: {
           borderRadius: 8,
           fontWeight: 600,
-          fontSize: 15,
+          fontSize: 12,
           letterSpacing: 0.5,
           transition: 'background 0.2s cubic-bezier(.4,0,.2,1), color 0.2s cubic-bezier(.4,0,.2,1)',
         },
@@ -121,7 +122,7 @@ const theme = createTheme({
         root: {
           borderRadius: 8,
           background: '#f8fafc',
-          fontSize: 16,
+          fontSize: 12.8,
           padding: '10px 14px',
           transition: 'background 0.2s cubic-bezier(.4,0,.2,1)',
         },
@@ -132,7 +133,7 @@ const theme = createTheme({
         root: {
           borderRadius: 8,
           background: '#f8fafc',
-          fontSize: 16,
+          fontSize: 12.8,
         },
       },
     },
@@ -141,7 +142,7 @@ const theme = createTheme({
         root: {
           borderRadius: 8,
           background: '#f8fafc',
-          fontSize: 16,
+          fontSize: 12.8,
         },
       },
     },
@@ -161,7 +162,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           fontWeight: 600,
-          fontSize: 15,
+          fontSize: 12,
           minHeight: 48,
           padding: '0 20px',
           transition: 'color 0.2s cubic-bezier(.4,0,.2,1)',
@@ -171,7 +172,7 @@ const theme = createTheme({
     MuiListItemButton: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
+          borderRadius: 0,
           margin: '4px 0',
           transition: 'background 0.2s cubic-bezier(.4,0,.2,1)',
         },
@@ -182,6 +183,7 @@ const theme = createTheme({
         paper: {
           background: '#fff',
           borderRight: '1.5px solid #e5e7eb',
+          borderRadius: 0,
         },
       },
     },
@@ -210,6 +212,7 @@ function App() {
             <Route path="/finance-dashboard" element={<FinanceDashboard />} />
             <Route path="/connect-data-sources" element={<ConnectDataSources />} />
             <Route path="/ai-workflows" element={<AIWorkflows />} />
+            <Route path="/assistant" element={<Assistant />} />
             <Route path="/ai-reconciliation" element={<AIReconciliation />} />
             <Route path="/security" element={<Security />} />
             <Route path="/pricing" element={<Pricing />} />

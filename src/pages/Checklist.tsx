@@ -23,6 +23,9 @@ import {
   List as MUIList,
   ListItem as MUIListItem,
   ListItemText as MUIListItemText,
+  Select,
+  FormControl,
+  MenuItem,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -147,15 +150,14 @@ const Checklist: React.FC = () => {
   const [showUpcoming, setShowUpcoming] = useState(true);
   const [search, setSearch] = useState('');
   const [expandedTask, setExpandedTask] = useState<number | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null); // null = no month selected
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth()); // default to current month
   const [comments, setComments] = useState<{ [taskId: number]: typeof initialComments }>({});
   const [newComment, setNewComment] = useState<{ [taskId: number]: string }>({});
   const [aiPanel, setAIPanel] = useState<{ open: boolean; taskId: number | null; loading: boolean; answer: string[]; prompt: string; generated: boolean }>({ open: false, taskId: null, loading: false, answer: [], prompt: '', generated: false });
-  const [viewMode, setViewMode] = useState<'month-list' | 'checklist'>('month-list');
 
   // For demo, use same tasks for all months
   const getMonthTasks = (monthIdx: number) => ({ overdue: overdueTasks, upcoming: upcomingTasks });
-  const { overdue: monthOverdue, upcoming: monthUpcoming } = getMonthTasks(selectedMonth ?? 0);
+  const { overdue: monthOverdue, upcoming: monthUpcoming } = getMonthTasks(selectedMonth);
   const filteredOverdue = monthOverdue.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()));
   const filteredUpcoming = monthUpcoming.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()));
 
@@ -213,46 +215,8 @@ const Checklist: React.FC = () => {
   const allTasks = [...overdueTasks, ...upcomingTasks];
   const currentTask = allTasks.find((t) => t.id === aiPanel.taskId);
 
-  // Month list for selection
-  if (viewMode === 'month-list') {
-    // Example: show 6 months, most recent first
-    const now = new Date();
-    const monthsToShow = 6;
-    const monthYearList = Array.from({ length: monthsToShow }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      return { month: d.getMonth(), year: d.getFullYear() };
-    });
-    return (
-      <Box sx={{ p: { xs: 1, md: 3 } }}>
-        <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>Close Checklist</Typography>
-        <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 3 }}>
-          Keep track of your close tasks and perform consolidations
-        </Typography>
-        <Box>
-          {monthYearList.map(({ month, year }) => (
-            <Paper key={`${month}-${year}`} sx={{ mb: 2, p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: 3, boxShadow: 'none', border: '1.5px solid #e5e7eb' }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>{monthNames[month]} {year}</Typography>
-              <Button
-                variant="outlined"
-                sx={{ minWidth: 100, fontWeight: 600, borderRadius: 2 }}
-                onClick={() => { setSelectedMonth(month); setViewMode('checklist'); }}
-              >
-                View
-              </Button>
-            </Paper>
-          ))}
-        </Box>
-      </Box>
-    );
-  }
-
-  // Checklist view for selected month
   return (
     <Box sx={{ p: { xs: 1, md: 3 } }}>
-      {/* Back button */}
-      <Button variant="text" onClick={() => setViewMode('month-list')} sx={{ mb: 2, fontWeight: 600 }}>
-        ← Back to months
-      </Button>
       {/* Progress Bar Section */}
       <Paper sx={{ mb: 3, p: 3, borderRadius: 3, boxShadow: 'none', border: '1.5px solid #e5e7eb' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
@@ -285,8 +249,21 @@ const Checklist: React.FC = () => {
         <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main', mr: 2 }}>
           Month-end close
         </Typography>
-        <Chip label={`${monthNames[selectedMonth ?? 0]} ${new Date().getFullYear()}`} variant="outlined" sx={{ fontWeight: 500, mr: 2 }} />
         <Box sx={{ flex: 1 }} />
+        <FormControl size="small" sx={{ mr: 2, minWidth: 120 }}>
+          <Select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value as number)}
+            displayEmpty
+            sx={{ borderRadius: 2 }}
+          >
+            {monthNames.map((month, index) => (
+              <MenuItem key={index} value={index}>
+                {month} {new Date().getFullYear()}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <Button startIcon={<FilterListIcon />} variant="outlined" sx={{ borderRadius: 2, mr: 2 }}>
           Filters
         </Button>

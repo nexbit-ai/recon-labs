@@ -18,14 +18,15 @@ import {
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  Dashboard as DashboardIcon,
-  Checklist as ChecklistIcon,
-  Edit as EditIcon,
-  CompareArrows as CompareArrowsIcon,
-  Assessment as AssessmentIcon,
-  Settings as SettingsIcon,
-  AttachMoney as AttachMoneyIcon,
-  Storage as StorageIcon,
+  DashboardOutlined as DashboardIcon,
+  ChecklistOutlined as ChecklistIcon,
+  EditOutlined as EditIcon,
+  CompareArrowsOutlined as CompareArrowsIcon,
+  AssessmentOutlined as AssessmentIcon,
+  SettingsOutlined as SettingsIcon,
+  AttachMoneyOutlined as AttachMoneyIcon,
+  StorageOutlined as StorageIcon,
+  ChatOutlined as ChatIcon,
 } from '@mui/icons-material';
 // @ts-ignore
 import logo from '../assets/logo.png';
@@ -34,13 +35,12 @@ const drawerWidth = 240;
 
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-  { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist' },
+  { text: 'Month-end close', icon: <ChecklistIcon />, path: '/checklist' },
   { text: 'Recent Activities', icon: <EditIcon />, path: '/recent-activities' },
-  { text: 'Reconciliation', icon: <CompareArrowsIcon />, path: '/reconciliation' },
   { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
   { text: 'Connect Data Sources', icon: <StorageIcon />, path: '/connect-data-sources' },
   { text: 'Finance Intelligence Dashboard', icon: <AttachMoneyIcon />, path: '/finance-dashboard' },
-  { text: 'AI Workflows', icon: <AssessmentIcon />, path: '/ai-workflows' },
+  { text: 'Assistant', icon: <ChatIcon />, path: '/assistant' },
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -88,8 +88,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               onClick={() => navigate(item.path)}
               selected={location.pathname === item.path}
               sx={{
-                borderRadius: '0 24px 24px 0',
+                borderRadius: 0,
                 mr: 2,
+                my: 0.25,
                 '&.Mui-selected': {
                   backgroundColor: theme.palette.primary.main + '15',
                   '&:hover': {
@@ -101,6 +102,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <ListItemIcon
                 sx={{
                   color: location.pathname === item.path ? theme.palette.primary.main : 'inherit',
+                  minWidth: 36,
                 }}
               >
                 {item.icon}
@@ -117,8 +119,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </List>
       <Box sx={{ mb: 2 }}>
         <ListItem disablePadding>
-          <ListItemButton onClick={handleSettingsClick} sx={{ borderRadius: '0 24px 24px 0', mr: 2 }}>
-            <ListItemIcon>
+          <ListItemButton onClick={handleSettingsClick} sx={{ borderRadius: 0, mr: 2, my: 0.25 }}>
+            <ListItemIcon sx={{ minWidth: 36 }}>
               <SettingsIcon />
             </ListItemIcon>
             <ListItemText primary="Settings" />
@@ -142,7 +144,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <Box sx={{ display: 'flex' }}>
       <Box
         component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+        sx={{ 
+          width: { sm: drawerWidth }, 
+          flexShrink: { sm: 0 },
+          borderRadius: 0,
+        }}
       >
         <Drawer
           variant="temporary"
@@ -153,7 +159,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              borderRadius: 0,
+            },
           }}
         >
           {drawer}
@@ -162,7 +172,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              borderRadius: 0,
+            },
           }}
           open
         >
