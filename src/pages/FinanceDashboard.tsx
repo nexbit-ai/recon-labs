@@ -30,6 +30,7 @@ import {
   Divider,
   IconButton,
   Grid,
+  Menu,
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import DateRangeSelector from '../components/DateRangeSelector';
@@ -66,6 +67,14 @@ import {
   Sync as SyncIcon,
   CheckCircle as CheckCircleIcon,
   Close as CloseIcon,
+  Edit as EditIcon,
+  Save as SaveIcon,
+  Delete as DeleteIcon,
+  DragIndicator as DragIndicatorIcon,
+  Fullscreen as FullscreenIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon,
+  Add as AddIcon,
+  Tune as TuneIcon,
 } from '@mui/icons-material';
 
 const accentColors = ['#14B8A6', '#3B82F6', '#F59E0B', '#EF4444'];
@@ -299,11 +308,183 @@ const PlatformSelector: React.FC<{
 };
 
 /* --------------------------- Overview Tab --------------------------- */
+interface Widget {
+  id: string;
+  type: string;
+  title: string;
+  visible: boolean;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+}
+
+// Available graph types for the add new functionality
+const availableGraphs = [
+  { id: 'cashflow', title: 'Cashflow Analysis', description: 'Track cash inflows and outflows over time' },
+  { id: 'return-stats', title: 'Return Statistics', description: 'Monitor return rates and refund trends' },
+  { id: 'profit-margins', title: 'Profit Margins', description: 'Analyze profitability across products and channels' },
+  { id: 'inventory-turnover', title: 'Inventory Turnover', description: 'Track inventory movement and efficiency' },
+  { id: 'customer-metrics', title: 'Customer Metrics', description: 'Customer acquisition costs and lifetime value' },
+];
+
+const EditableWidget: React.FC<{
+  widget: Widget;
+  editMode: boolean;
+  onRemove: (id: string) => void;
+  onResize: (id: string) => void;
+  children: React.ReactNode;
+}> = ({ widget, editMode, onRemove, onResize, children }) => {
+  return (
+    <Box
+      sx={{
+        position: 'relative',
+        '&:hover .edit-controls': editMode ? { opacity: 1 } : { opacity: 0 },
+      }}
+    >
+      {children}
+      {editMode && (
+        <Box
+          className="edit-controls"
+          sx={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            display: 'flex',
+            gap: 1,
+            opacity: 0,
+            transition: 'opacity 0.2s',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            borderRadius: 1,
+            p: 0.5,
+            boxShadow: 2,
+          }}
+        >
+          <IconButton
+            size="small"
+            onClick={() => onRemove(widget.id)}
+            sx={{ color: 'error.main' }}
+          >
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            sx={{ color: 'primary.main', cursor: 'move' }}
+          >
+            <DragIndicatorIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => onResize(widget.id)}
+            sx={{ color: 'primary.main' }}
+            title={`Resize (Current: ${widget.size.width}/12 width)`}
+          >
+            <FullscreenIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      )}
+    </Box>
+  );
+};
+
+const AddNewWidget: React.FC<{
+  onSelectGraph: (graphType: string) => void;
+}> = ({ onSelectGraph }) => {
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+  const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleGraphSelect = (graphId: string) => {
+    onSelectGraph(graphId);
+    handleClose();
+  };
+
+  return (
+    <Paper
+      sx={{
+        height: 300,
+        backgroundColor: 'transparent',
+        border: '2px dashed #d0d0d0',
+        borderRadius: 2,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        '&:hover': {
+          borderColor: '#6B7280',
+          backgroundColor: 'rgba(107, 114, 128, 0.04)',
+        },
+      }}
+      onClick={handleClick}
+    >
+      <Box sx={{ textAlign: 'center', color: '#6B7280' }}>
+        <AddIcon sx={{ fontSize: 60, mb: 1 }} />
+        <Typography variant="h6" sx={{ fontWeight: 500 }}>Add New Graph</Typography>
+        <Typography variant="body2" sx={{ mt: 1 }}>
+          Click to choose from available charts
+        </Typography>
+      </Box>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleClose}
+        PaperProps={{
+          sx: {
+            maxWidth: 300,
+            mt: 1,
+          },
+        }}
+      >
+        {availableGraphs.map((graph) => (
+          <MenuItem
+            key={graph.id}
+            onClick={() => handleGraphSelect(graph.id)}
+            sx={{ py: 2 }}
+          >
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                {graph.title}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {graph.description}
+              </Typography>
+            </Box>
+          </MenuItem>
+        ))}
+      </Menu>
+    </Paper>
+  );
+};
+
 const OverviewContent: React.FC<{ 
   data: FinanceMockData; 
   selectedDataType: string;
   onDataTypeChange: (dataType: string) => void;
-}> = ({ data, selectedDataType, onDataTypeChange }) => {
+  editMode?: boolean;
+  widgets?: Widget[];
+  onWidgetRemove?: (widgetId: string) => void;
+  onWidgetResize?: (widgetId: string) => void;
+  getWidgetById: (id: string) => Widget | undefined;
+  isWidgetVisible: (id: string) => boolean;
+  onGraphSelection?: (graphType: string) => void;
+}> = ({ 
+  data, 
+  selectedDataType, 
+  onDataTypeChange, 
+  editMode = false,
+  widgets = [],
+  onWidgetRemove = () => {},
+  onWidgetResize = () => {},
+  getWidgetById,
+  isWidgetVisible,
+  onGraphSelection = () => {}
+}) => {
   // Get the appropriate data and styling based on selected type
   const getChartData = () => {
     switch (selectedDataType) {
@@ -331,155 +512,219 @@ const OverviewContent: React.FC<{
   return (
   <Box>
     {/* KPI ROW */}
-    <Grid container spacing={3} mb={3}>
-      {data.kpis.map((kpi: KPI) => (
-        <Grid item xs={12} sm={6} md={3} key={kpi.id}>
-          <KPICard
-            title={kpi.label}
-            value={kpi.value}
-            change={kpi.change}
-            icon={iconMap[kpi.id]}
-          />
+    {isWidgetVisible('kpis') && (
+      <EditableWidget 
+        widget={getWidgetById('kpis') || { id: 'kpis', type: 'kpis', title: 'KPIs', visible: true, position: {x:0,y:0}, size: {width: 12, height: 1} }}
+        editMode={editMode}
+        onRemove={onWidgetRemove}
+        onResize={onWidgetResize}
+      >
+        <Grid container spacing={3} mb={3}>
+          {data.kpis.map((kpi: KPI) => (
+            <Grid item xs={12} sm={6} md={3} key={kpi.id}>
+              <KPICard
+                title={kpi.label}
+                value={kpi.value}
+                change={kpi.change}
+                icon={iconMap[kpi.id]}
+              />
+            </Grid>
+          ))}
         </Grid>
-      ))}
-    </Grid>
+      </EditableWidget>
+    )}
 
     {/* PRIMARY CHART */}
-    <Paper sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h6">
-          {chartConfig.title} Over Time
-        </Typography>
-        <Tabs
-          value={selectedDataType}
-          onChange={(_, newValue) => onDataTypeChange(newValue)}
-          textColor="inherit"
-          TabIndicatorProps={{ style: { backgroundColor: chartConfig.color, height: 2 } }}
-          sx={{ minHeight: 'auto' }}
-        >
-          {dataTypes.map((dataType) => (
-            <Tab 
-              key={dataType.value} 
-              label={dataType.label} 
-              value={dataType.value}
-              sx={{ 
-                minHeight: 'auto', 
-                py: 1, 
-                minWidth: 80,
-                fontSize: '0.875rem',
-                textTransform: 'none'
-              }}
-            />
-          ))}
-        </Tabs>
-      </Box>
-      <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id={chartConfig.gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={chartConfig.color} stopOpacity={0.8} />
-              <stop offset="95%" stopColor={chartConfig.color} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <XAxis dataKey="date" stroke="#9CA3AF" />
-          <YAxis stroke="#9CA3AF" />
-          <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #e0e0e0' }} />
-          <Area
-            type="monotone"
-            dataKey="revenue"
-            stroke={chartConfig.color}
-            fillOpacity={1}
-            fill={`url(#${chartConfig.gradientId})`}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </Paper>
+    {isWidgetVisible('primary-chart') && (
+      <EditableWidget 
+        widget={getWidgetById('primary-chart') || { id: 'primary-chart', type: 'chart', title: 'Revenue Over Time', visible: true, position: {x:0,y:1}, size: {width: 12, height: 2} }}
+        editMode={editMode}
+        onRemove={onWidgetRemove}
+        onResize={onWidgetResize}
+      >
+        <Paper sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6">
+              {chartConfig.title} Over Time
+            </Typography>
+            <Tabs
+              value={selectedDataType}
+              onChange={(_, newValue) => onDataTypeChange(newValue)}
+              textColor="inherit"
+              TabIndicatorProps={{ style: { backgroundColor: chartConfig.color, height: 2 } }}
+              sx={{ minHeight: 'auto' }}
+            >
+              {dataTypes.map((dataType) => (
+                <Tab 
+                  key={dataType.value} 
+                  label={dataType.label} 
+                  value={dataType.value}
+                  sx={{ 
+                    minHeight: 'auto', 
+                    py: 1, 
+                    minWidth: 80,
+                    fontSize: '0.875rem',
+                    textTransform: 'none'
+                  }}
+                />
+              ))}
+            </Tabs>
+          </Box>
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id={chartConfig.gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={chartConfig.color} stopOpacity={0.8} />
+                  <stop offset="95%" stopColor={chartConfig.color} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="date" stroke="#9CA3AF" />
+              <YAxis stroke="#9CA3AF" />
+              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #e0e0e0' }} />
+              <Area
+                type="monotone"
+                dataKey="revenue"
+                stroke={chartConfig.color}
+                fillOpacity={1}
+                fill={`url(#${chartConfig.gradientId})`}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </Paper>
+      </EditableWidget>
+    )}
 
     {/* SECONDARY ROW */}
     <Grid container direction="row" spacing={3}>
       {/* Sales by Channel */}
-      <Grid item xs={12} md={6} sx={{ flexGrow: 1 }}>
-        <Paper sx={{ p: 3, bgcolor: 'background.paper', minHeight: 420, width: '100%' }}>
-          <Typography variant="h6" mb={2}>
-            Sales by Channel
-          </Typography>
-          <ResponsiveContainer width="100%" height={380}>
-            <PieChart>
-              <Pie
-                dataKey="revenue"
-                nameKey="channel"
-                data={data.sales_by_channel}
-                innerRadius={100}
-                outerRadius={180}
-                label={({ channel, percent }) => `${channel} ${(percent * 100).toFixed(1)}%`}
-                labelLine={false}
-              >
-                {data.sales_by_channel.map((_, idx) => (
-                  <Cell key={idx} fill={accentColors[idx % accentColors.length]} />
-                ))}
-              </Pie>
-              <Tooltip 
-                contentStyle={{ background: '#ffffff', border: '1px solid #e0e0e0' }}
-                formatter={(value: number, name: string) => [
-                  `$${value.toLocaleString()}`, 
-                  name
-                ]}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </Paper>
-      </Grid>
+      {isWidgetVisible('sales-channel') && (
+        <Grid 
+          item 
+          xs={12} 
+          md={getWidgetById('sales-channel')?.size.width || 6} 
+          sx={{ flexGrow: 1 }}
+        >
+          <EditableWidget 
+            widget={getWidgetById('sales-channel') || { id: 'sales-channel', type: 'pie-chart', title: 'Sales by Channel', visible: true, position: {x:0,y:3}, size: {width: 6, height: 2} }}
+            editMode={editMode}
+            onRemove={onWidgetRemove}
+            onResize={onWidgetResize}
+          >
+            <Paper sx={{ p: 3, bgcolor: 'background.paper', minHeight: 420, width: '100%' }}>
+              <Typography variant="h6" mb={2}>
+                Sales by Channel
+              </Typography>
+              <ResponsiveContainer width="100%" height={380}>
+                <PieChart>
+                  <Pie
+                    dataKey="revenue"
+                    nameKey="channel"
+                    data={data.sales_by_channel}
+                    innerRadius={100}
+                    outerRadius={180}
+                    label={({ channel, percent }) => `${channel} ${(percent * 100).toFixed(1)}%`}
+                    labelLine={false}
+                  >
+                    {data.sales_by_channel.map((_, idx) => (
+                      <Cell key={idx} fill={accentColors[idx % accentColors.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ background: '#ffffff', border: '1px solid #e0e0e0' }}
+                    formatter={(value: number, name: string) => [
+                      `$${value.toLocaleString()}`, 
+                      name
+                    ]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </Paper>
+          </EditableWidget>
+        </Grid>
+      )}
 
       {/* Top Products */}
-      <Grid item xs={12} md={6} sx={{ flexGrow: 1 }}>
-        <Paper sx={{ p: 3, bgcolor: 'background.paper', minHeight: 420, width: '100%' }}>
-          <Typography variant="h6" mb={2}>
-            Top Products
-          </Typography>
-          <ResponsiveContainer width="100%" height={380}>
-            <BarChart
-              data={data.top_products}
-              layout="vertical"
-              margin={{ top: 10, right: 20, left: 60, bottom: 10 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis type="number" stroke="#9CA3AF" />
-              <YAxis
-                type="category"
-                dataKey="product"
-                stroke="#9CA3AF"
-                width={100}
-              />
-              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #e0e0e0' }} />
-              <Bar dataKey="revenue" fill="#3B82F6" barSize={25} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Paper>
-      </Grid>
+      {isWidgetVisible('top-products') && (
+        <Grid 
+          item 
+          xs={12} 
+          md={getWidgetById('top-products')?.size.width || 6} 
+          sx={{ flexGrow: 1 }}
+        >
+          <EditableWidget 
+            widget={getWidgetById('top-products') || { id: 'top-products', type: 'bar-chart', title: 'Top Products', visible: true, position: {x:6,y:3}, size: {width: 6, height: 2} }}
+            editMode={editMode}
+            onRemove={onWidgetRemove}
+            onResize={onWidgetResize}
+          >
+            <Paper sx={{ p: 3, bgcolor: 'background.paper', minHeight: 420, width: '100%' }}>
+              <Typography variant="h6" mb={2}>
+                Top Products
+              </Typography>
+              <ResponsiveContainer width="100%" height={380}>
+                <BarChart
+                  data={data.top_products}
+                  layout="vertical"
+                  margin={{ top: 10, right: 20, left: 60, bottom: 10 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis type="number" stroke="#9CA3AF" />
+                  <YAxis
+                    type="category"
+                    dataKey="product"
+                    stroke="#9CA3AF"
+                    width={100}
+                  />
+                  <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #e0e0e0' }} />
+                  <Bar dataKey="revenue" fill="#3B82F6" barSize={25} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Paper>
+          </EditableWidget>
+        </Grid>
+      )}
     </Grid>
 
     {/* INSIGHTS ROW */}
-    <Grid container spacing={3} mt={3}>
-      <Grid item xs={12}>
-        <Paper
-          sx={{ p: 3, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', maxHeight: 400, overflow: 'auto' }}
-        >
-          <Typography variant="h6" mb={2}>
-            Insights & Anomalies
-          </Typography>
-          {data.anomalies.map((item, idx) => (
-            <Box key={idx} mb={2}>
-              <Typography variant="body2">
-                {item.message}
+    {isWidgetVisible('insights') && (
+      <Grid container spacing={3} mt={3}>
+        <Grid item xs={12}>
+          <EditableWidget 
+            widget={getWidgetById('insights') || { id: 'insights', type: 'insights', title: 'Insights & Anomalies', visible: true, position: {x:0,y:5}, size: {width: 12, height: 1} }}
+            editMode={editMode}
+            onRemove={onWidgetRemove}
+            onResize={onWidgetResize}
+          >
+            <Paper
+              sx={{ p: 3, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', maxHeight: 400, overflow: 'auto' }}
+            >
+              <Typography variant="h6" mb={2}>
+                Insights & Anomalies
               </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {item.timestamp}
-              </Typography>
-            </Box>
-          ))}
-        </Paper>
+              {data.anomalies.map((item, idx) => (
+                <Box key={idx} mb={2}>
+                  <Typography variant="body2">
+                    {item.message}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {item.timestamp}
+                  </Typography>
+                </Box>
+              ))}
+            </Paper>
+          </EditableWidget>
+        </Grid>
       </Grid>
-    </Grid>
+    )}
+
+    {/* Add New Widget */}
+    {isWidgetVisible('add-new') && (
+      <Grid container spacing={3} mt={2}>
+        <Grid item xs={12} md={6}>
+          <AddNewWidget onSelectGraph={onGraphSelection} />
+        </Grid>
+      </Grid>
+    )}
   </Box>
   );
 };
@@ -932,6 +1177,21 @@ const FinanceDashboard: React.FC = () => {
   const [data, setData] = useState<FinanceMockData | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [customizeAnchorEl, setCustomizeAnchorEl] = useState<null | HTMLElement>(null);
+  const [widgets, setWidgets] = useState([
+    { id: 'kpis', type: 'kpis', title: 'Key Performance Indicators', visible: true, position: { x: 0, y: 0 }, size: { width: 12, height: 1 } },
+    { id: 'primary-chart', type: 'chart', title: 'Revenue Over Time', visible: true, position: { x: 0, y: 1 }, size: { width: 12, height: 2 } },
+    { id: 'sales-channel', type: 'pie-chart', title: 'Sales by Channel', visible: true, position: { x: 0, y: 3 }, size: { width: 6, height: 2 } },
+    { id: 'top-products', type: 'bar-chart', title: 'Top Products', visible: true, position: { x: 6, y: 3 }, size: { width: 6, height: 2 } },
+    { id: 'insights', type: 'insights', title: 'Insights & Anomalies', visible: true, position: { x: 0, y: 5 }, size: { width: 12, height: 1 } },
+  ]);
+
+  const getWidgetById = (id: string) => widgets.find(w => w.id === id);
+  const isWidgetVisible = (id: string) => {
+    const widget = getWidgetById(id);
+    return !widget || widget.visible;
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -948,6 +1208,89 @@ const FinanceDashboard: React.FC = () => {
     setSyncModalOpen(true);
   };
 
+  const handleEditToggle = () => {
+    setEditMode(!editMode);
+    setCustomizeAnchorEl(null);
+  };
+
+  const handleCustomizeClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setCustomizeAnchorEl(event.currentTarget);
+  };
+
+  const handleCustomizeClose = () => {
+    setCustomizeAnchorEl(null);
+  };
+
+  const handleAddNewGraph = () => {
+    // Check if add-new widget already exists
+    const addNewExists = widgets.some(w => w.type === 'add-new');
+    if (!addNewExists) {
+      const newWidget = {
+        id: 'add-new',
+        type: 'add-new',
+        title: 'Add New Graph',
+        visible: true,
+        position: { x: 0, y: 10 },
+        size: { width: 6, height: 2 }
+      };
+      setWidgets(prev => [...prev, newWidget]);
+    }
+    setCustomizeAnchorEl(null);
+  };
+
+  const handleGraphSelection = (graphType: string) => {
+    // Remove the add-new widget and add a placeholder for the new graph
+    setWidgets(prev => prev.filter(w => w.type !== 'add-new'));
+    
+    // Add new widget based on selected graph type
+    const newWidget = {
+      id: `${graphType}-${Date.now()}`,
+      type: graphType,
+      title: availableGraphs.find(g => g.id === graphType)?.title || 'New Graph',
+      visible: true,
+      position: { x: 0, y: 10 },
+      size: { width: 6, height: 2 }
+    };
+    
+    setWidgets(prev => [...prev, newWidget]);
+    console.log('Selected graph type:', graphType);
+  };
+
+  const handleWidgetRemove = (widgetId: string) => {
+    setWidgets(prev => prev.map(w => 
+      w.id === widgetId ? { ...w, visible: false } : w
+    ));
+  };
+
+  const handleWidgetResize = (widgetId: string, newSize: { width: number; height: number }) => {
+    setWidgets(prev => prev.map(w => 
+      w.id === widgetId ? { ...w, size: newSize } : w
+    ));
+  };
+
+  const cycleWidgetSize = (widgetId: string) => {
+    const widget = getWidgetById(widgetId);
+    if (!widget) return;
+    
+    // Cycle through sizes: 12 -> 6 -> 4 -> 12
+    let newWidth;
+    switch (widget.size.width) {
+      case 12:
+        newWidth = 6;
+        break;
+      case 6:
+        newWidth = 4;
+        break;
+      case 4:
+        newWidth = 12;
+        break;
+      default:
+        newWidth = 6;
+    }
+    
+    handleWidgetResize(widgetId, { width: newWidth, height: widget.size.height });
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
       <Box sx={{ p: 4, minHeight: '100vh' }}>
@@ -957,16 +1300,85 @@ const FinanceDashboard: React.FC = () => {
             Finance Dashboard
           </Typography>
           <Box display="flex" alignItems="center" gap={2}>
+            {editMode ? (
+              <Button
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={handleEditToggle}
+                sx={{
+                  borderColor: '#6B7280',
+                  color: 'white',
+                  backgroundColor: '#6B7280',
+                  textTransform: 'none',
+                  minHeight: 40,
+                  px: 2,
+                  '&:hover': {
+                    borderColor: '#4B5563',
+                    backgroundColor: '#4B5563',
+                  },
+                }}
+              >
+                Save Dashboard
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outlined"
+                  startIcon={<TuneIcon />}
+                  endIcon={<KeyboardArrowDownIcon />}
+                  onClick={handleCustomizeClick}
+                  sx={{
+                    borderColor: '#6B7280',
+                    color: '#6B7280',
+                    textTransform: 'none',
+                    minHeight: 40,
+                    px: 2,
+                    '&:hover': {
+                      borderColor: '#4B5563',
+                      backgroundColor: 'rgba(107, 114, 128, 0.04)',
+                    },
+                  }}
+                >
+                  Customize
+                </Button>
+                <Menu
+                  anchorEl={customizeAnchorEl}
+                  open={Boolean(customizeAnchorEl)}
+                  onClose={handleCustomizeClose}
+                  MenuListProps={{
+                    'aria-labelledby': 'customize-button',
+                  }}
+                  PaperProps={{
+                    sx: {
+                      mt: 1,
+                      minWidth: 160,
+                    }
+                  }}
+                >
+                  <MenuItem onClick={handleEditToggle}>
+                    <EditIcon sx={{ mr: 1, fontSize: 20 }} />
+                    Edit
+                  </MenuItem>
+                  <MenuItem onClick={handleAddNewGraph}>
+                    <AddIcon sx={{ mr: 1, fontSize: 20 }} />
+                    Add new graph
+                  </MenuItem>
+                </Menu>
+              </>
+            )}
             <Button
               variant="outlined"
               startIcon={<SyncIcon />}
               onClick={handleRefreshClick}
               sx={{
-                borderColor: '#14B8A6',
-                color: '#14B8A6',
+                borderColor: '#6B7280',
+                color: '#6B7280',
+                textTransform: 'none',
+                minHeight: 40,
+                px: 2,
                 '&:hover': {
-                  borderColor: '#0F766E',
-                  backgroundColor: 'rgba(20, 184, 166, 0.04)',
+                  borderColor: '#4B5563',
+                  backgroundColor: 'rgba(107, 114, 128, 0.04)',
                 },
               }}
             >
@@ -1006,7 +1418,18 @@ const FinanceDashboard: React.FC = () => {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
             >
-              {loading || !data ? <SkeletonOverview /> : <OverviewContent data={data} selectedDataType={selectedDataType} onDataTypeChange={setSelectedDataType} />}
+              {loading || !data ? <SkeletonOverview /> :             <OverviewContent
+              data={data}
+              selectedDataType={selectedDataType}
+              onDataTypeChange={setSelectedDataType}
+              editMode={editMode}
+              widgets={widgets}
+              onWidgetRemove={handleWidgetRemove}
+              onWidgetResize={cycleWidgetSize}
+              getWidgetById={getWidgetById}
+              isWidgetVisible={isWidgetVisible}
+              onGraphSelection={handleGraphSelection}
+            />}
             </motion.div>
           )}
 

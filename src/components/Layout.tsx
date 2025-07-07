@@ -27,6 +27,7 @@ import {
   AttachMoneyOutlined as AttachMoneyIcon,
   StorageOutlined as StorageIcon,
   ChatOutlined as ChatIcon,
+  StorefrontOutlined as StorefrontIcon,
 } from '@mui/icons-material';
 // @ts-ignore
 import logo from '../assets/logo.png';
@@ -34,12 +35,10 @@ import logo from '../assets/logo.png';
 const drawerWidth = 240;
 
 const menuItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+  { text: 'Marketplace', icon: <StorefrontIcon />, path: '/finance-dashboard' },
   { text: 'Month-end close', icon: <ChecklistIcon />, path: '/checklist' },
   { text: 'Recent Activities', icon: <EditIcon />, path: '/recent-activities' },
   { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
-  { text: 'Connect Data Sources', icon: <StorageIcon />, path: '/connect-data-sources' },
-  { text: 'Finance Intelligence Dashboard', icon: <AttachMoneyIcon />, path: '/finance-dashboard' },
   { text: 'Assistant', icon: <ChatIcon />, path: '/assistant' },
 ];
 
@@ -118,6 +117,38 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         ))}
       </List>
       <Box sx={{ mb: 2 }}>
+        <ListItem disablePadding>
+          <ListItemButton 
+            onClick={() => navigate('/connect-data-sources')} 
+            selected={location.pathname === '/connect-data-sources'}
+            sx={{ 
+              borderRadius: 0, 
+              mr: 2, 
+              my: 0.25,
+              '&.Mui-selected': {
+                backgroundColor: theme.palette.primary.main + '15',
+                '&:hover': {
+                  backgroundColor: theme.palette.primary.main + '25',
+                },
+              },
+            }}
+          >
+            <ListItemIcon 
+              sx={{ 
+                color: location.pathname === '/connect-data-sources' ? theme.palette.primary.main : 'inherit',
+                minWidth: 36 
+              }}
+            >
+              <StorageIcon />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Data Sources" 
+              sx={{
+                color: location.pathname === '/connect-data-sources' ? theme.palette.primary.main : 'inherit',
+              }}
+            />
+          </ListItemButton>
+        </ListItem>
         <ListItem disablePadding>
           <ListItemButton onClick={handleSettingsClick} sx={{ borderRadius: 0, mr: 2, my: 0.25 }}>
             <ListItemIcon sx={{ minWidth: 36 }}>
