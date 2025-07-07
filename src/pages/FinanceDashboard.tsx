@@ -404,6 +404,7 @@ const AddNewWidget: React.FC<{
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
     setAnchorEl(event.currentTarget);
   };
 
@@ -417,36 +418,45 @@ const AddNewWidget: React.FC<{
   };
 
   return (
-    <Paper
-      sx={{
-        height: 300,
-        backgroundColor: 'transparent',
-        border: '2px dashed #d0d0d0',
-        borderRadius: 2,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        transition: 'all 0.3s ease',
-        '&:hover': {
-          borderColor: '#6B7280',
-          backgroundColor: 'rgba(107, 114, 128, 0.04)',
-        },
-      }}
-      onClick={handleClick}
-    >
-      <Box sx={{ textAlign: 'center', color: '#6B7280' }}>
-        <AddIcon sx={{ fontSize: 60, mb: 1 }} />
-        <Typography variant="h6" sx={{ fontWeight: 500 }}>Add New Graph</Typography>
-        <Typography variant="body2" sx={{ mt: 1 }}>
-          Click to choose from available charts
-        </Typography>
-      </Box>
+    <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+      <Button
+        variant="outlined"
+        startIcon={<AddIcon />}
+        onClick={handleClick}
+        sx={{
+          borderColor: '#d0d0d0',
+          color: '#6B7280',
+          textTransform: 'none',
+          px: 3,
+          py: 1.5,
+          borderRadius: 8,
+          border: '2px dashed #d0d0d0',
+          backgroundColor: 'transparent',
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            borderColor: '#6B7280',
+            backgroundColor: 'rgba(107, 114, 128, 0.04)',
+            color: '#4B5563',
+          },
+        }}
+      >
+        Add New Graph
+      </Button>
 
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleClose}
+        disableAutoFocusItem
+        disableRestoreFocus
+        MenuListProps={{
+          'aria-labelledby': 'add-graph-button',
+        }}
+        slotProps={{
+          backdrop: {
+            onClick: handleClose
+          }
+        }}
         PaperProps={{
           sx: {
             maxWidth: 300,
@@ -454,6 +464,41 @@ const AddNewWidget: React.FC<{
           },
         }}
       >
+        {/* Close button header */}
+        <MenuItem 
+          disableRipple
+          sx={{ 
+            justifyContent: 'space-between', 
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            py: 1,
+            cursor: 'default',
+            '&:hover': {
+              backgroundColor: 'transparent'
+            }
+          }}
+        >
+          <Typography variant="subtitle2" color="text.secondary">
+            Select a chart type
+          </Typography>
+          <IconButton 
+            size="small" 
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              handleClose();
+            }}
+            sx={{ 
+              color: 'text.secondary',
+              '&:hover': {
+                backgroundColor: 'action.hover'
+              }
+            }}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </MenuItem>
+
         {availableGraphs.map((graph) => (
           <MenuItem
             key={graph.id}
@@ -471,7 +516,7 @@ const AddNewWidget: React.FC<{
           </MenuItem>
         ))}
       </Menu>
-    </Paper>
+    </Box>
   );
 };
 
@@ -932,11 +977,7 @@ const OverviewContent: React.FC<{
 
     {/* Add New Widget */}
     {isWidgetVisible('add-new') && (
-      <Grid container spacing={3} mt={2}>
-        <Grid item xs={12} md={6}>
-          <AddNewWidget onSelectGraph={onGraphSelection} />
-        </Grid>
-      </Grid>
+      <AddNewWidget onSelectGraph={onGraphSelection} />
     )}
   </Box>
   );
