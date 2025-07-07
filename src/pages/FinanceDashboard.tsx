@@ -31,6 +31,8 @@ import {
   IconButton,
   Grid,
   Menu,
+  Stack,
+  Alert,
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import DateRangeSelector from '../components/DateRangeSelector';
@@ -75,6 +77,17 @@ import {
   KeyboardArrowDown as KeyboardArrowDownIcon,
   Add as AddIcon,
   Tune as TuneIcon,
+  TrendingUp as TrendingUpIcon,
+  Warning as WarningIcon,
+  Info as InfoIcon,
+  Error as ErrorIcon,
+  AutoAwesome as AutoAwesomeIcon,
+  Assessment as AssessmentIcon,
+  Security as SecurityIcon,
+  Inventory as InventoryIcon,
+  Schedule as ScheduleIcon,
+  AccountBalance as AccountBalanceIcon,
+  People as PeopleIcon,
 } from '@mui/icons-material';
 
 const accentColors = ['#14B8A6', '#3B82F6', '#F59E0B', '#EF4444'];
@@ -473,6 +486,7 @@ const OverviewContent: React.FC<{
   getWidgetById: (id: string) => Widget | undefined;
   isWidgetVisible: (id: string) => boolean;
   onGraphSelection?: (graphType: string) => void;
+  onInsightClick?: (insight: any) => void;
 }> = ({ 
   data, 
   selectedDataType, 
@@ -483,7 +497,8 @@ const OverviewContent: React.FC<{
   onWidgetResize = () => {},
   getWidgetById,
   isWidgetVisible,
-  onGraphSelection = () => {}
+  onGraphSelection = () => {},
+  onInsightClick = () => {}
 }) => {
   // Get the appropriate data and styling based on selected type
   const getChartData = () => {
@@ -685,32 +700,230 @@ const OverviewContent: React.FC<{
       )}
     </Grid>
 
-    {/* INSIGHTS ROW */}
+    {/* INSIGHTS ROW - Enhanced AI Insights Section */}
     {isWidgetVisible('insights') && (
       <Grid container spacing={3} mt={3}>
         <Grid item xs={12}>
           <EditableWidget 
-            widget={getWidgetById('insights') || { id: 'insights', type: 'insights', title: 'Insights & Anomalies', visible: true, position: {x:0,y:5}, size: {width: 12, height: 1} }}
+            widget={getWidgetById('insights') || { id: 'insights', type: 'insights', title: 'AI-Powered Insights & Anomalies', visible: true, position: {x:0,y:5}, size: {width: 12, height: 1} }}
             editMode={editMode}
             onRemove={onWidgetRemove}
             onResize={onWidgetResize}
           >
             <Paper
-              sx={{ p: 3, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', maxHeight: 400, overflow: 'auto' }}
+              sx={{ 
+                p: 4, 
+                bgcolor: 'background.paper', 
+                border: '1px solid', 
+                borderColor: 'divider',
+                borderRadius: 3,
+                background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%)',
+                minHeight: 600
+              }}
             >
-              <Typography variant="h6" mb={2}>
-                Insights & Anomalies
-              </Typography>
-              {data.anomalies.map((item, idx) => (
-                <Box key={idx} mb={2}>
-                  <Typography variant="body2">
-                    {item.message}
+              <Box display="flex" alignItems="center" mb={4}>
+                <AutoAwesomeIcon 
+                  sx={{ 
+                    fontSize: 32, 
+                    mr: 2, 
+                    color: '#14B8A6',
+                    background: 'linear-gradient(45deg, #14B8A6, #3B82F6)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent'
+                  }} 
+                />
+                <Box>
+                  <Typography variant="h5" fontWeight={700} sx={{ color: 'text.primary' }}>
+                    AI-Powered Insights & Anomalies
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {item.timestamp}
+                  <Typography variant="body2" color="text.secondary" mt={0.5}>
+                    Real-time analysis powered by machine learning algorithms
                   </Typography>
                 </Box>
-              ))}
+              </Box>
+
+              <Grid container spacing={3}>
+                {data.anomalies.map((item, idx) => {
+                  // Determine icon and colors based on severity and type
+                  const getSeverityConfig = (severity: string, type: string) => {
+                    switch (severity) {
+                      case 'critical':
+                        return {
+                          icon: <ErrorIcon />,
+                          bgColor: 'rgba(239, 68, 68, 0.1)',
+                          borderColor: '#EF4444',
+                          iconColor: '#EF4444'
+                        };
+                      case 'warning':
+                        return {
+                          icon: <WarningIcon />,
+                          bgColor: 'rgba(245, 158, 11, 0.1)',
+                          borderColor: '#F59E0B',
+                          iconColor: '#F59E0B'
+                        };
+                      case 'positive':
+                        return {
+                          icon: type === 'spike' || type === 'trend' ? <TrendingUpIcon /> : 
+                                type === 'performance' ? <AssessmentIcon /> :
+                                type === 'customer' ? <PeopleIcon /> : <TrendingUpIcon />,
+                          bgColor: 'rgba(34, 197, 94, 0.1)',
+                          borderColor: '#22C55E',
+                          iconColor: '#22C55E'
+                        };
+                      default: // info
+                        return {
+                          icon: type === 'seasonal' ? <ScheduleIcon /> :
+                                type === 'commission' ? <AccountBalanceIcon /> :
+                                type === 'alert' ? <InventoryIcon /> :
+                                type === 'fraud' ? <SecurityIcon /> : <InfoIcon />,
+                          bgColor: 'rgba(59, 130, 246, 0.1)',
+                          borderColor: '#3B82F6',
+                          iconColor: '#3B82F6'
+                        };
+                    }
+                  };
+
+                  const config = getSeverityConfig(item.severity || 'info', item.type || '');
+
+                  return (
+                    <Grid item xs={12} md={6} lg={4} key={idx}>
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.1, duration: 0.4 }}
+                        whileHover={{ scale: 1.02 }}
+                        onClick={() => onInsightClick(item)}
+                      >
+                        <Paper
+                          sx={{
+                            p: 3,
+                            height: '100%',
+                            bgcolor: config.bgColor,
+                            border: `1px solid ${config.borderColor}`,
+                            borderRadius: 2,
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            '&:hover': {
+                              boxShadow: `0 8px 32px rgba(0,0,0,0.12)`,
+                              borderColor: config.iconColor,
+                              transform: 'translateY(-2px)'
+                            }
+                          }}
+                        >
+                          <Box display="flex" alignItems="flex-start" gap={2}>
+                            <Box
+                              sx={{
+                                p: 1.5,
+                                borderRadius: '50%',
+                                bgcolor: 'white',
+                                border: `2px solid ${config.borderColor}`,
+                                color: config.iconColor,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                minWidth: 48,
+                                minHeight: 48
+                              }}
+                            >
+                              {config.icon}
+                            </Box>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                                <Chip
+                                  label={item.severity?.toUpperCase() || 'INFO'}
+                                  size="small"
+                                  sx={{
+                                    bgcolor: config.borderColor,
+                                    color: 'white',
+                                    fontWeight: 600,
+                                    fontSize: '0.75rem'
+                                  }}
+                                />
+                                <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                                  {item.timestamp}
+                                </Typography>
+                              </Box>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  fontWeight: 500, 
+                                  lineHeight: 1.5,
+                                  color: 'text.primary'
+                                }}
+                              >
+                                {item.message}
+                              </Typography>
+                              {item.type && (
+                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textTransform: 'capitalize' }}>
+                                  {item.type.replace(/([A-Z])/g, ' $1').trim()} Detection
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                        </Paper>
+                      </motion.div>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+
+              {/* Summary Stats */}
+              <Box 
+                sx={{ 
+                  mt: 4, 
+                  p: 3, 
+                  bgcolor: 'rgba(255, 255, 255, 0.8)', 
+                  borderRadius: 2,
+                  border: '1px solid rgba(0,0,0,0.1)' 
+                }}
+              >
+                <Typography variant="h6" mb={2} sx={{ color: 'text.primary' }}>
+                  Insights Summary
+                </Typography>
+                <Grid container spacing={3}>
+                  <Grid item xs={6} sm={3}>
+                    <Box textAlign="center">
+                      <Typography variant="h4" fontWeight={700} color="success.main">
+                        {data.anomalies.filter(a => a.severity === 'positive').length}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Positive Trends
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Box textAlign="center">
+                      <Typography variant="h4" fontWeight={700} color="warning.main">
+                        {data.anomalies.filter(a => a.severity === 'warning').length}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Warnings
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Box textAlign="center">
+                      <Typography variant="h4" fontWeight={700} color="error.main">
+                        {data.anomalies.filter(a => a.severity === 'critical').length}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Critical Issues
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Box textAlign="center">
+                      <Typography variant="h4" fontWeight={700} color="primary.main">
+                        {data.anomalies.length}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Total Insights
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Box>
             </Paper>
           </EditableWidget>
         </Grid>
@@ -1168,6 +1381,227 @@ const SyncModal: React.FC<{
   );
 };
 
+/* ---------------------- Detailed Insight Modal Component ----------------------- */
+const DetailedInsightModal: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  insight: any;
+}> = ({ open, onClose, insight }) => {
+  if (!insight?.supportingData) return null;
+
+  const { supportingData } = insight;
+  const getSeverityConfig = (severity: string) => {
+    switch (severity) {
+      case 'critical':
+        return { color: '#EF4444', bgColor: 'rgba(239, 68, 68, 0.1)' };
+      case 'warning':
+        return { color: '#F59E0B', bgColor: 'rgba(245, 158, 11, 0.1)' };
+      case 'positive':
+        return { color: '#22C55E', bgColor: 'rgba(34, 197, 94, 0.1)' };
+      default:
+        return { color: '#3B82F6', bgColor: 'rgba(59, 130, 246, 0.1)' };
+    }
+  };
+
+  const config = getSeverityConfig(insight.severity);
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="lg"
+      fullWidth
+      PaperProps={{
+        sx: { minHeight: '70vh' }
+      }}
+    >
+      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+        <Box>
+          <Typography variant="h5" fontWeight={600} gutterBottom>
+            AI Insight Analysis
+          </Typography>
+          <Chip
+            label={insight.severity?.toUpperCase() || 'INFO'}
+            size="small"
+            sx={{
+              bgcolor: config.color,
+              color: 'white',
+              fontWeight: 600,
+              fontSize: '0.75rem'
+            }}
+          />
+        </Box>
+        <IconButton onClick={onClose} size="small">
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent>
+        {/* Alert Message */}
+        <Alert 
+          severity={insight.severity === 'positive' ? 'success' : 
+                   insight.severity === 'critical' ? 'error' : 
+                   insight.severity === 'warning' ? 'warning' : 'info'}
+          sx={{ mb: 3, bgcolor: config.bgColor, border: `1px solid ${config.color}` }}
+        >
+          <Typography variant="body1" fontWeight={500}>
+            {insight.message}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Detected {insight.timestamp} • Type: {insight.type?.replace(/([A-Z])/g, ' $1').trim() || 'General'}
+          </Typography>
+        </Alert>
+
+        <Grid container spacing={4}>
+          {/* Key Metrics */}
+          <Grid item xs={12} md={4}>
+            <Paper sx={{ p: 3, bgcolor: config.bgColor, border: `1px solid ${config.color}20` }}>
+              <Typography variant="h6" mb={2} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AssessmentIcon sx={{ color: config.color }} />
+                Key Metrics
+              </Typography>
+              
+              <Stack spacing={2}>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">Current Value</Typography>
+                  <Typography variant="h4" fontWeight={700} color={config.color}>
+                    ${supportingData.currentValue.toLocaleString()}
+                  </Typography>
+                </Box>
+                
+                <Box>
+                  <Typography variant="body2" color="text.secondary">Previous Value</Typography>
+                  <Typography variant="h6">
+                    ${supportingData.previousValue.toLocaleString()}
+                  </Typography>
+                </Box>
+                
+                <Box>
+                  <Typography variant="body2" color="text.secondary">Change</Typography>
+                  <Typography 
+                    variant="h5" 
+                    fontWeight={600}
+                    color={supportingData.percentageChange > 0 ? 'success.main' : 'error.main'}
+                  >
+                    {supportingData.percentageChange > 0 ? '+' : ''}{supportingData.percentageChange}%
+                  </Typography>
+                </Box>
+              </Stack>
+            </Paper>
+          </Grid>
+
+          {/* Trend Chart */}
+          <Grid item xs={12} md={8}>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h6" mb={2} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ShowChartIcon sx={{ color: config.color }} />
+                Trend Analysis (Last {Math.min(supportingData.timeSeriesData.length, 14)} Days)
+              </Typography>
+              
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={supportingData.timeSeriesData}>
+                  <defs>
+                    <linearGradient id="insightGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={config.color} stopOpacity={0.8} />
+                      <stop offset="95%" stopColor={config.color} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" stroke="#9CA3AF" />
+                  <YAxis stroke="#9CA3AF" />
+                  <Tooltip 
+                    contentStyle={{ background: '#ffffff', border: '1px solid #e0e0e0' }}
+                    formatter={(value: number, name: string) => [
+                      `$${value.toLocaleString()}`, 
+                      name === 'value' ? 'Actual' : 'Baseline'
+                    ]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="baseline"
+                    stroke="#9CA3AF"
+                    strokeDasharray="5 5"
+                    fill="transparent"
+                    strokeWidth={2}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke={config.color}
+                    fillOpacity={1}
+                    fill="url(#insightGradient)"
+                    strokeWidth={3}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Paper>
+          </Grid>
+
+          {/* Additional Metrics */}
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h6" mb={2} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <InfoIcon sx={{ color: config.color }} />
+                Additional Metrics
+              </Typography>
+              
+              <Grid container spacing={2}>
+                {supportingData.additionalMetrics?.map((metric: any, idx: number) => (
+                  <Grid item xs={6} key={idx}>
+                    <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {metric.label}
+                      </Typography>
+                      <Typography variant="h6" fontWeight={600}>
+                        {metric.value}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            </Paper>
+          </Grid>
+
+          {/* AI Recommendation */}
+          <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 3, bgcolor: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+              <Typography variant="h6" mb={2} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AutoAwesomeIcon sx={{ color: '#3B82F6' }} />
+                AI Recommendation
+              </Typography>
+              
+              <Typography variant="body1" sx={{ lineHeight: 1.6, color: 'text.primary' }}>
+                {supportingData.recommendation}
+              </Typography>
+              
+              <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+                <Button 
+                  variant="contained" 
+                  size="small"
+                  sx={{ bgcolor: '#3B82F6', '&:hover': { bgcolor: '#2563EB' } }}
+                >
+                  Take Action
+                </Button>
+                <Button variant="outlined" size="small">
+                  Schedule Review
+                </Button>
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
+      </DialogContent>
+
+      <DialogActions sx={{ p: 3, pt: 1 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+          Analysis powered by AI • Confidence: 94% • Last updated: {insight.timestamp}
+        </Typography>
+        <Button onClick={onClose} variant="contained" color="primary">
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 /* ------------------------ Main Page Component ----------------------- */
 const FinanceDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -1179,6 +1613,8 @@ const FinanceDashboard: React.FC = () => {
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [customizeAnchorEl, setCustomizeAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedInsight, setSelectedInsight] = useState<any>(null);
+  const [insightModalOpen, setInsightModalOpen] = useState(false);
   const [widgets, setWidgets] = useState([
     { id: 'kpis', type: 'kpis', title: 'Key Performance Indicators', visible: true, position: { x: 0, y: 0 }, size: { width: 12, height: 1 } },
     { id: 'primary-chart', type: 'chart', title: 'Revenue Over Time', visible: true, position: { x: 0, y: 1 }, size: { width: 12, height: 2 } },
@@ -1254,6 +1690,16 @@ const FinanceDashboard: React.FC = () => {
     
     setWidgets(prev => [...prev, newWidget]);
     console.log('Selected graph type:', graphType);
+  };
+
+  const handleInsightClick = (insight: any) => {
+    setSelectedInsight(insight);
+    setInsightModalOpen(true);
+  };
+
+  const handleInsightModalClose = () => {
+    setInsightModalOpen(false);
+    setSelectedInsight(null);
   };
 
   const handleWidgetRemove = (widgetId: string) => {
@@ -1429,6 +1875,7 @@ const FinanceDashboard: React.FC = () => {
               getWidgetById={getWidgetById}
               isWidgetVisible={isWidgetVisible}
               onGraphSelection={handleGraphSelection}
+              onInsightClick={handleInsightClick}
             />}
             </motion.div>
           )}
@@ -1463,6 +1910,13 @@ const FinanceDashboard: React.FC = () => {
           open={syncModalOpen}
           onClose={() => setSyncModalOpen(false)}
           selectedPlatforms={selectedPlatforms}
+        />
+
+        {/* Detailed Insight Modal */}
+        <DetailedInsightModal
+          open={insightModalOpen}
+          onClose={handleInsightModalClose}
+          insight={selectedInsight}
         />
       </Box>
     </motion.div>

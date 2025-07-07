@@ -23,6 +23,16 @@ export interface TopProduct {
 export interface Anomaly {
   message: string;
   timestamp: string;
+  type?: string;
+  severity?: 'positive' | 'warning' | 'info' | 'critical';
+  supportingData?: {
+    currentValue: number;
+    previousValue: number;
+    percentageChange: number;
+    timeSeriesData: { date: string; value: number; baseline?: number }[];
+    additionalMetrics?: { label: string; value: string | number }[];
+    recommendation?: string;
+  };
 }
 
 export interface SalesRow {
@@ -254,28 +264,217 @@ export const generateMockData = (dateRange: string, selectedPlatforms: Platform[
   // Prepare selected channels for reuse
   const selectedChannels = selectedPlatforms.map(p => p.charAt(0).toUpperCase() + p.slice(1));
 
-  // Generate anomalies based on time range and selected platforms
+  // Generate comprehensive insights and anomalies
   const anomalies: Anomaly[] = [];
-  const numAnomalies = Math.max(1, Math.floor(days / 10)); // More anomalies for longer periods
+  const numAnomalies = Math.max(5, Math.floor(days / 3) + 3); // Ensure at least 5 insights
+  
+  const products = ['Product A', 'Product B', 'Product C', 'Product D', 'Product E'];
+  const channels = selectedChannels;
+  
+  const insightTypes = [
+    {
+      type: 'spike',
+      message: (product: string) => `Sales spike detected: ${product} revenue increased by ${25 + Math.floor(Math.random() * 50)}% compared to last period`,
+      severity: 'positive'
+    },
+    {
+      type: 'trend',
+      message: (channel: string) => `Growing trend: ${channel} channel showing consistent ${5 + Math.floor(Math.random() * 15)}% week-over-week growth`,
+      severity: 'positive'
+    },
+    {
+      type: 'anomaly',
+      message: (product: string) => `Anomaly detected: ${product} return rate increased to ${2 + Math.random() * 3}% (${Math.random() > 0.5 ? 'above' : 'below'} normal range)`,
+      severity: 'warning'
+    },
+    {
+      type: 'optimization',
+      message: (channel: string) => `Opportunity: ${channel} conversion rate is ${15 + Math.floor(Math.random() * 25)}% higher on weekends`,
+      severity: 'info'
+    },
+    {
+      type: 'alert',
+      message: (product: string) => `Inventory alert: ${product} stock levels dropping, projected stockout in ${3 + Math.floor(Math.random() * 10)} days`,
+      severity: 'critical'
+    },
+    {
+      type: 'performance',
+      message: (channel: string) => `Performance insight: ${channel} average order value increased by $${5 + Math.floor(Math.random() * 15)} this period`,
+      severity: 'positive'
+    },
+         {
+       type: 'seasonal',
+       message: () => `Seasonal pattern: ${Math.random() > 0.5 ? 'Weekend' : 'Weekday'} sales are ${10 + Math.floor(Math.random() * 20)}% higher than historical average`,
+       severity: 'info' as const
+     },
+     {
+       type: 'commission',
+       message: (channel: string) => `Cost optimization: ${channel} marketplace fees have ${Math.random() > 0.5 ? 'decreased' : 'increased'} by ${1 + Math.random() * 3}% this month`,
+       severity: 'positive' as const
+     },
+     {
+       type: 'customer',
+       message: () => `Customer insight: Repeat customer rate is ${35 + Math.floor(Math.random() * 25)}%, showing strong loyalty`,
+       severity: 'positive' as const
+     },
+     {
+       type: 'fraud',
+       message: () => `Security alert: ${Math.floor(Math.random() * 5) + 1} potentially fraudulent transactions detected and flagged`,
+       severity: 'critical' as const
+     }
+  ];
   
   for (let i = 0; i < numAnomalies; i++) {
-    const products = ['Product A', 'Product B', 'Product C', 'Product D', 'Product E'];
-    const channels = selectedChannels;
-    const types = [
-      `Spike in sales detected for ${products[i % products.length]}`,
-      `Return rate increased for ${products[i % products.length]}`,
-      `Low revenue on ${channels[i % channels.length]} channel`,
-      `High conversion rate on ${channels[i % channels.length]}`,
-      `Inventory alert for ${products[i % products.length]}`,
-    ];
+    const insightType = insightTypes[i % insightTypes.length];
+    let message = '';
+    
+         if (insightType.type === 'spike' || insightType.type === 'anomaly' || insightType.type === 'performance' || insightType.type === 'alert') {
+       message = (insightType.message as (product: string) => string)(products[i % products.length]);
+     } else if (insightType.type === 'trend' || insightType.type === 'optimization' || insightType.type === 'commission') {
+       message = (insightType.message as (channel: string) => string)(channels[i % channels.length]);
+     } else {
+       message = (insightType.message as () => string)();
+     }
     
     const hoursAgo = Math.floor(Math.random() * (days * 24));
-    const timestamp = hoursAgo < 24 ? `${hoursAgo}h ago` : `${Math.floor(hoursAgo / 24)}d ago`;
+    const timestamp = hoursAgo < 1 ? 'Just now' : 
+                     hoursAgo < 24 ? `${hoursAgo}h ago` : 
+                     `${Math.floor(hoursAgo / 24)}d ago`;
     
-    anomalies.push({
-      message: types[i % types.length],
-      timestamp,
-    });
+     // Generate supporting evidence data for this insight
+     const generateSupportingData = (insightType: any, currentProduct?: string, currentChannel?: string) => {
+       const baseValue = Math.floor(Math.random() * 50000) + 10000;
+       const changePercent = 25 + Math.floor(Math.random() * 50); // 25-75% change
+       const previousValue = Math.floor(baseValue / (1 + changePercent / 100));
+       
+       // Generate time series data showing the trend
+       const timeSeriesData: { date: string; value: number; baseline?: number }[] = [];
+       const daysBack = Math.min(days, 14); // Show up to 14 days of supporting data
+       
+       for (let j = daysBack; j >= 0; j--) {
+         const date = new Date();
+         date.setDate(date.getDate() - j);
+         const dateStr = date.toISOString().slice(0, 10);
+         
+         let value, baseline;
+         if (insightType.severity === 'positive') {
+           // Show upward trend
+           baseline = previousValue;
+           value = j === 0 ? baseValue : 
+                   j < 3 ? previousValue + (baseValue - previousValue) * (1 - j / 3) :
+                   previousValue + Math.random() * (previousValue * 0.1);
+         } else if (insightType.severity === 'warning' || insightType.severity === 'critical') {
+           // Show concerning trend
+           baseline = baseValue;
+           value = j === 0 ? previousValue :
+                   j < 3 ? baseValue - (baseValue - previousValue) * (1 - j / 3) :
+                   baseValue + Math.random() * (baseValue * 0.1);
+         } else {
+           // Neutral trend with some variation
+           baseline = (baseValue + previousValue) / 2;
+           value = baseline + (Math.random() - 0.5) * baseline * 0.2;
+         }
+         
+         timeSeriesData.push({
+           date: dateStr,
+           value: Math.floor(value),
+           baseline: Math.floor(baseline)
+         });
+       }
+       
+       // Generate additional metrics based on insight type
+       const additionalMetrics: { label: string; value: string | number }[] = [];
+       switch (insightType.type) {
+         case 'spike':
+           additionalMetrics.push(
+             { label: 'Peak Revenue', value: `$${baseValue.toLocaleString()}` },
+             { label: 'Previous Period', value: `$${previousValue.toLocaleString()}` },
+             { label: 'Days in Trend', value: '3 days' },
+             { label: 'Conversion Rate', value: `${(3.2 + Math.random() * 2).toFixed(1)}%` }
+           );
+           break;
+         case 'trend':
+           additionalMetrics.push(
+             { label: 'Growth Rate', value: `${changePercent}%` },
+             { label: 'Trend Duration', value: `${Math.floor(Math.random() * 7) + 7} days` },
+             { label: 'Market Share', value: `${(15 + Math.random() * 10).toFixed(1)}%` }
+           );
+           break;
+         case 'anomaly':
+           additionalMetrics.push(
+             { label: 'Return Rate', value: `${(2 + Math.random() * 3).toFixed(1)}%` },
+             { label: 'Normal Range', value: '1.2% - 2.8%' },
+             { label: 'Total Returns', value: Math.floor(Math.random() * 50) + 20 },
+             { label: 'Avg Return Value', value: `$${Math.floor(Math.random() * 100) + 50}` }
+           );
+           break;
+         case 'alert':
+           additionalMetrics.push(
+             { label: 'Current Stock', value: Math.floor(Math.random() * 100) + 50 },
+             { label: 'Daily Sales Rate', value: `${Math.floor(Math.random() * 20) + 10} units/day` },
+             { label: 'Reorder Point', value: Math.floor(Math.random() * 50) + 25 },
+             { label: 'Lead Time', value: `${Math.floor(Math.random() * 5) + 3} days` }
+           );
+           break;
+         case 'performance':
+           additionalMetrics.push(
+             { label: 'AOV Increase', value: `$${Math.floor(Math.random() * 15) + 5}` },
+             { label: 'Units per Order', value: (1.5 + Math.random()).toFixed(1) },
+             { label: 'Customer Segments', value: 'Premium buyers' }
+           );
+           break;
+         case 'fraud':
+           additionalMetrics.push(
+             { label: 'Risk Score', value: `${(7.5 + Math.random() * 2).toFixed(1)}/10` },
+             { label: 'Flagged Amount', value: `$${Math.floor(Math.random() * 5000) + 1000}` },
+             { label: 'False Positive Rate', value: '12%' }
+           );
+           break;
+         default:
+           additionalMetrics.push(
+             { label: 'Confidence Level', value: '94%' },
+             { label: 'Data Points', value: Math.floor(Math.random() * 1000) + 500 }
+           );
+       }
+       
+       // Generate recommendations
+       let recommendation = '';
+       switch (insightType.severity) {
+         case 'positive':
+           recommendation = 'Consider increasing marketing spend on this high-performing product/channel to maximize growth opportunity.';
+           break;
+         case 'warning':
+           recommendation = 'Monitor closely and investigate underlying causes. Consider adjusting pricing or inventory strategies.';
+           break;
+         case 'critical':
+           recommendation = 'Immediate attention required. Review processes and implement corrective measures within 24 hours.';
+           break;
+         default:
+           recommendation = 'Continue monitoring trends and optimize based on seasonal patterns and customer behavior.';
+       }
+       
+       return {
+         currentValue: baseValue,
+         previousValue,
+         percentageChange: Math.round(changePercent),
+         timeSeriesData,
+         additionalMetrics,
+         recommendation
+       };
+     };
+
+     anomalies.push({
+       message,
+       timestamp,
+       type: insightType.type,
+       severity: insightType.severity as 'positive' | 'warning' | 'info' | 'critical',
+       supportingData: generateSupportingData(insightType, 
+         (insightType.type === 'spike' || insightType.type === 'anomaly' || insightType.type === 'performance' || insightType.type === 'alert') 
+           ? products[i % products.length] : undefined,
+         (insightType.type === 'trend' || insightType.type === 'optimization' || insightType.type === 'commission') 
+           ? channels[i % channels.length] : undefined
+       ),
+     });
   }
 
   // Generate sales table data for selected platforms only
