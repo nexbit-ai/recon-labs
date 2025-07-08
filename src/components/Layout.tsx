@@ -39,7 +39,7 @@ const menuItems = [
   { text: 'Month-end close', icon: <ChecklistIcon />, path: '/checklist' },
   { text: 'Recent Activities', icon: <EditIcon />, path: '/recent-activities' },
   { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
-  { text: 'Assistant', icon: <ChatIcon />, path: '/assistant' },
+  { text: 'Assistant (beta)', icon: <ChatIcon />, path: '/assistant' },
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {

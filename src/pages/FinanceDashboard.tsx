@@ -1185,7 +1185,7 @@ const SyncModal: React.FC<{
 }> = ({ open, onClose, selectedPlatforms }) => {
   const [syncStatuses, setSyncStatuses] = useState<PlatformSyncStatus[]>([]);
   const [allOrders, setAllOrders] = useState<OrderData[]>([]);
-  const [currentStep, setCurrentStep] = useState<'syncing' | 'completed'>('syncing');
+  const [currentStep, setCurrentStep] = useState<'syncing' | 'matching' | 'completed'>('syncing');
 
   useEffect(() => {
     if (open) {
@@ -1237,10 +1237,15 @@ const SyncModal: React.FC<{
           setAllOrders(prev => [...prev, ...newOrders]);
         }
 
-        // All platforms synced, move to completed step
+        // All platforms synced, move to matching step
+        setTimeout(() => {
+          setCurrentStep('matching');
+        }, 500);
+
+        // After matching, move to completed step
         setTimeout(() => {
           setCurrentStep('completed');
-        }, 500);
+        }, 3500); // Show matching for 3 seconds
       };
 
       syncPlatforms();
@@ -1355,6 +1360,42 @@ const SyncModal: React.FC<{
           </Box>
         )}
 
+        {currentStep === 'matching' && (
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              minHeight: 300,
+              py: 4 
+            }}
+          >
+            <CircularProgress 
+              size={60} 
+              sx={{ mb: 3, color: 'primary.main' }} 
+              thickness={4}
+            />
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                mb: 2, 
+                fontWeight: 500,
+                color: 'text.primary' 
+              }}
+            >
+              Matching revenue and sales data
+            </Typography>
+            <Typography 
+              variant="body2" 
+              color="text.secondary"
+              sx={{ textAlign: 'center', maxWidth: 400 }}
+            >
+              Cross-referencing data across platforms to ensure accuracy and completeness...
+            </Typography>
+          </Box>
+        )}
+
         {currentStep === 'completed' && (
           <Box>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -1406,7 +1447,7 @@ const SyncModal: React.FC<{
 
       <DialogActions>
         <Button onClick={onClose} variant="contained" color="primary">
-          {currentStep === 'syncing' ? 'Cancel' : 'Close'}
+          {currentStep === 'syncing' || currentStep === 'matching' ? 'Cancel' : 'Close'}
         </Button>
         {currentStep === 'completed' && (
           <Button variant="outlined" onClick={() => {
