@@ -114,7 +114,7 @@ const platforms: { value: Platform; label: string }[] = [
 
 const dataTypes = [
   { value: 'sales', label: 'Sales Revenue', color: '#14B8A6' },
-  { value: 'commissions', label: 'Marketplace Commissions', color: '#3B82F6' },
+  { value: 'commissions', label: 'PG Commissions', color: '#3B82F6' },
   { value: 'shipping', label: 'Shipping Fees', color: '#F59E0B' },
 ];
 
@@ -124,6 +124,7 @@ const dataSources = [
   { id: 'flipkart', name: 'Flipkart', logo: 'https://cdn.worldvectorlogo.com/logos/flipkart-1.svg' },
   { id: 'myntra', name: 'Myntra', logo: 'https://cdn.worldvectorlogo.com/logos/myntra-1.svg' },
   { id: 'nykaa', name: 'Nykaa', logo: 'https://cdn.worldvectorlogo.com/logos/nykaa-1.svg' },
+  { id: 'razorpay', name: 'Razorpay', logo: 'https://cdn.worldvectorlogo.com/logos/razorpay.svg' },
   { id: 'offline', name: 'Offline Stores', logo: '', icon: <StorefrontIcon fontSize="large" /> },
   { id: 'tally', name: 'Tally', logo: 'https://cdn.worldvectorlogo.com/logos/tally.svg' },
   { id: 'xero', name: 'Xero', logo: 'https://cdn.worldvectorlogo.com/logos/xero-1.svg' },
