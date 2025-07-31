@@ -14,6 +14,7 @@ import Pricing from './pages/Pricing';
 import FinanceDashboard from './pages/FinanceDashboard';
 import ConnectDataSources from './pages/ConnectDataSources';
 import Assistant from './pages/Assistant';
+import MarketplaceReconciliation from './pages/MarketplaceReconciliation';
 
 const theme = createTheme({
   palette: {
@@ -208,6 +209,7 @@ function App() {
             <Route path="/checklist" element={<Checklist />} />
             <Route path="/recent-activities" element={<RecentActivities />} />
             <Route path="/reconciliation" element={<Reconciliation />} />
+            <Route path="/marketplace-reconciliation" element={<MarketplaceReconciliation />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/finance-dashboard" element={<FinanceDashboard />} />
             <Route path="/connect-data-sources" element={<ConnectDataSources />} />

@@ -28,6 +28,7 @@ import {
   StorageOutlined as StorageIcon,
   ChatOutlined as ChatIcon,
   StorefrontOutlined as StorefrontIcon,
+  ReceiptOutlined as ReceiptIcon,
 } from '@mui/icons-material';
 // @ts-ignore
 import logo from '../assets/logo.png';
@@ -37,6 +38,7 @@ const drawerWidth = 240;
 const menuItems = [
   { text: 'Marketplace', icon: <StorefrontIcon />, path: '/finance-dashboard' },
   { text: 'Reconciliation', icon: <CompareArrowsIcon />, path: '/reconciliation' },
+  { text: 'Marketplace Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation' },
   { text: 'Month-end close', icon: <ChecklistIcon />, path: '/checklist' },
   { text: 'Recent Activities', icon: <EditIcon />, path: '/recent-activities' },
   { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
