@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { apiUtils } from './services/api';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Checklist from './pages/Checklist';
@@ -199,6 +200,11 @@ const theme = createTheme({
 });
 
 function App() {
+  // Initialize API credentials on app startup
+  useEffect(() => {
+    apiUtils.initializeApiCredentials();
+  }, []);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />

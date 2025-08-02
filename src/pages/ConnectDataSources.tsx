@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Typography, Card, CardActionArea, Button, Alert, TextField } from '@mui/material';
 import { Storefront as StorefrontIcon, CloudUpload as CloudUploadIcon } from '@mui/icons-material';
+import { reconciliationAPI } from '../services/api';
 
 interface DataSource {
   id: string;
@@ -82,27 +83,17 @@ const ConnectDataSources: React.FC = () => {
     }
   };
 
-  const getUploadUrl = async (file: File): Promise<UploadResponse | null> => {
+  const getUploadUrl = async (file: File, reportType: 'Sales' | 'SettleMent'): Promise<UploadResponse | null> => {
     try {
-      const response = await fetch('http://43.204.236.42:8080/v1/recon/upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          file_name: file.name,
-          file_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          file_size: file.size,
-          description: '',
-        }),
+      const response = await reconciliationAPI.uploadFile({
+        file_name: file.name,
+        file_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        file_size: file.size,
+        description: '',
+        report_type: reportType,
       });
 
-      if (!response.ok) {
-        throw new Error(`API call failed: ${response.status} ${response.statusText}`);
-      }
-
-      const data: UploadResponse = await response.json();
-      return data;
+      return response.data;
     } catch (error) {
       console.error('API call error:', error);
       return null;
@@ -122,7 +113,7 @@ const ConnectDataSources: React.FC = () => {
     try {
       // Upload settlement report
       setUploadMessage('Getting upload URL for settlement report...');
-      const settlementUploadData = await getUploadUrl(settlementReport);
+      const settlementUploadData = await getUploadUrl(settlementReport, 'SettleMent');
       
       if (!settlementUploadData) {
         throw new Error('Failed to get upload URL for settlement report');
@@ -137,7 +128,7 @@ const ConnectDataSources: React.FC = () => {
 
       // Upload sales report
       setUploadMessage('Getting upload URL for sales report...');
-      const salesUploadData = await getUploadUrl(salesReport);
+      const salesUploadData = await getUploadUrl(salesReport, 'Sales');
       
       if (!salesUploadData) {
         throw new Error('Failed to get upload URL for sales report');
@@ -151,7 +142,7 @@ const ConnectDataSources: React.FC = () => {
       }
 
       setUploadStatus('success');
-      setUploadMessage('Both files uploaded successfully! Processing will start automatically after 10 seconds.');
+      setUploadMessage('Files uploaded successfully!');
       
       console.log('Upload completed successfully');
       console.log('Settlement report processing ID:', settlementUploadData.processing_id);

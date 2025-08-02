@@ -29,6 +29,7 @@ import {
   Alert,
   Badge,
   LinearProgress,
+  CircularProgress,
 } from '@mui/material';
 import {
   StorefrontOutlined as StorefrontIcon,
@@ -54,6 +55,9 @@ import {
   Assessment as AssessmentIcon,
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
+import DateRangeSelector from '../components/DateRangeSelector';
+import { apiService } from '../services/api/apiService';
+import { ReconciliationAnalyticsResponse } from '../services/api/types';
 
 // Mock data based on API response structure
 const reconciliationData = {
@@ -110,6 +114,12 @@ const reconciliationData = {
 
 const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
+  const [selectedDateRange, setSelectedDateRange] = useState('Last 7 days');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [analyticsData, setAnalyticsData] = useState<ReconciliationAnalyticsResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const formatCurrency = (amount: number) => {
     return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
@@ -119,9 +129,124 @@ const MarketplaceReconciliation: React.FC = () => {
     return `${value.toFixed(1)}%`;
   };
 
-  // Calculate match percentage
-  const matchPercentage = (reconciliationData.matchedOrders / reconciliationData.totalOrders) * 100;
-  const mismatchPercentage = (reconciliationData.mismatchedOrders / reconciliationData.totalOrders) * 100;
+  // Get date range from selected option
+  const getDateRangeFromOption = (option: string): { startDate: string; endDate: string } => {
+    const today = new Date();
+    const startDate = new Date();
+    const endDate = new Date();
+
+    switch (option) {
+      case 'Today':
+        return {
+          startDate: today.toISOString().split('T')[0],
+          endDate: today.toISOString().split('T')[0]
+        };
+      case 'Yesterday':
+        startDate.setDate(today.getDate() - 1);
+        return {
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: startDate.toISOString().split('T')[0]
+        };
+      case 'Last 7 days':
+        startDate.setDate(today.getDate() - 7);
+        return {
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: today.toISOString().split('T')[0]
+        };
+      case 'Last 30 days':
+        startDate.setDate(today.getDate() - 30);
+        return {
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: today.toISOString().split('T')[0]
+        };
+      case 'This month':
+        startDate.setDate(1);
+        return {
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: today.toISOString().split('T')[0]
+        };
+      case 'Last month':
+        startDate.setMonth(today.getMonth() - 1);
+        startDate.setDate(1);
+        endDate.setDate(0); // Last day of previous month
+        return {
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0]
+        };
+      case 'Last 90 days':
+        startDate.setDate(today.getDate() - 90);
+        return {
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: today.toISOString().split('T')[0]
+        };
+      case 'Year to date':
+        startDate.setMonth(0, 1);
+        return {
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: today.toISOString().split('T')[0]
+        };
+      case 'Custom Range':
+        return {
+          startDate: customStartDate,
+          endDate: customEndDate
+        };
+      default:
+        return {
+          startDate: today.toISOString().split('T')[0],
+          endDate: today.toISOString().split('T')[0]
+        };
+    }
+  };
+
+  // Fetch analytics data
+  const fetchAnalyticsData = async (startDate: string, endDate: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await apiService.get<ReconciliationAnalyticsResponse>(
+        '/recon/analytics',
+        { start_date: startDate, end_date: endDate }
+      );
+      
+      if (response.success) {
+        setAnalyticsData(response.data);
+      } else {
+        setError('Failed to fetch analytics data');
+      }
+    } catch (err) {
+      console.error('Error fetching analytics data:', err);
+      setError('Error fetching analytics data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle date range change
+  const handleDateRangeChange = (newRange: string) => {
+    setSelectedDateRange(newRange);
+    const { startDate, endDate } = getDateRangeFromOption(newRange);
+    fetchAnalyticsData(startDate, endDate);
+  };
+
+  // Handle custom date change
+  const handleCustomDateChange = (startDate: string, endDate: string) => {
+    setCustomStartDate(startDate);
+    setCustomEndDate(endDate);
+    fetchAnalyticsData(startDate, endDate);
+  };
+
+  // Load initial data
+  useEffect(() => {
+    const { startDate, endDate } = getDateRangeFromOption(selectedDateRange);
+    fetchAnalyticsData(startDate, endDate);
+  }, []);
+
+  // Calculate match percentage from API data
+  const matchPercentage = analyticsData ? 
+    (analyticsData.settledOrders / analyticsData.totalOrders) * 100 : 0;
+  const mismatchPercentage = analyticsData ? 
+    ((analyticsData.totalOrders - analyticsData.settledOrders) / analyticsData.totalOrders) * 100 : 0;
 
   return (
     <Box sx={{ 
@@ -217,6 +342,7 @@ const MarketplaceReconciliation: React.FC = () => {
             <Box sx={{ 
               display: 'flex', 
               alignItems: 'center', 
+              justifyContent: 'space-between',
               mb: 3,
               background: 'rgba(255, 255, 255, 0.8)',
               backdropFilter: 'blur(20px)',
@@ -225,44 +351,75 @@ const MarketplaceReconciliation: React.FC = () => {
               border: '1px solid rgba(255, 255, 255, 0.2)',
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
             }}>
-              <Box sx={{
-                background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-                borderRadius: '20px',
-                p: 2,
-                mr: 3,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 8px 24px rgba(99, 102, 241, 0.3)',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'scale(1.05)',
-                  boxShadow: '0 12px 32px rgba(99, 102, 241, 0.4)',
-                },
-              }}>
-                <StorefrontIcon sx={{ fontSize: 32, color: 'white' }} />
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Box sx={{
+                  background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+                  borderRadius: '20px',
+                  p: 2,
+                  mr: 3,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 8px 24px rgba(99, 102, 241, 0.3)',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    transform: 'scale(1.05)',
+                    boxShadow: '0 12px 32px rgba(99, 102, 241, 0.4)',
+                  },
+                }}>
+                  <StorefrontIcon sx={{ fontSize: 32, color: 'white' }} />
+                </Box>
+                <Box>
+                  <Typography variant="h3" sx={{ 
+                    fontWeight: 800, 
+                    background: 'linear-gradient(135deg, #1e293b 0%, #475569 100%)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    letterSpacing: '-0.02em',
+                    mb: 1,
+                  }}>
+                    Marketplace Reconciliation
+                  </Typography>
+                  <Typography variant="body1" sx={{ 
+                    color: '#64748b', 
+                    fontWeight: 500,
+                    fontSize: '1.1rem',
+                  }}>
+                    Financial reconciliation and analytics dashboard
+                  </Typography>
+                </Box>
               </Box>
-              <Box>
-                <Typography variant="h3" sx={{ 
-                  fontWeight: 800, 
-                  background: 'linear-gradient(135deg, #1e293b 0%, #475569 100%)',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  letterSpacing: '-0.02em',
-                  mb: 1,
-                }}>
-                  Marketplace Reconciliation
-                </Typography>
-                <Typography variant="body1" sx={{ 
-                  color: '#64748b', 
-                  fontWeight: 500,
-                  fontSize: '1.1rem',
-                }}>
-                  Financial reconciliation and analytics dashboard
-                </Typography>
+              
+              {/* Date Range Selector */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                {loading && (
+                  <CircularProgress size={24} sx={{ color: '#6366f1' }} />
+                )}
+                <DateRangeSelector
+                  value={selectedDateRange}
+                  onChange={handleDateRangeChange}
+                  onCustomDateChange={handleCustomDateChange}
+                  customStartDate={customStartDate}
+                  customEndDate={customEndDate}
+                />
               </Box>
             </Box>
+            
+            {/* Error Alert */}
+            {error && (
+              <Alert 
+                severity="error" 
+                sx={{ 
+                  mb: 3,
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                }}
+              >
+                {error}
+              </Alert>
+            )}
           </Box>
         </Fade>
 
@@ -313,7 +470,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     </Typography>
                   </Box>
                   <Typography variant="h3" sx={{ fontWeight: 900, mb: 2, color: '#1e293b' }}>
-                    {formatCurrency(reconciliationData.totalSales)}
+                    {analyticsData ? formatCurrency(parseFloat(analyticsData.totalSales)) : 'Not Available'}
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
                     Gross Revenue
@@ -368,7 +525,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     </Typography>
                   </Box>
                   <Typography variant="h3" sx={{ fontWeight: 900, mb: 2, color: '#1e293b' }}>
-                    {formatCurrency(reconciliationData.totalCommission)}
+                    {analyticsData ? formatCurrency(parseFloat(analyticsData.totalCommission)) : 'Not Available'}
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
                     Platform Fees
@@ -425,12 +582,12 @@ const MarketplaceReconciliation: React.FC = () => {
                   <Typography variant="h3" sx={{ 
                     fontWeight: 900, 
                     mb: 2, 
-                    color: reconciliationData.finalDifference === 0 ? '#10b981' : '#ef4444'
+                    color: analyticsData && parseFloat(analyticsData.finalDifference) === 0 ? '#10b981' : '#ef4444'
                   }}>
-                    {formatCurrency(reconciliationData.finalDifference)}
+                    {analyticsData ? formatCurrency(parseFloat(analyticsData.finalDifference)) : 'Not Available'}
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-                    {reconciliationData.finalDifference === 0 ? 'Perfect Match' : 'Discrepancy Found'}
+                    {analyticsData && parseFloat(analyticsData.finalDifference) === 0 ? 'Perfect Match' : 'Discrepancy Found'}
                   </Typography>
                 </CardContent>
               </Card>
@@ -482,7 +639,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     </Typography>
                   </Box>
                   <Typography variant="h3" sx={{ fontWeight: 900, mb: 2, color: '#1e293b' }}>
-                    {reconciliationData.totalOrders.toLocaleString('en-IN')}
+                    {analyticsData ? analyticsData.totalOrders.toLocaleString('en-IN') : 'Not Available'}
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
                     Processed Orders
@@ -529,7 +686,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       },
                     }}>
                       <Typography variant="h4" sx={{ fontWeight: 900, color: '#6366f1', mb: 1 }}>
-                        {formatCurrency(reconciliationData.totalTDS)}
+                        {analyticsData ? formatCurrency(parseFloat(analyticsData.totalTDS)) : 'Not Available'}
                       </Typography>
                       <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
                         Total TDS
@@ -550,7 +707,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       },
                     }}>
                       <Typography variant="h4" sx={{ fontWeight: 900, color: '#a855f7', mb: 1 }}>
-                        {formatCurrency(reconciliationData.totalTCS)}
+                        {analyticsData ? formatCurrency(parseFloat(analyticsData.totalTCS)) : 'Not Available'}
                       </Typography>
                       <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
                         Total TCS
@@ -596,7 +753,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       },
                     }}>
                       <Typography variant="h4" sx={{ fontWeight: 900, color: '#ef4444', mb: 1 }}>
-                        {formatCurrency(reconciliationData.totalRefunds)}
+                        {analyticsData ? formatCurrency(parseFloat(analyticsData.totalRefunds)) : 'Not Available'}
                       </Typography>
                       <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
                         Total Refunds
@@ -617,7 +774,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       },
                     }}>
                       <Typography variant="h4" sx={{ fontWeight: 900, color: '#f59e0b', mb: 1 }}>
-                        {formatCurrency(reconciliationData.totalReversals)}
+                        {analyticsData ? formatCurrency(parseFloat(analyticsData.totalReversals)) : 'Not Available'}
                       </Typography>
                       <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
                         Total Reversals
@@ -679,10 +836,10 @@ const MarketplaceReconciliation: React.FC = () => {
                   }}>
                     <CheckCircleIcon sx={{ fontSize: 48, color: '#10b981', mb: 3 }} />
                     <Typography variant="h3" sx={{ fontWeight: 900, color: '#10b981', mb: 2 }}>
-                      {reconciliationData.matchedOrders.toLocaleString('en-IN')}
+                      {analyticsData ? analyticsData.settledOrders.toLocaleString('en-IN') : 'Not Available'}
                     </Typography>
                     <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
-                      Matched Orders
+                      Settled Orders
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
                       {formatPercentage(matchPercentage)} Match Rate
@@ -704,10 +861,10 @@ const MarketplaceReconciliation: React.FC = () => {
                   }}>
                     <ErrorIcon sx={{ fontSize: 48, color: '#ef4444', mb: 3 }} />
                     <Typography variant="h3" sx={{ fontWeight: 900, color: '#ef4444', mb: 2 }}>
-                      {reconciliationData.mismatchedOrders.toLocaleString('en-IN')}
+                      {analyticsData ? analyticsData.unsettledOrders.toLocaleString('en-IN') : 'Not Available'}
                     </Typography>
                     <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
-                      Mismatched Orders
+                      Unsettled Orders
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
                       {formatPercentage(mismatchPercentage)} Mismatch Rate
@@ -729,7 +886,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   }}>
                     <WarningIcon sx={{ fontSize: 48, color: '#f59e0b', mb: 3 }} />
                     <Typography variant="h3" sx={{ fontWeight: 900, color: '#f59e0b', mb: 2 }}>
-                      {formatCurrency(reconciliationData.totalDiscrepancyValue)}
+                      {analyticsData ? formatCurrency(parseFloat(analyticsData.totalDiscrepancyValue)) : 'Not Available'}
                     </Typography>
                     <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
                       Discrepancy Value
@@ -754,7 +911,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   }}>
                     <SwapHorizIcon sx={{ fontSize: 48, color: '#6366f1', mb: 3 }} />
                     <Typography variant="h3" sx={{ fontWeight: 900, color: '#6366f1', mb: 2 }}>
-                      {formatPercentage(matchPercentage)}
+                      {analyticsData ? formatPercentage(matchPercentage) : 'Not Available'}
                     </Typography>
                     <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
                       Reconciliation Rate
