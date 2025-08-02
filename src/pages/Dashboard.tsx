@@ -416,7 +416,7 @@ const Dashboard: React.FC = () => {
                 size="small"
                 sx={{
                   bgcolor: task.typeBg,
-                  color: (theme) => theme.palette[task.typeColor].main,
+                  color: (theme) => (theme.palette as any)[task.typeColor]?.main || theme.palette.primary.main,
                   fontWeight: 600,
                   mr: 2,
                   minWidth: 110,

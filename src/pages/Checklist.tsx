@@ -109,7 +109,13 @@ const progressData = [
 ];
 
 // Mock links for tasks
-const taskLinks = {
+interface TaskLink {
+  label: string;
+  url: string;
+  icon: string;
+}
+
+const taskLinks: { [key: number]: TaskLink[] } = {
   2: [
     {
       label: 'Netsuite - Journal entries',

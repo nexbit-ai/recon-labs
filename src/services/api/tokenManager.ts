@@ -7,7 +7,6 @@ class TokenManager {
 
   constructor(config: TokenConfig) {
     this.config = {
-      storageKey: 'auth_tokens',
       autoRefresh: true,
       refreshThreshold: 300, // 5 minutes before expiry
       ...config,

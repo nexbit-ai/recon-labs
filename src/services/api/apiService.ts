@@ -337,7 +337,8 @@ class ApiService {
     formData.append('file', file);
 
     const headers = await this.buildHeaders();
-    delete headers['Content-Type']; // Let browser set content-type for FormData
+    const headersObj = headers as Record<string, string>;
+    delete headersObj['Content-Type']; // Let browser set content-type for FormData
 
     const response = await fetch(buildApiUrl(url), {
       method: 'POST',

@@ -119,7 +119,7 @@ const MarketplaceReconciliationWithAPI: React.FC = () => {
     error: reconciliationError,
     success: reconciliationSuccess 
   } = useApiSubmit(
-    (data) => api.reconciliation.runReconciliation(data)
+    (data: any) => api.reconciliation.runReconciliation(data)
   );
 
   // Export data
@@ -128,7 +128,7 @@ const MarketplaceReconciliationWithAPI: React.FC = () => {
     loading: exportLoading, 
     error: exportError 
   } = useApiSubmit(
-    (params) => api.reconciliation.exportData(params)
+    (params: any) => api.reconciliation.exportData(params)
   );
 
   // Handle date range change
@@ -496,7 +496,7 @@ const MarketplaceReconciliationWithAPI: React.FC = () => {
       {/* Transaction Sheet */}
       <TransactionSheet
         open={showTransactionSheet}
-        onClose={() => setShowTransactionSheet(false)}
+        onBack={() => setShowTransactionSheet(false)}
         transaction={selectedTransaction}
       />
 

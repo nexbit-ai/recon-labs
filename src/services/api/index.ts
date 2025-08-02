@@ -4,6 +4,17 @@ import { tokenManager } from './tokenManager';
 import { API_CONFIG } from './config';
 import { api } from './endpoints';
 
+// Import hooks
+import { 
+  useApiCall, 
+  useApiData, 
+  useApiSubmit, 
+  usePaginatedData, 
+  useFileUpload, 
+  useAuth, 
+  useRealtimeData 
+} from './hooks';
+
 // Main API service exports
 export { default as ApiService, apiService } from './apiService';
 export { default as TokenManager, tokenManager } from './tokenManager';
@@ -20,6 +31,17 @@ export { dataSourcesAPI } from './endpoints';
 export { aiAPI } from './endpoints';
 export { settingsAPI } from './endpoints';
 export { fileAPI } from './endpoints';
+
+// Hook exports
+export { 
+  useApiCall, 
+  useApiData, 
+  useApiSubmit, 
+  usePaginatedData, 
+  useFileUpload, 
+  useAuth, 
+  useRealtimeData 
+};
 
 // Type exports
 export type {

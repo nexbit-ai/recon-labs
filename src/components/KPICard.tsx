@@ -30,8 +30,8 @@ const KPICard: React.FC<KPICardProps> = ({ title, value, change, icon }) => {
         </Typography>
         <Box sx={{ color: '#14B8A6' }}>{icon}</Box>
       </Stack>
-      <Typography variant="h4" component={motion.span} sx={{ display: 'block' }}>
-        {displayValue}
+      <Typography variant="h4" component="span" sx={{ display: 'block' }}>
+        {displayValue.get()}
       </Typography>
       <Typography variant="caption" color={change >= 0 ? '#22C55E' : '#EF4444'}>
         {change >= 0 ? '+' : ''}

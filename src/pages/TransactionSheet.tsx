@@ -44,8 +44,32 @@ import {
   Clear as ClearIcon,
 } from '@mui/icons-material';
 
+// Type definitions for transaction data
+interface TransactionRow {
+  "Order ID": string;
+  "Order Date": string;
+  "Sale Amount": number;
+  "Commission": {
+    "Marketplace Fee": number;
+    "Offer Fee": number;
+    "Shipping Fee": number;
+    "Protection Fund": number;
+    "Total": number;
+  };
+  "TDS": number;
+  "TCS": number;
+  "Refund": number;
+  "Settlement Value": number;
+  [key: string]: any; // Allow dynamic access
+}
+
+interface TransactionData {
+  columns: (string | Record<string, Record<string, number>>)[];
+  rows: TransactionRow[];
+}
+
 // Mock data with nested structure as per requirements
-const mockTransactionData = {
+const mockTransactionData: TransactionData = {
   columns: [
     "Order ID",
     "Order Date", 
@@ -150,9 +174,11 @@ const mockTransactionData = {
 
 interface TransactionSheetProps {
   onBack: () => void;
+  open?: boolean;
+  transaction?: any;
 }
 
-const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack }) => {
+const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction }) => {
   const [expandedColumns, setExpandedColumns] = useState<{[key: string]: boolean}>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
@@ -238,7 +264,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack }) => {
     Object.entries(columnFilters).forEach(([columnKey, filterValue]) => {
       if (filterValue.trim()) {
         filtered = filtered.filter(row => {
-          const value = row[columnKey];
+          const value = row[columnKey as keyof TransactionRow];
           if (value === null || value === undefined) return false;
           
           // Handle nested objects (like Commission)
@@ -295,7 +321,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack }) => {
       } else {
         // Handle nested column
         const columnKey = Object.keys(column)[0];
-        const nestedData = column[columnKey];
+        const nestedData = (column as Record<string, Record<string, number>>)[columnKey];
         
         if (expandedColumns[columnKey]) {
           // Show all nested columns
@@ -719,9 +745,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack }) => {
                           
                           let value: any;
                           if (isNested) {
-                            value = row[parentKey]?.[childKey];
+                            value = (row as any)[parentKey]?.[childKey];
                           } else {
-                            value = row[column];
+                            value = (row as any)[column];
                           }
                           
                           // Format value based on type
