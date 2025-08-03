@@ -30,7 +30,19 @@ import {
   Badge,
   LinearProgress,
   CircularProgress,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  Legend,
+} from 'recharts';
 import {
   StorefrontOutlined as StorefrontIcon,
   TrendingUp as TrendingUpIcon,
@@ -53,73 +65,42 @@ import {
   AccountBalance as AccountBalanceIcon,
   SwapHoriz as SwapHorizIcon,
   Assessment as AssessmentIcon,
+  LocalShipping as DeliveryIcon,
+  KeyboardReturn as ReturnIcon,
+  Payment as PaymentIcon,
+  PendingActions as PendingPaymentIcon,
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
-import DateRangeSelector from '../components/DateRangeSelector';
 import { apiService } from '../services/api/apiService';
-import { ReconciliationAnalyticsResponse } from '../services/api/types';
-
-// Mock data based on API response structure
-const reconciliationData = {
-  totalSales: 1250000,
-  totalCommission: 175000,
-  totalTDS: 15000,
-  totalTCS: 12000,
-  totalRefunds: 45000,
-  totalReversals: 10000,
-  finalDifference: 0,
-  totalOrders: 2140,
-  matchedOrders: 2110,
-  mismatchedOrders: 30,
-  totalDiscrepancyValue: 18420,
-  trends: {
-    salesVsSettled: [
-      { date: '2024-01-01', sales: 42000, settled: 41000 },
-      { date: '2024-01-02', sales: 45000, settled: 44000 },
-      { date: '2024-01-03', sales: 38000, settled: 37500 },
-      { date: '2024-01-04', sales: 52000, settled: 51000 },
-      { date: '2024-01-05', sales: 48000, settled: 47000 },
-    ],
-    refundPercentage: [
-      { date: '2024-01-01', percentage: 3.2 },
-      { date: '2024-01-02', percentage: 2.8 },
-      { date: '2024-01-03', percentage: 4.1 },
-      { date: '2024-01-04', percentage: 3.5 },
-      { date: '2024-01-05', percentage: 2.9 },
-    ],
-    commissionPercentage: [
-      { date: '2024-01-01', percentage: 14.2 },
-      { date: '2024-01-02', percentage: 13.8 },
-      { date: '2024-01-03', percentage: 14.5 },
-      { date: '2024-01-04', percentage: 13.9 },
-      { date: '2024-01-05', percentage: 14.1 },
-    ],
-    reconciliationMatchTrend: [
-      { date: '2024-01-01', matched: 95, mismatched: 5 },
-      { date: '2024-01-02', matched: 97, mismatched: 3 },
-      { date: '2024-01-03', matched: 94, mismatched: 6 },
-      { date: '2024-01-04', matched: 96, mismatched: 4 },
-      { date: '2024-01-05', matched: 98, mismatched: 2 },
-    ]
-  },
-  issues: [
-    "7 orders with negative settlements",
-    "12 refund mismatches", 
-    "4 TDS not deducted",
-    "4 flagged for manual review"
-  ]
-};
-
-
+import { MarketplaceReconciliationResponse } from '../services/api/types';
+import { mockReconciliationData, getSafeReconciliationData, isValidReconciliationData } from '../data/mockReconciliationData';
 
 const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
-  const [selectedDateRange, setSelectedDateRange] = useState('Last 7 days');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
-  const [analyticsData, setAnalyticsData] = useState<ReconciliationAnalyticsResponse | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState('2025-07');
+  const [reconciliationData, setReconciliationData] = useState<MarketplaceReconciliationResponse>(mockReconciliationData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usingMockData, setUsingMockData] = useState(false);
+
+  // Generate available months (last 12 months)
+  const generateAvailableMonths = () => {
+    const months = [];
+    const currentDate = new Date();
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      months.push({
+        value: `${year}-${month}`,
+        label: monthName
+      });
+    }
+    return months;
+  };
+
+  const availableMonths = generateAvailableMonths();
 
   const formatCurrency = (amount: number) => {
     return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
@@ -129,176 +110,77 @@ const MarketplaceReconciliation: React.FC = () => {
     return `${value.toFixed(1)}%`;
   };
 
-  // Get date range from selected option
-  const getDateRangeFromOption = (option: string): { startDate: string; endDate: string } => {
-    const today = new Date();
-    const startDate = new Date();
-    const endDate = new Date();
-
-    switch (option) {
-      case 'Today':
-        return {
-          startDate: today.toISOString().split('T')[0],
-          endDate: today.toISOString().split('T')[0]
-        };
-      case 'Yesterday':
-        startDate.setDate(today.getDate() - 1);
-        return {
-          startDate: startDate.toISOString().split('T')[0],
-          endDate: startDate.toISOString().split('T')[0]
-        };
-      case 'Last 7 days':
-        startDate.setDate(today.getDate() - 7);
-        return {
-          startDate: startDate.toISOString().split('T')[0],
-          endDate: today.toISOString().split('T')[0]
-        };
-      case 'Last 30 days':
-        startDate.setDate(today.getDate() - 30);
-        return {
-          startDate: startDate.toISOString().split('T')[0],
-          endDate: today.toISOString().split('T')[0]
-        };
-      case 'This month':
-        startDate.setDate(1);
-        return {
-          startDate: startDate.toISOString().split('T')[0],
-          endDate: today.toISOString().split('T')[0]
-        };
-      case 'Last month':
-        startDate.setMonth(today.getMonth() - 1);
-        startDate.setDate(1);
-        endDate.setDate(0); // Last day of previous month
-        return {
-          startDate: startDate.toISOString().split('T')[0],
-          endDate: endDate.toISOString().split('T')[0]
-        };
-      case 'Last 90 days':
-        startDate.setDate(today.getDate() - 90);
-        return {
-          startDate: startDate.toISOString().split('T')[0],
-          endDate: today.toISOString().split('T')[0]
-        };
-      case 'Year to date':
-        startDate.setMonth(0, 1);
-        return {
-          startDate: startDate.toISOString().split('T')[0],
-          endDate: today.toISOString().split('T')[0]
-        };
-      case 'Custom Range':
-        return {
-          startDate: customStartDate,
-          endDate: customEndDate
-        };
-      default:
-        return {
-          startDate: today.toISOString().split('T')[0],
-          endDate: today.toISOString().split('T')[0]
-        };
-    }
+  // Get start and end dates for a given month
+  const getMonthDateRange = (monthString: string) => {
+    const [year, month] = monthString.split('-').map(Number);
+    const startDate = new Date(year, month - 1, 1); // First day of month
+    const endDate = new Date(year, month, 0); // Last day of month
+    
+    return {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0]
+    };
   };
 
-  // Fetch analytics data
-  const fetchAnalyticsData = async (startDate: string, endDate: string) => {
+  // Fetch reconciliation data
+  const fetchReconciliationData = async (month: string) => {
     setLoading(true);
     setError(null);
+    setUsingMockData(false);
+    
+    const { startDate, endDate } = getMonthDateRange(month);
     
     try {
-      const response = await apiService.get<ReconciliationAnalyticsResponse>(
+      const response = await apiService.get<MarketplaceReconciliationResponse>(
         '/recon/analytics',
         { start_date: startDate, end_date: endDate }
       );
       
-      if (response.success) {
-        setAnalyticsData(response.data);
+      if (response.success && response.data) {
+        // Validate the response data and use mock data if invalid
+        const safeData = getSafeReconciliationData(response.data);
+        setReconciliationData(safeData);
+        
+        // Check if we're using mock data
+        if (!isValidReconciliationData(response.data)) {
+          setUsingMockData(true);
+          setError('API response was incomplete, showing mock data for demonstration');
+        }
       } else {
-        setError('Failed to fetch analytics data');
+        // API call failed, use mock data
+        setReconciliationData(mockReconciliationData);
+        setUsingMockData(true);
+        setError('Failed to fetch data from API, showing mock data');
       }
     } catch (err) {
-      console.error('Error fetching analytics data:', err);
-      setError('Error fetching analytics data. Please try again.');
+      console.error('Error fetching reconciliation data:', err);
+      // API call failed, use mock data
+      setReconciliationData(mockReconciliationData);
+      setUsingMockData(true);
+      setError('Network error, showing mock data for demonstration');
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle date range change
-  const handleDateRangeChange = (newRange: string) => {
-    setSelectedDateRange(newRange);
-    const { startDate, endDate } = getDateRangeFromOption(newRange);
-    fetchAnalyticsData(startDate, endDate);
-  };
-
-  // Handle custom date change
-  const handleCustomDateChange = (startDate: string, endDate: string) => {
-    setCustomStartDate(startDate);
-    setCustomEndDate(endDate);
-    fetchAnalyticsData(startDate, endDate);
+  // Handle month change
+  const handleMonthChange = (newMonth: string) => {
+    setSelectedMonth(newMonth);
+    fetchReconciliationData(newMonth);
   };
 
   // Load initial data
   useEffect(() => {
-    const { startDate, endDate } = getDateRangeFromOption(selectedDateRange);
-    fetchAnalyticsData(startDate, endDate);
+    fetchReconciliationData(selectedMonth);
   }, []);
-
-  // Calculate match percentage from API data
-  const matchPercentage = analyticsData ? 
-    (analyticsData.settledOrders / analyticsData.totalOrders) * 100 : 0;
-  const mismatchPercentage = analyticsData ? 
-    ((analyticsData.totalOrders - analyticsData.settledOrders) / analyticsData.totalOrders) * 100 : 0;
 
   return (
     <Box sx={{ 
       minHeight: '100vh',
-      background: `linear-gradient(135deg, 
-        rgba(248, 250, 252, 1) 0%, 
-        rgba(241, 245, 249, 1) 25%, 
-        rgba(226, 232, 240, 1) 50%, 
-        rgba(241, 245, 249, 1) 75%, 
-        rgba(248, 250, 252, 1) 100%)`,
-      backgroundSize: '400% 400%',
-      animation: 'gradientShift 20s ease infinite',
+      background: '#fafafa',
       position: 'relative',
       overflow: 'hidden',
-      '&::before': {
-        content: '""',
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.03) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.03) 0%, transparent 50%), radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.03) 0%, transparent 50%)',
-        pointerEvents: 'none',
-      },
-      '@keyframes gradientShift': {
-        '0%, 100%': { backgroundPosition: '0% 50%' },
-        '50%': { backgroundPosition: '100% 50%' },
-      },
     }}>
-      {/* Floating Elements */}
-      <Box sx={{
-        position: 'absolute',
-        top: '10%',
-        left: '5%',
-        width: 200,
-        height: 200,
-        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
-        borderRadius: '50%',
-        filter: 'blur(40px)',
-        transition: 'transform 0.3s ease',
-      }} />
-      <Box sx={{
-        position: 'absolute',
-        top: '60%',
-        right: '10%',
-        width: 300,
-        height: 300,
-        background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)',
-        borderRadius: '50%',
-        filter: 'blur(60px)',
-        transition: 'transform 0.3s ease',
-      }} />
 
       {/* View Detailed Transactions Button */}
       <Fab
@@ -311,27 +193,27 @@ const MarketplaceReconciliation: React.FC = () => {
           top: '50%',
           transform: 'translateY(-50%)',
           zIndex: 1000,
-          background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-          boxShadow: '0 8px 32px rgba(99, 102, 241, 0.3)',
+          background: '#1a1a1a',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
           '&:hover': {
-            background: 'linear-gradient(135deg, #5855eb 0%, #9333ea 100%)',
-            transform: 'translateY(-50%) scale(1.05)',
-            boxShadow: '0 12px 40px rgba(99, 102, 241, 0.4)',
+            background: '#000000',
+            transform: 'translateY(-50%) scale(1.02)',
+            boxShadow: '0 6px 24px rgba(0, 0, 0, 0.2)',
           },
           writingMode: 'vertical-rl',
           textOrientation: 'mixed',
-          height: 200,
-          width: 60,
-          borderRadius: '30px',
+          height: 180,
+          width: 50,
+          borderRadius: '25px',
         }}
         onClick={() => {
           console.log('Button clicked, setting showTransactionSheet to true');
           setShowTransactionSheet(true);
         }}
       >
-        <ArrowForwardIcon sx={{ mb: 1, transform: 'rotate(90deg)' }} />
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          View Detailed Transactions
+        <ArrowForwardIcon sx={{ mb: 1, transform: 'rotate(90deg)', color: 'white' }} />
+        <Typography variant="body2" sx={{ fontWeight: 500, color: 'white', fontSize: '0.75rem' }}>
+          View Transactions
         </Typography>
       </Fab>
 
@@ -343,741 +225,1187 @@ const MarketplaceReconciliation: React.FC = () => {
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'space-between',
-              mb: 3,
-              background: 'rgba(255, 255, 255, 0.8)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '24px',
+              mb: 4,
+              background: 'white',
+              borderRadius: '8px',
               p: 4,
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+              border: '1px solid #e0e0e0',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Box sx={{
-                  background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-                  borderRadius: '20px',
+                  background: '#1a1a1a',
+                  borderRadius: '6px',
                   p: 2,
                   mr: 3,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 8px 24px rgba(99, 102, 241, 0.3)',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    transform: 'scale(1.05)',
-                    boxShadow: '0 12px 32px rgba(99, 102, 241, 0.4)',
-                  },
                 }}>
-                  <StorefrontIcon sx={{ fontSize: 32, color: 'white' }} />
+                  <StorefrontIcon sx={{ fontSize: 28, color: 'white' }} />
                 </Box>
                 <Box>
-                  <Typography variant="h3" sx={{ 
-                    fontWeight: 800, 
-                    background: 'linear-gradient(135deg, #1e293b 0%, #475569 100%)',
-                    backgroundClip: 'text',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    letterSpacing: '-0.02em',
+                  <Typography variant="h4" sx={{ 
+                    fontWeight: 600, 
+                    color: '#1a1a1a',
+                    letterSpacing: '-0.01em',
                     mb: 1,
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                   }}>
                     Marketplace Reconciliation
                   </Typography>
                   <Typography variant="body1" sx={{ 
-                    color: '#64748b', 
-                    fontWeight: 500,
-                    fontSize: '1.1rem',
+                    color: '#666666', 
+                    fontWeight: 400,
+                    fontSize: '1rem',
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                   }}>
                     Financial reconciliation and analytics dashboard
                   </Typography>
                 </Box>
               </Box>
               
-              {/* Date Range Selector */}
+              {/* Month Selector */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 {loading && (
-                  <CircularProgress size={24} sx={{ color: '#6366f1' }} />
+                  <CircularProgress size={24} sx={{ color: '#1a1a1a' }} />
                 )}
-                <DateRangeSelector
-                  value={selectedDateRange}
-                  onChange={handleDateRangeChange}
-                  onCustomDateChange={handleCustomDateChange}
-                  customStartDate={customStartDate}
-                  customEndDate={customEndDate}
-                />
+                <FormControl sx={{ minWidth: 200 }}>
+                  <InputLabel id="month-select-label">Select Month</InputLabel>
+                  <Select
+                    labelId="month-select-label"
+                    value={selectedMonth}
+                    label="Select Month"
+                    onChange={(e) => handleMonthChange(e.target.value)}
+                    sx={{
+                      borderRadius: '6px',
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#d0d0d0',
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#1a1a1a',
+                      },
+                      '& .MuiSelect-select': {
+                        fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      },
+                    }}
+                  >
+                    {availableMonths.map((month) => (
+                      <MenuItem key={month.value} value={month.value}>
+                        {month.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Box>
             </Box>
             
             {/* Error Alert */}
             {error && (
               <Alert 
-                severity="error" 
+                severity={usingMockData ? "warning" : "error"}
                 sx={{ 
                   mb: 3,
-                  borderRadius: '16px',
-                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%)',
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  borderRadius: '6px',
+                  background: usingMockData ? '#fff3cd' : '#f8d7da',
+                  border: usingMockData ? '1px solid #ffeaa7' : '1px solid #f5c6cb',
+                  '& .MuiAlert-message': {
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  },
                 }}
               >
                 {error}
+                {usingMockData && (
+                  <Box sx={{ mt: 1, p: 2, borderRadius: '4px', background: 'rgba(255, 255, 255, 0.7)' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#1a1a1a', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                      Mock Data Values:
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#666666', fontSize: '0.875rem', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                      Gross Sales: ₹12,00,000 • Orders Delivered: 480 orders (₹12,30,000) • Returns: 12 orders (-₹30,000)
+                    </Typography>
+                  </Box>
+                )}
               </Alert>
             )}
           </Box>
         </Fade>
 
-        {/* Key Financial Metrics */}
-        <Grid container spacing={3} sx={{ mb: 5 }}>
-          <Grow in timeout={1000}>
-            <Grid item xs={12} md={3}>
-              <Card sx={{ 
-                background: 'rgba(255, 255, 255, 0.9)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: '24px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-                height: '100%',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-8px)',
-                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.12)',
-                },
-                position: 'relative',
-                overflow: 'hidden',
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: '4px',
-                  background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
-                },
+        {/* Reconciliation Calculation */}
+        <Card sx={{ 
+          mb: 4,
+          background: 'white',
+          borderRadius: '8px',
+          border: '1px solid #e0e0e0',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+        }}>
+          <CardContent sx={{ p: 4 }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600, 
+              mb: 3, 
+              color: '#1a1a1a',
+              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+              textAlign: 'left',
+            }}>
+              Reconciliation Calculation
+            </Typography>
+            
+            {/* Reconciliation Calculation - Boundaryless Sections */}
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 2,
+              flexWrap: 'wrap',
+              mt: 1,
+            }}>
+              {/* Section 1: Total Sales Value */}
+              <Box sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: 140,
               }}>
-                <CardContent sx={{ p: 4 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                    <Box sx={{
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      borderRadius: '16px',
-                      p: 1.5,
-                      mr: 2,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                    }}>
-                      <MonetizationIcon sx={{ fontSize: 24, color: 'white' }} />
-                    </Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                      Total Sales
-                    </Typography>
-                  </Box>
-                  <Typography variant="h3" sx={{ fontWeight: 900, mb: 2, color: '#1e293b' }}>
-                    {analyticsData ? formatCurrency(parseFloat(analyticsData.totalSales)) : 'Not Available'}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-                    Gross Revenue
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grow>
-
-          <Grow in timeout={1200}>
-            <Grid item xs={12} md={3}>
-              <Card sx={{ 
-                background: 'rgba(255, 255, 255, 0.9)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: '24px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-                height: '100%',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-8px)',
-                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.12)',
-                },
-                position: 'relative',
-                overflow: 'hidden',
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: '4px',
-                  background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
-                },
-              }}>
-                <CardContent sx={{ p: 4 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                    <Box sx={{
-                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                      borderRadius: '16px',
-                      p: 1.5,
-                      mr: 2,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
-                    }}>
-                      <ReceiptIcon sx={{ fontSize: 24, color: 'white' }} />
-                    </Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                      Total Commission
-                    </Typography>
-                  </Box>
-                  <Typography variant="h3" sx={{ fontWeight: 900, mb: 2, color: '#1e293b' }}>
-                    {analyticsData ? formatCurrency(parseFloat(analyticsData.totalCommission)) : 'Not Available'}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-                    Platform Fees
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grow>
-
-          <Grow in timeout={1400}>
-            <Grid item xs={12} md={3}>
-              <Card sx={{ 
-                background: 'rgba(255, 255, 255, 0.9)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: '24px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-                height: '100%',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-8px)',
-                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.12)',
-                },
-                position: 'relative',
-                overflow: 'hidden',
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: '4px',
-                  background: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)',
-                },
-              }}>
-                <CardContent sx={{ p: 4 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                    <Box sx={{
-                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                      borderRadius: '16px',
-                      p: 1.5,
-                      mr: 2,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
-                    }}>
-                      <AccountBalanceIcon sx={{ fontSize: 24, color: 'white' }} />
-                    </Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                      Final Difference
-                    </Typography>
-                  </Box>
-                  <Typography variant="h3" sx={{ 
-                    fontWeight: 900, 
-                    mb: 2, 
-                    color: analyticsData && parseFloat(analyticsData.finalDifference) === 0 ? '#10b981' : '#ef4444'
-                  }}>
-                    {analyticsData ? formatCurrency(parseFloat(analyticsData.finalDifference)) : 'Not Available'}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-                    {analyticsData && parseFloat(analyticsData.finalDifference) === 0 ? 'Perfect Match' : 'Discrepancy Found'}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grow>
-
-          <Grow in timeout={1600}>
-            <Grid item xs={12} md={3}>
-              <Card sx={{ 
-                background: 'rgba(255, 255, 255, 0.9)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: '24px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-                height: '100%',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-8px)',
-                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.12)',
-                },
-                position: 'relative',
-                overflow: 'hidden',
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: '4px',
-                  background: 'linear-gradient(90deg, #6366f1 0%, #a855f7 100%)',
-                },
-              }}>
-                <CardContent sx={{ p: 4 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                    <Box sx={{
-                      background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-                      borderRadius: '16px',
-                      p: 1.5,
-                      mr: 2,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
-                    }}>
-                      <AssessmentIcon sx={{ fontSize: 24, color: 'white' }} />
-                    </Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                      Total Orders
-                    </Typography>
-                  </Box>
-                  <Typography variant="h3" sx={{ fontWeight: 900, mb: 2, color: '#1e293b' }}>
-                    {analyticsData ? analyticsData.totalOrders.toLocaleString('en-IN') : 'Not Available'}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-                    Processed Orders
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grow>
-        </Grid>
-
-        {/* Tax and Refund Details */}
-        <Grid container spacing={3} sx={{ mb: 5 }}>
-          <Grid item xs={12} md={6}>
-            <Slide direction="up" in timeout={1600}>
-              <Card sx={{ 
-                background: 'rgba(255, 255, 255, 0.9)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: '24px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: '0 16px 40px rgba(0, 0, 0, 0.12)',
-                },
-              }}>
-                <CardContent sx={{ p: 4 }}>
-                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 4, color: '#1e293b' }}>
-                    Tax Details
-                  </Typography>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                    <Box sx={{ 
-                      textAlign: 'center',
-                      flex: 1,
-                      p: 3,
-                      borderRadius: '20px',
-                      background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
-                      border: '1px solid rgba(99, 102, 241, 0.2)',
-                      mr: 2,
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'scale(1.02)',
-                        boxShadow: '0 8px 24px rgba(99, 102, 241, 0.15)',
-                      },
-                    }}>
-                      <Typography variant="h4" sx={{ fontWeight: 900, color: '#6366f1', mb: 1 }}>
-                        {analyticsData ? formatCurrency(parseFloat(analyticsData.totalTDS)) : 'Not Available'}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
-                        Total TDS
-                      </Typography>
-                    </Box>
-                    <Box sx={{ 
-                      textAlign: 'center',
-                      flex: 1,
-                      p: 3,
-                      borderRadius: '20px',
-                      background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%)',
-                      border: '1px solid rgba(168, 85, 247, 0.2)',
-                      ml: 2,
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'scale(1.02)',
-                        boxShadow: '0 8px 24px rgba(168, 85, 247, 0.15)',
-                      },
-                    }}>
-                      <Typography variant="h4" sx={{ fontWeight: 900, color: '#a855f7', mb: 1 }}>
-                        {analyticsData ? formatCurrency(parseFloat(analyticsData.totalTCS)) : 'Not Available'}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
-                        Total TCS
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Slide>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Slide direction="up" in timeout={1800}>
-              <Card sx={{ 
-                background: 'rgba(255, 255, 255, 0.9)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: '24px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: '0 16px 40px rgba(0, 0, 0, 0.12)',
-                },
-              }}>
-                <CardContent sx={{ p: 4 }}>
-                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 4, color: '#1e293b' }}>
-                    Refunds & Reversals
-                  </Typography>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box sx={{ 
-                      textAlign: 'center',
-                      flex: 1,
-                      p: 3,
-                      borderRadius: '20px',
-                      background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%)',
-                      border: '1px solid rgba(239, 68, 68, 0.2)',
-                      mr: 2,
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'scale(1.02)',
-                        boxShadow: '0 8px 24px rgba(239, 68, 68, 0.15)',
-                      },
-                    }}>
-                      <Typography variant="h4" sx={{ fontWeight: 900, color: '#ef4444', mb: 1 }}>
-                        {analyticsData ? formatCurrency(parseFloat(analyticsData.totalRefunds)) : 'Not Available'}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
-                        Total Refunds
-                      </Typography>
-                    </Box>
-                    <Box sx={{ 
-                      textAlign: 'center',
-                      flex: 1,
-                      p: 3,
-                      borderRadius: '20px',
-                      background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%)',
-                      border: '1px solid rgba(245, 158, 11, 0.2)',
-                      ml: 2,
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'scale(1.02)',
-                        boxShadow: '0 8px 24px rgba(245, 158, 11, 0.15)',
-                      },
-                    }}>
-                      <Typography variant="h4" sx={{ fontWeight: 900, color: '#f59e0b', mb: 1 }}>
-                        {analyticsData ? formatCurrency(parseFloat(analyticsData.totalReversals)) : 'Not Available'}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
-                        Total Reversals
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Slide>
-          </Grid>
-        </Grid>
-
-        {/* Order Reconciliation Status */}
-        <Slide direction="up" in timeout={2000}>
-          <Card sx={{ 
-            mb: 5,
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: '32px',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.1)',
-            overflow: 'hidden',
-            position: 'relative',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: '6px',
-              background: 'linear-gradient(90deg, #6366f1 0%, #a855f7 0%, #ec4899 100%)',
-            },
-          }}>
-            <CardContent sx={{ p: 6 }}>
-              <Typography variant="h4" sx={{ 
-                fontWeight: 800, 
-                mb: 5, 
-                textAlign: 'center',
-                background: 'linear-gradient(135deg, #1e293b 0%, #475569 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}>
-                Order Reconciliation Status
-              </Typography>
-              <Grid container spacing={4}>
-                <Grid item xs={12} md={3}>
-                  <Box sx={{ 
-                    textAlign: 'center',
-                    p: 4,
-                    borderRadius: '24px',
-                    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
-                    border: '1px solid rgba(16, 185, 129, 0.2)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: '0 16px 40px rgba(16, 185, 129, 0.15)',
-                    },
-                  }}>
-                    <CheckCircleIcon sx={{ fontSize: 48, color: '#10b981', mb: 3 }} />
-                    <Typography variant="h3" sx={{ fontWeight: 900, color: '#10b981', mb: 2 }}>
-                      {analyticsData ? analyticsData.settledOrders.toLocaleString('en-IN') : 'Not Available'}
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
-                      Settled Orders
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-                      {formatPercentage(matchPercentage)} Match Rate
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <Box sx={{ 
-                    textAlign: 'center',
-                    p: 4,
-                    borderRadius: '24px',
-                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: '0 16px 40px rgba(239, 68, 68, 0.15)',
-                    },
-                  }}>
-                    <ErrorIcon sx={{ fontSize: 48, color: '#ef4444', mb: 3 }} />
-                    <Typography variant="h3" sx={{ fontWeight: 900, color: '#ef4444', mb: 2 }}>
-                      {analyticsData ? analyticsData.unsettledOrders.toLocaleString('en-IN') : 'Not Available'}
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
-                      Unsettled Orders
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-                      {formatPercentage(mismatchPercentage)} Mismatch Rate
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <Box sx={{ 
-                    textAlign: 'center',
-                    p: 4,
-                    borderRadius: '24px',
-                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%)',
-                    border: '1px solid rgba(245, 158, 11, 0.2)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: '0 16px 40px rgba(245, 158, 11, 0.15)',
-                    },
-                  }}>
-                    <WarningIcon sx={{ fontSize: 48, color: '#f59e0b', mb: 3 }} />
-                    <Typography variant="h3" sx={{ fontWeight: 900, color: '#f59e0b', mb: 2 }}>
-                      {analyticsData ? formatCurrency(parseFloat(analyticsData.totalDiscrepancyValue)) : 'Not Available'}
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
-                      Discrepancy Value
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-                      Total Variance Amount
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <Box sx={{ 
-                    textAlign: 'center',
-                    p: 4,
-                    borderRadius: '24px',
-                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
-                    border: '1px solid rgba(99, 102, 241, 0.2)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: '0 16px 40px rgba(99, 102, 241, 0.15)',
-                    },
-                  }}>
-                    <SwapHorizIcon sx={{ fontSize: 48, color: '#6366f1', mb: 3 }} />
-                    <Typography variant="h3" sx={{ fontWeight: 900, color: '#6366f1', mb: 2 }}>
-                      {analyticsData ? formatPercentage(matchPercentage) : 'Not Available'}
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
-                      Reconciliation Rate
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-                      Overall Success Rate
-                    </Typography>
-                  </Box>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        </Slide>
-
-        {/* Issues Needing Attention */}
-        <Slide direction="up" in timeout={2200}>
-          <Card sx={{ 
-            mb: 5,
-            background: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: '24px',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              transform: 'translateY(-4px)',
-              boxShadow: '0 16px 40px rgba(0, 0, 0, 0.12)',
-            },
-          }}>
-            <CardContent sx={{ p: 4 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-                <Box sx={{
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  borderRadius: '16px',
-                  p: 1.5,
-                  mr: 3,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+                <Typography variant="body1" sx={{
+                  fontWeight: 500,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  mb: 1,
+                  textAlign: 'center',
+                  fontSize: '0.75rem',
                 }}>
-                  <WarningIcon sx={{ fontSize: 24, color: 'white' }} />
-                </Box>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                  Issues Needing Attention
+                  Total Sales
+                </Typography>
+                <Typography variant="h4" sx={{
+                  fontWeight: 100,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  fontSize: '2rem',
+                  mb: 0.5,
+                  textAlign: 'center',
+                }}>
+                  {formatCurrency(reconciliationData.grossSales)}
+                </Typography>
+                <Typography variant="body2" sx={{
+                  color: '#666666',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  textAlign: 'center',
+                  fontSize: '0.75rem',
+                }}>
+                  Gross Sales
                 </Typography>
               </Box>
-              
-              <Grid container spacing={2}>
-                {reconciliationData.issues.map((issue, index) => (
-                  <Grid item xs={12} sm={6} md={3} key={index}>
-                    <Alert 
-                      severity="warning" 
-                      sx={{ 
-                        borderRadius: '16px',
-                        background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%)',
-                        border: '1px solid rgba(245, 158, 11, 0.2)',
-                        '& .MuiAlert-icon': {
-                          color: '#f59e0b',
-                        },
-                        '& .MuiAlert-message': {
-                          color: '#1e293b',
-                          fontWeight: 600,
-                        },
-                      }}
-                    >
-                      {issue}
-                    </Alert>
-                  </Grid>
-                ))}
-              </Grid>
-            </CardContent>
-          </Card>
-        </Slide>
 
-        {/* Trend Charts Placeholder */}
-        <Slide direction="up" in timeout={2400}>
-          <Card sx={{ 
-            mb: 5,
-            background: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: '24px',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-          }}>
-            <CardContent sx={{ p: 4 }}>
-              <Typography variant="h5" sx={{ fontWeight: 700, mb: 4, color: '#1e293b' }}>
-                Trend Analytics
+              {/* Minus Sign */}
+              <Typography variant="h3" sx={{
+                fontWeight: 400,
+                color: '#1a1a1a',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                fontSize: '2rem',
+                alignSelf: 'center',
+                mt: 0.5,
+              }}>
+                −
               </Typography>
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                  <Box sx={{ 
-                    p: 3, 
-                    borderRadius: '16px', 
-                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
-                    border: '1px solid rgba(99, 102, 241, 0.2)',
-                    textAlign: 'center',
-                  }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 2 }}>
-                      Total Sales vs Total Settled
-                    </Typography>
-                    <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Typography variant="body2" sx={{ color: '#64748b' }}>
-                        Chart placeholder - Sales vs Settled trend
-                      </Typography>
+
+              {/* Section 2: Collection Received */}
+              <Box sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: 140,
+              }}>
+                <Typography variant="body1" sx={{
+                  fontWeight: 500,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  mb: 1,
+                  textAlign: 'center',
+                  fontSize: '0.75rem',
+                }}>
+                  Collection
+                </Typography>
+                <Typography variant="h4" sx={{
+                  fontWeight: 100,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  fontSize: '2rem',
+                  mb: 0.5,
+                  textAlign: 'center',
+                }}>
+                  {formatCurrency(reconciliationData.payoutReceived)}
+                </Typography>
+                <Typography variant="body2" sx={{
+                  color: '#666666',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  textAlign: 'center',
+                  fontSize: '0.75rem',
+                }}>
+                  Payout
+                </Typography>
+              </Box>
+
+              {/* Minus Sign */}
+              <Typography variant="h3" sx={{
+                fontWeight: 400,
+                color: '#1a1a1a',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                fontSize: '2rem',
+                alignSelf: 'center',
+                mt: 0.5,
+              }}>
+                −
+              </Typography>
+
+              {/* Section 3: TDS */}
+              <Box sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: 140,
+              }}>
+                <Typography variant="body1" sx={{
+                  fontWeight: 500,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  mb: 1,
+                  textAlign: 'center',
+                  fontSize: '0.75rem',
+                }}>
+                  TDS
+                </Typography>
+                <Typography variant="h4" sx={{
+                  fontWeight: 100,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  fontSize: '2rem',
+                  mb: 0.5,
+                  textAlign: 'center',
+                }}>
+                  {formatCurrency(reconciliationData.tds)}
+                </Typography>
+                <Typography variant="body2" sx={{
+                  color: '#666666',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  textAlign: 'center',
+                  fontSize: '0.75rem',
+                }}>
+                  Tax Deducted
+                </Typography>
+              </Box>
+
+              {/* Minus Sign */}
+              <Typography variant="h3" sx={{
+                fontWeight: 400,
+                color: '#1a1a1a',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                fontSize: '2rem',
+                alignSelf: 'center',
+                mt: 0.5,
+              }}>
+                −
+              </Typography>
+
+              {/* Section 4: TCS */}
+              <Box sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: 140,
+              }}>
+                <Typography variant="body1" sx={{
+                  fontWeight: 500,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  mb: 1,
+                  textAlign: 'center',
+                  fontSize: '0.75rem',
+                }}>
+                  TCS
+                </Typography>
+                <Typography variant="h4" sx={{
+                  fontWeight: 100,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  fontSize: '2rem',
+                  mb: 0.5,
+                  textAlign: 'center',
+                }}>
+                  {formatCurrency(reconciliationData.tcs)}
+                </Typography>
+                <Typography variant="body2" sx={{
+                  color: '#666666',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  textAlign: 'center',
+                  fontSize: '0.75rem',
+                }}>
+                  Tax Collected
+                </Typography>
+              </Box>
+
+              {/* Minus Sign */}
+              <Typography variant="h3" sx={{
+                fontWeight: 400,
+                color: '#1a1a1a',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                fontSize: '2rem',
+                alignSelf: 'center',
+                mt: 0.5,
+              }}>
+                −
+              </Typography>
+
+              {/* Section 5: Commissions */}
+              <Box sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: 140,
+              }}>
+                <Typography variant="body1" sx={{
+                  fontWeight: 500,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  mb: 1,
+                  textAlign: 'center',
+                  fontSize: '0.75rem',
+                }}>
+                  Commissions
+                </Typography>
+                <Typography variant="h4" sx={{
+                  fontWeight: 100,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  fontSize: '2rem',
+                  mb: 0.5,
+                  textAlign: 'center',
+                }}>
+                  {formatCurrency(reconciliationData.commission)}
+                </Typography>
+                <Typography variant="body2" sx={{
+                  color: '#666666',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  textAlign: 'center',
+                  fontSize: '0.75rem',
+                }}>
+                  Platform Fees
+                </Typography>
+              </Box>
+
+              {/* Equals Sign */}
+              <Typography variant="h3" sx={{
+                fontWeight: 400,
+                color: '#1a1a1a',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                fontSize: '2rem',
+                alignSelf: 'center',
+                mt: 1,
+              }}>
+                =
+              </Typography>
+
+              {/* Section 6: Difference */}
+              <Box sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: 140,
+              }}>
+                <Typography variant="body1" sx={{
+                  fontWeight: 500,
+                  color: reconciliationData.difference === 0 ? '#155724' : '#d32f2f',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  mb: 1,
+                  textAlign: 'center',
+                  fontSize: '0.75rem',
+                }}>
+                  Difference
+                </Typography>
+                <Typography variant="h4" sx={{
+                  fontWeight: 100,
+                  color: reconciliationData.difference === 0 ? '#155724' : '#d32f2f',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  fontSize: '2rem',
+                  mb: 0.5,
+                  textAlign: 'center',
+                }}>
+                  {formatCurrency(Math.abs(reconciliationData.difference))}
+                </Typography>
+                <Typography variant="body2" sx={{
+                  color: reconciliationData.difference === 0 ? '#155724' : '#d32f2f',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  textAlign: 'center',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                }}>
+                  {reconciliationData.difference === 0 ? 'Matched' : 'Reconciliation Required'}
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+
+        {/* Financial Breakdown and Reconciliation Status Charts */}
+        <Grid container spacing={4} sx={{ mb: 4 }}>
+          {/* Financial Breakdown Pie Chart */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ 
+              background: 'white',
+              borderRadius: '8px',
+              border: '1px solid #e0e0e0',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+              height: '100%',
+            }}>
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h5" sx={{ 
+                  fontWeight: 600, 
+                  mb: 3, 
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                }}>
+                  Financial Breakdown
+                </Typography>
+                
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        {
+                          name: 'Net Receivable',
+                          value: reconciliationData.netReceivable,
+                          color: '#14B8A6',
+                          percentage: ((reconciliationData.netReceivable / reconciliationData.grossSales) * 100).toFixed(1)
+                        },
+                        {
+                          name: 'Commission',
+                          value: reconciliationData.commission,
+                          color: '#F59E0B',
+                          percentage: ((reconciliationData.commission / reconciliationData.grossSales) * 100).toFixed(1)
+                        },
+                        {
+                          name: 'TDS',
+                          value: reconciliationData.tds,
+                          color: '#EF4444',
+                          percentage: ((reconciliationData.tds / reconciliationData.grossSales) * 100).toFixed(1)
+                        },
+                        {
+                          name: 'TCS',
+                          value: reconciliationData.tcs,
+                          color: '#3B82F6',
+                          percentage: ((reconciliationData.tcs / reconciliationData.grossSales) * 100).toFixed(1)
+                        }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {[
+                        { name: 'Net Receivable', value: reconciliationData.netReceivable, color: '#14B8A6' },
+                        { name: 'Commission', value: reconciliationData.commission, color: '#F59E0B' },
+                        { name: 'TDS', value: reconciliationData.tds, color: '#EF4444' },
+                        { name: 'TCS', value: reconciliationData.tcs, color: '#3B82F6' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <Box sx={{
+                              background: 'white',
+                              border: '1px solid #e0e0e0',
+                              borderRadius: '6px',
+                              p: 2,
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                            }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a1a1a', mb: 1 }}>
+                                {data.name}
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#666666', mb: 0.5 }}>
+                                Amount: {formatCurrency(data.value)}
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#666666' }}>
+                                Percentage: {((data.value / reconciliationData.grossSales) * 100).toFixed(1)}%
+                              </Typography>
+                            </Box>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      height={36}
+                      formatter={(value, entry) => (
+                        <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                          {value} ({entry.payload && ((entry.payload.value / reconciliationData.grossSales) * 100).toFixed(1)}%)
+                        </span>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Reconciliation Match Status */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ 
+              background: 'white',
+              borderRadius: '8px',
+              border: '1px solid #e0e0e0',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+              height: '100%',
+            }}>
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h5" sx={{ 
+                  fontWeight: 600, 
+                  mb: 3, 
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                }}>
+                  Reconciliation Status
+                </Typography>
+                
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 300,
+                }}>
+                  {/* Gauge Chart */}
+                  <Box sx={{ position: 'relative', mb: 3 }}>
+                    <Box sx={{
+                      width: 200,
+                      height: 200,
+                      borderRadius: '50%',
+                      background: `conic-gradient(
+                        ${reconciliationData.difference === 0 ? '#14B8A6' : '#EF4444'} 0deg,
+                        ${reconciliationData.difference === 0 ? '#14B8A6' : '#EF4444'} ${reconciliationData.difference === 0 ? 360 : Math.min((1 - (reconciliationData.difference / reconciliationData.grossSales)) * 360, 360)}deg,
+                        #f0f0f0 ${reconciliationData.difference === 0 ? 360 : Math.min((1 - (reconciliationData.difference / reconciliationData.grossSales)) * 360, 360)}deg,
+                        #f0f0f0 360deg
+                      )`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                    }}>
+                      <Box sx={{
+                        width: 160,
+                        height: 160,
+                        borderRadius: '50%',
+                        background: 'white',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1)',
+                      }}>
+                        <Typography variant="h4" sx={{
+                          fontWeight: 700,
+                          color: reconciliationData.difference === 0 ? '#14B8A6' : '#EF4444',
+                          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                          mb: 1,
+                        }}>
+                          {reconciliationData.difference === 0 ? '100%' : `${Math.max(0, 100 - ((reconciliationData.difference / reconciliationData.grossSales) * 100)).toFixed(1)}%`}
+                        </Typography>
+                        <Typography variant="body2" sx={{
+                          color: '#666666',
+                          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                          textAlign: 'center',
+                          fontSize: '0.875rem',
+                        }}>
+                          {reconciliationData.difference === 0 ? 'Matched' : 'Reconciled'}
+                        </Typography>
+                      </Box>
                     </Box>
                   </Box>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Box sx={{ 
-                    p: 3, 
-                    borderRadius: '16px', 
-                    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
-                    border: '1px solid rgba(16, 185, 129, 0.2)',
-                    textAlign: 'center',
-                  }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 2 }}>
-                      Refund % Over Time
+
+                  {/* Status Details */}
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" sx={{
+                      fontWeight: 600,
+                      color: reconciliationData.difference === 0 ? '#14B8A6' : '#EF4444',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      mb: 2,
+                    }}>
+                      {reconciliationData.difference === 0 ? 'Perfect Match' : 'Reconciliation Required'}
                     </Typography>
-                    <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Typography variant="body2" sx={{ color: '#64748b' }}>
-                        Chart placeholder - Refund percentage trend
+                    
+                    <Box sx={{
+                      p: 2,
+                      borderRadius: '6px',
+                      background: reconciliationData.difference === 0 ? '#d4edda' : '#f8d7da',
+                      border: reconciliationData.difference === 0 ? '1px solid #c3e6cb' : '1px solid #f5c6cb',
+                      mb: 2,
+                    }}>
+                      <Typography variant="body2" sx={{
+                        color: reconciliationData.difference === 0 ? '#155724' : '#721c24',
+                        fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                        fontWeight: 600,
+                        mb: 1,
+                      }}>
+                        Difference Amount
+                      </Typography>
+                      <Typography variant="h6" sx={{
+                        color: reconciliationData.difference === 0 ? '#155724' : '#721c24',
+                        fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                        fontWeight: 700,
+                      }}>
+                        {formatCurrency(Math.abs(reconciliationData.difference))}
                       </Typography>
                     </Box>
+
+                    <Typography variant="body2" sx={{
+                      color: '#666666',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontSize: '0.875rem',
+                    }}>
+                      {reconciliationData.difference === 0 
+                        ? 'All transactions are perfectly reconciled' 
+                        : 'Some transactions require attention for reconciliation'
+                      }
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* Settlement Status Visualization */}
+        <Card sx={{ 
+          mb: 4,
+          background: 'white',
+          borderRadius: '8px',
+          border: '1px solid #e0e0e0',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+        }}>
+          <CardContent sx={{ p: 4 }}>
+            <Typography variant="h5" sx={{ 
+              fontWeight: 600, 
+              mb: 3, 
+              color: '#1a1a1a',
+              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+            }}>
+              Settlement and Unsettled Summary
+            </Typography>
+            
+            <Grid container spacing={4}>
+              {/* Settlement Status Chart */}
+              <Grid item xs={12} md={8}>
+                <Box sx={{ height: 400 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          {
+                            name: 'Settled Orders',
+                            value: reconciliationData.ordersDelivered.number - reconciliationData.awaitedSettlement.orders,
+                            amount: reconciliationData.payoutReceived,
+                            color: '#14B8A6',
+                            type: 'settled'
+                          },
+                          {
+                            name: 'Unsettled Orders',
+                            value: reconciliationData.awaitedSettlement.orders,
+                            amount: reconciliationData.awaitedSettlement.amount,
+                            color: '#F59E0B',
+                            type: 'unsettled'
+                          },
+                          {
+                            name: 'Unsettled Returns',
+                            value: reconciliationData.unsettledReturns.returns,
+                            amount: reconciliationData.unsettledReturns.amount,
+                            color: '#EF4444',
+                            type: 'returns'
+                          }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={80}
+                        outerRadius={140}
+                        paddingAngle={8}
+                        dataKey="value"
+                      >
+                        {[
+                          { name: 'Settled Orders', value: reconciliationData.ordersDelivered.number - reconciliationData.awaitedSettlement.orders, color: '#14B8A6' },
+                          { name: 'Unsettled Orders', value: reconciliationData.awaitedSettlement.orders, color: '#F59E0B' },
+                          { name: 'Unsettled Returns', value: reconciliationData.unsettledReturns.returns, color: '#EF4444' }
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <Box sx={{
+                                background: 'white',
+                                border: '1px solid #e0e0e0',
+                                borderRadius: '6px',
+                                p: 2,
+                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                              }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a1a1a', mb: 1 }}>
+                                  {data.name}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: '#666666', mb: 0.5 }}>
+                                  Orders: {data.value}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: '#666666' }}>
+                                  Amount: {formatCurrency(data.amount)}
+                                </Typography>
+                              </Box>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={36}
+                        formatter={(value, entry) => (
+                          <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                            {value} ({entry.payload && entry.payload.value} orders)
+                          </span>
+                        )}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Box>
+              </Grid>
+
+              {/* Settlement Details */}
+              <Grid item xs={12} md={4}>
+                <Box sx={{ height: 400, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 2 }}>
+                  {/* Settled Orders */}
+                  <Box sx={{
+                    p: 1,
+                    borderRadius: '8px',
+                    background: '#d4edda',
+                    border: '1px solid #c3e6cb',
+                    textAlign: 'center',
+                  }}>
+                    <Typography variant="h6" sx={{
+                      fontWeight: 600,
+                      color: '#155724',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      mb: 1,
+                    }}>
+                      Settled Orders
+                    </Typography>
+                    <Typography variant="h4" sx={{
+                      fontWeight: 700,
+                      color: '#155724',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      mb: 1,
+                    }}>
+                      {reconciliationData.ordersDelivered.number - reconciliationData.awaitedSettlement.orders}
+                    </Typography>
+                    <Typography variant="body2" sx={{
+                      color: '#155724',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontWeight: 500,
+                    }}>
+                      {formatCurrency(reconciliationData.payoutReceived)}
+                    </Typography>
+                    <Typography variant="caption" sx={{
+                      color: '#155724',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      opacity: 0.8,
+                    }}>
+                      Payment Received
+                    </Typography>
+                  </Box>
+
+                  {/* Unsettled Orders */}
+                  <Box sx={{
+                    p: 1,
+                    borderRadius: '8px',
+                    background: '#fff3cd',
+                    border: '1px solid #ffeaa7',
+                    textAlign: 'center',
+                  }}>
+                    <Typography variant="h6" sx={{
+                      fontWeight: 600,
+                      color: '#856404',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      mb: 1,
+                    }}>
+                      Unsettled Orders
+                    </Typography>
+                    <Typography variant="h4" sx={{
+                      fontWeight: 700,
+                      color: '#856404',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      mb: 1,
+                    }}>
+                      {reconciliationData.awaitedSettlement.orders}
+                    </Typography>
+                    <Typography variant="body2" sx={{
+                      color: '#856404',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontWeight: 500,
+                    }}>
+                      {formatCurrency(reconciliationData.awaitedSettlement.amount)}
+                    </Typography>
+                    <Typography variant="caption" sx={{
+                      color: '#856404',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      opacity: 0.8,
+                    }}>
+                      Awaiting Settlement
+                    </Typography>
+                  </Box>
+
+                  {/* Unsettled Returns */}
+                  <Box sx={{
+                    p: 1,
+                    borderRadius: '8px',
+                    background: '#f8d7da',
+                    border: '1px solid #f5c6cb',
+                    textAlign: 'center',
+                  }}>
+                    <Typography variant="h6" sx={{
+                      fontWeight: 600,
+                      color: '#721c24',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      mb: 1,
+                    }}>
+                      Unsettled Returns
+                    </Typography>
+                    <Typography variant="h4" sx={{
+                      fontWeight: 700,
+                      color: '#721c24',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      mb: 1,
+                    }}>
+                      {reconciliationData.unsettledReturns.returns}
+                    </Typography>
+                    <Typography variant="body2" sx={{
+                      color: '#721c24',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontWeight: 500,
+                    }}>
+                      {formatCurrency(reconciliationData.unsettledReturns.amount)}
+                    </Typography>
+                    <Typography variant="caption" sx={{
+                      color: '#721c24',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      opacity: 0.8,
+                    }}>
+                      Deduction Pending
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
+            </Grid>
+
+            {/* Settlement Summary */}
+            <Box sx={{ mt: 4, p: 3, borderRadius: '6px', background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+              <Typography variant="h6" sx={{
+                fontWeight: 600,
+                color: '#1a1a1a',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                mb: 2,
+              }}>
+                Settlement Summary
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={3}>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="body2" sx={{ color: '#666666', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                      Total Orders
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1a1a1a', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                      {reconciliationData.ordersDelivered.number}
+                    </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={12} md={6}>
-                  <Box sx={{ 
-                    p: 3, 
-                    borderRadius: '16px', 
-                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%)',
-                    border: '1px solid rgba(245, 158, 11, 0.2)',
-                    textAlign: 'center',
-                  }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 2 }}>
-                      Commission % Over Time
+                <Grid item xs={12} md={3}>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="body2" sx={{ color: '#666666', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                      Settlement Rate
                     </Typography>
-                    <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Typography variant="body2" sx={{ color: '#64748b' }}>
-                        Chart placeholder - Commission percentage trend
-                      </Typography>
-                    </Box>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#14B8A6', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                      {((reconciliationData.ordersDelivered.number - reconciliationData.awaitedSettlement.orders) / reconciliationData.ordersDelivered.number * 100).toFixed(1)}%
+                    </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={12} md={6}>
-                  <Box sx={{ 
-                    p: 3, 
-                    borderRadius: '16px', 
-                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    textAlign: 'center',
-                  }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 2 }}>
-                      Reconciliation Trend
+                <Grid item xs={12} md={3}>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="body2" sx={{ color: '#666666', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                      Pending Settlement
                     </Typography>
-                    <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Typography variant="body2" sx={{ color: '#64748b' }}>
-                        Chart placeholder - Matched vs mismatched trend
-                      </Typography>
-                    </Box>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#F59E0B', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                      {reconciliationData.awaitedSettlement.orders}
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="body2" sx={{ color: '#666666', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                      Pending Returns
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#EF4444', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                      {reconciliationData.unsettledReturns.returns}
+                    </Typography>
                   </Box>
                 </Grid>
               </Grid>
-            </CardContent>
-          </Card>
-        </Slide>
+            </Box>
+          </CardContent>
+        </Card>
+
+
+
+
+
+        {/* Sales Calculation */}
+        <Card sx={{ 
+          mb: 4,
+          background: 'white',
+          borderRadius: '8px',
+          border: '1px solid #e0e0e0',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+        }}>
+          <CardContent sx={{ p: 4 }}>
+            <Typography variant="h5" sx={{ 
+              fontWeight: 600, 
+              mb: 3, 
+              color: '#1a1a1a',
+              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+              textAlign: 'left',
+            }}>
+              Sales Calculation
+            </Typography>
+            
+            {/* Sales Calculation - Three Boundaryless Sections */}
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 3,
+              flexWrap: 'wrap',
+              mt: 1,
+            }}>
+              {/* Section 1: Order Sales Value */}
+              <Box sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: 160,
+              }}>
+                <Typography variant="body1" sx={{
+                  fontWeight: 500,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  mb: 1.5,
+                  textAlign: 'center',
+                  fontSize: '0.875rem',
+                }}>
+                  Order Sales Value
+                </Typography>
+                <Typography variant="h4" sx={{
+                  fontWeight: 100,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  fontSize: '2.5rem',
+                  mb: 0.5,
+                  textAlign: 'center',
+                }}>
+                  {formatCurrency(reconciliationData.ordersDelivered.amount)}
+                </Typography>
+                <Typography variant="body2" sx={{
+                  color: '#666666',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  textAlign: 'center',
+                  fontSize: '0.875rem',
+                }}>
+                  ({reconciliationData.ordersDelivered.number} orders)
+                </Typography>
+              </Box>
+
+              {/* Minus Sign */}
+              <Typography variant="h3" sx={{
+                fontWeight: 400,
+                color: '#1a1a1a',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                fontSize: '2.5rem',
+                alignSelf: 'center',
+                mt: 0.5,
+              }}>
+                −
+              </Typography>
+
+              {/* Section 2: Returns Value */}
+              <Box sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: 160,
+              }}>
+                <Typography variant="body1" sx={{
+                  fontWeight: 500,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  mb: 1.5,
+                  textAlign: 'center',
+                  fontSize: '0.875rem',
+                }}>
+                  Returns Value
+                </Typography>
+                <Typography variant="h4" sx={{
+                  fontWeight: 100,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  fontSize: '2.5rem',
+                  mb: 0.5,
+                  textAlign: 'center',
+                }}>
+                  {formatCurrency(Math.abs(reconciliationData.ordersReturned.amount))}
+                </Typography>
+                <Typography variant="body2" sx={{
+                  color: '#666666',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  textAlign: 'center',
+                  fontSize: '0.875rem',
+                }}>
+                  ({reconciliationData.ordersReturned.number} returns)
+                </Typography>
+              </Box>
+
+              {/* Equals Sign */}
+              <Typography variant="h3" sx={{
+                fontWeight: 400,
+                color: '#1a1a1a',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                fontSize: '2.5rem',
+                alignSelf: 'center',
+                mt: 1.5,
+              }}>
+                =
+              </Typography>
+
+              {/* Section 3: Gross Sales */}
+              <Box sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: 160,
+              }}>
+                <Typography variant="body1" sx={{
+                  fontWeight: 500,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  mb: 1.5,
+                  textAlign: 'center',
+                  fontSize: '0.875rem',
+                }}>
+                  Gross Sales
+                </Typography>
+                <Typography variant="h4" sx={{
+                  fontWeight: 100,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  fontSize: '2.5rem',
+                  mb: 0.5,
+                  textAlign: 'center',
+                }}>
+                  {formatCurrency(reconciliationData.grossSales)}
+                </Typography>
+                <Typography variant="body2" sx={{
+                  color: '#666666',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  textAlign: 'center',
+                  fontSize: '0.875rem',
+                }}>
+                  Net Revenue
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+
+        {/* Tax Breakdown */}
+        <Card sx={{ 
+          mb: 4,
+          background: 'white',
+          borderRadius: '8px',
+          border: '1px solid #e0e0e0',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+        }}>
+          <CardContent sx={{ p: 4 }}>
+            <Typography variant="h5" sx={{ 
+              fontWeight: 600, 
+              mb: 3, 
+              color: '#1a1a1a',
+              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+            }}>
+              Tax Breakdown
+            </Typography>
+            
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ 
+                  p: 3, 
+                  borderRadius: '6px', 
+                  background: '#e3f2fd',
+                  border: '1px solid #bbdefb',
+                  textAlign: 'center',
+                }}>
+                  <Typography variant="h6" sx={{ 
+                    fontWeight: 600, 
+                    color: '#1565c0', 
+                    mb: 2,
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  }}>
+                    TCS (Tax Collected at Source)
+                  </Typography>
+                  <Typography variant="h4" sx={{ 
+                    fontWeight: 700, 
+                    color: '#1565c0',
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  }}>
+                    {formatCurrency(reconciliationData.tcs)}
+                  </Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ 
+                  p: 3, 
+                  borderRadius: '6px', 
+                  background: '#f3e5f5',
+                  border: '1px solid #e1bee7',
+                  textAlign: 'center',
+                }}>
+                  <Typography variant="h6" sx={{ 
+                    fontWeight: 600, 
+                    color: '#7b1fa2', 
+                    mb: 2,
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  }}>
+                    TDS (Tax Deducted at Source)
+                  </Typography>
+                  <Typography variant="h4" sx={{ 
+                    fontWeight: 700, 
+                    color: '#7b1fa2',
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  }}>
+                    {formatCurrency(reconciliationData.tds)}
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
       </Box>
 
       {/* TransactionSheet Overlay */}

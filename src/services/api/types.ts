@@ -61,7 +61,34 @@ export interface ApiRequestConfig extends RequestConfig {
   params?: Record<string, any>;
 }
 
-// Marketplace Reconciliation Types
+// Marketplace Reconciliation Types - Updated
+export interface MarketplaceReconciliationResponse {
+  grossSales: number;
+  ordersDelivered: {
+    amount: number;
+    number: number;
+  };
+  ordersReturned: {
+    amount: number;
+    number: number;
+  };
+  commission: number;
+  netReceivable: number;
+  awaitedSettlement: {
+    amount: number;
+    orders: number;
+  };
+  unsettledReturns: {
+    amount: number;
+    returns: number;
+  };
+  tcs: number;
+  tds: number;
+  payoutReceived: number;
+  difference: number;
+}
+
+// Legacy types - keeping for backward compatibility
 export interface ReconciliationData {
   totalSales: number;
   totalCommission: number;
