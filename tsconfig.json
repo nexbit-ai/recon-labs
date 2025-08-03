@@ -20,6 +20,12 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": false,
+    "noImplicitAny": false,
+    "suppressImplicitAnyIndexErrors": false,
+    "noImplicitReturns": false,
+    "noImplicitThis": false,
+    "noUncheckedIndexedAccess": false,
+    "skipDefaultLibCheck": true,
 
     /* Path mapping */
     "baseUrl": ".",

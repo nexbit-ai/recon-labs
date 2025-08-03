@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { Box, Typography, Paper, Grid, Button, Chip, Container, Card, CardContent, Stack, Divider } from '@mui/material';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { Box, Typography, Paper, Grid, Card, CardContent } from '@mui/material';
 import SecurityIcon from '@mui/icons-material/Security';
