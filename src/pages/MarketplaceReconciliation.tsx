@@ -434,7 +434,7 @@ const MarketplaceReconciliation: React.FC = () => {
           </Box>
         </Fade>
 
-        {/* Reconciliation Calculation */}
+        {/* Reconciliation Difference */}
         <Card sx={{ 
           mb: 4,
           background: 'white',
@@ -450,300 +450,96 @@ const MarketplaceReconciliation: React.FC = () => {
               fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
               textAlign: 'left',
             }}>
-              Reconciliation Calculation
+              Reconciled Difference
             </Typography>
             
-            {/* Reconciliation Calculation - Boundaryless Sections */}
+            {/* Simplified Difference Display */}
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 2,
-              flexWrap: 'wrap',
               mt: 1,
             }}>
-              {/* Section 1: Total Sales Value */}
-              <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                minWidth: 140,
-              }}>
-                <Typography variant="body1" sx={{
-                  fontWeight: 500,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  mb: 1,
-                  textAlign: 'center',
-                  fontSize: '0.75rem',
+                              <Tooltip
+                  title={
+                    <Box sx={{ p: 1 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'white' }}>
+                        Reconciliation Calculation:
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <Typography variant="body2" sx={{ color: 'white' }}>
+                          Total Sales: {formatCurrency(parseAmount(reconciliationData.grossSales))}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'white' }}>
+                          - Collection: {formatCurrency(parseAmount(reconciliationData.MonthOrdersPayoutReceived))}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'white' }}>
+                          - Platform Commissions: {formatCurrency(parseAmount(reconciliationData.commission.totalCommission))}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'white' }}>
+                          - TDS (Tax Deducted): {formatCurrency(parseAmount(reconciliationData.TotalTDS))}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'white' }}>
+                          - TCS (Tax Collected): {formatCurrency(parseAmount(reconciliationData.TotalTDA))}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'white', fontWeight: 600, mt: 1 }}>
+                          = Difference: {formatCurrency(parseAmount(reconciliationData.difference))}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  }
+                arrow
+                placement="top"
+                enterDelay={1000}
+                leaveDelay={0}
+                PopperProps={{
+                  sx: {
+                    '& .MuiTooltip-tooltip': {
+                      backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                      borderRadius: '8px',
+                      fontSize: '0.875rem',
+                      padding: '12px',
+                      maxWidth: 350,
+                    },
+                    '& .MuiTooltip-arrow': {
+                      color: 'rgba(0, 0, 0, 0.9)',
+                    },
+                  },
+                }}
+              >
+                <Box sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  cursor: 'help',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    transform: 'scale(1.02)',
+                  },
                 }}>
-                  Total Sales
-                </Typography>
-                <Typography variant="h4" sx={{
-                  fontWeight: 100,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2rem',
-                  mb: 0.5,
-                  textAlign: 'center',
-                }}>
-                  {formatCurrency(parseAmount(reconciliationData.grossSales))}
-                </Typography>
-                <Typography variant="body2" sx={{
-                  color: '#666666',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  textAlign: 'center',
-                  fontSize: '0.75rem',
-                }}>
-                  Gross Sales
-                </Typography>
-              </Box>
-
-              {/* Minus Sign */}
-              <Typography variant="h3" sx={{
-                fontWeight: 400,
-                color: '#1a1a1a',
-                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                fontSize: '2rem',
-                alignSelf: 'center',
-                mt: 0.5,
-              }}>
-                −
-              </Typography>
-
-              {/* Section 2: Collection Received */}
-              <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                minWidth: 140,
-              }}>
-                <Typography variant="body1" sx={{
-                  fontWeight: 500,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  mb: 1,
-                  textAlign: 'center',
-                  fontSize: '0.75rem',
-                }}>
-                  Collection
-                </Typography>
-                <Typography variant="h4" sx={{
-                  fontWeight: 100,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2rem',
-                  mb: 0.5,
-                  textAlign: 'center',
-                }}>
-                  {formatCurrency(parseAmount(reconciliationData.MonthOrdersPayoutReceived))}
-                </Typography>
-                <Typography variant="body2" sx={{
-                  color: '#666666',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  textAlign: 'center',
-                  fontSize: '0.75rem',
-                }}>
-                  Payout
-                </Typography>
-              </Box>
-
-              {/* Minus Sign */}
-              <Typography variant="h3" sx={{
-                fontWeight: 400,
-                color: '#1a1a1a',
-                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                fontSize: '2rem',
-                alignSelf: 'center',
-                mt: 0.5,
-              }}>
-                −
-              </Typography>
-
-              {/* Section 3: TDS */}
-              <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                minWidth: 140,
-              }}>
-                <Typography variant="body1" sx={{
-                  fontWeight: 500,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  mb: 1,
-                  textAlign: 'center',
-                  fontSize: '0.75rem',
-                }}>
-                  TDS
-                </Typography>
-                <Typography variant="h4" sx={{
-                  fontWeight: 100,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2rem',
-                  mb: 0.5,
-                  textAlign: 'center',
-                }}>
-                  {formatCurrency(parseAmount(reconciliationData.TotalTDS))}
-                </Typography>
-                <Typography variant="body2" sx={{
-                  color: '#666666',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  textAlign: 'center',
-                  fontSize: '0.75rem',
-                }}>
-                  Tax Deducted
-                </Typography>
-              </Box>
-
-              {/* Minus Sign */}
-              <Typography variant="h3" sx={{
-                fontWeight: 400,
-                color: '#1a1a1a',
-                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                fontSize: '2rem',
-                alignSelf: 'center',
-                mt: 0.5,
-              }}>
-                −
-              </Typography>
-
-              {/* Section 4: TCS */}
-              <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                minWidth: 140,
-              }}>
-                <Typography variant="body1" sx={{
-                  fontWeight: 500,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  mb: 1,
-                  textAlign: 'center',
-                  fontSize: '0.75rem',
-                }}>
-                  TCS
-                </Typography>
-                <Typography variant="h4" sx={{
-                  fontWeight: 100,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2rem',
-                  mb: 0.5,
-                  textAlign: 'center',
-                }}>
-                  {formatCurrency(parseAmount(reconciliationData.TotalTDA))}
-                </Typography>
-                <Typography variant="body2" sx={{
-                  color: '#666666',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  textAlign: 'center',
-                  fontSize: '0.75rem',
-                }}>
-                  Tax Collected
-                </Typography>
-              </Box>
-
-              {/* Minus Sign */}
-              <Typography variant="h3" sx={{
-                fontWeight: 400,
-                color: '#1a1a1a',
-                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                fontSize: '2rem',
-                alignSelf: 'center',
-                mt: 0.5,
-              }}>
-                −
-              </Typography>
-
-              {/* Section 5: Commissions */}
-              <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                minWidth: 140,
-              }}>
-                <Typography variant="body1" sx={{
-                  fontWeight: 500,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  mb: 1,
-                  textAlign: 'center',
-                  fontSize: '0.75rem',
-                }}>
-                  Commissions
-                </Typography>
-                <Typography variant="h4" sx={{
-                  fontWeight: 100,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2rem',
-                  mb: 0.5,
-                  textAlign: 'center',
-                }}>
-                  {formatCurrency(parseAmount(reconciliationData.commission.totalCommission))}
-                </Typography>
-                <Typography variant="body2" sx={{
-                  color: '#666666',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  textAlign: 'center',
-                  fontSize: '0.75rem',
-                }}>
-                  Platform Fees
-                </Typography>
-              </Box>
-
-              {/* Equals Sign */}
-              <Typography variant="h3" sx={{
-                fontWeight: 400,
-                color: '#1a1a1a',
-                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                fontSize: '2rem',
-                alignSelf: 'center',
-                mt: 1,
-              }}>
-                =
-              </Typography>
-
-              {/* Section 6: Difference */}
-              <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                minWidth: 140,
-              }}>
-                <Typography variant="body1" sx={{
-                  fontWeight: 500,
-                  color: parseAmount(reconciliationData.difference) === 0 ? '#155724' : '#d32f2f',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  mb: 1,
-                  textAlign: 'center',
-                  fontSize: '0.75rem',
-                }}>
-                  Difference
-                </Typography>
-                <Typography variant="h4" sx={{
-                  fontWeight: 100,
-                  color: parseAmount(reconciliationData.difference) === 0 ? '#155724' : '#d32f2f',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2rem',
-                  mb: 0.5,
-                  textAlign: 'center',
-                }}>
-                  {formatCurrency(parseAmount(reconciliationData.difference))}
-                </Typography>
-                <Typography variant="body2" sx={{
-                  color: parseAmount(reconciliationData.difference) === 0 ? '#155724' : '#d32f2f',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  textAlign: 'center',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                }}>
-                  {parseAmount(reconciliationData.difference) === 0 ? 'Matched' : 'Reconciliation Required'}
-                </Typography>
-              </Box>
+                  <Typography variant="h2" sx={{
+                    fontWeight: 100,
+                    color: parseAmount(reconciliationData.difference) === 0 ? '#155724' : '#d32f2f',
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                    fontSize: '3.5rem',
+                    mb: 1,
+                    textAlign: 'center',
+                    lineHeight: 1,
+                  }}>
+                    {formatCurrency(parseAmount(reconciliationData.difference))}
+                  </Typography>
+                  <Typography variant="h6" sx={{
+                    color: parseAmount(reconciliationData.difference) === 0 ? '#155724' : '#d32f2f',
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                    textAlign: 'center',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}>
+                    {parseAmount(reconciliationData.difference) === 0 ? 'Perfectly Reconciled' : 'Reconciliation Required'}
+                  </Typography>
+                </Box>
+              </Tooltip>
             </Box>
           </CardContent>
         </Card>
