@@ -29,9 +29,13 @@ import {
   ChatOutlined as ChatIcon,
   StorefrontOutlined as StorefrontIcon,
   ReceiptOutlined as ReceiptIcon,
+  LogoutOutlined as LogoutIcon,
+  KeyboardArrowUp as KeyboardArrowUpIcon,
 } from '@mui/icons-material';
 // @ts-ignore
 import logo from '../assets/logo.png';
+// @ts-ignore
+import userPhoto from '../assets/user-photo.jpg';
 
 const drawerWidth = 240;
 
@@ -63,12 +67,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const handleMenuOption = (option: string) => {
     setSettingsAnchorEl(null);
-    if (option === 'Security') {
+    if (option === 'Settings') {
+      // Navigate to settings page or show settings modal
+      console.log('Settings clicked');
+    } else if (option === 'Security') {
       navigate('/security');
     } else if (option === 'Pricing') {
       navigate('/pricing');
+    } else if (option === 'Logout') {
+      // Navigate to login page
+      navigate('/login');
     }
-    // Example: navigate(`/settings/${option.toLowerCase()}`);
   };
 
   const drawer = (
@@ -152,9 +161,30 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <ListItem disablePadding>
           <ListItemButton onClick={handleSettingsClick} sx={{ borderRadius: 0, mr: 2, my: 0.25 }}>
             <ListItemIcon sx={{ minWidth: 36 }}>
-              <SettingsIcon />
+              <Avatar 
+                sx={{ 
+                  width: 32, 
+                  height: 32,
+                }}
+                src={userPhoto}
+                alt="Krishna"
+              />
             </ListItemIcon>
-            <ListItemText primary="Settings" />
+            <ListItemText 
+              primary={
+                <Typography sx={{ 
+                  fontWeight: 'bold', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 0.5, 
+                  color: 'text.primary',
+                  fontSize: '14px'
+                }}>
+                  Hi, Krishna
+                  <KeyboardArrowUpIcon sx={{ fontSize: '16px', color: 'text.primary', fontWeight: 'bold' }} />
+                </Typography>
+              } 
+            />
           </ListItemButton>
         </ListItem>
         <Menu
@@ -164,8 +194,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
+          <MenuItem onClick={() => handleMenuOption('Settings')}>Settings</MenuItem>
           <MenuItem onClick={() => handleMenuOption('Security')}>Security</MenuItem>
           <MenuItem onClick={() => handleMenuOption('Pricing')}>Pricing</MenuItem>
+          <MenuItem onClick={() => handleMenuOption('Logout')}>
+            <LogoutIcon sx={{ mr: 1 }} />
+            Logout
+          </MenuItem>
         </Menu>
       </Box>
     </Box>

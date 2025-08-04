@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import { apiUtils } from './services/api';
 import Layout from './components/Layout';
+import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Checklist from './pages/Checklist';
 import RecentActivities from './pages/RecentActivities';
@@ -208,25 +209,77 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
-        <Layout>
+              <Router>
           <Routes>
-            <Route path="/" element={<MarketplaceReconciliation />} />
-            <Route path="/checklist" element={<Checklist />} />
-            <Route path="/recent-activities" element={<RecentActivities />} />
-            <Route path="/reconciliation" element={<Reconciliation />} />
-            <Route path="/marketplace-reconciliation" element={<MarketplaceReconciliation />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/finance-dashboard" element={<FinanceDashboard />} />
-            <Route path="/connect-data-sources" element={<ConnectDataSources />} />
-            <Route path="/ai-workflows" element={<AIWorkflows />} />
-            <Route path="/assistant" element={<Assistant />} />
-            <Route path="/ai-reconciliation" element={<AIReconciliation />} />
-            <Route path="/security" element={<Security />} />
-            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<Login />} />
+            <Route path="/home" element={
+              <Layout>
+                <MarketplaceReconciliation />
+              </Layout>
+            } />
+            <Route path="/checklist" element={
+              <Layout>
+                <Checklist />
+              </Layout>
+            } />
+            <Route path="/recent-activities" element={
+              <Layout>
+                <RecentActivities />
+              </Layout>
+            } />
+            <Route path="/reconciliation" element={
+              <Layout>
+                <Reconciliation />
+              </Layout>
+            } />
+            <Route path="/marketplace-reconciliation" element={
+              <Layout>
+                <MarketplaceReconciliation />
+              </Layout>
+            } />
+            <Route path="/reports" element={
+              <Layout>
+                <Reports />
+              </Layout>
+            } />
+            <Route path="/finance-dashboard" element={
+              <Layout>
+                <FinanceDashboard />
+              </Layout>
+            } />
+            <Route path="/connect-data-sources" element={
+              <Layout>
+                <ConnectDataSources />
+              </Layout>
+            } />
+            <Route path="/ai-workflows" element={
+              <Layout>
+                <AIWorkflows />
+              </Layout>
+            } />
+            <Route path="/assistant" element={
+              <Layout>
+                <Assistant />
+              </Layout>
+            } />
+            <Route path="/ai-reconciliation" element={
+              <Layout>
+                <AIReconciliation />
+              </Layout>
+            } />
+            <Route path="/security" element={
+              <Layout>
+                <Security />
+              </Layout>
+            } />
+            <Route path="/pricing" element={
+              <Layout>
+                <Pricing />
+              </Layout>
+            } />
           </Routes>
-        </Layout>
-      </Router>
+        </Router>
     </ThemeProvider>
   );
 }
