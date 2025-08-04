@@ -1,54 +1,61 @@
 import { MarketplaceReconciliationResponse } from '../services/api/types';
 
 export const mockReconciliationData: MarketplaceReconciliationResponse = {
-  grossSales: 1200000,
+  grossSales: "1200000",
   ordersDelivered: {
-    amount: 1230000,
+    amount: "1230000",
     number: 480
   },
   ordersReturned: {
-    amount: -30000,
+    amount: "30000",
     number: 12
   },
-  commission: 80000,
-  netReceivable: 1033000,
-  awaitedSettlement: {
-    amount: 150000,
-    orders: 20
+  commission: {
+    totalCommission: "80000",
+    commissionRate: "6.67"
+  },
+  TotalTDS: "5000",
+  TotalTDA: "12000",
+  MonthOrdersPayoutReceived: "900000",
+  MonthOrdersAwaitedSettlement: {
+    SalesAmount: "150000",
+    SalesOrders: 20
   },
   unsettledReturns: {
-    amount: 22000,
-    returns: 8
+    returnAmount: "22000",
+    returnsOrders: 8
   },
-  tcs: 12000,
-  tds: 5000,
-  payoutReceived: 900000,
-  difference: 100000
+  difference: "100000",
+  returnRate: "2.5",
+  commissionRate: "6.67"
 };
 
 // Helper function to validate if the API response has all required fields
 export const isValidReconciliationData = (data: any): data is MarketplaceReconciliationResponse => {
   return (
     data &&
-    typeof data.grossSales === 'number' &&
+    typeof data.grossSales === 'string' &&
     data.ordersDelivered &&
-    typeof data.ordersDelivered.amount === 'number' &&
+    typeof data.ordersDelivered.amount === 'string' &&
     typeof data.ordersDelivered.number === 'number' &&
     data.ordersReturned &&
-    typeof data.ordersReturned.amount === 'number' &&
+    typeof data.ordersReturned.amount === 'string' &&
     typeof data.ordersReturned.number === 'number' &&
-    typeof data.commission === 'number' &&
-    typeof data.netReceivable === 'number' &&
-    data.awaitedSettlement &&
-    typeof data.awaitedSettlement.amount === 'number' &&
-    typeof data.awaitedSettlement.orders === 'number' &&
+    data.commission &&
+    typeof data.commission.totalCommission === 'string' &&
+    typeof data.commission.commissionRate === 'string' &&
+    typeof data.TotalTDS === 'string' &&
+    typeof data.TotalTDA === 'string' &&
+    typeof data.MonthOrdersPayoutReceived === 'string' &&
+    data.MonthOrdersAwaitedSettlement &&
+    typeof data.MonthOrdersAwaitedSettlement.SalesAmount === 'string' &&
+    typeof data.MonthOrdersAwaitedSettlement.SalesOrders === 'number' &&
     data.unsettledReturns &&
-    typeof data.unsettledReturns.amount === 'number' &&
-    typeof data.unsettledReturns.returns === 'number' &&
-    typeof data.tcs === 'number' &&
-    typeof data.tds === 'number' &&
-    typeof data.payoutReceived === 'number' &&
-    typeof data.difference === 'number'
+    typeof data.unsettledReturns.returnAmount === 'string' &&
+    typeof data.unsettledReturns.returnsOrders === 'number' &&
+    typeof data.difference === 'string' &&
+    typeof data.returnRate === 'string' &&
+    typeof data.commissionRate === 'string'
   );
 };
 

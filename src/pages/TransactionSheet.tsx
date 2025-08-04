@@ -28,6 +28,8 @@ import {
   SelectChangeEvent,
   Divider,
   LinearProgress,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -187,6 +189,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
 
   // Format currency values
   const formatCurrency = (amount: number) => {
@@ -231,7 +234,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   useEffect(() => {
     setLoading(true);
     
-    let filtered = mockTransactionData.rows;
+    let filtered = getCurrentData();
     
     // Search filter
     if (searchTerm) {
@@ -286,7 +289,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     
     setFilteredData(filtered);
     setLoading(false);
-  }, [searchTerm, dateRange, columnFilters]);
+  }, [searchTerm, dateRange, columnFilters, activeTab]);
 
   // Handle pagination
   const handleChangePage = (event: unknown, newPage: number) => {
@@ -309,6 +312,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setSearchTerm('');
     setDateRange({ start: '', end: '' });
     setColumnFilters({});
+  };
+
+  // Handle tab change
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+    setPage(0); // Reset to first page when changing tabs
+  };
+
+  // Separate settled and unsettled transactions
+  const settledTransactions = mockTransactionData.rows.filter(row => row["Settlement Value"] > 0);
+  const unsettledTransactions = mockTransactionData.rows.filter(row => row["Settlement Value"] <= 0);
+
+  // Get current data based on active tab
+  const getCurrentData = () => {
+    return activeTab === 0 ? settledTransactions : unsettledTransactions;
   };
 
   // Get visible columns
@@ -564,12 +582,24 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 {/* Results Summary */}
                 <Box sx={{ display: 'flex', alignItems: 'center', mt: 3, gap: 2 }}>
                   <Chip 
-                    label={`${filteredData.length} transactions found`}
+                    label={`${filteredData.length} ${activeTab === 0 ? 'settled' : 'unsettled'} transactions found`}
                     color="primary"
                     sx={{ 
                       borderRadius: '12px',
-                      background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+                      background: activeTab === 0 
+                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                        : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                       color: 'white',
+                      fontWeight: 600,
+                    }}
+                  />
+                  <Chip 
+                    label={`Total ${activeTab === 0 ? 'settled' : 'unsettled'}: ${activeTab === 0 ? settledTransactions.length : unsettledTransactions.length}`}
+                    variant="outlined"
+                    sx={{ 
+                      borderRadius: '12px',
+                      borderColor: activeTab === 0 ? '#10b981' : '#ef4444',
+                      color: activeTab === 0 ? '#10b981' : '#ef4444',
                       fontWeight: 600,
                     }}
                   />
@@ -579,8 +609,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       variant="outlined"
                       sx={{ 
                         borderRadius: '12px',
-                        borderColor: '#10b981',
-                        color: '#10b981',
+                        borderColor: '#6366f1',
+                        color: '#6366f1',
                         fontWeight: 600,
                       }}
                     />
@@ -604,6 +634,115 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               }} 
             />
           )}
+
+          {/* Transaction Tabs */}
+          <Fade in timeout={800}>
+            <Card sx={{ 
+              mb: 3,
+              background: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '24px',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+            }}>
+              <CardContent sx={{ p: 0 }}>
+                <Tabs 
+                  value={activeTab} 
+                  onChange={handleTabChange}
+                  sx={{
+                    '& .MuiTab-root': {
+                      minHeight: 64,
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      color: '#64748b',
+                      '&.Mui-selected': {
+                        color: '#6366f1',
+                        fontWeight: 700,
+                      },
+                    },
+                    '& .MuiTabs-indicator': {
+                      height: 3,
+                      borderRadius: '3px 3px 0 0',
+                      background: 'linear-gradient(90deg, #6366f1 0%, #a855f7 100%)',
+                    },
+                  }}
+                >
+                  <Tab 
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Chip 
+                          label={settledTransactions.length}
+                          size="small"
+                          sx={{ 
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white',
+                            fontWeight: 600,
+                            fontSize: '0.75rem',
+                          }}
+                        />
+                        <Typography>Settled Transactions</Typography>
+                      </Box>
+                    }
+                  />
+                  <Tab 
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Chip 
+                          label={unsettledTransactions.length}
+                          size="small"
+                          sx={{ 
+                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                            color: 'white',
+                            fontWeight: 600,
+                            fontSize: '0.75rem',
+                          }}
+                        />
+                        <Typography>Unsettled Transactions</Typography>
+                      </Box>
+                    }
+                  />
+                </Tabs>
+                
+                {/* Summary Section */}
+                <Box sx={{ p: 3, borderTop: '1px solid rgba(226, 232, 240, 0.5)' }}>
+                  <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
+                        Total {activeTab === 0 ? 'Settled' : 'Unsettled'} Value:
+                      </Typography>
+                      <Typography variant="h6" sx={{ 
+                        fontWeight: 700,
+                        color: activeTab === 0 ? '#10b981' : '#ef4444',
+                      }}>
+                        {formatCurrency(
+                          (activeTab === 0 ? settledTransactions : unsettledTransactions)
+                            .reduce((sum, row) => sum + row["Settlement Value"], 0)
+                        )}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
+                        Average {activeTab === 0 ? 'Settled' : 'Unsettled'} Value:
+                      </Typography>
+                      <Typography variant="h6" sx={{ 
+                        fontWeight: 700,
+                        color: activeTab === 0 ? '#10b981' : '#ef4444',
+                      }}>
+                        {formatCurrency(
+                          (activeTab === 0 ? settledTransactions : unsettledTransactions).length > 0
+                            ? (activeTab === 0 ? settledTransactions : unsettledTransactions)
+                                .reduce((sum, row) => sum + row["Settlement Value"], 0) / 
+                              (activeTab === 0 ? settledTransactions : unsettledTransactions).length
+                            : 0
+                        )}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Fade>
 
           {/* Transaction Table */}
           <Fade in timeout={1000}>
@@ -733,10 +872,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         key={rowIndex} 
                         sx={{ 
                           '&:hover': { 
-                            background: 'rgba(99, 102, 241, 0.05)',
+                            background: activeTab === 0 
+                              ? 'rgba(16, 185, 129, 0.05)' 
+                              : 'rgba(239, 68, 68, 0.05)',
                             transform: 'scale(1.001)',
                           },
                           transition: 'all 0.2s ease',
+                          borderLeft: `4px solid ${activeTab === 0 ? '#10b981' : '#ef4444'}`,
                         }}
                       >
                         {visibleColumns.map((column) => {
@@ -773,7 +915,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 fontWeight: childKey === 'Total' ? 600 : 500,
                                 color: '#1e293b',
                                 '&:hover': {
-                                  background: 'rgba(99, 102, 241, 0.1)',
+                                  background: activeTab === 0 
+                                    ? 'rgba(16, 185, 129, 0.1)' 
+                                    : 'rgba(239, 68, 68, 0.1)',
                                 },
                                 transition: 'all 0.2s ease',
                               }}
