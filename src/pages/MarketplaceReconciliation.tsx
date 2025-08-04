@@ -34,6 +34,15 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ListItemSecondaryAction,
 } from '@mui/material';
 import {
   PieChart,
@@ -69,6 +78,10 @@ import {
   KeyboardReturn as ReturnIcon,
   Payment as PaymentIcon,
   PendingActions as PendingPaymentIcon,
+  Sync as SyncIcon,
+  CloudSync as CloudSyncIcon,
+  CheckCircleOutline as CheckCircleOutlineIcon,
+  Schedule as ScheduleIcon,
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
 import { apiService } from '../services/api/apiService';
@@ -82,6 +95,11 @@ const MarketplaceReconciliation: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(false);
+
+  // Sync data sources state
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [lastSynced, setLastSynced] = useState<Date>(new Date(Date.now() - 2 * 60 * 60 * 1000)); // 2 hours ago
 
   // Generate available months (last 12 months)
   const generateAvailableMonths = () => {
@@ -129,6 +147,40 @@ const MarketplaceReconciliation: React.FC = () => {
       startDate: startDate.toISOString().split('T')[0],
       endDate: endDate.toISOString().split('T')[0]
     };
+  };
+
+  // Sync data sources function
+  const handleSyncDataSources = async () => {
+    setSyncLoading(true);
+    setShowSyncModal(true);
+    
+    // Simulate API call for 2-3 seconds
+    setTimeout(() => {
+      setSyncLoading(false);
+      setLastSynced(new Date());
+      // Close modal after showing success for a moment
+      setTimeout(() => {
+        setShowSyncModal(false);
+      }, 1000);
+    }, 2500);
+  };
+
+  // Format last synced time
+  const formatLastSynced = (date: Date) => {
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) {
+      return 'Just now';
+    } else if (diffInMinutes < 60) {
+      return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
+    } else if (diffInMinutes < 1440) {
+      const hours = Math.floor(diffInMinutes / 60);
+      return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    } else {
+      const days = Math.floor(diffInMinutes / 1440);
+      return `${days} day${days > 1 ? 's' : ''} ago`;
+    }
   };
 
   // Fetch reconciliation data
@@ -306,6 +358,49 @@ const MarketplaceReconciliation: React.FC = () => {
                     ))}
                   </Select>
                 </FormControl>
+
+                {/* Sync Data Sources Button */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<SyncIcon />}
+                    onClick={handleSyncDataSources}
+                    disabled={syncLoading}
+                    sx={{
+                      borderRadius: '6px',
+                      borderColor: '#1a1a1a',
+                      color: '#1a1a1a',
+                      textTransform: 'none',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontWeight: 500,
+                      px: 3,
+                      py: 1,
+                      '&:hover': {
+                        borderColor: '#000000',
+                        backgroundColor: '#f5f5f5',
+                      },
+                      '&:disabled': {
+                        borderColor: '#d0d0d0',
+                        color: '#d0d0d0',
+                      },
+                    }}
+                  >
+                    {syncLoading ? 'Syncing...' : 'Sync Data'}
+                  </Button>
+                  
+                  {/* Last Synced Text */}
+                  <Typography variant="caption" sx={{
+                    color: '#666666',
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                    fontSize: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                  }}>
+                    <ScheduleIcon sx={{ fontSize: '0.75rem' }} />
+                    Last synced: {formatLastSynced(lastSynced)}
+                  </Typography>
+                </Box>
               </Box>
             </Box>
             
@@ -1487,6 +1582,206 @@ const MarketplaceReconciliation: React.FC = () => {
           </CardContent>
         </Card>
       </Box>
+
+      {/* Sync Data Sources Modal */}
+      <Dialog
+        open={showSyncModal}
+        onClose={() => !syncLoading && setShowSyncModal(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+          }
+        }}
+      >
+        <DialogTitle sx={{
+          borderBottom: '1px solid #e0e0e0',
+          pb: 2,
+          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+          fontWeight: 600,
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <CloudSyncIcon sx={{ color: '#1a1a1a' }} />
+            Sync Data Sources
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent sx={{ pt: 3 }}>
+          {syncLoading ? (
+            // Loading State
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              py: 4,
+              gap: 2 
+            }}>
+              <CircularProgress size={60} sx={{ color: '#1a1a1a' }} />
+              <Typography variant="h6" sx={{
+                color: '#1a1a1a',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                fontWeight: 500,
+              }}>
+                Syncing Data Sources...
+              </Typography>
+              <Typography variant="body2" sx={{
+                color: '#666666',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                textAlign: 'center',
+                maxWidth: 300,
+              }}>
+                Please wait while we sync your connected marketplace data sources
+              </Typography>
+            </Box>
+          ) : (
+            // Success State
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              py: 4,
+              gap: 2 
+            }}>
+              <Box sx={{
+                width: 60,
+                height: 60,
+                borderRadius: '50%',
+                background: '#d4edda',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mb: 2,
+              }}>
+                <CheckCircleOutlineIcon sx={{ fontSize: 32, color: '#155724' }} />
+              </Box>
+              <Typography variant="h6" sx={{
+                color: '#155724',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                fontWeight: 600,
+              }}>
+                Sync Completed Successfully!
+              </Typography>
+              <Typography variant="body2" sx={{
+                color: '#666666',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                textAlign: 'center',
+                maxWidth: 300,
+              }}>
+                All connected data sources have been synchronized
+              </Typography>
+            </Box>
+          )}
+
+          {/* Connected Sources List */}
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="subtitle1" sx={{
+              fontWeight: 600,
+              color: '#1a1a1a',
+              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+              mb: 2,
+            }}>
+              Connected Data Sources
+            </Typography>
+            
+            <List sx={{ p: 0 }}>
+              <ListItem sx={{
+                borderRadius: '8px',
+                background: '#f8f9fa',
+                border: '1px solid #e9ecef',
+                mb: 1,
+              }}>
+                <ListItemIcon>
+                  <Box
+                    component="img"
+                    src="https://cdn.worldvectorlogo.com/logos/flipkart.svg"
+                    alt="Flipkart"
+                    sx={{
+                      width: 40,
+                      height: 40,
+                      objectFit: 'contain',
+                      borderRadius: '4px',
+                    }}
+                  />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Flipkart"
+                  secondary="E-commerce marketplace"
+                  sx={{
+                    '& .MuiListItemText-primary': {
+                      fontWeight: 600,
+                      color: '#1a1a1a',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                    },
+                    '& .MuiListItemText-secondary': {
+                      color: '#666666',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                    },
+                  }}
+                />
+                <ListItemSecondaryAction>
+                  <Chip
+                    label="Connected"
+                    color="success"
+                    size="small"
+                    sx={{
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontWeight: 500,
+                    }}
+                  />
+                </ListItemSecondaryAction>
+              </ListItem>
+            </List>
+
+            {/* Add More Sources Button */}
+            <Box sx={{ mt: 3, textAlign: 'center' }}>
+              <Button
+                variant="outlined"
+                startIcon={<CloudSyncIcon />}
+                sx={{
+                  borderRadius: '6px',
+                  borderColor: '#1a1a1a',
+                  color: '#1a1a1a',
+                  textTransform: 'none',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  fontWeight: 500,
+                  px: 3,
+                  py: 1,
+                  '&:hover': {
+                    borderColor: '#000000',
+                    backgroundColor: '#f5f5f5',
+                  },
+                }}
+              >
+                Connect More Sources
+              </Button>
+            </Box>
+          </Box>
+        </DialogContent>
+        
+        <DialogActions sx={{ 
+          borderTop: '1px solid #e0e0e0',
+          pt: 2,
+          px: 3,
+          pb: 3,
+        }}>
+          <Button
+            onClick={() => setShowSyncModal(false)}
+            disabled={syncLoading}
+            sx={{
+              borderRadius: '6px',
+              textTransform: 'none',
+              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+              fontWeight: 500,
+              px: 3,
+              py: 1,
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* TransactionSheet Overlay */}
       {showTransactionSheet && (
