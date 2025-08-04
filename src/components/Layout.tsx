@@ -39,7 +39,7 @@ const menuItems = [
   { text: 'Marketplace', icon: <StorefrontIcon />, path: '/finance-dashboard' },
   { text: 'Marketplace Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation' },
   { text: 'Month-end close', icon: <ChecklistIcon />, path: '/checklist' },
-  { text: 'Recent Activities', icon: <EditIcon />, path: '/recent-activities' },
+  { text: 'Assistant', icon: <ChatIcon />, path: '/assistant' },
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
