@@ -41,7 +41,7 @@ In your Stytch dashboard:
 
 2. **Set up Redirect URLs**
    - Go to Settings → Redirect URLs
-   - Add: `http://localhost:5173/reset-password`
+   - Add: `http://localhost:5173/reset-password`  
    - Add: `https://yourdomain.com/reset-password` (for production)
 
 3. **Configure Email Templates**
