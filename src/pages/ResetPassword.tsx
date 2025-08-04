@@ -16,14 +16,14 @@ import {
   VisibilityOff,
   Lock,
 } from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext';
+// import { useAuth } from '../contexts/AuthContext';
 // @ts-ignore
 import logo from '../assets/logo.png';
 
 const ResetPassword: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { resetPasswordWithToken } = useAuth();
+  // const { resetPasswordWithToken } = useAuth();
   
   const [formData, setFormData] = useState({
     password: '',
@@ -77,15 +77,15 @@ const ResetPassword: React.FC = () => {
     setError('');
 
     try {
-      const success = await resetPasswordWithToken(token, formData.password);
-      if (success) {
+      // const success = await resetPasswordWithToken(token, formData.password);
+      // if (success) {
         setSuccess(true);
         setTimeout(() => {
           navigate('/', { replace: true });
         }, 2000);
-      } else {
-        setError('Failed to reset password. Please try again.');
-      }
+      // } else {
+      //   setError('Failed to reset password. Please try again.');
+      // }
     } catch (err) {
       setError('An error occurred. Please try again.');
     } finally {

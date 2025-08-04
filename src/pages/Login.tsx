@@ -6,16 +6,8 @@ import {
   TextField,
   Button,
   Typography,
-  InputAdornment,
-  IconButton,
   Link,
 } from '@mui/material';
-import {
-  Visibility,
-  VisibilityOff,
-  Email,
-  Lock,
-} from '@mui/icons-material';
 // @ts-ignore
 import logo from '../assets/logo.png';
 
@@ -26,7 +18,6 @@ const Login: React.FC = () => {
     email: '',
     password: '',
   });
-  const [showPassword, setShowPassword] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -42,10 +33,6 @@ const Login: React.FC = () => {
     navigate('/home', { replace: true });
   };
 
-  const handleTogglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
-
   const handleResetPassword = () => {
     // Dummy reset password - just show alert
     alert('Password reset email sent! (This is a dummy implementation)');
@@ -58,19 +45,19 @@ const Login: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: '#f8fafc',
         padding: 2,
       }}
     >
       <Paper
-        elevation={24}
+        elevation={2}
         sx={{
           width: '100%',
           maxWidth: 400,
           padding: 4,
-          borderRadius: 3,
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
+          borderRadius: 2,
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
         }}
       >
         {/* Logo and Header */}
@@ -78,12 +65,12 @@ const Login: React.FC = () => {
           <img
             src={logo}
             alt="Company Logo"
-            style={{ width: 80, height: 80, marginBottom: 16 }}
+            style={{ width: 64, height: 64, marginBottom: 16 }}
           />
-          <Typography variant="h4" component="h1" fontWeight={800} gutterBottom>
+          <Typography variant="h4" component="h1" fontWeight={700} gutterBottom sx={{ color: '#111827' }}>
             Welcome back
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: '#6b7280' }}>
             Sign in to your account to continue
           </Typography>
         </Box>
@@ -97,14 +84,25 @@ const Login: React.FC = () => {
             type="email"
             value={formData.email}
             onChange={handleInputChange}
-            required
-            sx={{ mb: 2 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Email color="action" />
-                </InputAdornment>
-              ),
+            sx={{ 
+              mb: 2,
+              '& .MuiOutlinedInput-root': {
+                height: '40px',
+                '& fieldset': {
+                  borderColor: '#d1d5db',
+                },
+                '&:hover fieldset': {
+                  borderColor: '#9ca3af',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#2563eb',
+                },
+              },
+              '& .MuiInputLabel-root': {
+                '&.Mui-focused': {
+                  color: '#2563eb',
+                },
+              },
             }}
           />
 
@@ -112,28 +110,28 @@ const Login: React.FC = () => {
             fullWidth
             label="Password"
             name="password"
-            type={showPassword ? 'text' : 'password'}
+            type="password"
             value={formData.password}
             onChange={handleInputChange}
-            required
-            sx={{ mb: 3 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Lock color="action" />
-                </InputAdornment>
-              ),
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={handleTogglePasswordVisibility}
-                    edge="end"
-                    size="small"
-                  >
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
+            sx={{ 
+              mb: 3,
+              '& .MuiOutlinedInput-root': {
+                height: '40px',
+                '& fieldset': {
+                  borderColor: '#d1d5db',
+                },
+                '&:hover fieldset': {
+                  borderColor: '#9ca3af',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#2563eb',
+                },
+              },
+              '& .MuiInputLabel-root': {
+                '&.Mui-focused': {
+                  color: '#2563eb',
+                },
+              },
             }}
           />
 
@@ -148,6 +146,10 @@ const Login: React.FC = () => {
               fontWeight: 600,
               borderRadius: 2,
               textTransform: 'none',
+              backgroundColor: '#111827',
+              '&:hover': {
+                backgroundColor: '#374151',
+              },
             }}
           >
             Sign in
@@ -163,8 +165,10 @@ const Login: React.FC = () => {
             sx={{ 
               textDecoration: 'none',
               cursor: 'pointer',
+              color: '#6b7280',
               '&:hover': {
                 textDecoration: 'underline',
+                color: '#374151',
               }
             }}
           >

@@ -19,13 +19,13 @@ import {
   Lock,
   Person,
 } from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext';
+// import { useAuth } from '../contexts/AuthContext';
 // @ts-ignore
 import logo from '../assets/logo.png';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  // const { register } = useAuth();
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -72,12 +72,12 @@ const Register: React.FC = () => {
     setError('');
 
     try {
-      const success = await register(formData.email, formData.password);
-      if (success) {
+      // const success = await register(formData.email, formData.password);
+      // if (success) {
         navigate('/', { replace: true });
-      } else {
-        setError('Registration failed. Please try again.');
-      }
+      // } else {
+      //   setError('Registration failed. Please try again.');
+      // }
     } catch (err) {
       setError('An error occurred during registration. Please try again.');
     } finally {

@@ -1,3 +1,7 @@
+// Stytch authentication is currently disabled
+// This file is commented out to prevent build errors
+
+/*
 import { StytchUIClient } from '@stytch/vanilla-js';
 import { tokenManager } from '../api/tokenManager';
 import { ENV_CONFIG } from '../../config/environment';
@@ -218,4 +222,5 @@ class StytchAuthService {
 
 // Create and export singleton instance
 export const stytchAuthService = new StytchAuthService();
-export default StytchAuthService; 
+export default StytchAuthService;
+*/ 

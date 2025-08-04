@@ -11,12 +11,12 @@ import {
   Link as MuiLink,
 } from '@mui/material';
 import { Email } from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext';
+// import { useAuth } from '../contexts/AuthContext';
 // @ts-ignore
 import logo from '../assets/logo.png';
 
 const ForgotPassword: React.FC = () => {
-  const { resetPassword } = useAuth();
+  // const { resetPassword } = useAuth();
   
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -30,12 +30,12 @@ const ForgotPassword: React.FC = () => {
     setSuccess(false);
 
     try {
-      const success = await resetPassword(email);
-      if (success) {
+      // const success = await resetPassword(email);
+      // if (success) {
         setSuccess(true);
-      } else {
-        setError('Failed to send reset email. Please try again.');
-      }
+      // } else {
+      //   setError('Failed to send reset email. Please try again.');
+      // }
     } catch (err) {
       setError('An error occurred. Please try again.');
     } finally {

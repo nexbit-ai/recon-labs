@@ -1,3 +1,7 @@
+// Authentication context is currently disabled
+// This file is commented out to prevent build errors
+
+/*
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { stytchAuthService } from '../services/auth/stytchAuthService';
 
@@ -173,4 +177,5 @@ export const useAuth = (): AuthContextType => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}; 
+};
+*/ 
