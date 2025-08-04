@@ -37,12 +37,9 @@ const drawerWidth = 240;
 
 const menuItems = [
   { text: 'Marketplace', icon: <StorefrontIcon />, path: '/finance-dashboard' },
-  { text: 'Reconciliation', icon: <CompareArrowsIcon />, path: '/reconciliation' },
   { text: 'Marketplace Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation' },
   { text: 'Month-end close', icon: <ChecklistIcon />, path: '/checklist' },
   { text: 'Recent Activities', icon: <EditIcon />, path: '/recent-activities' },
-  { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
-  { text: 'Assistant (beta)', icon: <ChatIcon />, path: '/assistant' },
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {

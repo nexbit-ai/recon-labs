@@ -77,7 +77,7 @@ import { mockReconciliationData, getSafeReconciliationData, isValidReconciliatio
 
 const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState('2025-07');
+  const [selectedMonth, setSelectedMonth] = useState('2025-04');
   const [reconciliationData, setReconciliationData] = useState<MarketplaceReconciliationResponse>(mockReconciliationData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1196,12 +1196,12 @@ const MarketplaceReconciliation: React.FC = () => {
               Sales Calculation
             </Typography>
             
-            {/* Sales Calculation - Three Boundaryless Sections */}
+            {/* Sales Calculation - Boxed Sections with Separations */}
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 3,
+              gap: 2,
               flexWrap: 'wrap',
               mt: 1,
             }}>
@@ -1210,24 +1210,36 @@ const MarketplaceReconciliation: React.FC = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                minWidth: 160,
+                minWidth: 180,
+                p: 3,
+                borderRadius: '8px',
+                background: '#f8f9fa',
+                border: '1px solid #e9ecef',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+                  transform: 'translateY(-2px)',
+                },
               }}>
                 <Typography variant="body1" sx={{
-                  fontWeight: 500,
+                  fontWeight: 600,
                   color: '#1a1a1a',
                   fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  mb: 1.5,
+                  mb: 2,
                   textAlign: 'center',
                   fontSize: '0.875rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
                 }}>
                   Order Sales Value
                 </Typography>
                 <Typography variant="h4" sx={{
-                  fontWeight: 100,
-                  color: '#1a1a1a',
+                  fontWeight: 700,
+                  color: '#14B8A6',
                   fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2.5rem',
-                  mb: 0.5,
+                  fontSize: '2.25rem',
+                  mb: 1,
                   textAlign: 'center',
                 }}>
                   {formatCurrency(parseAmount(reconciliationData.ordersDelivered.amount))}
@@ -1237,46 +1249,73 @@ const MarketplaceReconciliation: React.FC = () => {
                   fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                   textAlign: 'center',
                   fontSize: '0.875rem',
+                  fontWeight: 500,
+                  background: '#e9ecef',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: '12px',
                 }}>
-                  ({reconciliationData.ordersDelivered.number} orders)
+                  {reconciliationData.ordersDelivered.number} orders
                 </Typography>
               </Box>
 
-              {/* Minus Sign */}
-              <Typography variant="h3" sx={{
-                fontWeight: 400,
-                color: '#1a1a1a',
-                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                fontSize: '2.5rem',
-                alignSelf: 'center',
-                mt: 0.5,
+              {/* Minus Sign with Background */}
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 60,
+                height: 60,
+                borderRadius: '50%',
+                background: '#f8f9fa',
+                border: '2px solid #e9ecef',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
               }}>
-                −
-              </Typography>
+                <Typography variant="h3" sx={{
+                  fontWeight: 700,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  fontSize: '2rem',
+                }}>
+                  −
+                </Typography>
+              </Box>
 
               {/* Section 2: Returns Value */}
               <Box sx={{
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                minWidth: 160,
+                minWidth: 180,
+                p: 3,
+                borderRadius: '8px',
+                background: '#fff5f5',
+                border: '1px solid #fed7d7',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+                  transform: 'translateY(-2px)',
+                },
               }}>
                 <Typography variant="body1" sx={{
-                  fontWeight: 500,
+                  fontWeight: 600,
                   color: '#1a1a1a',
                   fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  mb: 1.5,
+                  mb: 2,
                   textAlign: 'center',
                   fontSize: '0.875rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
                 }}>
                   Returns Value
                 </Typography>
                 <Typography variant="h4" sx={{
-                  fontWeight: 100,
-                  color: '#1a1a1a',
+                  fontWeight: 700,
+                  color: '#EF4444',
                   fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2.5rem',
-                  mb: 0.5,
+                  fontSize: '2.25rem',
+                  mb: 1,
                   textAlign: 'center',
                 }}>
                   {formatCurrency(parseAmount(reconciliationData.ordersReturned.amount))}
@@ -1286,46 +1325,73 @@ const MarketplaceReconciliation: React.FC = () => {
                   fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                   textAlign: 'center',
                   fontSize: '0.875rem',
+                  fontWeight: 500,
+                  background: '#fed7d7',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: '12px',
                 }}>
-                  ({reconciliationData.ordersReturned.number} returns)
+                  {reconciliationData.ordersReturned.number} returns
                 </Typography>
               </Box>
 
-              {/* Equals Sign */}
-              <Typography variant="h3" sx={{
-                fontWeight: 400,
-                color: '#1a1a1a',
-                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                fontSize: '2.5rem',
-                alignSelf: 'center',
-                mt: 1.5,
+              {/* Equals Sign with Background */}
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 60,
+                height: 60,
+                borderRadius: '50%',
+                background: '#f8f9fa',
+                border: '2px solid #e9ecef',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
               }}>
-                =
-              </Typography>
+                <Typography variant="h3" sx={{
+                  fontWeight: 700,
+                  color: '#1a1a1a',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  fontSize: '2rem',
+                }}>
+                  =
+                </Typography>
+              </Box>
 
               {/* Section 3: Gross Sales */}
               <Box sx={{
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                minWidth: 160,
+                minWidth: 180,
+                p: 3,
+                borderRadius: '8px',
+                background: '#f0f9ff',
+                border: '1px solid #bae6fd',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+                  transform: 'translateY(-2px)',
+                },
               }}>
                 <Typography variant="body1" sx={{
-                  fontWeight: 500,
+                  fontWeight: 600,
                   color: '#1a1a1a',
                   fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  mb: 1.5,
+                  mb: 2,
                   textAlign: 'center',
                   fontSize: '0.875rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
                 }}>
                   Gross Sales
                 </Typography>
                 <Typography variant="h4" sx={{
-                  fontWeight: 100,
-                  color: '#1a1a1a',
+                  fontWeight: 700,
+                  color: '#3B82F6',
                   fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2.5rem',
-                  mb: 0.5,
+                  fontSize: '2.25rem',
+                  mb: 1,
                   textAlign: 'center',
                 }}>
                   {formatCurrency(parseAmount(reconciliationData.grossSales))}
@@ -1335,6 +1401,11 @@ const MarketplaceReconciliation: React.FC = () => {
                   fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                   textAlign: 'center',
                   fontSize: '0.875rem',
+                  fontWeight: 500,
+                  background: '#bae6fd',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: '12px',
                 }}>
                   Net Revenue
                 </Typography>

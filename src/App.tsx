@@ -211,7 +211,7 @@ function App() {
       <Router>
         <Layout>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<MarketplaceReconciliation />} />
             <Route path="/checklist" element={<Checklist />} />
             <Route path="/recent-activities" element={<RecentActivities />} />
             <Route path="/reconciliation" element={<Reconciliation />} />

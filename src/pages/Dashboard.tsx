@@ -311,15 +311,15 @@ const Dashboard: React.FC = () => {
           </IconButton>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <IconButton size="large"><FilterListIcon sx={{ fontSize: 26 }} /></IconButton>
-          <IconButton size="large"><AddIcon sx={{ fontSize: 26 }} /></IconButton>
+          <IconButton size="large"><FilterListIcon sx={{ fontSize: 32 }} /></IconButton>
+          <IconButton size="large"><AddIcon sx={{ fontSize: 32 }} /></IconButton>
           <AvatarGroup max={3} sx={{ mr: 1 }}>
-            <Avatar src={users[0].avatar} sx={{ width: 36, height: 36 }} />
-            <Avatar src={users[1].avatar} sx={{ width: 36, height: 36 }} />
-            <Avatar src={users[2].avatar} sx={{ width: 36, height: 36 }} />
-            <Avatar sx={{ width: 36, height: 36, fontWeight: 700, fontSize: 18 }}>+2</Avatar>
+            <Avatar src={users[0].avatar} sx={{ width: 42, height: 42 }} />
+            <Avatar src={users[1].avatar} sx={{ width: 42, height: 42 }} />
+            <Avatar src={users[2].avatar} sx={{ width: 42, height: 42 }} />
+            <Avatar sx={{ width: 42, height: 42, fontWeight: 700, fontSize: 20 }}>+2</Avatar>
           </AvatarGroup>
-          <IconButton size="large"><MoreHorizIcon sx={{ fontSize: 28 }} /></IconButton>
+          <IconButton size="large"><MoreHorizIcon sx={{ fontSize: 32 }} /></IconButton>
         </Box>
       </Box>
 
