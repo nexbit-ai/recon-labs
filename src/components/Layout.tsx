@@ -33,6 +33,7 @@ import {
   LogoutOutlined as LogoutIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
 } from '@mui/icons-material';
+// import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
 // @ts-ignore
 import logo from '../assets/logo.png';
 // @ts-ignore
@@ -52,6 +53,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  // const { user, logout } = useAuth(); // Authentication disabled
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [settingsAnchorEl, setSettingsAnchorEl] = React.useState<null | HTMLElement>(null);
 

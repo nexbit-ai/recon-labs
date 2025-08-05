@@ -4,6 +4,9 @@ import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import { apiUtils } from './services/api';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Checklist from './pages/Checklist';
 import RecentActivities from './pages/RecentActivities';
@@ -212,78 +215,28 @@ function App() {
       <CssBaseline />
               <Router>
           <Routes>
+            {/* Authentication routes (public) */}
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Login />} />
-            <Route path="/home" element={
-              <Layout>
-                <MarketplaceReconciliation />
-              </Layout>
-            } />
-            <Route path="/checklist" element={
-              <Layout>
-                <Checklist />
-              </Layout>
-            } />
-            <Route path="/recent-activities" element={
-              <Layout>
-                <RecentActivities />
-              </Layout>
-            } />
-            <Route path="/reconciliation" element={
-              <Layout>
-                <Reconciliation />
-              </Layout>
-            } />
-            <Route path="/marketplace-reconciliation" element={
-              <Layout>
-                <MarketplaceReconciliation />
-              </Layout>
-            } />
-            <Route path="/bookkeeping" element={
-              <Layout>
-                <Bookkeeping />
-              </Layout>
-            } />
-            <Route path="/reports" element={
-              <Layout>
-                <Reports />
-              </Layout>
-            } />
-            <Route path="/finance-dashboard" element={
-              <Layout>
-                <FinanceDashboard />
-              </Layout>
-            } />
-            <Route path="/connect-data-sources" element={
-              <Layout>
-                <ConnectDataSources />
-              </Layout>
-            } />
-            <Route path="/ai-workflows" element={
-              <Layout>
-                <AIWorkflows />
-              </Layout>
-            } />
-            <Route path="/assistant" element={
-              <Layout>
-                <Assistant />
-              </Layout>
-            } />
-            <Route path="/ai-reconciliation" element={
-              <Layout>
-                <AIReconciliation />
-              </Layout>
-            } />
-            <Route path="/security" element={
-              <Layout>
-                <Security />
-              </Layout>
-            } />
-            <Route path="/pricing" element={
-              <Layout>
-                <Pricing />
-              </Layout>
-            } />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            
+            {/* Main application routes with Layout */}
+            <Route path="/" element={<Layout><FinanceDashboard /></Layout>} />
+            <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+            <Route path="/checklist" element={<Layout><Checklist /></Layout>} />
+            <Route path="/recent-activities" element={<Layout><RecentActivities /></Layout>} />
+            <Route path="/reconciliation" element={<Layout><Reconciliation /></Layout>} />
+            <Route path="/marketplace-reconciliation" element={<Layout><MarketplaceReconciliation /></Layout>} />
+            <Route path="/reports" element={<Layout><Reports /></Layout>} />
+            <Route path="/finance-dashboard" element={<Layout><FinanceDashboard /></Layout>} />
+            <Route path="/connect-data-sources" element={<Layout><ConnectDataSources /></Layout>} />
+            <Route path="/ai-workflows" element={<Layout><AIWorkflows /></Layout>} />
+            <Route path="/assistant" element={<Layout><Assistant /></Layout>} />
+            <Route path="/ai-reconciliation" element={<Layout><AIReconciliation /></Layout>} />
+            <Route path="/security" element={<Layout><Security /></Layout>} />
+            <Route path="/pricing" element={<Layout><Pricing /></Layout>} />
+            <Route path="/bookkeeping" element={<Layout><Bookkeeping /></Layout>} />
           </Routes>
         </Router>
     </ThemeProvider>
