@@ -689,13 +689,14 @@ const MarketplaceReconciliation: React.FC = () => {
                   flexDirection: 'column', 
                   alignItems: 'center',
                   justifyContent: 'center',
-                  height: 300,
+                  minHeight: 350,
+                  pb: 2,
                 }}>
                   {/* Gauge Chart */}
-                  <Box sx={{ position: 'relative', mb: 3 }}>
+                  <Box sx={{ position: 'relative', mb: 2 }}>
                     <Box sx={{
-                      width: 200,
-                      height: 200,
+                      width: 180,
+                      height: 180,
                       borderRadius: '50%',
                       background: `conic-gradient(
                         ${parseAmount(reconciliationData.difference) === 0 ? '#14B8A6' : '#EF4444'} 0deg,
@@ -709,8 +710,8 @@ const MarketplaceReconciliation: React.FC = () => {
                       position: 'relative',
                     }}>
                       <Box sx={{
-                        width: 160,
-                        height: 160,
+                        width: 140,
+                        height: 140,
                         borderRadius: '50%',
                         background: 'white',
                         display: 'flex',
@@ -774,16 +775,28 @@ const MarketplaceReconciliation: React.FC = () => {
                       </Typography>
                     </Box>
 
-                    <Typography variant="body2" sx={{
-                      color: '#666666',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '0.875rem',
+                    <Box sx={{
+                      p: 1.5,
+                      borderRadius: '6px',
+                      background: parseAmount(reconciliationData.difference) === 0 ? '#d4edda' : '#f8d7da',
+                      border: parseAmount(reconciliationData.difference) === 0 ? '1px solid #c3e6cb' : '1px solid #f5c6cb',
+                      mt: 2,
+                      mb: 1,
                     }}>
-                      {parseAmount(reconciliationData.difference) === 0 
-                        ? 'All transactions are perfectly reconciled' 
-                        : 'Some transactions require attention for reconciliation'
-                      }
-                    </Typography>
+                      <Typography variant="body2" sx={{
+                        color: parseAmount(reconciliationData.difference) === 0 ? '#155724' : '#721c24',
+                        fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        textAlign: 'center',
+                        lineHeight: 1.4,
+                      }}>
+                        {parseAmount(reconciliationData.difference) === 0 
+                          ? 'All transactions are perfectly reconciled' 
+                          : 'Some transactions require attention for reconciliation'
+                        }
+                      </Typography>
+                    </Box>
                   </Box>
                 </Box>
               </CardContent>
