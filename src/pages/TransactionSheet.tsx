@@ -945,9 +945,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const fetchOrders = async (pageNumber: number = 1) => {
     const isInitialLoad = pageNumber === 1 && allTransactionData.length === 0;
     
-    if (isInitialLoad) {
-      setLoading(true);
-    } else {
+    if (!isInitialLoad) {
       setPaginationLoading(true);
     }
     setError(null);
@@ -997,6 +995,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Fetch data on component mount
   useEffect(() => {
+    setLoading(true);
     fetchOrders(1);
   }, []);
 
@@ -1023,56 +1022,55 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Filter data based on search, date range, and column filters
   useEffect(() => {
-    setLoading(true);
+    if (allTransactionData.length > 0) {
+      let filtered = getCurrentData();
     
-    let filtered = getCurrentData();
-    
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(row => 
-        Object.values(row).some(value => 
-          typeof value === 'string' && value.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      );
-    }
-    
-    // Date range filter
-    if (dateRange.start || dateRange.end) {
-      filtered = filtered.filter(row => {
-        const orderDate = new Date(row["Order Date"]);
-        const startDate = dateRange.start ? new Date(dateRange.start) : null;
-        const endDate = dateRange.end ? new Date(dateRange.end) : null;
-        
-        if (startDate && endDate) {
-          return orderDate >= startDate && orderDate <= endDate;
-        } else if (startDate) {
-          return orderDate >= startDate;
-        } else if (endDate) {
-          return orderDate <= endDate;
-        }
-        return true;
-      });
-    }
-    
-    // Column filters
-    Object.entries(columnFilters).forEach(([columnKey, filterValue]) => {
-      if (filterValue.trim()) {
+      // Search filter
+      if (searchTerm) {
+        filtered = filtered.filter(row => 
+          Object.values(row).some(value => 
+            typeof value === 'string' && value.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        );
+      }
+      
+      // Date range filter
+      if (dateRange.start || dateRange.end) {
         filtered = filtered.filter(row => {
-          const value = row[columnKey as keyof TransactionRow];
-          if (value === null || value === undefined) return false;
+          const orderDate = new Date(row["Order Date"]);
+          const startDate = dateRange.start ? new Date(dateRange.start) : null;
+          const endDate = dateRange.end ? new Date(dateRange.end) : null;
           
-          // Handle different data types
-          if (typeof value === 'number') {
-            return String(value).includes(filterValue);
+          if (startDate && endDate) {
+            return orderDate >= startDate && orderDate <= endDate;
+          } else if (startDate) {
+            return orderDate >= startDate;
+          } else if (endDate) {
+            return orderDate <= endDate;
           }
-          
-          return String(value).toLowerCase().includes(filterValue.toLowerCase());
+          return true;
         });
       }
-    });
-    
-    setFilteredData(filtered);
-    setLoading(false);
+      
+      // Column filters
+      Object.entries(columnFilters).forEach(([columnKey, filterValue]) => {
+        if (filterValue.trim()) {
+          filtered = filtered.filter(row => {
+            const value = row[columnKey as keyof TransactionRow];
+            if (value === null || value === undefined) return false;
+            
+            // Handle different data types
+            if (typeof value === 'number') {
+              return String(value).includes(filterValue);
+            }
+            
+            return String(value).toLowerCase().includes(filterValue.toLowerCase());
+          });
+        }
+      });
+      
+      setFilteredData(filtered);
+    }
   }, [searchTerm, dateRange, columnFilters, activeTab, allTransactionData]);
 
   // Handle pagination
@@ -1478,18 +1476,24 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   <TableBody>
                     {loading && allTransactionData.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={visibleColumns.length} sx={{ textAlign: 'center', py: 4 }}>
-                          <Typography variant="body2" sx={{ color: '#6b7280' }}>
-                            Loading transaction data...
-                          </Typography>
+                        <TableCell colSpan={visibleColumns.length} sx={{ textAlign: 'center', py: 6 }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                            <CircularProgress size={40} sx={{ color: '#1f2937' }} />
+                            <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500 }}>
+                              Loading transaction data...
+                            </Typography>
+                          </Box>
                         </TableCell>
                       </TableRow>
                     ) : paginationLoading ? (
                       <TableRow>
                         <TableCell colSpan={visibleColumns.length} sx={{ textAlign: 'center', py: 4 }}>
-                          <Typography variant="body2" sx={{ color: '#6b7280' }}>
-                            Loading page {currentPage}...
-                          </Typography>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                            <CircularProgress size={30} sx={{ color: '#3b82f6' }} />
+                            <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>
+                              Loading page {currentPage}...
+                            </Typography>
+                          </Box>
                         </TableCell>
                       </TableRow>
                     ) : filteredData.length === 0 ? (
