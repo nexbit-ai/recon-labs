@@ -16,6 +16,7 @@
     "@mui/material": "^6.5.0",
     "@mui/system": "^6.5.0",
     "@mui/x-data-grid": "^8.5.1",
+    "@stytch/vanilla-js": "^5.29.0",
     "@types/react-router-dom": "^5.3.3",
     "framer-motion": "^11.0.0",
     "react": "^19.1.0",

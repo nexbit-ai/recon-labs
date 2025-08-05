@@ -617,13 +617,14 @@ const TransactionDetailsPopup: React.FC<{
     const rect = anchorEl.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
-    const popupHeight = 400; // Estimated popup height
+    const popupHeight = 500; // Increased estimated popup height
     const popupWidth = 380;
-    const offset = 8;
+    const offset = 12;
 
     // Calculate vertical position
     let top: number;
     let animationDirection: 'up' | 'down' = 'down';
+    let maxHeight: number | undefined;
     
     if (rect.bottom + popupHeight + offset <= viewportHeight) {
       // Enough space below - show below
@@ -633,8 +634,21 @@ const TransactionDetailsPopup: React.FC<{
       top = rect.top - popupHeight - offset;
       animationDirection = 'up';
     } else {
-      // Not enough space either way - show below but adjust
-      top = Math.max(offset, viewportHeight - popupHeight - offset);
+      // Not enough space either way - position optimally and make scrollable
+      if (rect.bottom + offset < viewportHeight / 2) {
+        // More space below - show below with limited height
+        top = rect.bottom + offset;
+        maxHeight = viewportHeight - top - offset;
+      } else {
+        // More space above - show above with limited height
+        top = offset;
+        maxHeight = rect.top - offset * 2;
+      }
+    }
+
+    // Ensure minimum height for scrollable content
+    if (maxHeight && maxHeight < 300) {
+      maxHeight = 300;
     }
 
     // Calculate horizontal position
@@ -647,7 +661,16 @@ const TransactionDetailsPopup: React.FC<{
       left = Math.max(offset, viewportWidth - popupWidth - offset);
     }
 
-    return { top, left, animationDirection };
+    // Fallback: ensure modal is always visible
+    if (top < offset) {
+      top = offset;
+      maxHeight = viewportHeight - offset * 2;
+    }
+    if (top + (maxHeight || popupHeight) > viewportHeight - offset) {
+      top = viewportHeight - (maxHeight || popupHeight) - offset;
+    }
+
+    return { top, left, animationDirection, maxHeight };
   };
 
   const position = getPopupPosition();
@@ -685,6 +708,7 @@ const TransactionDetailsPopup: React.FC<{
           top: position.top,
           left: position.left,
           width: '380px',
+          maxHeight: position.maxHeight ? `${position.maxHeight}px` : 'auto',
           background: '#ffffff',
           border: '1px solid #e5e7eb',
           borderRadius: '12px',
@@ -713,6 +737,8 @@ const TransactionDetailsPopup: React.FC<{
               transform: 'scale(1) translateY(0)',
             },
           },
+          display: 'flex',
+          flexDirection: 'column',
           overflow: 'hidden',
         }}
       >
@@ -755,7 +781,25 @@ const TransactionDetailsPopup: React.FC<{
       </Box>
 
       {/* Content */}
-      <Box sx={{ p: 2.5 }}>
+      <Box sx={{ 
+        p: 2.5, 
+        flex: 1,
+        overflowY: 'auto',
+        '&::-webkit-scrollbar': {
+          width: '6px',
+        },
+        '&::-webkit-scrollbar-track': {
+          background: '#f1f5f9',
+          borderRadius: '3px',
+        },
+        '&::-webkit-scrollbar-thumb': {
+          background: '#cbd5e1',
+          borderRadius: '3px',
+          '&:hover': {
+            background: '#94a3b8',
+          },
+        },
+      }}>
         {/* Order Value - Primary Information */}
         <Box sx={{ 
           p: 2.5, 
@@ -858,7 +902,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [filteredData, setFilteredData] = useState<TransactionRow[]>([]);
   const [allTransactionData, setAllTransactionData] = useState<TransactionRow[]>([]);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(50);
+  const [rowsPerPage, setRowsPerPage] = useState(100);
   const [loading, setLoading] = useState(false);
   const [paginationLoading, setPaginationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -897,7 +941,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
 
 
-  // Fetch orders from API
+  // Fetch orders from API with pagination
   const fetchOrders = async (pageNumber: number = 1) => {
     const isInitialLoad = pageNumber === 1 && allTransactionData.length === 0;
     
@@ -911,7 +955,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     try {
       const response = await api.orders.getOrders({
         page: pageNumber,
-        limit: 50
+        limit: 100
       } as any);
       
       if (response.success && response.data.orders) {
@@ -924,6 +968,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           });
         });
         
+        // For pagination, we show only the current page data
         setAllTransactionData(transactionRows);
         setFilteredData(transactionRows);
         setCurrentPage(pageNumber);
@@ -1057,6 +1102,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setDateRange({ start: '', end: '' });
     setColumnFilters({});
     setPage(0);
+    setCurrentPage(1);
     fetchOrders(1);
   };
 
@@ -1064,6 +1110,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
     setPage(0); // Reset to first page when changing tabs
+    setCurrentPage(1); // Reset current page
     fetchOrders(1); // Fetch first page data
   };
 
@@ -1073,13 +1120,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setAnchorEl(event.currentTarget);
   };
 
-      // Separate settled and unsettled transactions
+      // Separate settled and unsettled transactions for current page
     const settledTransactions = allTransactionData.filter(row => row["Settlement Date"] !== "");
     const unsettledTransactions = allTransactionData.filter(row => row["Settlement Date"] === "");
 
   // Get current data based on active tab
   const getCurrentData = () => {
-    return activeTab === 0 ? settledTransactions : unsettledTransactions;
+    // For pagination, we work with the current page data
+    const currentData = allTransactionData;
+    return activeTab === 0 ? 
+      currentData.filter(row => row["Settlement Date"] !== "") : 
+      currentData.filter(row => row["Settlement Date"] === "");
   };
 
   // Get visible columns
@@ -1580,7 +1631,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               {/* Pagination */}
               <Box sx={{ p: 2, borderTop: '1px solid #e5e7eb' }}>
                 <TablePagination
-                  rowsPerPageOptions={[50]}
+                  rowsPerPageOptions={[100]}
                   component="div"
                   count={totalCount || filteredData.length}
                   rowsPerPage={rowsPerPage}
