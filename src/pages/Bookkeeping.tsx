@@ -97,6 +97,114 @@ const Bookkeeping: React.FC = () => {
       category: 'Taxes',
       status: 'pending',
       zohoId: null
+    },
+    {
+      id: 'TXN004',
+      date: '2025-01-14',
+      description: 'Amazon Sales Revenue',
+      amount: 89000,
+      category: 'Sales',
+      status: 'synced',
+      zohoId: 'ZOHO003'
+    },
+    {
+      id: 'TXN005',
+      date: '2025-01-14',
+      description: 'Shipping Charges',
+      amount: -4500,
+      category: 'Expenses',
+      status: 'synced',
+      zohoId: 'ZOHO004'
+    },
+    {
+      id: 'TXN006',
+      date: '2025-01-13',
+      description: 'Myntra Sales Revenue',
+      amount: 67000,
+      category: 'Sales',
+      status: 'synced',
+      zohoId: 'ZOHO005'
+    },
+    {
+      id: 'TXN007',
+      date: '2025-01-13',
+      description: 'Payment Gateway Fees',
+      amount: -3350,
+      category: 'Fees',
+      status: 'error',
+      zohoId: null
+    },
+    {
+      id: 'TXN008',
+      date: '2025-01-12',
+      description: 'Snapdeal Sales Revenue',
+      amount: 45000,
+      category: 'Sales',
+      status: 'synced',
+      zohoId: 'ZOHO006'
+    },
+    {
+      id: 'TXN009',
+      date: '2025-01-12',
+      description: 'Warehouse Storage Fees',
+      amount: -8000,
+      category: 'Expenses',
+      status: 'pending',
+      zohoId: null
+    },
+    {
+      id: 'TXN010',
+      date: '2025-01-11',
+      description: 'Paytm Mall Sales Revenue',
+      amount: 78000,
+      category: 'Sales',
+      status: 'synced',
+      zohoId: 'ZOHO007'
+    },
+    {
+      id: 'TXN011',
+      date: '2025-01-11',
+      description: 'Marketing Expenses',
+      amount: -12000,
+      category: 'Marketing',
+      status: 'synced',
+      zohoId: 'ZOHO008'
+    },
+    {
+      id: 'TXN012',
+      date: '2025-01-10',
+      description: 'JioMart Sales Revenue',
+      amount: 92000,
+      category: 'Sales',
+      status: 'synced',
+      zohoId: 'ZOHO009'
+    },
+    {
+      id: 'TXN013',
+      date: '2025-01-10',
+      description: 'Employee Salaries',
+      amount: -25000,
+      category: 'Payroll',
+      status: 'pending',
+      zohoId: null
+    },
+    {
+      id: 'TXN014',
+      date: '2025-01-09',
+      description: 'Tata Cliq Sales Revenue',
+      amount: 55000,
+      category: 'Sales',
+      status: 'synced',
+      zohoId: 'ZOHO010'
+    },
+    {
+      id: 'TXN015',
+      date: '2025-01-09',
+      description: 'Office Rent',
+      amount: -15000,
+      category: 'Rent',
+      status: 'synced',
+      zohoId: 'ZOHO011'
     }
   ];
 
