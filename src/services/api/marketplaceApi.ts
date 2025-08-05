@@ -47,34 +47,28 @@ export interface MarketplaceOverviewResponse {
   topProducts: TopProduct[];
 }
 
-export interface MarketplaceApiConfig {
-  baseUrl: string;
-  apiKey: string;
-  orgId: string;
-}
-
 class MarketplaceApiService {
-  private config: MarketplaceApiConfig;
+  private baseUrl: string;
+  private apiKey: string;
+  private orgId: string;
 
   constructor() {
-    this.config = {
-      baseUrl: 'http://localhost:8080',
-      apiKey: 'kapiva-7b485b6a865b2b4a3d728ef2fd4f3',
-      orgId: '6ce6ee73-e1ef-4020-ad74-4ee45e731201'
-    };
+    this.baseUrl = 'http://localhost:8080';
+    this.apiKey = 'kapiva-7b485b6a865b2b4a3d728ef2fd4f3';
+    this.orgId = '6ce6ee73-e1ef-4020-ad74-4ee45e731201';
   }
 
   async getMarketplaceOverview(startDate: string, endDate: string): Promise<MarketplaceOverviewResponse> {
     try {
-      const url = `${this.config.baseUrl}/v1/recon/stats/sales`;
+      const url = `${this.baseUrl}/v1/recon/stats/sales`;
       const params = {
         start_date: startDate,
         end_date: endDate
       };
 
       const headers = {
-        'X-API-Key': this.config.apiKey,
-        'X-Org-ID': this.config.orgId,
+        'X-API-Key': this.apiKey,
+        'X-Org-ID': this.orgId,
         'Content-Type': 'application/json'
       };
 
@@ -82,22 +76,18 @@ class MarketplaceApiService {
       console.log('📅 Date range:', { startDate, endDate });
       console.log('🔑 Headers:', headers);
 
-      const response = await fetch(`${url}?${new URLSearchParams(params)}`, {
-        method: 'GET',
-        headers
-      });
+      const response = await apiService.get<MarketplaceOverviewResponse>(
+        url,
+        params,
+        {
+          headers,
+          timeout: 30000,
+          retryAttempts: 3
+        }
+      );
 
-      console.log('📡 Response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ API Error Response:', errorText);
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ API Response received:', data);
-      return data;
+      console.log('✅ API Response received:', response.data);
+      return response.data;
     } catch (error) {
       console.error('❌ Error fetching marketplace overview:', error);
       throw error;
@@ -108,8 +98,6 @@ class MarketplaceApiService {
   formatDateForAPI(date: Date): string {
     return date.toISOString().split('T')[0];
   }
-
-
 }
 
 export const marketplaceApi = new MarketplaceApiService(); 

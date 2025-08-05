@@ -48,7 +48,68 @@ import {
   CalendarToday as CalendarTodayIcon,
 } from '@mui/icons-material';
 import { Platform } from '../data/mockData';
-import { marketplaceApi, MarketplaceOverviewResponse } from '../services/api/marketplaceApi';
+import { apiService } from '../services/api/apiService';
+import { API_CONFIG } from '../services/api/config';
+import { MarketplaceOverviewResponse } from '../services/api/marketplaceApi';
+
+// Mock data for fallback
+const mockMarketplaceData: MarketplaceOverviewResponse = {
+  kpis: {
+    totalSales: "1250000.00",
+    totalCommission: "125000.00",
+    totalOrders: 1250,
+    aov: "1000.00",
+    returns: 125
+  },
+  chartData: {
+    sales: [
+      { date: "2025-04-01", value: "1146380.47" },
+      { date: "2025-04-02", value: "949922.32" },
+      { date: "2025-04-03", value: "1234567.89" },
+      { date: "2025-04-04", value: "987654.32" },
+      { date: "2025-04-05", value: "1111111.11" }
+    ],
+    shipping: [
+      { date: "2025-04-01", value: "500" },
+      { date: "2025-04-02", value: "450" },
+      { date: "2025-04-03", value: "600" },
+      { date: "2025-04-04", value: "480" },
+      { date: "2025-04-05", value: "520" }
+    ]
+  },
+  insights: [
+    {
+      id: "1",
+      type: "sales",
+      severity: "high",
+      title: "Sales Increase",
+      description: "Sales increased by 15% compared to last month",
+      value: "15%",
+      trend: "up",
+      icon: "trending_up"
+    }
+  ],
+  topProducts: [
+    {
+      id: "1",
+      name: "Product A",
+      sku: "SKU001",
+      revenue: "250000.00",
+      unitsSold: 250,
+      growth: "12%",
+      platform: "Flipkart"
+    },
+    {
+      id: "2",
+      name: "Product B",
+      sku: "SKU002",
+      revenue: "200000.00",
+      unitsSold: 200,
+      growth: "8%",
+      platform: "Amazon"
+    }
+  ]
+};
 
 const iconMap: Record<string, React.ReactNode> = {
   totalRevenue: <AttachMoneyIcon />,
@@ -70,10 +131,11 @@ const FinanceDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['flipkart', 'amazon']);
-  const [apiData, setApiData] = useState<MarketplaceOverviewResponse | null>(null);
+  const [apiData, setApiData] = useState<MarketplaceOverviewResponse>(mockMarketplaceData);
   const [loading, setLoading] = useState(true);
   const [apiLoading, setApiLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [usingMockData, setUsingMockData] = useState(false);
   const [monthMenuAnchorEl, setMonthMenuAnchorEl] = useState<null | HTMLElement>(null);
 
   // Generate available months (last 12 months)
@@ -98,17 +160,11 @@ const FinanceDashboard: React.FC = () => {
   // Get start and end dates for a given month
   const getMonthDateRange = (monthString: string) => {
     const [year, month] = monthString.split('-').map(Number);
-    
-    // Create dates in local timezone to avoid timezone issues
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
     
-    // Format dates as YYYY-MM-DD
     const formatDate = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+      return date.toISOString().split('T')[0];
     };
     
     return {
@@ -117,52 +173,56 @@ const FinanceDashboard: React.FC = () => {
     };
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      console.log('🔄 Starting data fetch...');
-      setLoading(true);
-      setApiLoading(true);
-      setApiError(null);
+  // Fetch data from API with fallback to mock data
+  const fetchData = async () => {
+    setLoading(true);
+    setApiLoading(true);
+    setApiError(null);
+    setUsingMockData(false);
+    
+    const { startDate, endDate } = getMonthDateRange(selectedMonth);
+    
+    try {
+      const response = await apiService.get<MarketplaceOverviewResponse>(
+        '/recon/stats/sales',
+        { start_date: startDate, end_date: endDate },
+        {
+          headers: {
+            'X-API-Key': API_CONFIG.API_KEY,
+            'X-Org-ID': API_CONFIG.ORG_ID,
+            'Content-Type': 'application/json'
+          },
+          timeout: 30000,
+          retryAttempts: 3
+        }
+      );
       
-      try {
-        const { startDate, endDate } = getMonthDateRange(selectedMonth);
-        console.log('📅 Date range for API:', { startDate, endDate });
-        
-        console.log('🌐 Fetching API data...');
-        const response = await marketplaceApi.getMarketplaceOverview(startDate, endDate);
-        console.log('✅ API data received:', response);
-        setApiData(response);
-        
-      } catch (error) {
-        console.error('❌ Error fetching marketplace data:', error);
-        setApiError(error instanceof Error ? error.message : 'Failed to fetch data');
-      } finally {
-        console.log('🏁 Data fetch completed');
-        setLoading(false);
-        setApiLoading(false);
+      if (response.success && response.data) {
+        setApiData(response.data);
+      } else {
+        // API call failed, use mock data
+        setApiData(mockMarketplaceData);
+        setUsingMockData(true);
+        setApiError('Failed to fetch data from API, showing mock data');
       }
-    };
+    } catch (err) {
+      console.error('Error fetching marketplace data:', err);
+      // API call failed, use mock data
+      setApiData(mockMarketplaceData);
+      setUsingMockData(true);
+      setApiError('Network error, showing mock data for demonstration');
+    } finally {
+      setLoading(false);
+      setApiLoading(false);
+    }
+  };
 
+  // Load initial data
+  useEffect(() => {
     fetchData();
   }, [selectedMonth, selectedPlatforms]);
 
   const handleRefreshClick = () => {
-    // Trigger data refresh
-    const fetchData = async () => {
-      setApiLoading(true);
-      setApiError(null);
-      
-      try {
-        const { startDate, endDate } = getMonthDateRange(selectedMonth);
-        const response = await marketplaceApi.getMarketplaceOverview(startDate, endDate);
-        setApiData(response);
-      } catch (error) {
-        setApiError(error instanceof Error ? error.message : 'Failed to fetch data');
-      } finally {
-        setApiLoading(false);
-      }
-    };
-
     fetchData();
   };
 
@@ -216,27 +276,24 @@ const FinanceDashboard: React.FC = () => {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
       <Box sx={{ p: 4, minHeight: '100vh' }}>
+        {/* Alerts */}
+        {apiError && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            {apiError}
+          </Alert>
+        )}
+        
+        {usingMockData && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Using mock data for demonstration purposes
+          </Alert>
+        )}
+        
         {/* Header */}
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h4" fontWeight={700}>
             Finance Dashboard
           </Typography>
-          
-          {/* API Error Alert */}
-          {apiError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              API Error: {apiError} - Using fallback data
-            </Alert>
-          )}
-          
-          {/* Loading State */}
-          {loading && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Loading marketplace data...
-            </Alert>
-          )}
-          
-
           
           <Box display="flex" alignItems="center" gap={2}>
               <Button
