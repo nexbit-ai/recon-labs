@@ -43,6 +43,7 @@ import {
   ListItemIcon,
   ListItemText,
   ListItemSecondaryAction,
+  Menu,
 } from '@mui/material';
 import {
   PieChart,
@@ -82,11 +83,14 @@ import {
   CloudSync as CloudSyncIcon,
   CheckCircleOutline as CheckCircleOutlineIcon,
   Schedule as ScheduleIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon,
+  CalendarToday as CalendarTodayIcon,
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
 import { apiService } from '../services/api/apiService';
 import { MarketplaceReconciliationResponse } from '../services/api/types';
 import { mockReconciliationData, getSafeReconciliationData, isValidReconciliationData } from '../data/mockReconciliationData';
+import { Platform } from '../data/mockData';
 
 const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
@@ -100,6 +104,18 @@ const MarketplaceReconciliation: React.FC = () => {
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [lastSynced, setLastSynced] = useState<Date>(new Date(Date.now() - 2 * 60 * 60 * 1000)); // 2 hours ago
+  
+  // Month selector menu state
+  const [monthMenuAnchorEl, setMonthMenuAnchorEl] = useState<null | HTMLElement>(null);
+  
+  // Platform selector state
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['flipkart']);
+  const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
+  
+  // Available platforms (only Flipkart for now)
+  const availablePlatforms = [
+    { value: 'flipkart' as Platform, label: 'Flipkart' }
+  ];
 
   // Generate available months (last 12 months)
   const generateAvailableMonths = () => {
@@ -300,77 +316,163 @@ const MarketplaceReconciliation: React.FC = () => {
               alignItems: 'center', 
               justifyContent: 'space-between',
               mb: 4,
-              background: 'white',
-              borderRadius: '8px',
-              p: 4,
-              border: '1px solid #e0e0e0',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Box sx={{
-                  background: '#1a1a1a',
-                  borderRadius: '6px',
-                  p: 2,
-                  mr: 3,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <StorefrontIcon sx={{ fontSize: 28, color: 'white' }} />
-                </Box>
-                <Box>
-                  <Typography variant="h4" sx={{ 
-                    fontWeight: 600, 
-                    color: '#1a1a1a',
-                    letterSpacing: '-0.01em',
-                    mb: 1,
-                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  }}>
-                    Marketplace Reconciliation
-                  </Typography>
-                  <Typography variant="body1" sx={{ 
-                    color: '#666666', 
-                    fontWeight: 400,
-                    fontSize: '1rem',
-                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  }}>
-                    Financial reconciliation and analytics dashboard
-                  </Typography>
-                </Box>
-              </Box>
+              <Typography variant="h4" sx={{ 
+                fontWeight: 700, 
+                color: '#1a1a1a',
+                letterSpacing: '-0.01em',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+              }}>
+                Marketplace Reconciliation
+              </Typography>
               
               {/* Month Selector */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 {loading && (
                   <CircularProgress size={24} sx={{ color: '#1a1a1a' }} />
                 )}
-                <FormControl sx={{ minWidth: 200 }}>
-                  <InputLabel id="month-select-label">Select Month</InputLabel>
-                  <Select
-                    labelId="month-select-label"
-                    value={selectedMonth}
-                    label="Select Month"
-                    onChange={(e) => handleMonthChange(e.target.value)}
-                    sx={{
-                      borderRadius: '6px',
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: '#d0d0d0',
-                      },
-                      '&:hover .MuiOutlinedInput-notchedOutline': {
-                        borderColor: '#1a1a1a',
-                      },
-                      '& .MuiSelect-select': {
-                        fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      },
-                    }}
-                  >
-                    {availableMonths.map((month) => (
-                      <MenuItem key={month.value} value={month.value}>
-                        {month.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Button
+                  variant="outlined"
+                  endIcon={<KeyboardArrowDownIcon />}
+                  startIcon={<CalendarTodayIcon />}
+                  onClick={(event) => setMonthMenuAnchorEl(event.currentTarget)}
+                  sx={{
+                    borderColor: '#6B7280',
+                    color: '#6B7280',
+                    textTransform: 'none',
+                    minWidth: 200,
+                    minHeight: 40,
+                    px: 2,
+                    fontSize: '1rem',
+                    '&:hover': {
+                      borderColor: '#4B5563',
+                      backgroundColor: 'rgba(107, 114, 128, 0.04)',
+                    },
+                  }}
+                >
+                  {availableMonths.find(month => month.value === selectedMonth)?.label || 'Select Month'}
+                </Button>
+                <Menu
+                  anchorEl={monthMenuAnchorEl}
+                  open={Boolean(monthMenuAnchorEl)}
+                  onClose={() => setMonthMenuAnchorEl(null)}
+                  MenuListProps={{
+                    'aria-labelledby': 'month-select-button',
+                  }}
+                  PaperProps={{
+                    sx: {
+                      mt: 1,
+                      minWidth: 280,
+                      maxWidth: 320,
+                    }
+                  }}
+                >
+                  {availableMonths.map((month) => (
+                    <MenuItem
+                      key={month.value}
+                      onClick={() => {
+                        handleMonthChange(month.value);
+                        setMonthMenuAnchorEl(null);
+                      }}
+                      sx={{
+                        py: 1.5,
+                        px: 2,
+                        '&:hover': {
+                          backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                        },
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                        <CalendarTodayIcon sx={{ mr: 2, fontSize: 20, color: '#6B7280' }} />
+                        <Typography variant="body2" sx={{ flex: 1 }}>
+                          {month.label}
+                        </Typography>
+                        {selectedMonth === month.value && (
+                          <Chip 
+                            label="Selected" 
+                            size="small" 
+                            color="primary" 
+                            sx={{ ml: 1 }}
+                          />
+                        )}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Menu>
+
+                {/* Platform Selector */}
+                <Button
+                  variant="outlined"
+                  endIcon={<KeyboardArrowDownIcon />}
+                  startIcon={<StorefrontIcon />}
+                  onClick={(event) => setPlatformMenuAnchorEl(event.currentTarget)}
+                  sx={{
+                    borderColor: '#6B7280',
+                    color: '#6B7280',
+                    textTransform: 'none',
+                    minWidth: 200,
+                    minHeight: 40,
+                    px: 2,
+                    fontSize: '1rem',
+                    '&:hover': {
+                      borderColor: '#4B5563',
+                      backgroundColor: 'rgba(107, 114, 128, 0.04)',
+                    },
+                  }}
+                >
+                  {selectedPlatforms.length > 0 
+                    ? availablePlatforms.find(p => p.value === selectedPlatforms[0])?.label || 'Flipkart'
+                    : 'Select Platforms'
+                  }
+                </Button>
+                <Menu
+                  anchorEl={platformMenuAnchorEl}
+                  open={Boolean(platformMenuAnchorEl)}
+                  onClose={() => setPlatformMenuAnchorEl(null)}
+                  MenuListProps={{
+                    'aria-labelledby': 'platform-select-button',
+                  }}
+                  PaperProps={{
+                    sx: {
+                      mt: 1,
+                      minWidth: 200,
+                    }
+                  }}
+                >
+                  {availablePlatforms.map((platform) => (
+                    <MenuItem
+                      key={platform.value}
+                      onClick={() => {
+                        setSelectedPlatforms([platform.value]);
+                        setPlatformMenuAnchorEl(null);
+                      }}
+                      sx={{
+                        py: 1.5,
+                        px: 2,
+                        '&:hover': {
+                          backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                        },
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                        <StorefrontIcon sx={{ mr: 2, fontSize: 20, color: '#6B7280' }} />
+                        <Typography variant="body2" sx={{ flex: 1 }}>
+                          {platform.label}
+                        </Typography>
+                        {selectedPlatforms.includes(platform.value) && (
+                          <Chip 
+                            label="Selected" 
+                            size="small" 
+                            color="primary" 
+                            sx={{ ml: 1 }}
+                          />
+                        )}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Menu>
+                </Box>
 
                 {/* Sync Data Sources Button */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
@@ -381,16 +483,16 @@ const MarketplaceReconciliation: React.FC = () => {
                     disabled={syncLoading}
                     sx={{
                       borderRadius: '6px',
-                      borderColor: '#1a1a1a',
-                      color: '#1a1a1a',
+                      borderColor: '#6B7280',
+                      color: '#6B7280',
                       textTransform: 'none',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                       fontWeight: 500,
-                      px: 3,
-                      py: 1,
+                      minHeight: 40,
+                      px: 2,
                       '&:hover': {
-                        borderColor: '#000000',
-                        backgroundColor: '#f5f5f5',
+                        borderColor: '#4B5563',
+                        backgroundColor: 'rgba(107, 114, 128, 0.04)',
                       },
                       '&:disabled': {
                         borderColor: '#d0d0d0',

@@ -41,7 +41,7 @@ import userPhoto from '../assets/user-photo.jpg';
 const drawerWidth = 240;
 
 const menuItems = [
-  { text: 'Marketplace', icon: <StorefrontIcon />, path: '/finance-dashboard' },
+  { text: 'Sales Overview', icon: <StorefrontIcon />, path: '/finance-dashboard' },
   { text: 'Marketplace Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation' },
   { text: 'Bookkeeping', icon: <AccountBalanceIcon />, path: '/bookkeeping' },
   { text: 'Month-end close', icon: <ChecklistIcon />, path: '/checklist' },
