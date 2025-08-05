@@ -951,9 +951,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setError(null);
     
     try {
+      const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
       const response = await api.orders.getOrders({
         page: pageNumber,
-        limit: 100
+        limit: 100,
+        remark: remark
       } as any);
       
       if (response.success && response.data.orders) {
@@ -1088,10 +1090,55 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     fetchOrders(1);
   };
 
-  // Export to Excel (placeholder)
+  // Export to Excel
   const handleExport = () => {
-    // TODO: Implement Excel export
-    console.log('Exporting to Excel...');
+    try {
+      // Prepare data for export
+      const exportData = filteredData.map(row => ({
+        'Order ID': row['Order ID'],
+        'Order Value': row['Order Value'],
+        'Order Date': row['Order Date'],
+        'Settlement Date': row['Settlement Date'],
+        'Difference': row['Difference'],
+        'Remark': row['Remark'],
+        'Event Type': row['Event Type']
+      }));
+
+      // Convert to CSV format
+      const headers = Object.keys(exportData[0]);
+      const csvContent = [
+        headers.join(','),
+        ...exportData.map(row => 
+          headers.map(header => {
+            const value = row[header as keyof typeof row];
+            // Handle special characters and commas in values
+            if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+              return `"${value.replace(/"/g, '""')}"`;
+            }
+            return value;
+          }).join(',')
+        )
+      ].join('\n');
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `transaction_sheet_${activeTab === 0 ? 'settled' : 'unsettled'}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      // You could add a toast notification here if you have a notification system
+    }
   };
 
   // Clear filters
@@ -1118,17 +1165,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setAnchorEl(event.currentTarget);
   };
 
-      // Separate settled and unsettled transactions for current page
-    const settledTransactions = allTransactionData.filter(row => row["Settlement Date"] !== "");
-    const unsettledTransactions = allTransactionData.filter(row => row["Settlement Date"] === "");
+
 
   // Get current data based on active tab
   const getCurrentData = () => {
     // For pagination, we work with the current page data
-    const currentData = allTransactionData;
-    return activeTab === 0 ? 
-      currentData.filter(row => row["Settlement Date"] !== "") : 
-      currentData.filter(row => row["Settlement Date"] === "");
+    return allTransactionData;
   };
 
   // Get visible columns
@@ -1249,19 +1291,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   </Box>
                 </Box>
 
-                {/* Compact Transaction Tabs */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                {/* Transaction Tabs - Centered */}
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 3 }}>
                   <Tabs 
                     value={activeTab} 
                     onChange={handleTabChange}
                     sx={{
                       '& .MuiTab-root': {
-                        minHeight: 48,
-                        fontSize: '0.9rem',
+                        minHeight: 56,
+                        fontSize: '1.1rem',
                         fontWeight: 600,
                         textTransform: 'none',
                         color: '#6b7280',
-                        px: 2,
+                        px: 4,
                         '&.Mui-selected': {
                           color: '#1f2937',
                           fontWeight: 700,
@@ -1274,71 +1316,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       },
                     }}
                   >
-                    <Tab 
-                      label={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Chip 
-                            label={settledTransactions.length}
-                            size="small"
-                            sx={{ 
-                              background: '#10b981',
-                              color: 'white',
-                              fontWeight: 600,
-                              fontSize: '0.7rem',
-                              height: 20,
-                            }}
-                          />
-                          <Typography variant="body2">Settled</Typography>
-                        </Box>
-                      }
-                    />
-                    <Tab 
-                      label={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Chip 
-                            label={unsettledTransactions.length}
-                            size="small"
-                            sx={{ 
-                              background: '#ef4444',
-                              color: 'white',
-                              fontWeight: 600,
-                              fontSize: '0.7rem',
-                              height: 20,
-                            }}
-                          />
-                          <Typography variant="body2">Unsettled</Typography>
-                        </Box>
-                      }
-                    />
+                    <Tab label="Settled" />
+                    <Tab label="Unsettled" />
                   </Tabs>
-                  
-                  {/* Compact Summary */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, fontSize: '1rem' }}>
-                        Count:
-                      </Typography>
-                      <Typography variant="body2" sx={{ 
-                        fontWeight: 700,
-                        color: '#111827',
-                        fontSize: '1.2rem',
-                      }}>
-                        {getCountFromStats()}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, fontSize: '1rem' }}>
-                        Total:
-                      </Typography>
-                      <Typography variant="body2" sx={{ 
-                        fontWeight: 700,
-                        color: '#111827',
-                        fontSize: '1.2rem',
-                      }}>
-                        {formatCurrency(getTotalFromStats())}
-                      </Typography>
-                    </Box>
-                  </Box>
                 </Box>
               </CardContent>
             </Card>

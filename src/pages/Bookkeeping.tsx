@@ -165,6 +165,23 @@ const Bookkeeping: React.FC = () => {
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {syncStatus === 'syncing' && <CircularProgress size={24} sx={{ color: '#1a1a1a' }} />}
+            <Button
+              variant="outlined"
+              startIcon={<CloudUploadIcon />}
+              component="a"
+              href="/src/assets/sales-working-fk.csv"
+              download
+              sx={{
+                borderRadius: '6px',
+                borderColor: '#1a1a1a',
+                color: '#1a1a1a',
+                textTransform: 'none',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                fontWeight: 500,
+              }}
+            >
+              Download Excel Sheet
+            </Button>
             
             <Button
               variant="outlined"
