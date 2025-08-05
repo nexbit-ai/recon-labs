@@ -17,6 +17,7 @@ import FinanceDashboard from './pages/FinanceDashboard';
 import ConnectDataSources from './pages/ConnectDataSources';
 import Assistant from './pages/Assistant';
 import MarketplaceReconciliation from './pages/MarketplaceReconciliation';
+import Bookkeeping from './pages/Bookkeeping';
 
 const theme = createTheme({
   palette: {
@@ -236,6 +237,11 @@ function App() {
             <Route path="/marketplace-reconciliation" element={
               <Layout>
                 <MarketplaceReconciliation />
+              </Layout>
+            } />
+            <Route path="/bookkeeping" element={
+              <Layout>
+                <Bookkeeping />
               </Layout>
             } />
             <Route path="/reports" element={

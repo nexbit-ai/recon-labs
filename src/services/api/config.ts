@@ -57,6 +57,12 @@ export const API_CONFIG = {
     TRANSACTION_UPDATE: '/transactions/:id',
     TRANSACTION_DELETE: '/transactions/:id',
     
+    // Orders
+    ORDERS: '/recon/orders',
+    
+    // Stats
+    FETCH_STATS: '/recon/fetchStats',
+    
     // Reports
     REPORTS: '/reports',
     REPORT_GENERATE: '/reports/generate',

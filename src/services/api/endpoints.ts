@@ -7,7 +7,8 @@ import {
   DateRangeParams, 
   PaginationParams, 
   FilterParams,
-  PaginatedResponse 
+  PaginatedResponse,
+  MarketplaceReconciliationResponse
 } from './types';
 
 // Authentication API
@@ -100,6 +101,24 @@ export const transactionsAPI = {
 
   bulkDelete: (ids: string[]) =>
     apiService.post(`${API_CONFIG.ENDPOINTS.TRANSACTIONS}/bulk-delete`, { ids }),
+};
+
+// Orders API
+export const ordersAPI = {
+  // Get orders list
+  getOrders: (params?: DateRangeParams & PaginationParams & FilterParams) =>
+    apiService.get<{ orders: any[] }>(API_CONFIG.ENDPOINTS.ORDERS, params),
+
+  // Get single order
+  getOrder: (id: string) =>
+    apiService.get<any>(`${API_CONFIG.ENDPOINTS.ORDERS}/${id}`),
+};
+
+// Stats API
+export const statsAPI = {
+  // Get reconciliation stats
+  getStats: (params?: DateRangeParams) =>
+    apiService.get<MarketplaceReconciliationResponse>(API_CONFIG.ENDPOINTS.FETCH_STATS, params),
 };
 
 // Reports API
@@ -231,6 +250,8 @@ export const api = {
   user: userAPI,
   reconciliation: reconciliationAPI,
   transactions: transactionsAPI,
+  orders: ordersAPI,
+  stats: statsAPI,
   reports: reportsAPI,
   dataSources: dataSourcesAPI,
   ai: aiAPI,

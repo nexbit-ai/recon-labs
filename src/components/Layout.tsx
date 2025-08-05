@@ -29,6 +29,7 @@ import {
   ChatOutlined as ChatIcon,
   StorefrontOutlined as StorefrontIcon,
   ReceiptOutlined as ReceiptIcon,
+  AccountBalanceOutlined as AccountBalanceIcon,
   LogoutOutlined as LogoutIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
 } from '@mui/icons-material';
@@ -42,6 +43,7 @@ const drawerWidth = 240;
 const menuItems = [
   { text: 'Marketplace', icon: <StorefrontIcon />, path: '/finance-dashboard' },
   { text: 'Marketplace Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation' },
+  { text: 'Bookkeeping', icon: <AccountBalanceIcon />, path: '/bookkeeping' },
   { text: 'Month-end close', icon: <ChecklistIcon />, path: '/checklist' },
   { text: 'Assistant', icon: <ChatIcon />, path: '/assistant' },
 ];

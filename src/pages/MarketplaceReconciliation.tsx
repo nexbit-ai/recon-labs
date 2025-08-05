@@ -140,12 +140,25 @@ const MarketplaceReconciliation: React.FC = () => {
   // Get start and end dates for a given month
   const getMonthDateRange = (monthString: string) => {
     const [year, month] = monthString.split('-').map(Number);
+    // The month value is already 1-indexed (April = 4), so we use it directly
+    // JavaScript Date constructor expects 0-indexed months, so we use month-1
     const startDate = new Date(year, month - 1, 1); // First day of month
+    // For end date, we want the last day of the current month
+    // new Date(year, month, 0) gives the last day of the previous month
+    // So we use new Date(year, month, 0) to get the last day of the current month
     const endDate = new Date(year, month, 0); // Last day of month
     
+    // Use toLocaleDateString to avoid timezone issues with toISOString()
+    const formatDate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
     return {
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0]
+      startDate: formatDate(startDate),
+      endDate: formatDate(endDate)
     };
   };
 
@@ -1592,7 +1605,10 @@ const MarketplaceReconciliation: React.FC = () => {
             background: 'rgba(0, 0, 0, 0.5)',
           }}
         >
-          <TransactionSheet onBack={() => setShowTransactionSheet(false)} />
+          <TransactionSheet 
+          onBack={() => setShowTransactionSheet(false)} 
+          statsData={reconciliationData}
+        />
         </Box>
       )}
     </Box>

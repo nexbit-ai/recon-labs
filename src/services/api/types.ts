@@ -170,4 +170,67 @@ export interface FilterParams {
   status?: string;
   category?: string;
   [key: string]: any;
+}
+
+// Orders API Types
+export interface OrderItem {
+  order_item_id: string;
+  event_type: string;
+  event_sub_type: string;
+  payment_date: string | null;
+  order_date: string;
+  item_quantity: number;
+  last_month_sales: string;
+  next_month_sales: string;
+  buyer_invoice_amount: string;
+  settlement_value: string;
+  marketplace_fee: string;
+  taxes: string;
+  tds: string;
+  tcs: string;
+  customer_addons_amount: string;
+  total_offer_amount: string;
+  seller_share_offer: string;
+  offer_adjustments: string;
+  diff: string;
+  remark: string;
+}
+
+export interface CommissionBreakdown {
+  marketplace_fee: string;
+  tds: string;
+  tcs: string;
+  taxes: string;
+  customer_addons_amount: string;
+  total_offer_amount: string;
+  seller_share_offer: string;
+  offer_adjustments: string;
+}
+
+export interface Commission {
+  total: string;
+  breakdown: CommissionBreakdown;
+}
+
+export interface Order {
+  order_id: string;
+  item_quantity: number;
+  last_month_sales: string;
+  next_month_sales: string;
+  buyer_invoice_amount: string;
+  settlement_value: string;
+  diff: string;
+  remarks: string[];
+  commission: Commission;
+  order_items: OrderItem[];
+}
+
+export interface OrdersResponse {
+  orders: Order[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 } 
