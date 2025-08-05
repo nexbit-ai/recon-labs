@@ -1035,52 +1035,97 @@ const MarketplaceReconciliation: React.FC = () => {
             </Grid>
 
             {/* Settlement Summary */}
-            <Box sx={{ mt: 4, p: 3, borderRadius: '6px', background: '#f8f9fa', border: '1px solid #e9ecef' }}>
-              <Typography variant="h6" sx={{
+            <Box sx={{ mt: 4, p: 4, borderRadius: '6px', background: '#f8f9fa', border: '1px solid #e9ecef' }}>
+              <Typography variant="h5" sx={{
                 fontWeight: 600,
                 color: '#1a1a1a',
                 fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                mb: 2,
+                mb: 3,
+                fontSize: '1.5rem',
               }}>
                 Settlement Summary
               </Typography>
-              <Grid container spacing={2}>
+              <Grid container spacing={3}>
                 <Grid item xs={12} md={3}>
                   <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="body2" sx={{ color: '#666666', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                    <Typography variant="body1" sx={{ 
+                      color: '#666666', 
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontSize: '1rem',
+                      fontWeight: 500,
+                      mb: 1,
+                    }}>
                       Total Orders
                     </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1a1a1a', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                    <Typography variant="h5" sx={{ 
+                      fontWeight: 600, 
+                      color: '#1a1a1a', 
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontSize: '1.75rem',
+                    }}>
                       {reconciliationData.ordersDelivered.number}
                     </Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={12} md={3}>
                   <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="body2" sx={{ color: '#666666', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                    <Typography variant="body1" sx={{ 
+                      color: '#666666', 
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontSize: '1rem',
+                      fontWeight: 500,
+                      mb: 1,
+                    }}>
                       Settlement Rate
                     </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#14B8A6', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                    <Typography variant="h5" sx={{ 
+                      fontWeight: 600, 
+                      color: '#14B8A6', 
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontSize: '1.75rem',
+                    }}>
                       {((reconciliationData.ordersDelivered.number - reconciliationData.MonthOrdersAwaitedSettlement.SalesOrders) / reconciliationData.ordersDelivered.number * 100).toFixed(1)}%
                     </Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={12} md={3}>
                   <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="body2" sx={{ color: '#666666', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                      Pending Settlement
+                    <Typography variant="body1" sx={{ 
+                      color: '#666666', 
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontSize: '1rem',
+                      fontWeight: 500,
+                      mb: 1,
+                    }}>
+                      Net Pending Amount
                     </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#F59E0B', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                      {reconciliationData.MonthOrdersAwaitedSettlement.SalesOrders}
+                    <Typography variant="h5" sx={{ 
+                      fontWeight: 600, 
+                      color: '#F59E0B', 
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontSize: '1.75rem',
+                    }}>
+                      {formatCurrency(parseAmount(reconciliationData.MonthOrdersAwaitedSettlement.SalesAmount) - parseAmount(reconciliationData.unsettledReturns.returnAmount))}
                     </Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={12} md={3}>
                   <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="body2" sx={{ color: '#666666', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                    <Typography variant="body1" sx={{ 
+                      color: '#666666', 
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontSize: '1rem',
+                      fontWeight: 500,
+                      mb: 1,
+                    }}>
                       Pending Returns
                     </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#EF4444', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                    <Typography variant="h5" sx={{ 
+                      fontWeight: 600, 
+                      color: '#EF4444', 
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontSize: '1.75rem',
+                    }}>
                       {reconciliationData.unsettledReturns.returnsOrders}
                     </Typography>
                   </Box>
