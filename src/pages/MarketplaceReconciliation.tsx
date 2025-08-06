@@ -87,18 +87,17 @@ import {
   CalendarToday as CalendarTodayIcon,
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
-import { apiService } from '../services/api/apiService';
 import { MarketplaceReconciliationResponse } from '../services/api/types';
-import { mockReconciliationData, getSafeReconciliationData, isValidReconciliationData } from '../data/mockReconciliationData';
+import { getMockDataForMonth } from '../data/mockReconciliationData';
 import { Platform } from '../data/mockData';
 
 const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
-  const [reconciliationData, setReconciliationData] = useState<MarketplaceReconciliationResponse>(mockReconciliationData);
+  const [reconciliationData, setReconciliationData] = useState<MarketplaceReconciliationResponse>(getMockDataForMonth('2025-04'));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usingMockData, setUsingMockData] = useState(false);
+  const [usingMockData, setUsingMockData] = useState(true);
 
   // Sync data sources state
   const [showSyncModal, setShowSyncModal] = useState(false);
@@ -212,45 +211,19 @@ const MarketplaceReconciliation: React.FC = () => {
     }
   };
 
-  // Fetch reconciliation data
-  const fetchReconciliationData = async (month: string) => {
+  // Fetch reconciliation data (using dummy data only)
+  const fetchReconciliationData = (month: string) => {
     setLoading(true);
     setError(null);
-    setUsingMockData(false);
+    setUsingMockData(true);
     
-    const { startDate, endDate } = getMonthDateRange(month);
-    
-    try {
-      const response = await apiService.get<MarketplaceReconciliationResponse>(
-        '/recon/fetchStats',
-        { start_date: startDate, end_date: endDate }
-      );
-      
-      if (response.success && response.data) {
-        // Validate the response data and use mock data if invalid
-        const safeData = getSafeReconciliationData(response.data);
-        setReconciliationData(safeData);
-        
-        // Check if we're using mock data
-        if (!isValidReconciliationData(response.data)) {
-          setUsingMockData(true);
-          setError('API response was incomplete, showing mock data for demonstration');
-        }
-      } else {
-        // API call failed, use mock data
-        setReconciliationData(mockReconciliationData);
-        setUsingMockData(true);
-        setError('Failed to fetch data from API, showing mock data');
-      }
-    } catch (err) {
-      console.error('Error fetching reconciliation data:', err);
-      // API call failed, use mock data
-      setReconciliationData(mockReconciliationData);
-      setUsingMockData(true);
-      setError('Network error, showing mock data for demonstration');
-    } finally {
+    // Simulate loading delay for better UX
+    setTimeout(() => {
+      const mockData = getMockDataForMonth(month);
+      setReconciliationData(mockData);
+      setError('Using demo data for demonstration purposes');
       setLoading(false);
-    }
+    }, 800);
   };
 
   // Handle month change
@@ -519,31 +492,29 @@ const MarketplaceReconciliation: React.FC = () => {
               </Box>
             </Box>
             
-            {/* Error Alert */}
+            {/* Demo Data Alert */}
             {error && (
               <Alert 
-                severity={usingMockData ? "warning" : "error"}
+                severity="info"
                 sx={{ 
                   mb: 3,
                   borderRadius: '6px',
-                  background: usingMockData ? '#fff3cd' : '#f8d7da',
-                  border: usingMockData ? '1px solid #ffeaa7' : '1px solid #f5c6cb',
+                  background: '#e3f2fd',
+                  border: '1px solid #bbdefb',
                   '& .MuiAlert-message': {
                     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                   },
                 }}
               >
                 {error}
-                {usingMockData && (
-                  <Box sx={{ mt: 1, p: 2, borderRadius: '4px', background: 'rgba(255, 255, 255, 0.7)' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#1a1a1a', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                      Mock Data Values:
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#666666', fontSize: '0.875rem', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                      Gross Sales: ₹12,00,000 • Orders Delivered: 480 orders (₹12,30,000) • Returns: 12 orders (-₹30,000)
-                    </Typography>
-                  </Box>
-                )}
+                <Box sx={{ mt: 1, p: 2, borderRadius: '4px', background: 'rgba(255, 255, 255, 0.7)' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#1a1a1a', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                    Demo Data Overview:
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#666666', fontSize: '0.875rem', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                    Gross Sales: ₹18,50,000 • Orders Delivered: 756 orders (₹18,90,000) • Returns: 16 orders (-₹40,000) • Commission: ₹1,23,500 (6.68%)
+                  </Typography>
+                </Box>
               </Alert>
             )}
           </Box>

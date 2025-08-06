@@ -212,8 +212,9 @@ const Bookkeeping: React.FC = () => {
     return `₹${Math.abs(amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
   };
 
-  const handleSync = async () => {
+  const handleSync = () => {
     setSyncStatus('syncing');
+    // Simulate sync process with dummy data
     setTimeout(() => {
       setSyncStatus('success');
       setTimeout(() => setSyncStatus('idle'), 3000);

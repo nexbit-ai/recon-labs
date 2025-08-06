@@ -48,33 +48,51 @@ import {
   CalendarToday as CalendarTodayIcon,
 } from '@mui/icons-material';
 import { Platform } from '../data/mockData';
-import { apiService } from '../services/api/apiService';
-import { API_CONFIG } from '../services/api/config';
 import { MarketplaceOverviewResponse } from '../services/api/marketplaceApi';
 
-// Mock data for fallback
+// Enhanced mock data for demonstration
 const mockMarketplaceData: MarketplaceOverviewResponse = {
   kpis: {
-    totalSales: "1250000.00",
-    totalCommission: "125000.00",
-    totalOrders: 1250,
-    aov: "1000.00",
-    returns: 125
+    totalSales: "1850000.00",
+    totalCommission: "123500.00",
+    totalOrders: 756,
+    aov: "2447.09",
+    returns: 16
   },
   chartData: {
     sales: [
-      { date: "2025-04-01", value: "1146380.47" },
-      { date: "2025-04-02", value: "949922.32" },
-      { date: "2025-04-03", value: "1234567.89" },
-      { date: "2025-04-04", value: "987654.32" },
-      { date: "2025-04-05", value: "1111111.11" }
+      { date: "2025-04-01", value: "125000.00" },
+      { date: "2025-04-02", value: "145000.00" },
+      { date: "2025-04-03", value: "135000.00" },
+      { date: "2025-04-04", value: "155000.00" },
+      { date: "2025-04-05", value: "140000.00" },
+      { date: "2025-04-06", value: "160000.00" },
+      { date: "2025-04-07", value: "150000.00" },
+      { date: "2025-04-08", value: "170000.00" },
+      { date: "2025-04-09", value: "145000.00" },
+      { date: "2025-04-10", value: "165000.00" },
+      { date: "2025-04-11", value: "155000.00" },
+      { date: "2025-04-12", value: "175000.00" },
+      { date: "2025-04-13", value: "160000.00" },
+      { date: "2025-04-14", value: "180000.00" },
+      { date: "2025-04-15", value: "170000.00" }
     ],
     shipping: [
-      { date: "2025-04-01", value: "500" },
-      { date: "2025-04-02", value: "450" },
-      { date: "2025-04-03", value: "600" },
-      { date: "2025-04-04", value: "480" },
-      { date: "2025-04-05", value: "520" }
+      { date: "2025-04-01", value: "45" },
+      { date: "2025-04-02", value: "52" },
+      { date: "2025-04-03", value: "48" },
+      { date: "2025-04-04", value: "55" },
+      { date: "2025-04-05", value: "50" },
+      { date: "2025-04-06", value: "58" },
+      { date: "2025-04-07", value: "53" },
+      { date: "2025-04-08", value: "61" },
+      { date: "2025-04-09", value: "56" },
+      { date: "2025-04-10", value: "64" },
+      { date: "2025-04-11", value: "59" },
+      { date: "2025-04-12", value: "67" },
+      { date: "2025-04-13", value: "62" },
+      { date: "2025-04-14", value: "70" },
+      { date: "2025-04-15", value: "65" }
     ]
   },
   insights: [
@@ -82,31 +100,78 @@ const mockMarketplaceData: MarketplaceOverviewResponse = {
       id: "1",
       type: "sales",
       severity: "high",
-      title: "Sales Increase",
-      description: "Sales increased by 15% compared to last month",
-      value: "15%",
+      title: "Strong Sales Growth",
+      description: "Sales increased by 18% compared to last month",
+      value: "18%",
       trend: "up",
       icon: "trending_up"
+    },
+    {
+      id: "2",
+      type: "orders",
+      severity: "medium",
+      title: "Order Volume Up",
+      description: "Order volume increased by 12% with improved AOV",
+      value: "12%",
+      trend: "up",
+      icon: "shopping_cart"
+    },
+    {
+      id: "3",
+      type: "returns",
+      severity: "low",
+      title: "Low Return Rate",
+      description: "Return rate decreased to 2.11% from 2.5%",
+      value: "2.11%",
+      trend: "down",
+      icon: "undo"
     }
   ],
   topProducts: [
     {
       id: "1",
-      name: "Product A",
-      sku: "SKU001",
-      revenue: "250000.00",
-      unitsSold: 250,
-      growth: "12%",
+      name: "Wireless Bluetooth Headphones",
+      sku: "WH-001",
+      revenue: "285000.00",
+      unitsSold: 285,
+      growth: "15%",
       platform: "Flipkart"
     },
     {
       id: "2",
-      name: "Product B",
-      sku: "SKU002",
-      revenue: "200000.00",
-      unitsSold: 200,
-      growth: "8%",
+      name: "Smart Fitness Band",
+      sku: "FB-002",
+      revenue: "245000.00",
+      unitsSold: 245,
+      growth: "12%",
       platform: "Amazon"
+    },
+    {
+      id: "3",
+      name: "Portable Power Bank",
+      sku: "PB-003",
+      revenue: "220000.00",
+      unitsSold: 220,
+      growth: "18%",
+      platform: "Flipkart"
+    },
+    {
+      id: "4",
+      name: "Wireless Mouse",
+      sku: "WM-004",
+      revenue: "195000.00",
+      unitsSold: 195,
+      growth: "10%",
+      platform: "Amazon"
+    },
+    {
+      id: "5",
+      name: "USB Type-C Cable",
+      sku: "UC-005",
+      revenue: "180000.00",
+      unitsSold: 360,
+      growth: "8%",
+      platform: "Flipkart"
     }
   ]
 };
@@ -173,48 +238,27 @@ const FinanceDashboard: React.FC = () => {
     };
   };
 
-  // Fetch data from API with fallback to mock data
-  const fetchData = async () => {
+  // Fetch data using dummy data
+  const fetchData = () => {
     setLoading(true);
     setApiLoading(true);
     setApiError(null);
-    setUsingMockData(false);
+    setUsingMockData(true);
     
-    const { startDate, endDate } = getMonthDateRange(selectedMonth);
-    
-    try {
-      const response = await apiService.get<MarketplaceOverviewResponse>(
-        '/recon/stats/sales',
-        { start_date: startDate, end_date: endDate },
-        {
-          headers: {
-            'X-API-Key': API_CONFIG.API_KEY,
-            'X-Org-ID': API_CONFIG.ORG_ID,
-            'Content-Type': 'application/json'
-          },
-          timeout: 30000,
-          retryAttempts: 3
-        }
-      );
-      
-      if (response.success && response.data) {
-        setApiData(response.data);
-      } else {
-        // API call failed, use mock data
+    // Simulate API delay
+    setTimeout(() => {
+      try {
+        // Use mock data for demonstration
         setApiData(mockMarketplaceData);
-        setUsingMockData(true);
-        setApiError('Failed to fetch data from API, showing mock data');
+        setApiError('Using demo data for demonstration purposes');
+      } catch (err) {
+        console.error('Error loading mock data:', err);
+        setApiError('Failed to load data. Please try again.');
+      } finally {
+        setLoading(false);
+        setApiLoading(false);
       }
-    } catch (err) {
-      console.error('Error fetching marketplace data:', err);
-      // API call failed, use mock data
-      setApiData(mockMarketplaceData);
-      setUsingMockData(true);
-      setApiError('Network error, showing mock data for demonstration');
-    } finally {
-      setLoading(false);
-      setApiLoading(false);
-    }
+    }, 800);
   };
 
   // Load initial data
@@ -276,16 +320,10 @@ const FinanceDashboard: React.FC = () => {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
       <Box sx={{ p: 4, minHeight: '100vh' }}>
-        {/* Alerts */}
+        {/* Demo Data Alert */}
         {apiError && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
+          <Alert severity="info" sx={{ mb: 2, borderRadius: '6px', background: '#e3f2fd', border: '1px solid #bbdefb' }}>
             {apiError}
-          </Alert>
-        )}
-        
-        {usingMockData && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            Using mock data for demonstration purposes
           </Alert>
         )}
         

@@ -33,8 +33,7 @@ import {
   Alert,
   CircularProgress,
 } from '@mui/material';
-import { api } from '../services/api';
-import { OrdersResponse, OrderItem, MarketplaceReconciliationResponse } from '../services/api/types';
+import { MarketplaceReconciliationResponse } from '../services/api/types';
 import {
   ArrowBack as ArrowBackIcon,
   Search as SearchIcon,
@@ -64,41 +63,24 @@ interface TransactionData {
   rows: TransactionRow[];
 }
 
-// Transform API data to TransactionRow format
-const transformOrderItemToTransactionRow = (orderItem: OrderItem): TransactionRow => {
-  const orderValue = parseFloat(orderItem.buyer_invoice_amount);
-  const difference = parseFloat(orderItem.diff);
-  
-  // Determine remark based on API response
-  let remark = "Pending Settlement";
-  if (orderItem.remark === "settlement_matched") {
-    if (difference === 0) {
-      remark = "Matched";
-    } else if (difference > 0) {
-      remark = "Short Amount Received";
-    } else {
-      remark = "Excess Amount Received";
-    }
-  } else if (orderItem.event_type === "Return") {
-    remark = "Return Initiated";
+// Helper function to get mock data based on active tab
+const getMockDataForTab = (activeTab: number): TransactionRow[] => {
+  if (activeTab === 0) {
+    // Settled transactions: Matched, Short Amount Received, Excess Amount Received
+    return mockTransactionData.rows.filter(row => 
+      row["Settlement Date"] !== "" && 
+      ["Matched", "Short Amount Received", "Excess Amount Received"].includes(row["Remark"])
+    );
+  } else {
+    // Unsettled transactions: Payment Awaited, Return Initiated
+    return mockTransactionData.rows.filter(row => 
+      row["Settlement Date"] === "" && 
+      ["Payment Awaited", "Return Initiated"].includes(row["Remark"])
+    );
   }
-  
-  // Determine if settled or unsettled
-  const isSettled = orderItem.remark === "settlement_matched";
-  const settlementDate = isSettled ? new Date().toISOString().split('T')[0] : ""; // Placeholder for now
-  
-  return {
-    "Order ID": orderItem.order_item_id,
-    "Order Value": orderValue,
-    "Order Date": new Date(orderItem.order_date).toISOString().split('T')[0],
-    "Settlement Date": settlementDate,
-    "Difference": difference,
-    "Remark": remark,
-    "Event Type": orderItem.event_type,
-  };
 };
 
-// Mock data with new structure as per requirements
+// Mock data with proper remark mapping as per requirements
 const mockTransactionData: TransactionData = {
   columns: [
     "Order ID",
@@ -110,7 +92,7 @@ const mockTransactionData: TransactionData = {
     "Event Type"
   ],
   rows: [
-    // Settled Transactions (25 entries)
+    // SETTLED TRANSACTIONS - Matched (20 entries)
     {
       "Order ID": "FK12345",
       "Order Value": 1200,
@@ -425,7 +407,7 @@ const mockTransactionData: TransactionData = {
       "Order Date": "2025-02-19",
       "Settlement Date": "",
       "Difference": 0,
-      "Remark": "Pending Settlement",
+      "Remark": "Payment Awaited",
       "Event Type": "Sale"
     },
     {
@@ -443,7 +425,7 @@ const mockTransactionData: TransactionData = {
       "Order Date": "2025-02-21",
       "Settlement Date": "",
       "Difference": 0,
-      "Remark": "Pending Settlement",
+      "Remark": "Payment Awaited",
       "Event Type": "Sale"
     },
     {
@@ -461,7 +443,7 @@ const mockTransactionData: TransactionData = {
       "Order Date": "2025-02-23",
       "Settlement Date": "",
       "Difference": 0,
-      "Remark": "Pending Settlement",
+      "Remark": "Payment Awaited",
       "Event Type": "Sale"
     },
     {
@@ -479,7 +461,7 @@ const mockTransactionData: TransactionData = {
       "Order Date": "2025-02-25",
       "Settlement Date": "",
       "Difference": 0,
-      "Remark": "Pending Settlement",
+      "Remark": "Payment Awaited",
       "Event Type": "Sale"
     },
     {
@@ -497,7 +479,7 @@ const mockTransactionData: TransactionData = {
       "Order Date": "2025-02-27",
       "Settlement Date": "",
       "Difference": 0,
-      "Remark": "Pending Settlement",
+      "Remark": "Payment Awaited",
       "Event Type": "Sale"
     },
     {
@@ -515,7 +497,7 @@ const mockTransactionData: TransactionData = {
       "Order Date": "2025-03-01",
       "Settlement Date": "",
       "Difference": 0,
-      "Remark": "Pending Settlement",
+      "Remark": "Payment Awaited",
       "Event Type": "Sale"
     },
     {
@@ -533,7 +515,7 @@ const mockTransactionData: TransactionData = {
       "Order Date": "2025-03-03",
       "Settlement Date": "",
       "Difference": 0,
-      "Remark": "Pending Settlement",
+      "Remark": "Payment Awaited",
       "Event Type": "Sale"
     },
     {
@@ -551,7 +533,7 @@ const mockTransactionData: TransactionData = {
       "Order Date": "2025-03-05",
       "Settlement Date": "",
       "Difference": 0,
-      "Remark": "Pending Settlement",
+      "Remark": "Payment Awaited",
       "Event Type": "Sale"
     },
     {
@@ -569,7 +551,7 @@ const mockTransactionData: TransactionData = {
       "Order Date": "2025-03-07",
       "Settlement Date": "",
       "Difference": 0,
-      "Remark": "Pending Settlement",
+      "Remark": "Payment Awaited",
       "Event Type": "Sale"
     },
     {
@@ -587,7 +569,7 @@ const mockTransactionData: TransactionData = {
       "Order Date": "2025-03-09",
       "Settlement Date": "",
       "Difference": 0,
-      "Remark": "Pending Settlement",
+      "Remark": "Payment Awaited",
       "Event Type": "Sale"
     },
     {
@@ -941,64 +923,46 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
 
 
-  // Fetch orders from API with pagination
-  const fetchOrders = async (pageNumber: number = 1) => {
+  // Fetch orders using dummy data
+  const fetchOrders = (pageNumber: number = 1, tabValue?: number) => {
     const isInitialLoad = pageNumber === 1 && allTransactionData.length === 0;
+    const currentTab = tabValue !== undefined ? tabValue : activeTab;
     
     if (!isInitialLoad) {
       setPaginationLoading(true);
     }
     setError(null);
     
-    try {
-      const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-      const response = await api.orders.getOrders({
-        page: pageNumber,
-        limit: 100,
-        remark: remark
-      } as any);
-      
-      if (response.success && response.data.orders) {
-        // Transform all order items to transaction rows
-        const transactionRows: TransactionRow[] = [];
+    // Simulate API delay
+    setTimeout(() => {
+      try {
+        // Get mock data based on current tab
+        const transactionRows = getMockDataForTab(currentTab);
         
-        response.data.orders.forEach((order: any) => {
-          order.order_items.forEach((orderItem: OrderItem) => {
-            transactionRows.push(transformOrderItemToTransactionRow(orderItem));
-          });
-        });
-        
-        // For pagination, we show only the current page data
         setAllTransactionData(transactionRows);
         setFilteredData(transactionRows);
         setCurrentPage(pageNumber);
+        setTotalCount(transactionRows.length);
         
-        // Update total count if available in response
-        if ((response.data as any).pagination) {
-          setTotalCount((response.data as any).pagination.total);
+        // Set demo data message
+        setError('Using demo data for demonstration purposes');
+      } catch (err) {
+        console.error('Error loading mock data:', err);
+        setError('Failed to load transaction data. Please try again.');
+      } finally {
+        if (isInitialLoad) {
+          setLoading(false);
         } else {
-          // Estimate total count based on current data
-          setTotalCount(transactionRows.length);
+          setPaginationLoading(false);
         }
-      } else {
-        setError('Failed to fetch orders data');
       }
-    } catch (err) {
-      console.error('Error fetching orders:', err);
-      setError('Failed to load transaction data. Please try again.');
-    } finally {
-      if (isInitialLoad) {
-        setLoading(false);
-      } else {
-        setPaginationLoading(false);
-      }
-    }
+    }, 800);
   };
 
   // Fetch data on component mount
   useEffect(() => {
     setLoading(true);
-    fetchOrders(1);
+    fetchOrders(1, 0); // Start with settled tab (0)
   }, []);
 
   // Handle search
@@ -1079,7 +1043,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleChangePage = (event: unknown, newPage: number) => {
     const newPageNumber = newPage + 1; // Convert from 0-based to 1-based
     setPage(newPage);
-    fetchOrders(newPageNumber);
+    fetchOrders(newPageNumber, activeTab);
   };
 
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1087,7 +1051,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setRowsPerPage(newRowsPerPage);
     setPage(0);
     // Reset to first page when changing rows per page
-    fetchOrders(1);
+    fetchOrders(1, activeTab);
   };
 
   // Export to Excel
@@ -1148,7 +1112,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setColumnFilters({});
     setPage(0);
     setCurrentPage(1);
-    fetchOrders(1);
+    fetchOrders(1, activeTab);
   };
 
   // Handle tab change
@@ -1156,7 +1120,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setActiveTab(newValue);
     setPage(0); // Reset to first page when changing tabs
     setCurrentPage(1); // Reset current page
-    fetchOrders(1); // Fetch first page data
+    fetchOrders(1, newValue); // Fetch first page data with new tab value
   };
 
   // Handle transaction row click
@@ -1247,7 +1211,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   <Box sx={{ display: 'flex', gap: 2 }}>
                     <Button
                       variant="outlined"
-                      onClick={() => fetchOrders(1)}
+                      onClick={() => fetchOrders(1, activeTab)}
                       disabled={loading}
                       sx={{
                         borderColor: '#1f2937',
@@ -1324,16 +1288,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
             </Card>
           </Fade>
 
-          {/* Error Display */}
+          {/* Demo Data Alert */}
           {error && (
             <Alert 
-              severity="error" 
-              sx={{ mb: 2 }}
-              action={
-                <Button color="inherit" size="small" onClick={() => fetchOrders(1)}>
-                  Retry
-                </Button>
-              }
+              severity="info" 
+              sx={{ mb: 2, borderRadius: '6px', background: '#e3f2fd', border: '1px solid #bbdefb' }}
             >
               {error}
             </Alert>
@@ -1525,7 +1484,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   (value === 'Matched' ? '#10b981' : 
                                    value === 'Excess Amount Received' ? '#f59e0b' : 
                                    value === 'Short Amount Received' ? '#ef4444' :
-                                   value === 'Pending Settlement' ? '#3b82f6' :
+                                   value === 'Payment Awaited' ? '#3b82f6' :
                                    value === 'Return Initiated' ? '#8b5cf6' : '#111827') : 
                                   column === 'Event Type' ? 
                                   (value === 'Sale' ? '#10b981' : '#ef4444') : '#111827',
@@ -1545,12 +1504,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         background: value === 'Matched' ? '#dcfce7' : 
                                                      value === 'Excess Amount Received' ? '#fef3c7' : 
                                                      value === 'Short Amount Received' ? '#fee2e2' :
-                                                     value === 'Pending Settlement' ? '#dbeafe' :
+                                                     value === 'Payment Awaited' ? '#dbeafe' :
                                                      value === 'Return Initiated' ? '#f3e8ff' : '#f3f4f6',
                                         color: value === 'Matched' ? '#059669' : 
                                                value === 'Excess Amount Received' ? '#d97706' : 
                                                value === 'Short Amount Received' ? '#dc2626' :
-                                               value === 'Pending Settlement' ? '#2563eb' :
+                                               value === 'Payment Awaited' ? '#2563eb' :
                                                value === 'Return Initiated' ? '#7c3aed' : '#374151',
                                         fontWeight: 600,
                                         fontSize: '0.75rem',
