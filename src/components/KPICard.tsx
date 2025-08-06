@@ -1,6 +1,6 @@
 import React from 'react';
 import { Paper, Typography, Stack, Box } from '@mui/material';
-import { motion, useSpring, useTransform } from 'framer-motion';
+import { motion, useSpring, useTransform, useMotionValueEvent } from 'framer-motion';
 
 interface KPICardProps {
   title: string;
@@ -11,12 +11,17 @@ interface KPICardProps {
 
 const KPICard: React.FC<KPICardProps> = ({ title, value, change, icon }) => {
   const spring = useSpring(0, { stiffness: 80, damping: 20 });
+  const [displayValue, setDisplayValue] = React.useState('0');
 
   React.useEffect(() => {
     spring.set(value);
   }, [value, spring]);
 
-  const displayValue = useTransform(spring, (latest) => Math.round(latest).toLocaleString());
+  const motionValue = useTransform(spring, (latest) => Math.round(latest).toLocaleString());
+  
+  useMotionValueEvent(motionValue, "change", (latest) => {
+    setDisplayValue(latest);
+  });
 
   return (
     <Paper
