@@ -49,8 +49,9 @@ import {
 
 // Type definitions for transaction data
 interface TransactionRow {
-  "Order ID": string;
+  "Order Item ID": string;
   "Order Value": number;
+  "Settlement Value": number;
   "Order Date": string;
   "Settlement Date": string;
   "Difference": number;
@@ -67,7 +68,43 @@ interface TransactionData {
 // Transform API data to TransactionRow format
 const transformOrderItemToTransactionRow = (orderItem: OrderItem): TransactionRow => {
   const orderValue = parseFloat(orderItem.buyer_invoice_amount);
+  const settlementValue = parseFloat(orderItem.settlement_value);
   const difference = parseFloat(orderItem.diff);
+  
+  // Debug logging to see what we're getting from the API
+  console.log('payment_date from API:', orderItem.payment_date);
+  console.log('OrderItem from API:', orderItem);
+  console.log('order_item_id:', orderItem.order_item_id);
+  
+  // Handle missing or empty order_item_id
+  let orderItemId = orderItem.order_item_id;
+  if (!orderItemId || orderItemId.trim() === '') {
+    // Try alternative field names that might be used in the API
+    const alternativeFields = [
+      'id',
+      'item_id', 
+      'orderItemId',
+      'orderItem_id',
+      'order_itemId',
+      'itemId',
+      'orderId',
+      'order_id'
+    ];
+    
+    for (const field of alternativeFields) {
+      if ((orderItem as any)[field] && (orderItem as any)[field].toString().trim() !== '') {
+        orderItemId = (orderItem as any)[field].toString();
+        console.log(`Found order item ID in alternative field '${field}':`, orderItemId);
+        break;
+      }
+    }
+    
+    // If still no ID found, generate a fallback
+    if (!orderItemId || orderItemId.trim() === '') {
+      orderItemId = `ITEM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.warn('No order item ID found in any field, using fallback:', orderItemId);
+    }
+  }
   
   // Determine remark based on API response
   let remark = "Pending Settlement";
@@ -83,13 +120,24 @@ const transformOrderItemToTransactionRow = (orderItem: OrderItem): TransactionRo
     remark = "Return Initiated";
   }
   
-  // Determine if settled or unsettled
-  const isSettled = orderItem.remark === "settlement_matched";
-  const settlementDate = isSettled ? new Date().toISOString().split('T')[0] : ""; // Placeholder for now
+  // Determine settlement date from API response
+  let settlementDate = "";
+  if (orderItem.payment_date && orderItem.payment_date.trim() !== '') {
+    // Use the actual payment_date from API if available
+    try {
+      settlementDate = new Date(orderItem.payment_date).toISOString().split('T')[0];
+    } catch (error) {
+      settlementDate = "Invalid Date";
+    }
+  } else {
+    // Show "Invalid Date" when payment_date is null or empty
+    settlementDate = "Invalid Date";
+  }
   
   return {
-    "Order ID": orderItem.order_item_id,
+    "Order Item ID": orderItemId,
     "Order Value": orderValue,
+    "Settlement Value": settlementValue,
     "Order Date": new Date(orderItem.order_date).toISOString().split('T')[0],
     "Settlement Date": settlementDate,
     "Difference": difference,
@@ -101,8 +149,9 @@ const transformOrderItemToTransactionRow = (orderItem: OrderItem): TransactionRo
 // Mock data with new structure as per requirements
 const mockTransactionData: TransactionData = {
   columns: [
-    "Order ID",
-    "Order Value", 
+    "Order Item ID",
+    "Order Value",
+    "Settlement Value",
     "Order Date",
     "Settlement Date",
     "Difference",
@@ -112,8 +161,9 @@ const mockTransactionData: TransactionData = {
   rows: [
     // Settled Transactions (25 entries)
     {
-      "Order ID": "FK12345",
+      "Order Item ID": "FK12345",
       "Order Value": 1200,
+      "Settlement Value": 1200,
       "Order Date": "2025-01-15",
       "Settlement Date": "2025-01-20",
       "Difference": 0,
@@ -121,8 +171,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12346",
+      "Order Item ID": "FK12346",
       "Order Value": 850,
+      "Settlement Value": 850,
       "Order Date": "2025-01-16",
       "Settlement Date": "2025-01-21",
       "Difference": 0,
@@ -130,8 +181,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12347",
+      "Order Item ID": "FK12347",
       "Order Value": 2100,
+      "Settlement Value": 2100,
       "Order Date": "2025-01-17",
       "Settlement Date": "2025-01-22",
       "Difference": 0,
@@ -139,8 +191,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12349",
+      "Order Item ID": "FK12349",
       "Order Value": 1600,
+      "Settlement Value": 1600,
       "Order Date": "2025-01-19",
       "Settlement Date": "2025-01-24",
       "Difference": 0,
@@ -148,8 +201,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12350",
+      "Order Item ID": "FK12350",
       "Order Value": 950,
+      "Settlement Value": 950,
       "Order Date": "2025-01-20",
       "Settlement Date": "2025-01-25",
       "Difference": 0,
@@ -157,8 +211,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12351",
+      "Order Item ID": "FK12351",
       "Order Value": 1800,
+      "Settlement Value": 1800,
       "Order Date": "2025-01-21",
       "Settlement Date": "2025-01-26",
       "Difference": 0,
@@ -166,8 +221,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12352",
+      "Order Item ID": "FK12352",
       "Order Value": 1350,
+      "Settlement Value": 1350,
       "Order Date": "2025-01-22",
       "Settlement Date": "2025-01-27",
       "Difference": 0,
@@ -175,8 +231,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12353",
+      "Order Item ID": "FK12353",
       "Order Value": 2200,
+      "Settlement Value": 2200,
       "Order Date": "2025-01-23",
       "Settlement Date": "2025-01-28",
       "Difference": 0,
@@ -184,8 +241,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12354",
+      "Order Item ID": "FK12354",
       "Order Value": 1100,
+      "Settlement Value": 1100,
       "Order Date": "2025-01-24",
       "Settlement Date": "2025-01-29",
       "Difference": 0,
@@ -193,8 +251,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12355",
+      "Order Item ID": "FK12355",
       "Order Value": 1700,
+      "Settlement Value": 1700,
       "Order Date": "2025-01-25",
       "Settlement Date": "2025-01-30",
       "Difference": 0,
@@ -202,8 +261,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12356",
+      "Order Item ID": "FK12356",
       "Order Value": 1400,
+      "Settlement Value": 1400,
       "Order Date": "2025-01-26",
       "Settlement Date": "2025-02-01",
       "Difference": 0,
@@ -211,8 +271,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12357",
+      "Order Item ID": "FK12357",
       "Order Value": 1900,
+      "Settlement Value": 1900,
       "Order Date": "2025-01-27",
       "Settlement Date": "2025-02-02",
       "Difference": 0,
@@ -220,8 +281,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12358",
+      "Order Item ID": "FK12358",
       "Order Value": 1250,
+      "Settlement Value": 1250,
       "Order Date": "2025-01-28",
       "Settlement Date": "2025-02-03",
       "Difference": 0,
@@ -229,8 +291,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12359",
+      "Order Item ID": "FK12359",
       "Order Value": 2300,
+      "Settlement Value": 2300,
       "Order Date": "2025-01-29",
       "Settlement Date": "2025-02-04",
       "Difference": 0,
@@ -238,8 +301,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12360",
+      "Order Item ID": "FK12360",
       "Order Value": 1000,
+      "Settlement Value": 1000,
       "Order Date": "2025-01-30",
       "Settlement Date": "2025-02-05",
       "Difference": 0,
@@ -247,8 +311,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12361",
+      "Order Item ID": "FK12361",
       "Order Value": 1550,
+      "Settlement Value": 1550,
       "Order Date": "2025-02-01",
       "Settlement Date": "2025-02-06",
       "Difference": 0,
@@ -256,8 +321,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12362",
+      "Order Item ID": "FK12362",
       "Order Value": 2000,
+      "Settlement Value": 2000,
       "Order Date": "2025-02-02",
       "Settlement Date": "2025-02-07",
       "Difference": 0,
@@ -265,8 +331,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12363",
+      "Order Item ID": "FK12363",
       "Order Value": 1150,
+      "Settlement Value": 1150,
       "Order Date": "2025-02-03",
       "Settlement Date": "2025-02-08",
       "Difference": 0,
@@ -274,8 +341,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12364",
+      "Order Item ID": "FK12364",
       "Order Value": 1750,
+      "Settlement Value": 1750,
       "Order Date": "2025-02-04",
       "Settlement Date": "2025-02-09",
       "Difference": 0,
@@ -283,8 +351,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12365",
+      "Order Item ID": "FK12365",
       "Order Value": 1300,
+      "Settlement Value": 1300,
       "Order Date": "2025-02-05",
       "Settlement Date": "2025-02-10",
       "Difference": 0,
@@ -292,8 +361,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12366",
+      "Order Item ID": "FK12366",
       "Order Value": 1850,
+      "Settlement Value": 1850,
       "Order Date": "2025-02-06",
       "Settlement Date": "2025-02-11",
       "Difference": 0,
@@ -301,8 +371,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12367",
+      "Order Item ID": "FK12367",
       "Order Value": 1450,
+      "Settlement Value": 1450,
       "Order Date": "2025-02-07",
       "Settlement Date": "2025-02-12",
       "Difference": 0,
@@ -310,8 +381,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12368",
+      "Order Item ID": "FK12368",
       "Order Value": 1950,
+      "Settlement Value": 1950,
       "Order Date": "2025-02-08",
       "Settlement Date": "2025-02-13",
       "Difference": 0,
@@ -319,8 +391,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12369",
+      "Order Item ID": "FK12369",
       "Order Value": 1200,
+      "Settlement Value": 1200,
       "Order Date": "2025-02-09",
       "Settlement Date": "2025-02-14",
       "Difference": 0,
@@ -329,8 +402,9 @@ const mockTransactionData: TransactionData = {
     },
     // Settled Transactions with Discrepancies (10 entries)
     {
-      "Order ID": "FK12348",
+      "Order Item ID": "FK12348",
       "Order Value": 750,
+      "Settlement Value": 750,
       "Order Date": "2025-01-18",
       "Settlement Date": "2025-01-23",
       "Difference": -50,
@@ -338,8 +412,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12370",
+      "Order Item ID": "FK12370",
       "Order Value": 800,
+      "Settlement Value": 800,
       "Order Date": "2025-02-10",
       "Settlement Date": "2025-02-15",
       "Difference": 25,
@@ -347,8 +422,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12371",
+      "Order Item ID": "FK12371",
       "Order Value": 650,
+      "Settlement Value": 650,
       "Order Date": "2025-02-11",
       "Settlement Date": "2025-02-16",
       "Difference": -30,
@@ -356,8 +432,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12372",
+      "Order Item ID": "FK12372",
       "Order Value": 900,
+      "Settlement Value": 900,
       "Order Date": "2025-02-12",
       "Settlement Date": "2025-02-17",
       "Difference": 45,
@@ -365,8 +442,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12373",
+      "Order Item ID": "FK12373",
       "Order Value": 550,
+      "Settlement Value": 550,
       "Order Date": "2025-02-13",
       "Settlement Date": "2025-02-18",
       "Difference": -20,
@@ -374,8 +452,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12374",
+      "Order Item ID": "FK12374",
       "Order Value": 700,
+      "Settlement Value": 700,
       "Order Date": "2025-02-14",
       "Settlement Date": "2025-02-19",
       "Difference": 35,
@@ -383,8 +462,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12375",
+      "Order Item ID": "FK12375",
       "Order Value": 450,
+      "Settlement Value": 450,
       "Order Date": "2025-02-15",
       "Settlement Date": "2025-02-20",
       "Difference": -15,
@@ -392,8 +472,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12376",
+      "Order Item ID": "FK12376",
       "Order Value": 600,
+      "Settlement Value": 600,
       "Order Date": "2025-02-16",
       "Settlement Date": "2025-02-21",
       "Difference": 40,
@@ -401,8 +482,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12377",
+      "Order Item ID": "FK12377",
       "Order Value": 850,
+      "Settlement Value": 850,
       "Order Date": "2025-02-17",
       "Settlement Date": "2025-02-22",
       "Difference": -25,
@@ -410,8 +492,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12378",
+      "Order Item ID": "FK12378",
       "Order Value": 500,
+      "Settlement Value": 500,
       "Order Date": "2025-02-18",
       "Settlement Date": "2025-02-23",
       "Difference": 30,
@@ -420,8 +503,9 @@ const mockTransactionData: TransactionData = {
     },
     // Unsettled Transactions (15 entries)
     {
-      "Order ID": "FK12379",
+      "Order Item ID": "FK12379",
       "Order Value": 750,
+      "Settlement Value": 750,
       "Order Date": "2025-02-19",
       "Settlement Date": "",
       "Difference": 0,
@@ -429,8 +513,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12380",
+      "Order Item ID": "FK12380",
       "Order Value": 400,
+      "Settlement Value": 400,
       "Order Date": "2025-02-20",
       "Settlement Date": "",
       "Difference": 0,
@@ -438,8 +523,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Return"
     },
     {
-      "Order ID": "FK12381",
+      "Order Item ID": "FK12381",
       "Order Value": 650,
+      "Settlement Value": 650,
       "Order Date": "2025-02-21",
       "Settlement Date": "",
       "Difference": 0,
@@ -447,8 +533,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12382",
+      "Order Item ID": "FK12382",
       "Order Value": 900,
+      "Settlement Value": 900,
       "Order Date": "2025-02-22",
       "Settlement Date": "",
       "Difference": 0,
@@ -456,8 +543,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Return"
     },
     {
-      "Order ID": "FK12383",
+      "Order Item ID": "FK12383",
       "Order Value": 550,
+      "Settlement Value": 550,
       "Order Date": "2025-02-23",
       "Settlement Date": "",
       "Difference": 0,
@@ -465,8 +553,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12384",
+      "Order Item ID": "FK12384",
       "Order Value": 800,
+      "Settlement Value": 800,
       "Order Date": "2025-02-24",
       "Settlement Date": "",
       "Difference": 0,
@@ -474,8 +563,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Return"
     },
     {
-      "Order ID": "FK12385",
+      "Order Item ID": "FK12385",
       "Order Value": 700,
+      "Settlement Value": 700,
       "Order Date": "2025-02-25",
       "Settlement Date": "",
       "Difference": 0,
@@ -483,8 +573,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12386",
+      "Order Item ID": "FK12386",
       "Order Value": 600,
+      "Settlement Value": 600,
       "Order Date": "2025-02-26",
       "Settlement Date": "",
       "Difference": 0,
@@ -492,8 +583,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Return"
     },
     {
-      "Order ID": "FK12387",
+      "Order Item ID": "FK12387",
       "Order Value": 850,
+      "Settlement Value": 850,
       "Order Date": "2025-02-27",
       "Settlement Date": "",
       "Difference": 0,
@@ -501,8 +593,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12388",
+      "Order Item ID": "FK12388",
       "Order Value": 500,
+      "Settlement Value": 500,
       "Order Date": "2025-02-28",
       "Settlement Date": "",
       "Difference": 0,
@@ -510,8 +603,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Return"
     },
     {
-      "Order ID": "FK12389",
+      "Order Item ID": "FK12389",
       "Order Value": 750,
+      "Settlement Value": 750,
       "Order Date": "2025-03-01",
       "Settlement Date": "",
       "Difference": 0,
@@ -519,8 +613,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12390",
+      "Order Item ID": "FK12390",
       "Order Value": 650,
+      "Settlement Value": 650,
       "Order Date": "2025-03-02",
       "Settlement Date": "",
       "Difference": 0,
@@ -528,8 +623,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Return"
     },
     {
-      "Order ID": "FK12391",
+      "Order Item ID": "FK12391",
       "Order Value": 900,
+      "Settlement Value": 900,
       "Order Date": "2025-03-03",
       "Settlement Date": "",
       "Difference": 0,
@@ -537,8 +633,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12392",
+      "Order Item ID": "FK12392",
       "Order Value": 550,
+      "Settlement Value": 550,
       "Order Date": "2025-03-04",
       "Settlement Date": "",
       "Difference": 0,
@@ -546,8 +643,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Return"
     },
     {
-      "Order ID": "FK12393",
+      "Order Item ID": "FK12393",
       "Order Value": 800,
+      "Settlement Value": 800,
       "Order Date": "2025-03-05",
       "Settlement Date": "",
       "Difference": 0,
@@ -555,8 +653,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12394",
+      "Order Item ID": "FK12394",
       "Order Value": 700,
+      "Settlement Value": 700,
       "Order Date": "2025-03-06",
       "Settlement Date": "",
       "Difference": 0,
@@ -564,8 +663,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Return"
     },
     {
-      "Order ID": "FK12395",
+      "Order Item ID": "FK12395",
       "Order Value": 600,
+      "Settlement Value": 600,
       "Order Date": "2025-03-07",
       "Settlement Date": "",
       "Difference": 0,
@@ -573,8 +673,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12396",
+      "Order Item ID": "FK12396",
       "Order Value": 850,
+      "Settlement Value": 850,
       "Order Date": "2025-03-08",
       "Settlement Date": "",
       "Difference": 0,
@@ -582,8 +683,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Return"
     },
     {
-      "Order ID": "FK12397",
+      "Order Item ID": "FK12397",
       "Order Value": 500,
+      "Settlement Value": 500,
       "Order Date": "2025-03-09",
       "Settlement Date": "",
       "Difference": 0,
@@ -591,8 +693,9 @@ const mockTransactionData: TransactionData = {
       "Event Type": "Sale"
     },
     {
-      "Order ID": "FK12398",
+      "Order Item ID": "FK12398",
       "Order Value": 750,
+      "Settlement Value": 750,
       "Order Date": "2025-03-10",
       "Settlement Date": "",
       "Difference": 0,
@@ -760,7 +863,7 @@ const TransactionDetailsPopup: React.FC<{
             Transaction Details
           </Typography>
           <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>
-            Order ID: {transaction["Order ID"]}
+            Order Item ID: {transaction["Order Item ID"]}
           </Typography>
         </Box>
         <IconButton
@@ -824,10 +927,10 @@ const TransactionDetailsPopup: React.FC<{
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid #f1f5f9' }}>
             <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-              Collection Received
+              Settlement Value
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a' }}>
-              {formatCurrency(transaction["Order Value"] - transaction["Difference"])}
+              {formatCurrency(transaction["Settlement Value"])}
             </Typography>
           </Box>
 
@@ -917,9 +1020,34 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
   };
 
+  // Helper function to format date in "17th March, 2025" format
+  const formatDateWithOrdinal = (dateString: string) => {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString; // Return original if invalid date
+    
+    const day = date.getDate();
+    const month = date.toLocaleDateString('en-US', { month: 'long' });
+    const year = date.getFullYear();
+    
+    // Add ordinal suffix to day
+    const getOrdinalSuffix = (day: number) => {
+      if (day > 3 && day < 21) return 'th';
+      switch (day % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+      }
+    };
+    
+    return `${day}${getOrdinalSuffix(day)} ${month}, ${year}`;
+  };
+
   // Format date
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN');
+    return formatDateWithOrdinal(dateString);
   };
 
   // Calculate count from stats data
@@ -942,7 +1070,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
 
   // Fetch orders from API with pagination
-  const fetchOrders = async (pageNumber: number = 1) => {
+  const fetchOrders = async (pageNumber: number = 1, remark?: string) => {
     const isInitialLoad = pageNumber === 1 && allTransactionData.length === 0;
     
     if (!isInitialLoad) {
@@ -951,19 +1079,29 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setError(null);
     
     try {
-      const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+      // Use provided remark or determine from activeTab
+      const remarkToUse = remark || (activeTab === 0 ? 'settlement_matched' : 'unsettled');
+      console.log(`Fetching orders with remark: ${remarkToUse}, page: ${pageNumber}, activeTab: ${activeTab}`);
       const response = await api.orders.getOrders({
         page: pageNumber,
         limit: 100,
-        remark: remark
+        remark: remarkToUse
       } as any);
       
       if (response.success && response.data.orders) {
+        // Debug: Log the API response structure
+        console.log('API Response:', response.data);
+        console.log('Orders:', response.data.orders);
+        
         // Transform all order items to transaction rows
         const transactionRows: TransactionRow[] = [];
         
-        response.data.orders.forEach((order: any) => {
-          order.order_items.forEach((orderItem: OrderItem) => {
+        response.data.orders.forEach((order: any, orderIndex: number) => {
+          console.log(`Order ${orderIndex}:`, order);
+          console.log(`Order items for order ${orderIndex}:`, order.order_items);
+          
+          order.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
+            console.log(`OrderItem ${itemIndex} in Order ${orderIndex}:`, orderItem);
             transactionRows.push(transformOrderItemToTransactionRow(orderItem));
           });
         });
@@ -998,7 +1136,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Fetch data on component mount
   useEffect(() => {
     setLoading(true);
-    fetchOrders(1);
+    // Start with settled transactions (activeTab = 0)
+    fetchOrders(1, 'settlement_matched');
   }, []);
 
   // Handle search
@@ -1079,7 +1218,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleChangePage = (event: unknown, newPage: number) => {
     const newPageNumber = newPage + 1; // Convert from 0-based to 1-based
     setPage(newPage);
-    fetchOrders(newPageNumber);
+    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+    fetchOrders(newPageNumber, remark);
   };
 
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1087,7 +1227,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setRowsPerPage(newRowsPerPage);
     setPage(0);
     // Reset to first page when changing rows per page
-    fetchOrders(1);
+    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+    fetchOrders(1, remark);
   };
 
   // Export to Excel
@@ -1095,7 +1236,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     try {
       // Prepare data for export
       const exportData = filteredData.map(row => ({
-        'Order ID': row['Order ID'],
+        'Order Item ID': row['Order Item ID'],
         'Order Value': row['Order Value'],
         'Order Date': row['Order Date'],
         'Settlement Date': row['Settlement Date'],
@@ -1148,15 +1289,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setColumnFilters({});
     setPage(0);
     setCurrentPage(1);
-    fetchOrders(1);
+    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+    fetchOrders(1, remark);
   };
 
   // Handle tab change
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    console.log(`Tab changed from ${activeTab} to ${newValue}`);
     setActiveTab(newValue);
     setPage(0); // Reset to first page when changing tabs
     setCurrentPage(1); // Reset current page
-    fetchOrders(1); // Fetch first page data
+    
+    // Determine the correct remark based on the new tab value
+    const remark = newValue === 0 ? 'settlement_matched' : 'unsettled';
+    console.log(`Fetching data for tab ${newValue} with remark: ${remark}`);
+    fetchOrders(1, remark); // Fetch first page data with correct remark
   };
 
   // Handle transaction row click
@@ -1176,8 +1323,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Get visible columns
   const getVisibleColumns = () => {
     return [
-      "Order ID",
-      "Order Value", 
+      "Order Item ID",
+      "Order Value",
+      "Settlement Value",
       "Order Date",
       "Settlement Date",
       "Difference",
@@ -1197,23 +1345,23 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         position: 'relative',
         overflow: 'auto',
       }}>
-        <Box sx={{ p: { xs: 2, md: 4 }, position: 'relative', zIndex: 1 }}>
+        <Box sx={{ p: { xs: 1, md: 2 }, position: 'relative', zIndex: 1 }}>
           {/* Header */}
           <Fade in timeout={800}>
             <Card sx={{ 
-              mb: 2,
+              mb: 1,
               background: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #e5e7eb',
               boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
             }}>
-              <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <CardContent sx={{ p: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                     <IconButton
                       onClick={onBack}
+                      size="small"
                       sx={{
-                        mr: 2,
                         background: '#1f2937',
                         color: 'white',
                         '&:hover': {
@@ -1223,38 +1371,60 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         transition: 'all 0.3s ease',
                       }}
                     >
-                      <ArrowBackIcon />
+                      <ArrowBackIcon fontSize="small" />
                     </IconButton>
-                    <Box>
-                      <Typography variant="h4" sx={{ 
-                        fontWeight: 700, 
-                        color: '#111827',
-                        letterSpacing: '-0.02em',
-                        mb: 1,
-                      }}>
-                        Transaction Sheet
-                      </Typography>
-                      <Typography variant="body1" sx={{ 
-                        color: '#6b7280', 
-                        fontWeight: 500,
-                        fontSize: '1.1rem',
-                      }}>
-                        Complete transaction details with expandable columns
-                      </Typography>
-                    </Box>
+                    <Typography variant="h5" sx={{ 
+                      fontWeight: 700, 
+                      color: '#111827',
+                      letterSpacing: '-0.02em',
+                    }}>
+                      Transaction Sheet
+                    </Typography>
+                    
+                    {/* Transaction Tabs - Inline */}
+                    <Tabs 
+                      value={activeTab} 
+                      onChange={handleTabChange}
+                      sx={{
+                        '& .MuiTab-root': {
+                          minHeight: 32,
+                          fontSize: '0.875rem',
+                          fontWeight: 600,
+                          textTransform: 'none',
+                          color: '#6b7280',
+                          px: 2,
+                          py: 0.5,
+                          '&.Mui-selected': {
+                            color: '#1f2937',
+                            fontWeight: 700,
+                          },
+                        },
+                        '& .MuiTabs-indicator': {
+                          height: 2,
+                          borderRadius: '2px 2px 0 0',
+                          background: '#1f2937',
+                        },
+                      }}
+                    >
+                      <Tab label="Settled" />
+                      <Tab label="Unsettled" />
+                    </Tabs>
                   </Box>
                   
                   <Box sx={{ display: 'flex', gap: 2 }}>
                     <Button
                       variant="outlined"
-                      onClick={() => fetchOrders(1)}
+                      onClick={() => {
+                        const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+                        fetchOrders(1, remark);
+                      }}
                       disabled={loading}
                       sx={{
                         borderColor: '#1f2937',
                         color: '#1f2937',
                         borderRadius: '8px',
-                        px: 3,
-                        py: 1.5,
+                        px: 2,
+                        py: 1,
                         fontWeight: 600,
                         textTransform: 'none',
                         '&:hover': {
@@ -1273,8 +1443,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       sx={{
                         background: '#1f2937',
                         borderRadius: '8px',
-                        px: 3,
-                        py: 1.5,
+                        px: 2,
+                        py: 1,
                         fontWeight: 600,
                         textTransform: 'none',
                         boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
@@ -1290,36 +1460,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     </Button>
                   </Box>
                 </Box>
-
-                {/* Transaction Tabs - Centered */}
-                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 3 }}>
-                  <Tabs 
-                    value={activeTab} 
-                    onChange={handleTabChange}
-                    sx={{
-                      '& .MuiTab-root': {
-                        minHeight: 56,
-                        fontSize: '1.1rem',
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        color: '#6b7280',
-                        px: 4,
-                        '&.Mui-selected': {
-                          color: '#1f2937',
-                          fontWeight: 700,
-                        },
-                      },
-                      '& .MuiTabs-indicator': {
-                        height: 3,
-                        borderRadius: '3px 3px 0 0',
-                        background: '#1f2937',
-                      },
-                    }}
-                  >
-                    <Tab label="Settled" />
-                    <Tab label="Unsettled" />
-                  </Tabs>
-                </Box>
               </CardContent>
             </Card>
           </Fade>
@@ -1330,7 +1470,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               severity="error" 
               sx={{ mb: 2 }}
               action={
-                <Button color="inherit" size="small" onClick={() => fetchOrders(1)}>
+                <Button color="inherit" size="small" onClick={() => {
+                  const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+                  fetchOrders(1, remark);
+                }}>
                   Retry
                 </Button>
               }
@@ -1385,9 +1528,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 <Table stickyHeader>
                   <TableHead>
                     <TableRow>
-                      {visibleColumns.map((column, index) => (
-                        <TableCell
-                          key={column}
+                                              {visibleColumns.map((column, index) => (
+                          <TableCell
+                            key={`header-${column}`}
                           sx={{
                             fontWeight: 700,
                             color: '#111827',
@@ -1487,7 +1630,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     ) : (
                       filteredData
                         .map((row, rowIndex) => {
-                        const isSelected = selectedTransaction?.["Order ID"] === row["Order ID"];
+                        const isSelected = selectedTransaction?.["Order Item ID"] === row["Order Item ID"];
                         return (
                           <React.Fragment key={rowIndex}>
                             <TableRow 
@@ -1497,13 +1640,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 position: 'relative',
                               }}
                             >
-                        {visibleColumns.map((column) => {
+                        {visibleColumns.map((column, colIndex) => {
                           const value = (row as any)[column];
                           
                           // Format value based on type
                           let displayValue = value;
                           if (typeof value === 'number') {
-                            if (column === 'Order Value' || column === 'Difference') {
+                            if (column === 'Order Value' || column === 'Settlement Value' || column === 'Difference') {
                               displayValue = formatCurrency(value);
                             } else {
                               displayValue = value.toLocaleString('en-IN');
@@ -1514,7 +1657,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           
                           return (
                             <TableCell
-                              key={column}
+                              key={`${row["Order Item ID"]}-${column}-${colIndex}`}
                               sx={{
                                 border: '1px solid #e5e7eb',
                                 background: '#ffffff',
