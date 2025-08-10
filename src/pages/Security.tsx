@@ -63,7 +63,7 @@ const Security: React.FC = () => {
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1000, mx: 'auto' }}>
       {/* Page Header */}
-      <Box sx={{ mb: 5, textAlign: 'center' }}>
+  <Box sx={{ mb: 5, textAlign: 'left' }}>
         <SecurityIcon color="primary" sx={{ fontSize: 48, mb: 2 }} />
         <Typography variant="h3" sx={{ fontWeight: 800, color: 'text.primary', mb: 2 }}>
           Security & Trust
@@ -75,7 +75,7 @@ const Security: React.FC = () => {
 
       {/* Security Features Section */}
       <Box sx={{ mb: 6 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main', mb: 4, textAlign: 'center' }}>
+  <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main', mb: 4, textAlign: 'left' }}>
           Data Protection & Privacy
         </Typography>
         <Grid container spacing={3}>
@@ -104,7 +104,7 @@ const Security: React.FC = () => {
 
       {/* Guardrails Section */}
       <Box sx={{ mb: 6 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main', mb: 4, textAlign: 'center' }}>
+  <Typography variant="h4" sx={{ fontWeight: 700, color: 'primary.main', mb: 4, textAlign: 'left' }}>
           AI Guardrails & Human Oversight
         </Typography>
         <Grid container spacing={3}>
@@ -113,7 +113,7 @@ const Security: React.FC = () => {
             return (
               <Grid item xs={12} md={4} key={guardrail.title}>
                 <Paper elevation={0} sx={{ p: 3, h: '100%', border: '1px solid #e5e7eb', borderRadius: 2 }}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
                     <Icon {...guardrail.iconProps} />
                     <Typography variant="h6" sx={{ fontWeight: 600, mt: 2, mb: 1, color: 'text.primary' }}>
                       {guardrail.title}

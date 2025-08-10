@@ -30,6 +30,10 @@ import {
   Badge,
   LinearProgress,
   CircularProgress,
+  Tabs,
+  Tab,
+  Checkbox,
+  Snackbar,
   Select,
   MenuItem,
   FormControl,
@@ -99,6 +103,15 @@ const MarketplaceReconciliation: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(false);
+  const [activeMainTab, setActiveMainTab] = useState<'recon' | 'dispute'>('recon');
+  const handleMainTabChange = (_: any, value: number) => setActiveMainTab(value === 0 ? 'recon' : 'dispute');
+
+  // Dispute tab states
+  const [disputeSubTab, setDisputeSubTab] = useState<number>(0); // 0: open, 1: raised
+  const handleDisputeSubTabChange = (_: any, value: number) => setDisputeSubTab(value);
+  const [disputeRows, setDisputeRows] = useState<Array<{ id: string; orderItemId: string; orderDate: string; difference: number; remark: string; eventType: string; status: 'open' | 'raised'; }>>([]);
+  const [selectedDisputeIds, setSelectedDisputeIds] = useState<string[]>([]);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   // Sync data sources state
   const [showSyncModal, setShowSyncModal] = useState(false);
@@ -153,6 +166,26 @@ const MarketplaceReconciliation: React.FC = () => {
     return parseFloat(percentage) || 0;
   };
 
+  // Init dispute mock data
+  useEffect(() => {
+    if (disputeRows.length === 0) {
+      const remarks = ['Short Amount Received', 'Excess Amount Received', 'Pending Settlement'];
+      const rows: Array<{ id: string; orderItemId: string; orderDate: string; difference: number; remark: string; eventType: string; status: 'open' | 'raised'; }> = [];
+      for (let i = 0; i < 12; i++) {
+        rows.push({
+          id: `DISP_${1000 + i}`,
+          orderItemId: `FK${12345 + i}`,
+          orderDate: new Date(Date.now() - i * 86400000).toISOString().slice(0, 10),
+          difference: (i % 2 === 0 ? 1 : -1) * (500 + i * 25),
+          remark: remarks[i % remarks.length],
+          eventType: i % 3 === 0 ? 'Return' : 'Sale',
+          status: i % 3 === 0 ? 'raised' : 'open',
+        });
+      }
+      setDisputeRows(rows);
+    }
+  }, []);
+
   // Get start and end dates for a given month
   const getMonthDateRange = (monthString: string) => {
     const [year, month] = monthString.split('-').map(Number);
@@ -176,6 +209,26 @@ const MarketplaceReconciliation: React.FC = () => {
       startDate: formatDate(startDate),
       endDate: formatDate(endDate)
     };
+  };
+
+  // Dispute helpers
+  const currentDisputeRows = disputeRows.filter(r => (disputeSubTab === 0 ? r.status === 'open' : r.status === 'raised'));
+  const allSelectedInView = currentDisputeRows.length > 0 && currentDisputeRows.every(r => selectedDisputeIds.includes(r.id));
+  const toggleSelectAllInView = () => {
+    if (allSelectedInView) {
+      setSelectedDisputeIds(prev => prev.filter(id => !currentDisputeRows.some(r => r.id === id)));
+    } else {
+      setSelectedDisputeIds(prev => Array.from(new Set([...prev, ...currentDisputeRows.map(r => r.id)])));
+    }
+  };
+  const toggleSelectRow = (id: string) => {
+    setSelectedDisputeIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  };
+  const sendSelectedToFlipkart = () => {
+    if (selectedDisputeIds.length === 0) return;
+    setSnackbarOpen(true);
+    setDisputeRows(prev => prev.map(r => (selectedDisputeIds.includes(r.id) ? { ...r, status: 'raised' } : r)));
+    setSelectedDisputeIds([]);
   };
 
   // Sync data sources function
@@ -307,31 +360,31 @@ const MarketplaceReconciliation: React.FC = () => {
         </Typography>
       </Fab>
 
-      <Box sx={{ p: { xs: 2, md: 6 }, position: 'relative', zIndex: 1 }}>
+      <Box sx={{ p: { xs: 2, md: 3 }, position: 'relative', zIndex: 1 }}>
         {/* Header */}
         <Fade in timeout={800}>
-          <Box sx={{ mb: 6 }}>
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between',
-              mb: 4,
-            }}>
+          <Box sx={{ mb: 2 }}>
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                mb: 2,
+              }}>
               <Typography variant="h4" sx={{ 
                 fontWeight: 700, 
                 color: '#1a1a1a',
                 letterSpacing: '-0.01em',
                 fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
               }}>
-                Marketplace Reconciliation
+                Reconciliation
               </Typography>
               
               {/* Month Selector */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {loading && (
                   <CircularProgress size={24} sx={{ color: '#1a1a1a' }} />
                 )}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Button
                   variant="outlined"
                   endIcon={<KeyboardArrowDownIcon />}
@@ -341,10 +394,10 @@ const MarketplaceReconciliation: React.FC = () => {
                     borderColor: '#6B7280',
                     color: '#6B7280',
                     textTransform: 'none',
-                    minWidth: 200,
-                    minHeight: 40,
-                    px: 2,
-                    fontSize: '1rem',
+                    minWidth: 'auto',
+                    minHeight: 36,
+                    px: 1.5,
+                    fontSize: '0.7875rem',
                     '&:hover': {
                       borderColor: '#4B5563',
                       backgroundColor: 'rgba(107, 114, 128, 0.04)',
@@ -411,10 +464,10 @@ const MarketplaceReconciliation: React.FC = () => {
                     borderColor: '#6B7280',
                     color: '#6B7280',
                     textTransform: 'none',
-                    minWidth: 200,
-                    minHeight: 40,
-                    px: 2,
-                    fontSize: '1rem',
+                    minWidth: 'auto',
+                    minHeight: 36,
+                    px: 1.5,
+                    fontSize: '0.7875rem',
                     '&:hover': {
                       borderColor: '#4B5563',
                       backgroundColor: 'rgba(107, 114, 128, 0.04)',
@@ -475,21 +528,23 @@ const MarketplaceReconciliation: React.FC = () => {
                 </Box>
 
                 {/* Sync Data Sources Button */}
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, mt: 1 }}>
                   <Button
                     variant="outlined"
                     startIcon={<SyncIcon />}
                     onClick={handleSyncDataSources}
                     disabled={syncLoading}
                     sx={{
+                      mt: 1.5,
                       borderRadius: '6px',
                       borderColor: '#6B7280',
                       color: '#6B7280',
                       textTransform: 'none',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                       fontWeight: 500,
-                      minHeight: 40,
-                      px: 2,
+                      minHeight: 36,
+                      px: 1.5,
+                      fontSize: '0.7875rem',
                       '&:hover': {
                         borderColor: '#4B5563',
                         backgroundColor: 'rgba(107, 114, 128, 0.04)',
@@ -502,8 +557,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   >
                     {syncLoading ? 'Syncing...' : 'Sync Data'}
                   </Button>
-                  
-                  {/* Last Synced Text */}
+                  {/* Last Synced Text (below) */}
                   <Typography variant="caption" sx={{
                     color: '#666666',
                     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -513,7 +567,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     gap: 0.5,
                   }}>
                     <ScheduleIcon sx={{ fontSize: '0.75rem' }} />
-                    Last synced: {formatLastSynced(lastSynced)}
+                     synced: {formatLastSynced(lastSynced)}
                   </Typography>
                 </Box>
               </Box>
@@ -549,33 +603,69 @@ const MarketplaceReconciliation: React.FC = () => {
           </Box>
         </Fade>
 
-        {/* Reconciliation Difference */}
-        <Card sx={{ 
-          mb: 4,
-          background: 'white',
-          borderRadius: '8px',
-          border: '1px solid #e0e0e0',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
-        }}>
-          <CardContent sx={{ p: 4 }}>
-            <Typography variant="h6" sx={{ 
-              fontWeight: 600, 
-              mb: 3, 
-              color: '#1a1a1a',
-              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-              textAlign: 'left',
-            }}>
-              Reconciled Difference
-            </Typography>
-            
-            {/* Simplified Difference Display */}
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              mt: 1,
-            }}>
-                              <Tooltip
+        <Grid container spacing={4} sx={{ mb: 4 }}>
+          <Grid item xs={12} md={7}>
+            <Card sx={{ background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)', height: '100%' }}>
+              <CardContent sx={{ p: 0, minHeight: 520 }}>
+                {/* Title */}
+                <Box sx={{ px: 2, py: 1.5 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>Reconciliation Summary</Typography>
+                </Box>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700, background: '#f8fafc' }}>Buckets</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700, background: '#f8fafc' }}>Count</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700, background: '#f8fafc' }}>Amount</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {(() => {
+                        const totalTransactions = (reconciliationData.ordersDelivered?.number || 0) + (reconciliationData.ordersReturned?.number || 0);
+                        const netSalesSalesReports = parseAmount(reconciliationData.grossSales);
+                        const netSalesPaymentReport = parseAmount(reconciliationData.MonthOrdersPayoutReceived);
+                        const pendingPaymentCount = reconciliationData.MonthOrdersAwaitedSettlement?.SalesOrders || 0;
+                        const pendingPaymentAmount = parseAmount(reconciliationData.MonthOrdersAwaitedSettlement?.SalesAmount || '0');
+                        const reconciledOrders = reconciliationData.ordersDelivered?.number || 0;
+                        const lessPaymentAmount = Math.max(0, parseAmount(reconciliationData.difference));
+                        const lessPaymentCount = Math.min(pendingPaymentCount, Math.max(0, Math.round(pendingPaymentCount * 0.08)));
+                        const morePaymentAmount = 0;
+                        const morePaymentCount = 0;
+                        const totalUnrecAmount = lessPaymentAmount + pendingPaymentAmount;
+                        const rows = [
+                          { label: 'Total Transactions', count: totalTransactions, amount: netSalesSalesReports, highlight: false },
+                          { label: 'Net Sales as per Sales Reports', count: totalTransactions - (reconciliationData.ordersReturned?.number || 0), amount: netSalesSalesReports, highlight: false },
+                          { label: 'Net Sales as per Payment Report', count: reconciledOrders, amount: netSalesPaymentReport, highlight: false },
+                          { label: 'Total Unreconciled Amount', count: pendingPaymentCount + lessPaymentCount + morePaymentCount, amount: totalUnrecAmount, highlight: true },
+                          { label: 'Reconciled Orders', count: reconciledOrders, amount: netSalesPaymentReport, highlight: false },
+                          { label: 'Less Payment Received from Amazon', count: lessPaymentCount, amount: lessPaymentAmount, highlight: true },
+                          { label: 'More Payment Received from Amazon', count: morePaymentCount, amount: morePaymentAmount, highlight: false },
+                          { label: 'Pending Payment from Amazon', count: pendingPaymentCount, amount: pendingPaymentAmount, highlight: true },
+                          { label: 'Cancelled Orders', count: reconciliationData.ordersReturned?.number || 0, amount: 0, highlight: false },
+                          { label: 'No Bucket', count: 0, amount: 0, highlight: false },
+                          { label: 'No Bucket Mapped', count: 0, amount: 0, highlight: false },
+                        ];
+                        return rows.map((r, idx) => (
+                          <TableRow key={idx} sx={{ background: r.highlight ? '#fb7185' : 'transparent' }}>
+                            <TableCell sx={{ fontWeight: 600, color: r.highlight ? 'white' : '#111827' }}>{r.label}</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 700, color: r.highlight ? 'white' : '#111827' }}>{r.count.toLocaleString('en-IN')}</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 700, color: r.highlight ? 'white' : '#111827' }}>{formatCurrency(r.amount)}</TableCell>
+                          </TableRow>
+                        ));
+                      })()}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={5}>
+            <Card sx={{ mb: 2, background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)' }}>
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#1a1a1a', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif', textAlign: 'left' }}>Reconciled Difference</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 1 }}>
+                  <Tooltip
                   title={
                     <Box sx={{ p: 1 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'white' }}>
@@ -654,12 +744,29 @@ const MarketplaceReconciliation: React.FC = () => {
                     {parseAmount(reconciliationData.difference) === 0 ? 'Perfectly Reconciled' : 'Reconciliation Required'}
                   </Typography>
                 </Box>
-              </Tooltip>
-            </Box>
-          </CardContent>
-        </Card>
+                  </Tooltip>
+                </Box>
+              </CardContent>
+            </Card>
 
-        {/* Financial Breakdown and Reconciliation Status Charts */}
+            {/* Additional card below: Diff */}
+            <Card sx={{ background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: '#1a1a1a' }}>Diff</Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    Difference between Sales vs Settlements to aid reconciliation.
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    Current Diff: {formatCurrency(parseAmount(reconciliationData.difference))}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        /* Financial Breakdown and Reconciliation Status Charts */
         <Grid container spacing={4} sx={{ mb: 4 }}>
           {/* Financial Breakdown Pie Chart */}
           <Grid item xs={12} md={6}>

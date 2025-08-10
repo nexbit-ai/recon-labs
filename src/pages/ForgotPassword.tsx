@@ -71,7 +71,7 @@ const ForgotPassword: React.FC = () => {
         }}
       >
         {/* Logo and Header */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
+  <Box sx={{ textAlign: 'left', mb: 4 }}>
           <img
             src={logo}
             alt="Nexbit Logo"
@@ -137,7 +137,7 @@ const ForgotPassword: React.FC = () => {
             </Button>
           </Box>
         ) : (
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
+  <Box sx={{ textAlign: 'left', mb: 3 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Didn't receive the email? Check your spam folder or try again.
             </Typography>

@@ -61,7 +61,7 @@ const Login: React.FC = () => {
         }}
       >
         {/* Logo and Header */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
+  <Box sx={{ textAlign: 'left', mb: 4 }}>
           <img
             src={logo}
             alt="Company Logo"
@@ -95,12 +95,12 @@ const Login: React.FC = () => {
                   borderColor: '#9ca3af',
                 },
                 '&.Mui-focused fieldset': {
-                  borderColor: '#2563eb',
+            borderColor: '#111111',
                 },
               },
               '& .MuiInputLabel-root': {
                 '&.Mui-focused': {
-                  color: '#2563eb',
+            color: '#111111',
                 },
               },
             }}
@@ -124,12 +124,12 @@ const Login: React.FC = () => {
                   borderColor: '#9ca3af',
                 },
                 '&.Mui-focused fieldset': {
-                  borderColor: '#2563eb',
+            borderColor: '#111111',
                 },
               },
               '& .MuiInputLabel-root': {
                 '&.Mui-focused': {
-                  color: '#2563eb',
+            color: '#111111',
                 },
               },
             }}

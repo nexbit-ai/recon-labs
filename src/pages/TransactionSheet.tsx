@@ -26,6 +26,11 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
+  Checkbox,
+  OutlinedInput,
+  Popover,
+  Menu,
+  Portal,
   Divider,
   LinearProgress,
   Tabs,
@@ -936,7 +941,7 @@ const TransactionDetailsPopup: React.FC<{
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid #f1f5f9' }}>
             <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-              Commission (2%)
+              Commission
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a' }}>
               {formatCurrency(transaction["Order Value"] * 0.02)}
@@ -945,7 +950,7 @@ const TransactionDetailsPopup: React.FC<{
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid #f1f5f9' }}>
             <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-              TDS Deducted (1%)
+              TDS Deducted
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a' }}>
               {formatCurrency(transaction["Order Value"] * 0.01)}
@@ -954,7 +959,7 @@ const TransactionDetailsPopup: React.FC<{
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid #f1f5f9' }}>
             <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-              TCS Deducted (0.5%)
+              TCS Deducted
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a' }}>
               {formatCurrency(transaction["Order Value"] * 0.005)}
@@ -1001,7 +1006,8 @@ interface TransactionSheetProps {
 const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
-  const [columnFilters, setColumnFilters] = useState<{[key: string]: string}>({});
+  // Column filters can be string (contains), number range {min,max}, date range {from,to}, or enum string[]
+  const [columnFilters, setColumnFilters] = useState<{ [key: string]: any }>({});
   const [filteredData, setFilteredData] = useState<TransactionRow[]>([]);
   const [allTransactionData, setAllTransactionData] = useState<TransactionRow[]>([]);
   const [page, setPage] = useState(0);
@@ -1014,6 +1020,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HTMLElement | null>(null);
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+  const [tabCounts, setTabCounts] = useState<{ settled: number | null; unsettled: number | null }>({ settled: null, unsettled: null });
 
   // Format currency values
   const formatCurrency = (amount: number) => {
@@ -1048,6 +1057,69 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Format date
   const formatDate = (dateString: string) => {
     return formatDateWithOrdinal(dateString);
+  };
+
+  // Column metadata for rendering filter UIs
+  const COLUMN_META: Record<string, { type: 'string' | 'number' | 'date' | 'enum' }> = {
+    'Order Item ID': { type: 'string' },
+    'Order Value': { type: 'number' },
+    'Settlement Value': { type: 'number' },
+    'Order Date': { type: 'date' },
+    'Settlement Date': { type: 'date' },
+    'Difference': { type: 'number' },
+    'Status': { type: 'enum' },
+  };
+
+  // Helpers to get enum options from current data
+  const getUniqueValuesForColumn = (columnName: string): string[] => {
+    // Special handling for computed columns
+    if (columnName === 'Status') {
+      const remarks = new Set<string>();
+      const events = new Set<string>();
+      allTransactionData.forEach(row => {
+        const remark = (row as any)['Remark'];
+        const eventType = (row as any)['Event Type'];
+        if (typeof remark === 'string' && remark) remarks.add(`remark:${remark}`);
+        if (typeof eventType === 'string' && eventType) events.add(`event:${eventType}`);
+      });
+      return [
+        ...Array.from(remarks).sort((a,b) => a.localeCompare(b)),
+        ...Array.from(events).sort((a,b) => a.localeCompare(b)),
+      ];
+    }
+
+    const values = new Set<string>();
+    allTransactionData.forEach(row => {
+      const value = row[columnName as keyof TransactionRow];
+      if (typeof value === 'string' && value) {
+        values.add(value);
+      }
+    });
+    return Array.from(values).sort();
+  };
+
+  // Helper: chip colors for remark values
+  const getRemarkChipColors = (remark: string): { background: string; color: string } => {
+    switch (remark) {
+      case 'Matched':
+        return { background: '#dcfce7', color: '#059669' };
+      case 'Excess Amount Received':
+        return { background: '#fef3c7', color: '#d97706' };
+      case 'Short Amount Received':
+        return { background: '#fee2e2', color: '#dc2626' };
+      case 'Pending Settlement':
+      return { background: '#e5e7eb', color: '#111111' };
+      case 'Return Initiated':
+        return { background: '#f3e8ff', color: '#7c3aed' };
+      default:
+        return { background: '#f3f4f6', color: '#374151' };
+    }
+  };
+
+  // Helper: chip colors for event type
+  const getEventTypeChipColors = (eventType: string): { background: string; color: string } => {
+    if (eventType === 'Sale') return { background: '#dcfce7', color: '#059669' };
+    return { background: '#fee2e2', color: '#dc2626' };
   };
 
   // Calculate count from stats data
@@ -1138,7 +1210,54 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setLoading(true);
     // Start with settled transactions (activeTab = 0)
     fetchOrders(1, 'settlement_matched');
+    // Prefetch counts for both tabs
+    fetchTabCount('settlement_matched');
+    fetchTabCount('unsettled');
   }, []);
+
+  // Close filter on outside click with proper event handling
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Don't close if clicking on the filter icon or inside the popup
+      const target = event.target as Element;
+      const isFilterIcon = target?.closest('[aria-label*="Filter"]');
+      const isInsidePopup = target?.closest('[data-filter-popup="true"]');
+      
+      if (!isFilterIcon && !isInsidePopup && headerFilterAnchor) {
+        closeFilterPopover();
+      }
+    };
+    
+    if (headerFilterAnchor) {
+      // Add a small delay to prevent immediate closing
+      setTimeout(() => {
+        document.addEventListener('click', handleClickOutside, true);
+      }, 100);
+      
+      return () => document.removeEventListener('click', handleClickOutside, true);
+    }
+  }, [headerFilterAnchor]);
+
+  // Fetch only the count for a given remark without altering the table data
+  const fetchTabCount = async (remark: 'settlement_matched' | 'unsettled') => {
+    try {
+      const response = await api.orders.getOrders({ page: 1, limit: 1, remark } as any);
+      let count = 0;
+      if ((response.data as any)?.pagination?.total != null) {
+        count = (response.data as any).pagination.total;
+      } else if (Array.isArray((response.data as any)?.orders)) {
+        // Fallback to number of order_items across first order if pagination not provided
+        const orders = (response.data as any).orders;
+        count = orders.reduce((acc: number, o: any) => acc + (Array.isArray(o?.order_items) ? o.order_items.length : 0), 0);
+      }
+      setTabCounts(prev => ({
+        ...prev,
+        [remark === 'settlement_matched' ? 'settled' : 'unsettled']: count,
+      }));
+    } catch (e) {
+      // Ignore count errors
+    }
+  };
 
   // Handle search
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1153,12 +1272,88 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }));
   };
 
-  // Handle column filter change
-  const handleColumnFilterChange = (columnKey: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle string contains filter
+  const handleStringFilterChange = (columnKey: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setColumnFilters(prev => ({
       ...prev,
-      [columnKey]: event.target.value
+      [columnKey]: event.target.value,
     }));
+  };
+
+  // Handle number range filter
+  const handleNumberRangeChange = (columnKey: string, bound: 'min' | 'max') => (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setColumnFilters(prev => ({
+      ...prev,
+      [columnKey]: {
+        ...(prev[columnKey] || {}),
+        [bound]: value,
+      },
+    }));
+  };
+
+  // Handle date range filter
+  const handleDateRangeFilterChange = (columnKey: string, bound: 'from' | 'to') => (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setColumnFilters(prev => ({
+      ...prev,
+      [columnKey]: {
+        ...(prev[columnKey] || {}),
+        [bound]: value,
+      },
+    }));
+  };
+
+  // Handle enum multi-select filter
+  const handleEnumFilterChange = (columnKey: string) => (event: SelectChangeEvent<string[]>) => {
+    const value = event.target.value as string[];
+    setColumnFilters(prev => ({
+      ...prev,
+      [columnKey]: value,
+    }));
+  };
+
+  // Clear specific column filter
+  const clearColumnFilter = (columnKey: string) => {
+    setColumnFilters(prev => {
+      const next = { ...prev };
+      delete next[columnKey];
+      return next;
+    });
+  };
+
+  // Open/close popover for a column
+  const openFilterPopover = (columnKey: string, target: HTMLElement) => {
+    console.log('openFilterPopover called:', columnKey, target);
+    console.log('Setting state - activeFilterColumn:', columnKey, 'headerFilterAnchor:', !!target);
+    setActiveFilterColumn(columnKey);
+    setHeaderFilterAnchor(target);
+    
+    // Debug: Check state after a short delay
+    setTimeout(() => {
+      console.log('State after 50ms:', { 
+        activeFilterColumn: columnKey, 
+        headerFilterAnchor: !!target,
+        shouldRender: Boolean(target) && Boolean(columnKey)
+      });
+    }, 50);
+  };
+
+  const closeFilterPopover = () => {
+    console.log('closeFilterPopover called');
+    setHeaderFilterAnchor(null);
+    setActiveFilterColumn(null);
+  };
+
+  const isFilterActive = (columnKey: string) => {
+    const meta = COLUMN_META[columnKey]?.type || 'string';
+    const v = columnFilters[columnKey];
+    if (v == null) return false;
+    if (meta === 'string') return String(v).trim().length > 0;
+    if (meta === 'number') return (v?.min?.toString().trim() || v?.max?.toString().trim()) ? true : false;
+    if (meta === 'date') return (v?.from?.toString().trim() || v?.to?.toString().trim()) ? true : false;
+    if (meta === 'enum') return Array.isArray(v) && v.length > 0;
+    return false;
   };
 
   // Filter data based on search, date range, and column filters
@@ -1195,19 +1390,48 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       
       // Column filters
       Object.entries(columnFilters).forEach(([columnKey, filterValue]) => {
-        if (filterValue.trim()) {
+        const meta = COLUMN_META[columnKey] || { type: 'string' as const };
+
           filtered = filtered.filter(row => {
-            const value = row[columnKey as keyof TransactionRow];
+          const value = row[columnKey as keyof TransactionRow] as any;
             if (value === null || value === undefined) return false;
             
-            // Handle different data types
-            if (typeof value === 'number') {
-              return String(value).includes(filterValue);
+          switch (meta.type) {
+            case 'string': {
+              const text = (filterValue || '').toString().trim();
+              if (!text) return true;
+              return String(value).toLowerCase().includes(text.toLowerCase());
             }
-            
-            return String(value).toLowerCase().includes(filterValue.toLowerCase());
-          });
-        }
+            case 'number': {
+              const minRaw = (filterValue?.min ?? '').toString().trim();
+              const maxRaw = (filterValue?.max ?? '').toString().trim();
+              const num = typeof value === 'number' ? value : parseFloat(String(value));
+              if (Number.isNaN(num)) return false;
+              let ok = true;
+              if (minRaw !== '') ok = ok && num >= parseFloat(minRaw);
+              if (maxRaw !== '') ok = ok && num <= parseFloat(maxRaw);
+              return ok;
+            }
+            case 'date': {
+              const from = (filterValue?.from ?? '').toString().trim();
+              const to = (filterValue?.to ?? '').toString().trim();
+              if (!from && !to) return true;
+              const current = new Date(String(value));
+              if (isNaN(current.getTime())) return false;
+              let ok = true;
+              if (from) ok = ok && current >= new Date(from);
+              if (to) ok = ok && current <= new Date(to);
+              return ok;
+            }
+            case 'enum': {
+              const selected: string[] = Array.isArray(filterValue) ? filterValue : [];
+              if (selected.length === 0) return true;
+              return selected.includes(String(value));
+            }
+            default:
+              return true;
+          }
+        });
       });
       
       setFilteredData(filtered);
@@ -1329,8 +1553,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       "Order Date",
       "Settlement Date",
       "Difference",
-      "Remark",
-      "Event Type"
+      "Status"
     ];
   };
 
@@ -1406,8 +1629,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         },
                       }}
                     >
-                      <Tab label="Settled" />
-                      <Tab label="Unsettled" />
+                      <Tab label={`Settled${tabCounts.settled != null ? ` (${tabCounts.settled})` : ''}`} />
+                      <Tab label={`Unsettled${tabCounts.unsettled != null ? ` (${tabCounts.unsettled})` : ''}`} />
                     </Tabs>
                   </Box>
                   
@@ -1544,53 +1767,129 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         >
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                             {/* Column Header */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
-                                {column}
+                                {column === 'Status' ? 'Status' : column}
                               </Typography>
-                            </Box>
-                            
-                            {/* Column Filter Input */}
-                            <TextField
-                              size="small"
-                              placeholder={`Filter ${column}`}
-                              value={columnFilters[column] || ''}
-                              onChange={handleColumnFilterChange(column)}
-                              InputProps={{
-                                endAdornment: columnFilters[column] && (
-                                  <InputAdornment position="end">
                                     <IconButton 
                                       size="small" 
-                                      onClick={() => {
-                                        setColumnFilters(prev => {
-                                          const newFilters = { ...prev };
-                                          delete newFilters[column];
-                                          return newFilters;
-                                        });
-                                      }}
-                                    >
-                                      <ClearIcon fontSize="small" />
-                                    </IconButton>
-                                  </InputAdornment>
-                                ),
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log('Filter icon clicked for column:', column);
+                                openFilterPopover(column, e.currentTarget);
                               }}
                               sx={{
-                                '& .MuiOutlinedInput-root': {
-                                  fontSize: '0.75rem',
-                                  height: 32,
-                                  background: '#ffffff',
-                                  '&:hover': {
-                                    background: '#f9fafb',
-                                  },
-                                  '&.Mui-focused': {
-                                    background: '#ffffff',
-                                  },
-                                },
-                                '& .MuiOutlinedInput-input': {
-                                  padding: '6px 8px',
-                                },
+                                ml: 0.5,
+                                color: isFilterActive(column) ? '#1f2937' : '#6b7280',
+                                background: isFilterActive(column) ? '#e5e7eb' : 'transparent',
+                                '&:hover': { background: '#f3f4f6' },
                               }}
-                            />
+                              aria-label={`Filter ${column}`}
+                            >
+                                                            <FilterIcon fontSize="small" />
+                                    </IconButton>
+                                <Popover
+                                  open={Boolean(headerFilterAnchor) && activeFilterColumn === column}
+                                  anchorEl={headerFilterAnchor}
+                                  onClose={closeFilterPopover}
+                                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                                  slotProps={{
+                                    paper: {
+                                      sx: {
+                                        p: 2,
+                                        minWidth: 280,
+                                        zIndex: (theme) => theme.zIndex.modal + 1,
+                                      },
+                                    },
+                                  }}
+                                >
+                                  {(() => {
+                                    const meta = (COLUMN_META as any)[column]?.type || 'string';
+                                    if (meta === 'string') {
+                                      const val = (columnFilters[column] || '') as string;
+                                      return (
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Contains</Typography>
+                                          <TextField size="small" value={val} onChange={handleStringFilterChange(column)} placeholder={`Filter ${column}`} />
+                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                                            <Button size="small" onClick={() => clearColumnFilter(column)}>Clear</Button>
+                                            <Button size="small" variant="contained" onClick={closeFilterPopover}>Apply</Button>
+                                          </Box>
+                                        </Box>
+                                      );
+                                    }
+                                    if (meta === 'number') {
+                                      const minVal = (columnFilters[column]?.min ?? '') as string;
+                                      const maxVal = (columnFilters[column]?.max ?? '') as string;
+                                      return (
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Between</Typography>
+                                          <Box sx={{ display: 'flex', gap: 1 }}>
+                                            <TextField size="small" type="number" placeholder="Min" value={minVal} onChange={handleNumberRangeChange(column, 'min')} />
+                                            <TextField size="small" type="number" placeholder="Max" value={maxVal} onChange={handleNumberRangeChange(column, 'max')} />
+                                          </Box>
+                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                                            <Button size="small" onClick={() => clearColumnFilter(column)}>Clear</Button>
+                                          <Button size="small" variant="contained" onClick={closeFilterPopover}>Apply</Button>
+                                          </Box>
+                                        </Box>
+                                      );
+                                    }
+                                    if (meta === 'date') {
+                                      const fromVal = (columnFilters[column]?.from ?? '') as string;
+                                      const toVal = (columnFilters[column]?.to ?? '') as string;
+                                      return (
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Between dates</Typography>
+                                          <Box sx={{ display: 'flex', gap: 1 }}>
+                                            <TextField size="small" type="date" value={fromVal} onChange={handleDateRangeFilterChange(column, 'from')} />
+                                            <TextField size="small" type="date" value={toVal} onChange={handleDateRangeFilterChange(column, 'to')} />
+                                          </Box>
+                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                                            <Button size="small" onClick={() => clearColumnFilter(column)}>Clear</Button>
+                                            <Button size="small" variant="contained" onClick={closeFilterPopover}>Apply</Button>
+                                          </Box>
+                                        </Box>
+                                      );
+                                    }
+                                    if (meta === 'enum') {
+                                      const options = getUniqueValuesForColumn(column);
+                                      const value: string[] = Array.isArray(columnFilters[column]) ? columnFilters[column] : [];
+                                      return (
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Select values</Typography>
+                                          <FormControl size="small">
+                                            <Select
+                                              multiple
+                                              value={value}
+                                              onChange={handleEnumFilterChange(column)}
+                                              input={<OutlinedInput />}
+                                              renderValue={(selected) => (selected as string[]).join(', ')}
+                                              MenuProps={{ PaperProps: { style: { maxHeight: 240 } } }}
+                                            >
+                                              {options.map((opt) => (
+                                                <MenuItem key={opt} value={opt}>
+                                                  <Checkbox checked={value.indexOf(opt) > -1} />
+                                                  <Typography variant="caption">{opt}</Typography>
+                                                </MenuItem>
+                                              ))}
+                                            </Select>
+                                          </FormControl>
+                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                                            <Button size="small" onClick={() => clearColumnFilter(column)}>Clear</Button>
+                                            <Button size="small" variant="contained" onClick={closeFilterPopover}>Apply</Button>
+                                          </Box>
+                                        </Box>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </Popover>
+                              </Box>
+                            
+                            {/* Removed duplicate column filter icon */}
                           </Box>
                         </TableCell>
                       ))}
@@ -1664,14 +1963,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 textAlign: 'center',
                                 minWidth: 160,
                                 fontWeight: 600,
-                                color: column === 'Remark' ? 
-                                  (value === 'Matched' ? '#10b981' : 
-                                   value === 'Excess Amount Received' ? '#f59e0b' : 
-                                   value === 'Short Amount Received' ? '#ef4444' :
-                                   value === 'Pending Settlement' ? '#3b82f6' :
-                                   value === 'Return Initiated' ? '#8b5cf6' : '#111827') : 
-                                  column === 'Event Type' ? 
-                                  (value === 'Sale' ? '#10b981' : '#ef4444') : '#111827',
+                                color: column === 'Status' ? '#111827' : '#111827',
                                 '&:hover': {
                                   background: '#f9fafb',
                                 },
@@ -1679,64 +1971,43 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               }}
                             >
                               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                {column === 'Remark' ? (
+                                {column === 'Status' ? (
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    {/* Remark chip */}
                                     <Chip
-                                      label={displayValue}
+                                      label={(row as any)['Remark']}
                                       size="small"
                                       sx={{
-                                        background: value === 'Matched' ? '#dcfce7' : 
-                                                     value === 'Excess Amount Received' ? '#fef3c7' : 
-                                                     value === 'Short Amount Received' ? '#fee2e2' :
-                                                     value === 'Pending Settlement' ? '#dbeafe' :
-                                                     value === 'Return Initiated' ? '#f3e8ff' : '#f3f4f6',
-                                        color: value === 'Matched' ? '#059669' : 
-                                               value === 'Excess Amount Received' ? '#d97706' : 
-                                               value === 'Short Amount Received' ? '#dc2626' :
-                                               value === 'Pending Settlement' ? '#2563eb' :
-                                               value === 'Return Initiated' ? '#7c3aed' : '#374151',
+                                        background: (row as any)['Remark'] === 'Matched' ? '#dcfce7' : 
+                                                   (row as any)['Remark'] === 'Excess Amount Received' ? '#fef3c7' : 
+                                                   (row as any)['Remark'] === 'Short Amount Received' ? '#fee2e2' :
+                                                   (row as any)['Remark'] === 'Pending Settlement' ? '#dbeafe' :
+                                                   (row as any)['Remark'] === 'Return Initiated' ? '#f3e8ff' : '#f3f4f6',
+                                        color: (row as any)['Remark'] === 'Matched' ? '#059669' : 
+                                               (row as any)['Remark'] === 'Excess Amount Received' ? '#d97706' : 
+                                               (row as any)['Remark'] === 'Short Amount Received' ? '#dc2626' :
+                                               (row as any)['Remark'] === 'Pending Settlement' ? '#111111' :
+                                               (row as any)['Remark'] === 'Return Initiated' ? '#7c3aed' : '#374151',
                                         fontWeight: 600,
                                         fontSize: '0.75rem',
                                         height: 24,
-                                        '& .MuiChip-label': {
-                                          px: 1,
-                                        },
+                                        '& .MuiChip-label': { px: 1 },
                                       }}
                                     />
-                                    <IconButton
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleTransactionClick(row, e);
-                                      }}
-                                      size="small"
-                                      sx={{ 
-                                        p: 0.5,
-                                        color: '#6b7280',
-                                        '&:hover': {
-                                          background: '#f3f4f6',
-                                          color: '#374151',
-                                        },
-                                        transition: 'all 0.2s ease',
-                                      }}
-                                    >
-                                      <ExpandMoreIcon fontSize="small" />
-                                    </IconButton>
-                                  </Box>
-                                ) : column === 'Event Type' ? (
+                                    {/* Event Type chip */}
                                   <Chip
-                                    label={displayValue}
+                                      label={(row as any)['Event Type']}
                                     size="small"
                                     sx={{
-                                      background: value === 'Sale' ? '#dcfce7' : '#fee2e2',
-                                      color: value === 'Sale' ? '#059669' : '#dc2626',
+                                        background: (row as any)['Event Type'] === 'Sale' ? '#dcfce7' : '#fee2e2',
+                                        color: (row as any)['Event Type'] === 'Sale' ? '#059669' : '#dc2626',
                                       fontWeight: 600,
                                       fontSize: '0.75rem',
                                       height: 24,
-                                      '& .MuiChip-label': {
-                                        px: 1,
-                                      },
+                                        '& .MuiChip-label': { px: 1 },
                                     }}
                                   />
+                                  </Box>
                                 ) : (
                                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                                     {displayValue}
@@ -1788,6 +2059,264 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           formatDate={formatDate}
           anchorEl={anchorEl}
         />
+
+        {/* Filter Menu Portal - Rendered outside table container */}
+        {(() => {
+          const shouldRender = Boolean(headerFilterAnchor) && Boolean(activeFilterColumn);
+          console.log('Portal render check:', { 
+            headerFilterAnchor: !!headerFilterAnchor, 
+            activeFilterColumn, 
+            shouldRender 
+          });
+          return shouldRender;
+        })() && (
+          <Portal>
+            <Box
+              data-filter-popup="true"
+              sx={{
+                position: 'fixed',
+                top: (() => {
+                  if (headerFilterAnchor) {
+                    const rect = headerFilterAnchor.getBoundingClientRect();
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    const popupHeight = 200; // estimated popup height
+                    
+                    // If not enough space below, position above
+                    if (spaceBelow < popupHeight) {
+                      return rect.top - popupHeight - 5;
+                    }
+                    return rect.bottom + 5;
+                  }
+                  return 100;
+                })(),
+                left: (() => {
+                  if (headerFilterAnchor) {
+                    const rect = headerFilterAnchor.getBoundingClientRect();
+                    const popupWidth = 250;
+                    const spaceRight = window.innerWidth - rect.left;
+                    
+                    // If not enough space on right, align to right edge
+                    if (spaceRight < popupWidth) {
+                      return Math.max(10, rect.right - popupWidth);
+                    }
+                    return rect.left;
+                  }
+                  return 100;
+                })(),
+                zIndex: 9999,
+                backgroundColor: 'white',
+                border: '1px solid #e0e0e0',
+                borderRadius: '8px',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                p: 1.5,
+                minWidth: 220,
+                maxWidth: 300,
+                animation: 'filterPopupFadeIn 0.15s ease-out',
+                '@keyframes filterPopupFadeIn': {
+                  '0%': {
+                    opacity: 0,
+                    transform: 'translateY(-10px) scale(0.95)',
+                  },
+                  '100%': {
+                    opacity: 1,
+                    transform: 'translateY(0) scale(1)',
+                  },
+                },
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {(() => {
+                  if (!activeFilterColumn) return null;
+                  const meta = (COLUMN_META as any)[activeFilterColumn]?.type || 'string';
+                  
+                  if (meta === 'string') {
+                    const val = (columnFilters[activeFilterColumn] || '') as string;
+                    return (
+                      <>
+                        <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Contains</Typography>
+                        <TextField 
+                          size="small" 
+                          value={val} 
+                          onChange={handleStringFilterChange(activeFilterColumn)} 
+                          placeholder={`Filter ${activeFilterColumn}`}
+                          sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 } }}
+                        />
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, gap: 1 }}>
+                          <Button size="small" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, color: '#666', '&:hover': { backgroundColor: '#f5f5f5' } }} onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
+                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={closeFilterPopover}>Apply</Button>
+                        </Box>
+                      </>
+                    );
+                  }
+                  
+                  if (meta === 'number') {
+                    const minVal = (columnFilters[activeFilterColumn]?.min ?? '') as string;
+                    const maxVal = (columnFilters[activeFilterColumn]?.max ?? '') as string;
+                    return (
+                      <>
+                        <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Between</Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <TextField 
+                            size="small" 
+                            type="number" 
+                            placeholder="Min" 
+                            value={minVal} 
+                            onChange={handleNumberRangeChange(activeFilterColumn, 'min')}
+                            sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 } }}
+                          />
+                          <TextField 
+                            size="small" 
+                            type="number" 
+                            placeholder="Max" 
+                            value={maxVal} 
+                            onChange={handleNumberRangeChange(activeFilterColumn, 'max')}
+                            sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 } }}
+                          />
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, gap: 1 }}>
+                          <Button size="small" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, color: '#666', '&:hover': { backgroundColor: '#f5f5f5' } }} onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
+                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={closeFilterPopover}>Apply</Button>
+                        </Box>
+                      </>
+                    );
+                  }
+                  
+                  if (meta === 'date') {
+                    const fromVal = (columnFilters[activeFilterColumn]?.from ?? '') as string;
+                    const toVal = (columnFilters[activeFilterColumn]?.to ?? '') as string;
+                    return (
+                      <>
+                        <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Between dates</Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexDirection: 'column' }}>
+                          <TextField 
+                            size="small" 
+                            type="date" 
+                            label="From"
+                            value={fromVal} 
+                            onChange={handleDateRangeFilterChange(activeFilterColumn, 'from')}
+                            sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 } }}
+                          />
+                          <TextField 
+                            size="small" 
+                            type="date" 
+                            label="To"
+                            value={toVal} 
+                            onChange={handleDateRangeFilterChange(activeFilterColumn, 'to')}
+                            sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 } }}
+                          />
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, gap: 1 }}>
+                          <Button size="small" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, color: '#666', '&:hover': { backgroundColor: '#f5f5f5' } }} onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
+                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={closeFilterPopover}>Apply</Button>
+                        </Box>
+                      </>
+                    );
+                  }
+                  
+                  if (meta === 'enum') {
+                    const rawOptions = getUniqueValuesForColumn(activeFilterColumn);
+                    const value: string[] = Array.isArray(columnFilters[activeFilterColumn]) ? columnFilters[activeFilterColumn] : [];
+                    // For Status, we show both Remark and Event Type distincts, grouped with badges
+                    const isStatus = activeFilterColumn === 'Status';
+                    const options = isStatus
+                      ? rawOptions
+                      : rawOptions;
+                    return (
+                      <>
+                        <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Select values</Typography>
+                        <Box sx={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 1, p: 0.5 }}>
+                          {options.map((opt) => (
+                            <Box
+                              key={opt}
+                              onClick={() => {
+                                const newValue = value.includes(opt)
+                                  ? value.filter(v => v !== opt)
+                                  : [...value, opt];
+                                setColumnFilters(prev => ({
+                                  ...prev,
+                                  [activeFilterColumn]: newValue
+                                }));
+                              }}
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                p: 0.5,
+                                cursor: 'pointer',
+                                borderRadius: 0.5,
+                                '&:hover': { backgroundColor: '#f5f5f5' },
+                                backgroundColor: value.includes(opt) ? '#1f2937' : 'transparent',
+                                color: value.includes(opt) ? 'white' : '#333',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                {isStatus ? (
+                                  (() => {
+                                    const [group, raw] = opt.split(':', 2);
+                                    if (group === 'remark') {
+                                      const { background, color } = getRemarkChipColors(raw);
+                                      return (
+                                        <Chip
+                                          label={raw}
+                                          size="small"
+                                          sx={{
+                                            background,
+                                            color,
+                                            fontWeight: 600,
+                                            fontSize: '0.7rem',
+                                            height: 22,
+                                            '& .MuiChip-label': { px: 0.75 },
+                                          }}
+                                        />
+                                      );
+                                    } else {
+                                      const { background, color } = getEventTypeChipColors(raw);
+                                      return (
+                                        <Chip
+                                          label={raw}
+                                          size="small"
+                                          sx={{
+                                            background,
+                                            color,
+                                            fontWeight: 600,
+                                            fontSize: '0.7rem',
+                                            height: 22,
+                                            '& .MuiChip-label': { px: 0.75 },
+                                          }}
+                                        />
+                                      );
+                                    }
+                                  })()
+                                ) : (
+                                  <Typography variant="caption" sx={{ fontSize: '0.75rem', fontWeight: value.includes(opt) ? 600 : 400 }}>
+                                    {opt}
+                                  </Typography>
+                                )}
+                              </Box>
+                              {value.includes(opt) && (
+                                <Typography variant="caption" sx={{ fontSize: '0.7rem', opacity: 0.8 }}>
+                                  ✓
+                                </Typography>
+                              )}
+                            </Box>
+                          ))}
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, gap: 1 }}>
+                          <Button size="small" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, color: '#666', '&:hover': { backgroundColor: '#f5f5f5' } }} onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
+                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={closeFilterPopover}>Apply</Button>
+                        </Box>
+                      </>
+                    );
+                  }
+                  
+                  return null;
+                })()}
+              </Box>
+            </Box>
+          </Portal>
+        )}
       </Box>
     </Slide>
   );

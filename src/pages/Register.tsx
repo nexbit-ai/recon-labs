@@ -116,7 +116,7 @@ const Register: React.FC = () => {
         }}
       >
         {/* Logo and Header */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
+  <Box sx={{ textAlign: 'left', mb: 4 }}>
           <img
             src={logo}
             alt="Nexbit Logo"

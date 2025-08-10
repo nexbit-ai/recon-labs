@@ -30,6 +30,7 @@ import {
   StorefrontOutlined as StorefrontIcon,
   ReceiptOutlined as ReceiptIcon,
   AccountBalanceOutlined as AccountBalanceIcon,
+  ReportProblemOutlined as ReportProblemIcon,
   LogoutOutlined as LogoutIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
 } from '@mui/icons-material';
@@ -42,9 +43,10 @@ import userPhoto from '../assets/user-photo.jpg';
 const drawerWidth = 240;
 
 const menuItems = [
-  { text: 'Sales Overview', icon: <StorefrontIcon />, path: '/finance-dashboard' },
-  { text: 'Marketplace Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation' },
-  { text: 'Bookkeeping', icon: <AccountBalanceIcon />, path: '/bookkeeping' },
+  { text: 'Sales', icon: <StorefrontIcon />, path: '/finance-dashboard' },
+  { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation' },
+  { text: 'Dispute', icon: <ReportProblemIcon />, path: '/dispute' },
+  { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping' },
   { text: 'Month-end close', icon: <ChecklistIcon />, path: '/checklist' },
   { text: 'Assistant', icon: <ChatIcon />, path: '/assistant' },
 ];

@@ -57,7 +57,7 @@ const capabilities: Capability[] = [
     title: 'Flux Analysis',
     description: 'Analyze variances and trends with detailed commentary',
     icon: <TrendingUpIcon />,
-    color: '#2563eb',
+  color: '#111111',
     examples: [
       'What changed in COGS last month?',
       'Analyze revenue variance vs budget',
@@ -225,7 +225,7 @@ const OscarAI: React.FC = () => {
 
   const getMessageTypeColor = (type?: string) => {
     switch (type) {
-      case 'analysis': return '#2563eb';
+  case 'analysis': return '#111111';
       case 'audit': return '#dc2626';
       case 'report': return '#059669';
       default: return '#6b7280';
@@ -241,7 +241,7 @@ const OscarAI: React.FC = () => {
             <Avatar sx={{ bgcolor: 'primary.main', width: 64, height: 64, mr: 2 }}>
               <PsychologyIcon sx={{ fontSize: 32 }} />
             </Avatar>
-            <Typography variant="h3" sx={{ fontWeight: 800, background: 'linear-gradient(45deg, #2563eb, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+  <Typography variant="h3" sx={{ fontWeight: 800, background: 'linear-gradient(45deg, #111111, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               Oscar AI
             </Typography>
           </Box>

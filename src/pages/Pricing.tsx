@@ -17,12 +17,12 @@ const Pricing: React.FC = () => {
     }}>
       <Container maxWidth="xl">
         {/* Page Header */}
-        <Box sx={{ mb: 8, textAlign: 'center' }}>
+        <Box sx={{ mb: 8, textAlign: 'left' }}>
           <Box sx={{ 
             display: 'inline-flex', 
             p: 2, 
             borderRadius: 3, 
-            background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+            background: 'linear-gradient(135deg, #111111 0%, #000000 100%)',
             mb: 3
           }}>
             <AttachMoneyIcon sx={{ fontSize: 40, color: 'white' }} />
@@ -98,7 +98,7 @@ const Pricing: React.FC = () => {
               ],
               buttonText: 'Start Free Trial',
               buttonVariant: 'contained' as const,
-              borderColor: '#2563eb',
+              borderColor: '#111111',
               background: 'linear-gradient(135deg, #ffffff 0%, #eff6ff 100%)'
             },
             {
@@ -127,20 +127,20 @@ const Pricing: React.FC = () => {
               <Box sx={{ position: 'relative', height: '100%' }}>
                 {/* Most Popular Badge - Fixed positioning */}
                 {plan.popular && (
-                  <Box
+                      <Box
                     sx={{
                       position: 'absolute',
                       top: -12,
                       left: '50%',
                       transform: 'translateX(-50%)',
-                      background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                          background: 'linear-gradient(135deg, #111111 0%, #000000 100%)',
                       color: 'white',
                       px: 3,
                       py: 1,
                       borderRadius: 20,
                       fontWeight: 700,
                       fontSize: '0.75rem',
-                      boxShadow: '0 8px 25px rgba(37, 99, 235, 0.3)',
+                       boxShadow: '0 8px 25px rgba(17, 17, 17, 0.3)',
                       zIndex: 10,
                       whiteSpace: 'nowrap'
                     }}
@@ -164,13 +164,13 @@ const Pricing: React.FC = () => {
                     '&:hover': {
                       transform: 'translateY(-8px)',
                       boxShadow: '0 25px 60px rgba(0,0,0,0.15)',
-                      borderColor: '#2563eb'
+                       borderColor: '#111111'
                     }
                   }}
                 >
                   <CardContent sx={{ p: 4, flex: 1, display: 'flex', flexDirection: 'column' }}>
                     {/* Header */}
-                    <Box sx={{ textAlign: 'center', mb: 3, mt: plan.popular ? 1 : 0 }}>
+            <Box sx={{ textAlign: 'left', mb: 3, mt: plan.popular ? 1 : 0 }}>
                       <Typography 
                         variant="h4" 
                         sx={{ 
@@ -300,12 +300,12 @@ const Pricing: React.FC = () => {
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
-                          ...(plan.buttonVariant === 'contained' && {
-                            background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                            boxShadow: '0 8px 25px rgba(37, 99, 235, 0.3)',
+                           ...(plan.buttonVariant === 'contained' && {
+                            background: 'linear-gradient(135deg, #111111 0%, #000000 100%)',
+                            boxShadow: '0 8px 25px rgba(17, 17, 17, 0.3)',
                             '&:hover': {
-                              background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
-                              boxShadow: '0 12px 35px rgba(37, 99, 235, 0.4)'
+                              background: 'linear-gradient(135deg, #222222 0%, #111111 100%)',
+                              boxShadow: '0 12px 35px rgba(17, 17, 17, 0.4)'
                             }
                           }),
                           ...(plan.buttonVariant === 'outlined' && {
@@ -336,7 +336,7 @@ const Pricing: React.FC = () => {
               fontWeight: 800, 
               color: 'primary.main', 
               mb: 6, 
-              textAlign: 'center',
+              textAlign: 'left',
               fontSize: { xs: '2rem', md: '2.5rem' }
             }}
           >
@@ -356,7 +356,7 @@ const Pricing: React.FC = () => {
                 icon: SecurityIcon,
                 title: 'Enhanced Accuracy',
                 description: 'Ensure audit-readiness with AI-powered validation and audit trail',
-                gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                 gradient: 'linear-gradient(135deg, #222222 0%, #111111 100%)'
               },
               {
                 icon: VisibilityIcon,

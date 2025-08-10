@@ -21,6 +21,7 @@ import ConnectDataSources from './pages/ConnectDataSources';
 import Assistant from './pages/Assistant';
 import MarketplaceReconciliation from './pages/MarketplaceReconciliation';
 import Bookkeeping from './pages/Bookkeeping';
+import DisputePage from './pages/Dispute';
 
 const theme = createTheme({
   palette: {
@@ -30,7 +31,7 @@ const theme = createTheme({
       paper: '#fff',
     },
     primary: {
-      main: '#2563eb', // blue
+      main: '#111111', // brand black
       contrastText: '#fff',
     },
     secondary: {
@@ -52,7 +53,7 @@ const theme = createTheme({
       main: '#f59e42',
     },
     info: {
-      main: '#2563eb',
+      main: '#111111',
     },
   },
   shape: {
@@ -161,7 +162,7 @@ const theme = createTheme({
         indicator: {
           height: 3,
           borderRadius: 2,
-          background: '#2563eb',
+          background: '#111111',
         },
       },
     },
@@ -228,6 +229,7 @@ function App() {
             <Route path="/recent-activities" element={<Layout><RecentActivities /></Layout>} />
             <Route path="/reconciliation" element={<Layout><Reconciliation /></Layout>} />
             <Route path="/marketplace-reconciliation" element={<Layout><MarketplaceReconciliation /></Layout>} />
+            <Route path="/dispute" element={<Layout><DisputePage /></Layout>} />
             <Route path="/reports" element={<Layout><Reports /></Layout>} />
             <Route path="/finance-dashboard" element={<Layout><FinanceDashboard /></Layout>} />
             <Route path="/connect-data-sources" element={<Layout><ConnectDataSources /></Layout>} />
