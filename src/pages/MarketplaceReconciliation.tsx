@@ -871,12 +871,14 @@ const MarketplaceReconciliation: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Additional card below: Diff */}
+            {/* Reconciliation Status */}
             <Card sx={{ 
               background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
               borderRadius: '16px',
               border: '1px solid #f1f3f4',
               boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              minHeight: 'fit-content',
+              maxHeight: '520px',
               overflow: 'hidden',
               transition: 'all 0.3s ease',
               '&:hover': {
@@ -890,175 +892,8 @@ const MarketplaceReconciliation: React.FC = () => {
                   mb: 3, 
                   color: '#1f2937',
                   fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  letterSpacing: '-0.025em'
-                }}>
-                  Analysis Summary
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Typography variant="body2" sx={{ 
-                    color: '#6b7280',
-                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                    lineHeight: 1.6
-                  }}>
-                    Difference between Sales vs Settlements to aid reconciliation.
-                  </Typography>
-                  <Box sx={{ 
-                    p: 3, 
-                    borderRadius: '12px', 
-                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                    border: '1px solid #e2e8f0'
-                  }}>
-                    <Typography variant="body2" sx={{ 
-                      fontWeight: 600,
-                      color: '#374151',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
-                    }}>
-                      Current Difference: {formatCurrency(parseAmount(reconciliationData.difference))}
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* Financial Breakdown and Reconciliation Status Charts */}
-        <Grid container spacing={3} sx={{ mb: 6 }}>
-          {/* Financial Breakdown Pie Chart */}
-          <Grid item xs={12} md={6}>
-            <Card sx={{ 
-              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
-              borderRadius: '16px',
-              border: '1px solid #f1f3f4',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
-              height: '100%',
-              overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                transform: 'translateY(-2px)',
-              }
-            }}>
-              <CardContent sx={{ p: 5 }}>
-                <Typography variant="h6" sx={{ 
-                  fontWeight: 600, 
-                  mb: 4, 
-                  color: '#1f2937',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  letterSpacing: '-0.025em'
-                }}>
-                  Financial Breakdown
-                </Typography>
-                
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={[
-                        {
-                          name: 'Net Receivable',
-                          value: parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount),
-                          color: '#14B8A6',
-                          percentage: (((parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount)) / parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount)) * 100).toFixed(1)
-                        },
-                        {
-                          name: 'Commission',
-                          value: parseAmount(reconciliationData.commission.totalCommission),
-                          color: '#F59E0B',
-                          percentage: ((parseAmount(reconciliationData.commission.totalCommission) / parseAmount(reconciliationData.grossSales)) * 100).toFixed(1)
-                        },
-                        {
-                          name: 'TDS',
-                          value: parseAmount(reconciliationData.totalTDS),
-                          color: '#EF4444',
-                          percentage: ((parseAmount(reconciliationData.totalTDS) / parseAmount(reconciliationData.grossSales)) * 100).toFixed(1)
-                        },
-                        {
-                          name: 'TCS',
-                          value: parseAmount(reconciliationData.totalTDA),
-                          color: '#3B82F6',
-                          percentage: ((parseAmount(reconciliationData.totalTDA) / parseAmount(reconciliationData.grossSales)) * 100).toFixed(1)
-                        }
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {[
-                        { name: 'Net Receivable', value: parseAmount(reconciliationData.grossSales) - parseAmount(reconciliationData.commission.totalCommission) - parseAmount(reconciliationData.totalTDS) - parseAmount(reconciliationData.totalTDA), color: '#14B8A6' },
-                        { name: 'Commission', value: parseAmount(reconciliationData.commission.totalCommission), color: '#F59E0B' },
-                        { name: 'TDS', value: parseAmount(reconciliationData.totalTDS), color: '#EF4444' },
-                        { name: 'TCS', value: parseAmount(reconciliationData.totalTDA), color: '#3B82F6' }
-                      ].map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <Box sx={{
-                              background: 'white',
-                              border: '1px solid #e0e0e0',
-                              borderRadius: '6px',
-                              p: 2,
-                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                            }}>
-                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a1a1a', mb: 1 }}>
-                                {data.name}
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: '#666666', mb: 0.5 }}>
-                                Amount: {formatCurrency(data.value)}
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: '#666666' }}>
-                                Percentage: {((data.value / parseAmount(reconciliationData.grossSales)) * 100).toFixed(1)}%
-                              </Typography>
-                            </Box>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Legend
-                      verticalAlign="bottom"
-                      height={36}
-                      formatter={(value, entry) => (
-                        <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                          {value} ({entry.payload && ((entry.payload.value / parseAmount(reconciliationData.grossSales)) * 100).toFixed(1)}%)
-                        </span>
-                      )}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Reconciliation Match Status */}
-          <Grid item xs={12} md={6}>
-            <Card sx={{ 
-              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
-              borderRadius: '16px',
-              border: '1px solid #f1f3f4',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
-              height: '100%',
-              overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                transform: 'translateY(-2px)',
-              }
-            }}>
-              <CardContent sx={{ p: 5 }}>
-                <Typography variant="h6" sx={{ 
-                  fontWeight: 600, 
-                  mb: 4, 
-                  color: '#1f2937',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  letterSpacing: '-0.025em'
+                  letterSpacing: '-0.025em',
+                  textAlign: 'center'
                 }}>
                   Reconciliation Status
                 </Typography>
@@ -1067,21 +902,20 @@ const MarketplaceReconciliation: React.FC = () => {
                   display: 'flex', 
                   flexDirection: 'column', 
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  minHeight: 350,
-                  pb: 2,
+                  justifyContent: 'flex-start',
+                  gap: 3,
                 }}>
                   {/* Gauge Chart */}
-                  <Box sx={{ position: 'relative', mb: 2 }}>
+                  <Box sx={{ position: 'relative' }}>
                     <Box sx={{
-                      width: 180,
-                      height: 180,
-                      borderRadius: '50%',
+                      width: 200,
+                      height: 200,
+                      borderRadius: '100%',
                       background: `conic-gradient(
-                        ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#14B8A6' : '#EF4444'} 0deg,
-                        ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#14B8A6' : '#EF4444'} ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
-                        #f0f0f0 ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
-                        #f0f0f0 360deg
+                        ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#10b981' : '#ef4444'} 0deg,
+                        ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#10b981' : '#ef4444'} ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
+                        #f1f5f9 ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
+                        #f1f5f9 360deg
                       )`,
                       display: 'flex',
                       alignItems: 'center',
@@ -1089,93 +923,55 @@ const MarketplaceReconciliation: React.FC = () => {
                       position: 'relative',
                     }}>
                       <Box sx={{
-                        width: 140,
-                        height: 140,
+                        width: 180,
+                        height: 180,
                         borderRadius: '50%',
                         background: 'white',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1)',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
                       }}>
-                        <Typography variant="h4" sx={{
-                          fontWeight: 700,
-                          color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#14B8A6' : '#EF4444',
+                        <Typography variant="h3" sx={{
+                          fontWeight: 500,
+                          color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#059669' : '#dc2626',
                           fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                          mb: 1,
+                          mb: 0.5,
+                          fontSize: '2rem',
+                          letterSpacing: '-0.02em'
                         }}>
                           {parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '100%' : `${Math.max(0, 100 - ((parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales)) * 100)).toFixed(1)}%`}
-                        </Typography>
-                        <Typography variant="body2" sx={{
-                          color: '#666666',
-                          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                          textAlign: 'center',
-                          fontSize: '0.875rem',
-                        }}>
-                          {parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 'Matched' : 'Reconciled'}
                         </Typography>
                       </Box>
                     </Box>
                   </Box>
 
-                  {/* Status Details */}
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h6" sx={{
-                      fontWeight: 600,
-                      color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#14B8A6' : '#EF4444',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      mb: 2,
-                    }}>
-                      {parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 'Perfect Match' : 'Reconciliation Required'}
-                    </Typography>
-                    
+                  {/* Difference Amount Card */}
                     <Box sx={{
-                      p: 2,
-                      borderRadius: '6px',
-                      background: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#d4edda' : '#f8d7da',
-                      border: parseAmount(reconciliationData.difference) === 0 ? '1px solid #c3e6cb' : '1px solid #f5c6cb',
-                      mb: 2,
+                    width: '100%',
+                    p: 3,
+                    textAlign: 'center',
                     }}>
                                               <Typography variant="body2" sx={{
-                          color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#155724' : '#721c24',
+                        color: '#1f2937',
                           fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                          fontWeight: 600,
+                      fontWeight: 500,
                           mb: 1,
+                      fontSize: '0.875rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                         }}>
                           Difference Amount
                         </Typography>
-                      <Typography variant="h6" sx={{
-                        color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#155724' : '#721c24',
+                    <Typography variant="h5" sx={{
+                      color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#047857' : '#dc2626',
                         fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                         fontWeight: 700,
+                      letterSpacing: '-0.02em'
                       }}>
-                        {formatCurrency(parseAmount(reconciliationData.summaryData.totalUnreconciled.amount))}
+                      {formatCurrency(parseAmount(reconciliationData.summaryData.totalUnreconciled.amount))}
                       </Typography>
-                    </Box>
-
-                    <Box sx={{
-                      p: 1.5,
-                      borderRadius: '6px',
-                      background: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#d4edda' : '#f8d7da',
-                      border: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '1px solid #c3e6cb' : '1px solid #f5c6cb',
-                      mt: 2,
-                      mb: 1,
-                    }}>
-                      <Typography variant="body2" sx={{
-                        color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#155724' : '#721c24',
-                        fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        textAlign: 'center',
-                        lineHeight: 1.4,
-                      }}>
-                        {parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 
-                          ? 'All transactions are perfectly reconciled' 
-                          : 'Some transactions require attention for reconciliation'
-                        }
-                      </Typography>
-                    </Box>
                   </Box>
                 </Box>
               </CardContent>
@@ -1220,7 +1016,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             name: 'Settled Orders',
                             value: reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number,
                             amount: parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount),
-                            color: '#14B8A6',
+                            color: '#059669',
                             type: 'settled'
                           },
                           {
@@ -1240,13 +1036,14 @@ const MarketplaceReconciliation: React.FC = () => {
                         ]}
                         cx="50%"
                         cy="50%"
-                        innerRadius={80}
+                        innerRadius={115}
                         outerRadius={140}
-                        paddingAngle={8}
+                        paddingAngle={10}
+                        cornerRadius={8}
                         dataKey="value"
                       >
                         {[
-                          { name: 'Settled Orders', value: reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number, color: '#14B8A6' },
+                          { name: 'Settled Orders', value: reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number, color: '#047857' },
                           { name: 'Unsettled Orders', value: reconciliationData.summaryData.netSalesAsPerSalesReport.number, color: '#F59E0B' },
                           { name: 'cancelled Returns', value: reconciliationData.summaryData.returnedOrCancelledOrders.number, color: '#EF4444' }
                         ].map((entry, index) => (
@@ -1285,7 +1082,7 @@ const MarketplaceReconciliation: React.FC = () => {
                         height={36}
                         formatter={(value, entry) => (
                           <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                            {value} ({entry.payload && entry.payload.value} orders)
+                            {value} ({entry.payload && entry.payload.value})
                           </span>
                         )}
                       />
@@ -1296,106 +1093,118 @@ const MarketplaceReconciliation: React.FC = () => {
 
               {/* Settlement Details */}
               <Grid item xs={12} md={4}>
-                <Box sx={{ height: 400, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 2 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {/* Settled Orders */}
                   <Box sx={{
-                    p: 4,
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                    border: '1px solid #bbf7d0',
+                    position: 'relative',
+                    p: 5,
+                    borderRadius: '20px',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.06)',
                     textAlign: 'center',
-                    transition: 'all 0.3s ease',
+                    overflow: 'hidden',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 8px 25px rgba(16, 185, 129, 0.15)',
+                      transform: 'translateY(-4px) scale(1.02)',
+                      boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                    },
+                    '&:before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '4px',
+                      borderRadius: '20px 20px 0 0',
                     }
                   }}>
-                    <Typography variant="h6" sx={{
-                      fontWeight: 600,
-                      color: '#065f46',
+                    <Typography variant="body2" sx={{
+                      fontWeight: 500,
+                      color: '#6b7280',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      mb: 2,
-                      letterSpacing: '-0.025em'
+                      mb: 1,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      fontSize: '0.75rem'
                     }}>
                       Settled Orders
                     </Typography>
-                    <Typography variant="h4" sx={{
-                      fontWeight: 700,
-                      color: '#047857',
+                    <Typography variant="h3" sx={{
+                      fontWeight: 300,
+                      color: '#1f2937',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                       mb: 2,
                       letterSpacing: '-0.02em'
                     }}>
                       {(reconciliationData.ordersDelivered?.number || 0) - (reconciliationData.monthOrdersAwaitedSettlement?.salesOrders || 0)}
                     </Typography>
-                    <Typography variant="body2" sx={{
-                      color: '#047857',
+                    <Typography variant="h6" sx={{
+                      color: '#059669',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                       fontWeight: 600,
-                      mb: 1
+                      letterSpacing: '-0.01em'
                     }}>
                       {formatCurrency(parseAmount(reconciliationData.monthOrdersPayoutReceived || '0'))}
-                    </Typography>
-                    <Typography variant="caption" sx={{
-                      color: '#065f46',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      opacity: 0.7,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      fontSize: '0.75rem'
-                    }}>
-                      Payment Received
                     </Typography>
                   </Box>
 
                   {/* Unsettled Orders */}
                   <Box sx={{
-                    p: 4,
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-                    border: '1px solid #fde68a',
+                    position: 'relative',
+                    p: 5,
+                    borderRadius: '20px',
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.06)',
                     textAlign: 'center',
-                    transition: 'all 0.3s ease',
+                    overflow: 'hidden',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 8px 25px rgba(245, 158, 11, 0.15)',
+                      transform: 'translateY(-4px) scale(1.02)',
+                      boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                    },
+                    '&:before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '4px',
+                      borderRadius: '20px 20px 0 0',
                     }
                   }}>
-                    <Typography variant="h6" sx={{
-                      fontWeight: 600,
-                      color: '#92400e',
+                    <Typography variant="body2" sx={{
+                      fontWeight: 500,
+                      color: '#6b7280',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      mb: 2,
-                      letterSpacing: '-0.025em'
+                      mb: 1,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      fontSize: '0.75rem'
                     }}>
                       Unsettled Orders
                     </Typography>
-                    <Typography variant="h4" sx={{
-                      fontWeight: 700,
-                      color: '#d97706',
+                    <Typography variant="h3" sx={{
+                      fontWeight: 300,
+                      color: '#1f2937',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                       mb: 2,
                       letterSpacing: '-0.02em'
                     }}>
                       {reconciliationData.monthOrdersAwaitedSettlement?.salesOrders || 0}
                     </Typography>
-                    <Typography variant="body2" sx={{
+                    <Typography variant="h6" sx={{
                       color: '#d97706',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontWeight: 600,
-                      mb: 1
+                      fontWeight: 600, 
+                      letterSpacing: '-0.01em'
                     }}>
                       {formatCurrency(parseAmount(reconciliationData.monthOrdersAwaitedSettlement?.salesAmount || '0'))}
-                    </Typography>
-                    <Typography variant="caption" sx={{
-                      color: '#92400e',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      opacity: 0.7,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      fontSize: '0.75rem'
-                    }}>
-                      Awaiting Settlement
                     </Typography>
                   </Box>
                 </Box>
@@ -1403,115 +1212,144 @@ const MarketplaceReconciliation: React.FC = () => {
             </Grid>
 
             {/* Settlement Summary */}
-            <Box sx={{ 
-              mt: 5, 
-              p: 5, 
-              borderRadius: '16px', 
-              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', 
-              border: '1px solid #e2e8f0'
-            }}>
+            <Box sx={{ mt: 4 }}>
               <Grid container spacing={4}>
-                <Grid item xs={12} md={3}>
-                  <Box sx={{ 
+                {/* Total Orders */}
+                <Grid item xs={12} md={4}>
+                  <Box sx={{
+                    position: 'relative',
+                    p: 4,
+                    borderRadius: '18px',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(229, 231, 235, 0.4)',
                     textAlign: 'center',
-                    p: 3,
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)',
-                    border: '1px solid #e5e7eb',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+                    overflow: 'hidden',
+                    '&:before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: '60px',
+                      height: '3px',
+                      borderRadius: '0 0 20px 20px',
                     }
                   }}>
-                    <Typography variant="body2" sx={{ 
-                      color: '#6b7280', 
+                    <Typography variant="caption" sx={{ 
+                      color: '#9ca3af', 
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '0.875rem',
+                      fontSize: '0.75rem',
                       fontWeight: 500,
                       mb: 2,
+                      display: 'block',
                       textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
+                      letterSpacing: '0.1em'
                     }}>
                       Total Orders
                     </Typography>
-                    <Typography variant="h4" sx={{ 
-                      fontWeight: 700, 
-                      color: '#374151', 
+                    <Typography variant="h2" sx={{
+                      fontWeight: 200,
+                      color: '#1f2937', 
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      letterSpacing: '-0.02em'
+                      letterSpacing: '-0.03em',
+                      fontSize: '2.5rem'
                     }}>
                       {reconciliationData.summaryData.netSalesAsPerSalesReport.number}
                     </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={12} md={3}>
-                  <Box sx={{ 
+
+                {/* Settlement Rate */}
+                <Grid item xs={12} md={4}>
+            <Box sx={{
+                    position: 'relative',
+                    p: 4,
+                    borderRadius: '18px',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(187, 247, 208, 0.4)',
                     textAlign: 'center',
-                    p: 3,
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                    border: '1px solid #bbf7d0',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 8px 25px rgba(16, 185, 129, 0.15)',
+                    overflow: 'hidden',
+                    '&:before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: '60px',
+                      height: '3px',
+                      borderRadius: '0 0 20px 20px',
                     }
                   }}>
-                    <Typography variant="body2" sx={{ 
+                    <Typography variant="caption" sx={{ 
                       color: '#065f46', 
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '0.875rem',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontSize: '0.75rem',
                       fontWeight: 500,
-                      mb: 2,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
+                  mb: 2,
+                      display: 'block',
+                  textTransform: 'uppercase',
+                      letterSpacing: '0.1em'
+                }}>
                       Settlement Rate
-                    </Typography>
-                    <Typography variant="h4" sx={{ 
-                      fontWeight: 700, 
-                      color: '#047857', 
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      letterSpacing: '-0.02em'
+                </Typography>
+                    <Typography variant="h2" sx={{
+                      fontWeight: 200,
+                      color: '#1f2937', 
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      letterSpacing: '-0.03em',
+                      fontSize: '2.5rem'
                     }}>
                       {((reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number) / (reconciliationData.summaryData.netSalesAsPerSalesReport.number) * 100).toFixed(1)}%
-                    </Typography>
-                  </Box>
+                </Typography>
+              </Box>
                 </Grid>
-                <Grid item xs={12} md={3}>
-                  <Box sx={{ 
+
+                {/* Net Pending Amount */}
+                <Grid item xs={12} md={4}>
+              <Box sx={{
+                    position: 'relative',
+                    p: 4,
+                    borderRadius: '18px',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(253, 230, 138, 0.4)',
                     textAlign: 'center',
-                    p: 3,
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-                    border: '1px solid #fde68a',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 8px 25px rgba(245, 158, 11, 0.15)',
+                    overflow: 'hidden',
+                    '&:before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: '60px',
+                      height: '3px',
+                      borderRadius: '0 0 20px 20px',
                     }
                   }}>
-                    <Typography variant="body2" sx={{ 
+                    <Typography variant="caption" sx={{ 
                       color: '#92400e', 
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '0.875rem',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontSize: '0.75rem',
                       fontWeight: 500,
-                      mb: 2,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
+                  mb: 2,
+                      display: 'block',
+                  textTransform: 'uppercase',
+                      letterSpacing: '0.1em'
+                }}>
                       Net Pending Amount
-                    </Typography>
-                    <Typography variant="h4" sx={{ 
-                      fontWeight: 700, 
-                      color: '#d97706', 
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      letterSpacing: '-0.02em'
+                </Typography>
+                    <Typography variant="h5" sx={{
+                      fontWeight: 300,
+                      color: '#1f2937', 
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      letterSpacing: '-0.02em',
+                      fontSize: '1.5rem'
                     }}>
                       {formatCurrency(parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount) - parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount))}
-                    </Typography>
-                  </Box>
+                </Typography>
+              </Box>
                 </Grid>
               </Grid>
             </Box>
