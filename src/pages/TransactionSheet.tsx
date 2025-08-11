@@ -50,6 +50,7 @@ import {
   Close as CloseIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  MoreVert as MoreVertIcon,
 } from '@mui/icons-material';
 
 // Type definitions for transaction data
@@ -1023,6 +1024,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HTMLElement | null>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const [tabCounts, setTabCounts] = useState<{ settled: number | null; unsettled: number | null }>({ settled: null, unsettled: null });
+  
+  // Dropdown menu state for Status column
+  const [statusDropdownAnchor, setStatusDropdownAnchor] = useState<HTMLElement | null>(null);
+  const [selectedStatusRow, setSelectedStatusRow] = useState<TransactionRow | null>(null);
 
   // Format currency values
   const formatCurrency = (amount: number) => {
@@ -1354,6 +1359,31 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     if (meta === 'date') return (v?.from?.toString().trim() || v?.to?.toString().trim()) ? true : false;
     if (meta === 'enum') return Array.isArray(v) && v.length > 0;
     return false;
+  };
+
+  // Dropdown menu handlers for Status column
+  const handleStatusDropdownOpen = (event: React.MouseEvent<HTMLElement>, row: TransactionRow) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setStatusDropdownAnchor(event.currentTarget);
+    setSelectedStatusRow(row);
+  };
+
+  const handleStatusDropdownClose = () => {
+    setStatusDropdownAnchor(null);
+    setSelectedStatusRow(null);
+  };
+
+  const handleStatusAction = (action: string) => {
+    if (selectedStatusRow) {
+      console.log(`Action ${action} for row:`, selectedStatusRow);
+      // Here you can implement specific actions like:
+      // - Update status
+      // - Send to backend
+      // - Show confirmation dialog
+      // - etc.
+    }
+    handleStatusDropdownClose();
   };
 
   // Filter data based on search, date range, and column filters
@@ -1995,18 +2025,35 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       }}
                                     />
                                     {/* Event Type chip */}
-                                  <Chip
+                                    <Chip
                                       label={(row as any)['Event Type']}
-                                    size="small"
-                                    sx={{
+                                      size="small"
+                                      sx={{
                                         background: (row as any)['Event Type'] === 'Sale' ? '#dcfce7' : '#fee2e2',
                                         color: (row as any)['Event Type'] === 'Sale' ? '#059669' : '#dc2626',
-                                      fontWeight: 600,
-                                      fontSize: '0.75rem',
-                                      height: 24,
+                                        fontWeight: 600,
+                                        fontSize: '0.75rem',
+                                        height: 24,
                                         '& .MuiChip-label': { px: 1 },
-                                    }}
-                                  />
+                                      }}
+                                    />
+                                    {/* Dropdown menu button */}
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => handleStatusDropdownOpen(e, row)}
+                                      sx={{
+                                        p: 0.5,
+                                        minWidth: 20,
+                                        height: 20,
+                                        color: '#6b7280',
+                                        '&:hover': {
+                                          background: '#f3f4f6',
+                                          color: '#374151',
+                                        },
+                                      }}
+                                    >
+                                      <MoreVertIcon fontSize="small" />
+                                    </IconButton>
                                   </Box>
                                 ) : (
                                   <Typography variant="body2" sx={{ fontWeight: 600 }}>

@@ -76,12 +76,55 @@ export interface MarketplaceReconciliationResponse {
     totalCommission: string;
     commissionRate: string;
   };
-  TotalTDS: string;
-  TotalTDA: string;
-  MonthOrdersPayoutReceived: string;
-  MonthOrdersAwaitedSettlement: {
-    SalesAmount: string;
-    SalesOrders: number;
+  settledSales: string;
+  summaryData: {
+    totalTransaction: {
+      amount: string;
+      number: number;
+    };
+    netSalesAsPerSalesReport: {
+      amount: string;
+      number: number;
+    };
+    paymentReceivedAsPerSettlementReport: {
+      amount: string;
+      number: number;
+    };
+    totalUnreconciled: {
+      amount: string;
+      number: number;
+      lessPaymentReceivedFromFlipkart: {
+        amount: string;
+        number: number;
+      };
+      excessPaymentReceivedFromFlipkart: {
+        amount: string;
+        number: number;
+      };
+    };
+    totalReconciled: {
+      amount: string;
+      number: number;
+    };
+    pendingPaymentFromMarketplace: {
+      amount: string;
+      number: number;
+    };
+    pendingDeductions: {
+      amount: string;
+      number: number;
+    };
+    returnedOrCancelledOrders: {
+      amount: string;
+      number: number;
+    };
+  };
+  totalTDS: string;
+  totalTDA: string;
+  monthOrdersPayoutReceived: string;
+  monthOrdersAwaitedSettlement: {
+    salesAmount: string;
+    salesOrders: number;
   };
   unsettledReturns: {
     returnAmount: string;

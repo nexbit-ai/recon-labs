@@ -603,54 +603,152 @@ const MarketplaceReconciliation: React.FC = () => {
           </Box>
         </Fade>
 
-        <Grid container spacing={4} sx={{ mb: 4 }}>
+        <Grid container spacing={3} sx={{ mb: 6 }}>
           <Grid item xs={12} md={7}>
-            <Card sx={{ background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)', height: '100%' }}>
+            <Card sx={{ 
+              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+              borderRadius: '16px',
+              border: '1px solid #f1f3f4',
+              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              height: '100%',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+                transform: 'translateY(-2px)',
+              }
+            }}>
               <CardContent sx={{ p: 0, minHeight: 520 }}>
                 {/* Title */}
-                <Box sx={{ px: 2, py: 1.5 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>Reconciliation Summary</Typography>
+                <Box sx={{ 
+                  px: 4, 
+                  py: 3,
+                  background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
+                  borderBottom: '1px solid #f1f3f4'
+                }}>
+                  <Typography variant="h6" sx={{ 
+                    fontWeight: 600,
+                    color: '#1f2937',
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                    letterSpacing: '-0.025em'
+                  }}>
+                    Reconciliation Summary
+                  </Typography>
                 </Box>
-                <TableContainer>
-                  <Table size="small">
+                <TableContainer sx={{ px: 4, pb: 4 }}>
+                  <Table>
                     <TableHead>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: 700, background: '#f8fafc' }}>Buckets</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700, background: '#f8fafc' }}>Count</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700, background: '#f8fafc' }}>Amount</TableCell>
+                        <TableCell sx={{ 
+                          fontWeight: 600, 
+                          background: 'transparent',
+                          color: '#6b7280',
+                          fontSize: '0.875rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          border: 'none',
+                          py: 2
+                        }}>
+                          Buckets
+                        </TableCell>
+                        <TableCell align="right" sx={{ 
+                          fontWeight: 600, 
+                          background: 'transparent',
+                          color: '#6b7280',
+                          fontSize: '0.875rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          border: 'none',
+                          py: 2
+                        }}>
+                          Count
+                        </TableCell>
+                        <TableCell align="right" sx={{ 
+                          fontWeight: 600, 
+                          background: 'transparent',
+                          color: '#6b7280',
+                          fontSize: '0.875rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          border: 'none',
+                          py: 2
+                        }}>
+                          Amount
+                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {(() => {
                         const totalTransactions = (reconciliationData.ordersDelivered?.number || 0) + (reconciliationData.ordersReturned?.number || 0);
+                        const totalTransactionsAmount = parseAmount(reconciliationData.summaryData.totalTransaction.amount);
+                        const totalTransactionsCount = reconciliationData.summaryData.totalTransaction.number;
                         const netSalesSalesReports = parseAmount(reconciliationData.grossSales);
-                        const netSalesPaymentReport = parseAmount(reconciliationData.MonthOrdersPayoutReceived);
-                        const pendingPaymentCount = reconciliationData.MonthOrdersAwaitedSettlement?.SalesOrders || 0;
-                        const pendingPaymentAmount = parseAmount(reconciliationData.MonthOrdersAwaitedSettlement?.SalesAmount || '0');
-                        const reconciledOrders = reconciliationData.ordersDelivered?.number || 0;
-                        const lessPaymentAmount = Math.max(0, parseAmount(reconciliationData.difference));
-                        const lessPaymentCount = Math.min(pendingPaymentCount, Math.max(0, Math.round(pendingPaymentCount * 0.08)));
-                        const morePaymentAmount = 0;
-                        const morePaymentCount = 0;
-                        const totalUnrecAmount = lessPaymentAmount + pendingPaymentAmount;
+                        const netSalesSalesReportsCount = reconciliationData.summaryData.netSalesAsPerSalesReport.number;
+                        const netSalesSalesReportsAmount = parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount);
+                        const netPaymentReceivedAsPerPaymentAmount = parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount);
+                        const netPaymentReceivedAsPerPaymentCount = reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number;
+                        const pendingPaymentCount = reconciliationData.summaryData?.pendingPaymentFromMarketplace?.number || 0;
+                        const pendingPaymentAmount = parseAmount(reconciliationData.summaryData?.pendingPaymentFromMarketplace?.amount || '0');
+                        const reconciledOrdersAmount = parseAmount(reconciliationData.summaryData?.totalReconciled?.amount || '0');
+                        const reconciledOrdersCount = reconciliationData.summaryData?.totalReconciled?.number || 0;
+                        const lessPaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.amount || '0');
+                        const lessPaymentCount = reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.number || 0;
+                        const morePaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.amount || '0');
+                        const morePaymentCount = reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.number || 0;
+                        const totalUnrecAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.amount || '0');
+                        const totalUnrecCount = reconciliationData.summaryData?.totalUnreconciled?.number || 0;
+                        const cancelledOrdersCount = reconciliationData.summaryData.returnedOrCancelledOrders.number;
+                        const cancelledOrdersAmount = parseAmount(reconciliationData.summaryData?.returnedOrCancelledOrders?.amount || '0');
                         const rows = [
-                          { label: 'Total Transactions', count: totalTransactions, amount: netSalesSalesReports, highlight: false },
-                          { label: 'Net Sales as per Sales Reports', count: totalTransactions - (reconciliationData.ordersReturned?.number || 0), amount: netSalesSalesReports, highlight: false },
-                          { label: 'Net Sales as per Payment Report', count: reconciledOrders, amount: netSalesPaymentReport, highlight: false },
-                          { label: 'Total Unreconciled Amount', count: pendingPaymentCount + lessPaymentCount + morePaymentCount, amount: totalUnrecAmount, highlight: true },
-                          { label: 'Reconciled Orders', count: reconciledOrders, amount: netSalesPaymentReport, highlight: false },
-                          { label: 'Less Payment Received from Amazon', count: lessPaymentCount, amount: lessPaymentAmount, highlight: true },
-                          { label: 'More Payment Received from Amazon', count: morePaymentCount, amount: morePaymentAmount, highlight: false },
-                          { label: 'Pending Payment from Amazon', count: pendingPaymentCount, amount: pendingPaymentAmount, highlight: true },
-                          { label: 'Cancelled Orders', count: reconciliationData.ordersReturned?.number || 0, amount: 0, highlight: false },
-                          { label: 'No Bucket', count: 0, amount: 0, highlight: false },
-                          { label: 'No Bucket Mapped', count: 0, amount: 0, highlight: false },
+                          { label: 'Total Transactions', count: totalTransactionsCount, amount: totalTransactionsAmount, highlight: false },
+                          { label: 'Net Sales as per Sales Reports', count: netSalesSalesReportsCount, amount: netSalesSalesReportsAmount, highlight: false },
+                          { label: 'Payment Received as per Payment Report', count: netPaymentReceivedAsPerPaymentCount, amount: netPaymentReceivedAsPerPaymentAmount, highlight: false },
+                          { label: 'Total Unreconciled Amount', count: totalUnrecCount, amount: totalUnrecAmount, highlight: false },
+                          { label: 'Reconciled Orders', count: reconciledOrdersCount, amount: reconciledOrdersAmount, highlight: false },
+                          { label: 'Less Payment Received', count: lessPaymentCount, amount: lessPaymentAmount, highlight: false },
+                          { label: 'More Payment Received', count: morePaymentCount, amount: morePaymentAmount, highlight: false },
+                          { label: 'Pending Payment', count: pendingPaymentCount, amount: pendingPaymentAmount, highlight: false },
+                          { label: 'Cancelled Orders', count: cancelledOrdersCount, amount: cancelledOrdersAmount, highlight: false },
                         ];
                         return rows.map((r, idx) => (
-                          <TableRow key={idx} sx={{ background: r.highlight ? '#fb7185' : 'transparent' }}>
-                            <TableCell sx={{ fontWeight: 600, color: r.highlight ? 'white' : '#111827' }}>{r.label}</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 700, color: r.highlight ? 'white' : '#111827' }}>{r.count.toLocaleString('en-IN')}</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 700, color: r.highlight ? 'white' : '#111827' }}>{formatCurrency(r.amount)}</TableCell>
+                          <TableRow key={idx} sx={{ 
+                            background: r.highlight ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' : 'transparent',
+                            borderBottom: idx === rows.length - 1 ? 'none' : '1px solid #f3f4f6',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              backgroundColor: r.highlight ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : '#f9fafb',
+                            }
+                          }}>
+                            <TableCell sx={{ 
+                              fontWeight: 500, 
+                              color: r.highlight ? 'white' : '#374151',
+                              border: 'none',
+                              py: 2.5,
+                              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                              fontSize: '0.875rem'
+                            }}>
+                              {r.label}
+                            </TableCell>
+                            <TableCell align="right" sx={{ 
+                              fontWeight: 600, 
+                              color: r.highlight ? 'white' : '#1f2937',
+                              border: 'none',
+                              py: 2.5,
+                              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                              fontSize: '0.875rem'
+                            }}>
+                              {r.count.toLocaleString('en-IN')}
+                            </TableCell>
+                            <TableCell align="right" sx={{ 
+                              fontWeight: 600, 
+                              color: r.highlight ? 'white' : '#1f2937',
+                              border: 'none',
+                              py: 2.5,
+                              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                              fontSize: '0.875rem'
+                            }}>
+                              {formatCurrency(r.amount)}
+                            </TableCell>
                           </TableRow>
                         ));
                       })()}
@@ -661,9 +759,30 @@ const MarketplaceReconciliation: React.FC = () => {
             </Card>
           </Grid>
           <Grid item xs={12} md={5}>
-            <Card sx={{ mb: 2, background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)' }}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, color: '#1a1a1a', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif', textAlign: 'left' }}>Reconciled Difference</Typography>
+            <Card sx={{ 
+              mb: 3, 
+              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+              borderRadius: '16px',
+              border: '1px solid #f1f3f4',
+              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+                transform: 'translateY(-2px)',
+              }
+            }}>
+              <CardContent sx={{ p: 5 }}>
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 600, 
+                  mb: 4, 
+                  color: '#1f2937', 
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif', 
+                  textAlign: 'center',
+                  letterSpacing: '-0.025em'
+                }}>
+                  Reconciled Difference
+                </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 1 }}>
                   <Tooltip
                   title={
@@ -676,16 +795,16 @@ const MarketplaceReconciliation: React.FC = () => {
                           Total Sales: {formatCurrency(parseAmount(reconciliationData.grossSales))}
                         </Typography>
                         <Typography variant="body2" sx={{ color: 'white' }}>
-                          - Collection: {formatCurrency(parseAmount(reconciliationData.MonthOrdersPayoutReceived))}
+                          - Collection: {formatCurrency(parseAmount(reconciliationData.summaryData?.paymentReceivedAsPerSettlementReport?.amount || '0'))}
                         </Typography>
                         <Typography variant="body2" sx={{ color: 'white' }}>
-                          - Platform Commissions: {formatCurrency(parseAmount(reconciliationData.commission.totalCommission))}
+                          - Platform Commissions: {formatCurrency(parseAmount(reconciliationData.commission?.totalCommission || '0'))}
                         </Typography>
                         <Typography variant="body2" sx={{ color: 'white' }}>
-                          - TDS (Tax Deducted): {formatCurrency(parseAmount(reconciliationData.TotalTDS))}
+                          - TDS (Tax Deducted): {formatCurrency(parseAmount(reconciliationData.totalTDS))}
                         </Typography>
                         <Typography variant="body2" sx={{ color: 'white' }}>
-                          - TCS (Tax Collected): {formatCurrency(parseAmount(reconciliationData.TotalTDA))}
+                          - TCS (Tax Collected): {formatCurrency(parseAmount(reconciliationData.totalTDA))}
                         </Typography>
                         <Typography variant="body2" sx={{ color: 'white', fontWeight: 600, mt: 1 }}>
                           = Difference: {formatCurrency(parseAmount(reconciliationData.difference))}
@@ -723,23 +842,26 @@ const MarketplaceReconciliation: React.FC = () => {
                   },
                 }}>
                   <Typography variant="h2" sx={{
-                    fontWeight: 100,
-                    color: parseAmount(reconciliationData.difference) === 0 ? '#155724' : '#d32f2f',
+                    fontWeight: 300,
+                    color: parseAmount(reconciliationData.difference) === 0 ? '#059669' : '#dc2626',
                     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                    fontSize: '3.5rem',
-                    mb: 1,
+                    fontSize: '3rem',
+                    mb: 2,
                     textAlign: 'center',
                     lineHeight: 1,
+                    letterSpacing: '-0.02em',
                   }}>
                     {formatCurrency(parseAmount(reconciliationData.difference))}
                   </Typography>
-                  <Typography variant="h6" sx={{
-                    color: parseAmount(reconciliationData.difference) === 0 ? '#155724' : '#d32f2f',
+                  <Typography variant="body1" sx={{
+                    color: parseAmount(reconciliationData.difference) === 0 ? '#065f46' : '#991b1b',
                     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                     textAlign: 'center',
-                    fontWeight: 600,
+                    fontWeight: 500,
                     textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
+                    letterSpacing: '0.1em',
+                    fontSize: '0.875rem',
+                    opacity: 0.8,
                   }}>
                     {parseAmount(reconciliationData.difference) === 0 ? 'Perfectly Reconciled' : 'Reconciliation Required'}
                   </Typography>
@@ -750,39 +872,80 @@ const MarketplaceReconciliation: React.FC = () => {
             </Card>
 
             {/* Additional card below: Diff */}
-            <Card sx={{ background: 'white', borderRadius: '8px', border: '1px solid #e0e0e0', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)' }}>
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: '#1a1a1a' }}>Diff</Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+            <Card sx={{ 
+              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+              borderRadius: '16px',
+              border: '1px solid #f1f3f4',
+              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+                transform: 'translateY(-2px)',
+              }
+            }}>
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 600, 
+                  mb: 3, 
+                  color: '#1f2937',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  letterSpacing: '-0.025em'
+                }}>
+                  Analysis Summary
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Typography variant="body2" sx={{ 
+                    color: '#6b7280',
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                    lineHeight: 1.6
+                  }}>
                     Difference between Sales vs Settlements to aid reconciliation.
                   </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    Current Diff: {formatCurrency(parseAmount(reconciliationData.difference))}
-                  </Typography>
+                  <Box sx={{ 
+                    p: 3, 
+                    borderRadius: '12px', 
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                    border: '1px solid #e2e8f0'
+                  }}>
+                    <Typography variant="body2" sx={{ 
+                      fontWeight: 600,
+                      color: '#374151',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+                    }}>
+                      Current Difference: {formatCurrency(parseAmount(reconciliationData.difference))}
+                    </Typography>
+                  </Box>
                 </Box>
               </CardContent>
             </Card>
           </Grid>
         </Grid>
 
-        /* Financial Breakdown and Reconciliation Status Charts */
-        <Grid container spacing={4} sx={{ mb: 4 }}>
+        {/* Financial Breakdown and Reconciliation Status Charts */}
+        <Grid container spacing={3} sx={{ mb: 6 }}>
           {/* Financial Breakdown Pie Chart */}
           <Grid item xs={12} md={6}>
             <Card sx={{ 
-              background: 'white',
-              borderRadius: '8px',
-              border: '1px solid #e0e0e0',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+              borderRadius: '16px',
+              border: '1px solid #f1f3f4',
+              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
               height: '100%',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+                transform: 'translateY(-2px)',
+              }
             }}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h5" sx={{ 
+              <CardContent sx={{ p: 5 }}>
+                <Typography variant="h6" sx={{ 
                   fontWeight: 600, 
-                  mb: 3, 
-                  color: '#1a1a1a',
+                  mb: 4, 
+                  color: '#1f2937',
                   fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  letterSpacing: '-0.025em'
                 }}>
                   Financial Breakdown
                 </Typography>
@@ -793,9 +956,9 @@ const MarketplaceReconciliation: React.FC = () => {
                       data={[
                         {
                           name: 'Net Receivable',
-                          value: parseAmount(reconciliationData.grossSales) - parseAmount(reconciliationData.commission.totalCommission) - parseAmount(reconciliationData.TotalTDS) - parseAmount(reconciliationData.TotalTDA),
+                          value: parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount),
                           color: '#14B8A6',
-                          percentage: (((parseAmount(reconciliationData.grossSales) - parseAmount(reconciliationData.commission.totalCommission) - parseAmount(reconciliationData.TotalTDS) - parseAmount(reconciliationData.TotalTDA)) / parseAmount(reconciliationData.grossSales)) * 100).toFixed(1)
+                          percentage: (((parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount)) / parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount)) * 100).toFixed(1)
                         },
                         {
                           name: 'Commission',
@@ -805,15 +968,15 @@ const MarketplaceReconciliation: React.FC = () => {
                         },
                         {
                           name: 'TDS',
-                          value: parseAmount(reconciliationData.TotalTDS),
+                          value: parseAmount(reconciliationData.totalTDS),
                           color: '#EF4444',
-                          percentage: ((parseAmount(reconciliationData.TotalTDS) / parseAmount(reconciliationData.grossSales)) * 100).toFixed(1)
+                          percentage: ((parseAmount(reconciliationData.totalTDS) / parseAmount(reconciliationData.grossSales)) * 100).toFixed(1)
                         },
                         {
                           name: 'TCS',
-                          value: parseAmount(reconciliationData.TotalTDA),
+                          value: parseAmount(reconciliationData.totalTDA),
                           color: '#3B82F6',
-                          percentage: ((parseAmount(reconciliationData.TotalTDA) / parseAmount(reconciliationData.grossSales)) * 100).toFixed(1)
+                          percentage: ((parseAmount(reconciliationData.totalTDA) / parseAmount(reconciliationData.grossSales)) * 100).toFixed(1)
                         }
                       ]}
                       cx="50%"
@@ -824,10 +987,10 @@ const MarketplaceReconciliation: React.FC = () => {
                       dataKey="value"
                     >
                       {[
-                        { name: 'Net Receivable', value: parseAmount(reconciliationData.grossSales) - parseAmount(reconciliationData.commission.totalCommission) - parseAmount(reconciliationData.TotalTDS) - parseAmount(reconciliationData.TotalTDA), color: '#14B8A6' },
+                        { name: 'Net Receivable', value: parseAmount(reconciliationData.grossSales) - parseAmount(reconciliationData.commission.totalCommission) - parseAmount(reconciliationData.totalTDS) - parseAmount(reconciliationData.totalTDA), color: '#14B8A6' },
                         { name: 'Commission', value: parseAmount(reconciliationData.commission.totalCommission), color: '#F59E0B' },
-                        { name: 'TDS', value: parseAmount(reconciliationData.TotalTDS), color: '#EF4444' },
-                        { name: 'TCS', value: parseAmount(reconciliationData.TotalTDA), color: '#3B82F6' }
+                        { name: 'TDS', value: parseAmount(reconciliationData.totalTDS), color: '#EF4444' },
+                        { name: 'TCS', value: parseAmount(reconciliationData.totalTDA), color: '#3B82F6' }
                       ].map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
@@ -877,18 +1040,25 @@ const MarketplaceReconciliation: React.FC = () => {
           {/* Reconciliation Match Status */}
           <Grid item xs={12} md={6}>
             <Card sx={{ 
-              background: 'white',
-              borderRadius: '8px',
-              border: '1px solid #e0e0e0',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+              borderRadius: '16px',
+              border: '1px solid #f1f3f4',
+              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
               height: '100%',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+                transform: 'translateY(-2px)',
+              }
             }}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h5" sx={{ 
+              <CardContent sx={{ p: 5 }}>
+                <Typography variant="h6" sx={{ 
                   fontWeight: 600, 
-                  mb: 3, 
-                  color: '#1a1a1a',
+                  mb: 4, 
+                  color: '#1f2937',
                   fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  letterSpacing: '-0.025em'
                 }}>
                   Reconciliation Status
                 </Typography>
@@ -908,9 +1078,9 @@ const MarketplaceReconciliation: React.FC = () => {
                       height: 180,
                       borderRadius: '50%',
                       background: `conic-gradient(
-                        ${parseAmount(reconciliationData.difference) === 0 ? '#14B8A6' : '#EF4444'} 0deg,
-                        ${parseAmount(reconciliationData.difference) === 0 ? '#14B8A6' : '#EF4444'} ${parseAmount(reconciliationData.difference) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.difference) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
-                        #f0f0f0 ${parseAmount(reconciliationData.difference) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.difference) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
+                        ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#14B8A6' : '#EF4444'} 0deg,
+                        ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#14B8A6' : '#EF4444'} ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
+                        #f0f0f0 ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
                         #f0f0f0 360deg
                       )`,
                       display: 'flex',
@@ -931,11 +1101,11 @@ const MarketplaceReconciliation: React.FC = () => {
                       }}>
                         <Typography variant="h4" sx={{
                           fontWeight: 700,
-                          color: parseAmount(reconciliationData.difference) === 0 ? '#14B8A6' : '#EF4444',
+                          color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#14B8A6' : '#EF4444',
                           fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                           mb: 1,
                         }}>
-                          {parseAmount(reconciliationData.difference) === 0 ? '100%' : `${Math.max(0, 100 - ((parseAmount(reconciliationData.difference) / parseAmount(reconciliationData.grossSales)) * 100)).toFixed(1)}%`}
+                          {parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '100%' : `${Math.max(0, 100 - ((parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales)) * 100)).toFixed(1)}%`}
                         </Typography>
                         <Typography variant="body2" sx={{
                           color: '#666666',
@@ -943,7 +1113,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           textAlign: 'center',
                           fontSize: '0.875rem',
                         }}>
-                          {parseAmount(reconciliationData.difference) === 0 ? 'Matched' : 'Reconciled'}
+                          {parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 'Matched' : 'Reconciled'}
                         </Typography>
                       </Box>
                     </Box>
@@ -953,22 +1123,22 @@ const MarketplaceReconciliation: React.FC = () => {
                   <Box sx={{ textAlign: 'center' }}>
                     <Typography variant="h6" sx={{
                       fontWeight: 600,
-                      color: parseAmount(reconciliationData.difference) === 0 ? '#14B8A6' : '#EF4444',
+                      color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#14B8A6' : '#EF4444',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                       mb: 2,
                     }}>
-                      {parseAmount(reconciliationData.difference) === 0 ? 'Perfect Match' : 'Reconciliation Required'}
+                      {parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 'Perfect Match' : 'Reconciliation Required'}
                     </Typography>
                     
                     <Box sx={{
                       p: 2,
                       borderRadius: '6px',
-                      background: parseAmount(reconciliationData.difference) === 0 ? '#d4edda' : '#f8d7da',
+                      background: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#d4edda' : '#f8d7da',
                       border: parseAmount(reconciliationData.difference) === 0 ? '1px solid #c3e6cb' : '1px solid #f5c6cb',
                       mb: 2,
                     }}>
                                               <Typography variant="body2" sx={{
-                          color: parseAmount(reconciliationData.difference) === 0 ? '#155724' : '#721c24',
+                          color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#155724' : '#721c24',
                           fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                           fontWeight: 600,
                           mb: 1,
@@ -976,31 +1146,31 @@ const MarketplaceReconciliation: React.FC = () => {
                           Difference Amount
                         </Typography>
                       <Typography variant="h6" sx={{
-                        color: parseAmount(reconciliationData.difference) === 0 ? '#155724' : '#721c24',
+                        color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#155724' : '#721c24',
                         fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                         fontWeight: 700,
                       }}>
-                        {formatCurrency(parseAmount(reconciliationData.difference))}
+                        {formatCurrency(parseAmount(reconciliationData.summaryData.totalUnreconciled.amount))}
                       </Typography>
                     </Box>
 
                     <Box sx={{
                       p: 1.5,
                       borderRadius: '6px',
-                      background: parseAmount(reconciliationData.difference) === 0 ? '#d4edda' : '#f8d7da',
-                      border: parseAmount(reconciliationData.difference) === 0 ? '1px solid #c3e6cb' : '1px solid #f5c6cb',
+                      background: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#d4edda' : '#f8d7da',
+                      border: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '1px solid #c3e6cb' : '1px solid #f5c6cb',
                       mt: 2,
                       mb: 1,
                     }}>
                       <Typography variant="body2" sx={{
-                        color: parseAmount(reconciliationData.difference) === 0 ? '#155724' : '#721c24',
+                        color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#155724' : '#721c24',
                         fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                         fontSize: '0.875rem',
                         fontWeight: 600,
                         textAlign: 'center',
                         lineHeight: 1.4,
                       }}>
-                        {parseAmount(reconciliationData.difference) === 0 
+                        {parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 
                           ? 'All transactions are perfectly reconciled' 
                           : 'Some transactions require attention for reconciliation'
                         }
@@ -1015,23 +1185,30 @@ const MarketplaceReconciliation: React.FC = () => {
 
         {/* Settlement Status Visualization */}
         <Card sx={{ 
-          mb: 4,
-          background: 'white',
-          borderRadius: '8px',
-          border: '1px solid #e0e0e0',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+          mb: 6,
+          background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+          borderRadius: '16px',
+          border: '1px solid #f1f3f4',
+          boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+          overflow: 'hidden',
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+            transform: 'translateY(-2px)',
+          }
         }}>
-          <CardContent sx={{ p: 4 }}>
-            <Typography variant="h5" sx={{ 
+          <CardContent sx={{ p: 5 }}>
+            <Typography variant="h6" sx={{ 
               fontWeight: 600, 
-              mb: 3, 
-              color: '#1a1a1a',
+              mb: 4, 
+              color: '#1f2937',
               fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+              letterSpacing: '-0.025em'
             }}>
               Settlement and Unsettled Summary
             </Typography>
             
-            <Grid container spacing={4}>
+            <Grid container spacing={3}>
               {/* Settlement Status Chart */}
               <Grid item xs={12} md={8}>
                 <Box sx={{ height: 400 }}>
@@ -1041,22 +1218,22 @@ const MarketplaceReconciliation: React.FC = () => {
                         data={[
                           {
                             name: 'Settled Orders',
-                            value: reconciliationData.ordersDelivered.number - reconciliationData.MonthOrdersAwaitedSettlement.SalesOrders,
-                            amount: parseAmount(reconciliationData.MonthOrdersPayoutReceived),
+                            value: reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number,
+                            amount: parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount),
                             color: '#14B8A6',
                             type: 'settled'
                           },
                           {
                             name: 'Unsettled Orders',
-                            value: reconciliationData.MonthOrdersAwaitedSettlement.SalesOrders,
-                            amount: parseAmount(reconciliationData.MonthOrdersAwaitedSettlement.SalesAmount),
+                            value: reconciliationData.summaryData.netSalesAsPerSalesReport.number,
+                            amount: parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount),
                             color: '#F59E0B',
                             type: 'unsettled'
                           },
                           {
-                            name: 'Unsettled Returns',
-                            value: reconciliationData.unsettledReturns.returnsOrders,
-                            amount: parseAmount(reconciliationData.unsettledReturns.returnAmount),
+                            name: 'cancelled Orders',
+                            value: reconciliationData.summaryData.returnedOrCancelledOrders.number,
+                            amount: parseAmount(reconciliationData.summaryData.returnedOrCancelledOrders.amount),
                             color: '#EF4444',
                             type: 'returns'
                           }
@@ -1069,9 +1246,9 @@ const MarketplaceReconciliation: React.FC = () => {
                         dataKey="value"
                       >
                         {[
-                          { name: 'Settled Orders', value: reconciliationData.ordersDelivered.number - reconciliationData.MonthOrdersAwaitedSettlement.SalesOrders, color: '#14B8A6' },
-                          { name: 'Unsettled Orders', value: reconciliationData.MonthOrdersAwaitedSettlement.SalesOrders, color: '#F59E0B' },
-                          { name: 'Unsettled Returns', value: reconciliationData.unsettledReturns.returnsOrders, color: '#EF4444' }
+                          { name: 'Settled Orders', value: reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number, color: '#14B8A6' },
+                          { name: 'Unsettled Orders', value: reconciliationData.summaryData.netSalesAsPerSalesReport.number, color: '#F59E0B' },
+                          { name: 'cancelled Returns', value: reconciliationData.summaryData.returnedOrCancelledOrders.number, color: '#EF4444' }
                         ].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
@@ -1122,39 +1299,50 @@ const MarketplaceReconciliation: React.FC = () => {
                 <Box sx={{ height: 400, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 2 }}>
                   {/* Settled Orders */}
                   <Box sx={{
-                    p: 1,
-                    borderRadius: '8px',
-                    background: '#d4edda',
-                    border: '1px solid #c3e6cb',
+                    p: 4,
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                    border: '1px solid #bbf7d0',
                     textAlign: 'center',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 8px 25px rgba(16, 185, 129, 0.15)',
+                    }
                   }}>
                     <Typography variant="h6" sx={{
                       fontWeight: 600,
-                      color: '#155724',
+                      color: '#065f46',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      mb: 1,
+                      mb: 2,
+                      letterSpacing: '-0.025em'
                     }}>
                       Settled Orders
                     </Typography>
                     <Typography variant="h4" sx={{
                       fontWeight: 700,
-                      color: '#155724',
+                      color: '#047857',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      mb: 1,
+                      mb: 2,
+                      letterSpacing: '-0.02em'
                     }}>
-                      {reconciliationData.ordersDelivered.number - reconciliationData.MonthOrdersAwaitedSettlement.SalesOrders}
+                      {(reconciliationData.ordersDelivered?.number || 0) - (reconciliationData.monthOrdersAwaitedSettlement?.salesOrders || 0)}
                     </Typography>
                     <Typography variant="body2" sx={{
-                      color: '#155724',
+                      color: '#047857',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontWeight: 500,
+                      fontWeight: 600,
+                      mb: 1
                     }}>
-                      {formatCurrency(parseAmount(reconciliationData.MonthOrdersPayoutReceived))}
+                      {formatCurrency(parseAmount(reconciliationData.monthOrdersPayoutReceived || '0'))}
                     </Typography>
                     <Typography variant="caption" sx={{
-                      color: '#155724',
+                      color: '#065f46',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      opacity: 0.8,
+                      opacity: 0.7,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.75rem'
                     }}>
                       Payment Received
                     </Typography>
@@ -1162,81 +1350,52 @@ const MarketplaceReconciliation: React.FC = () => {
 
                   {/* Unsettled Orders */}
                   <Box sx={{
-                    p: 1,
-                    borderRadius: '8px',
-                    background: '#fff3cd',
-                    border: '1px solid #ffeaa7',
+                    p: 4,
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                    border: '1px solid #fde68a',
                     textAlign: 'center',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 8px 25px rgba(245, 158, 11, 0.15)',
+                    }
                   }}>
                     <Typography variant="h6" sx={{
                       fontWeight: 600,
-                      color: '#856404',
+                      color: '#92400e',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      mb: 1,
+                      mb: 2,
+                      letterSpacing: '-0.025em'
                     }}>
                       Unsettled Orders
                     </Typography>
                     <Typography variant="h4" sx={{
                       fontWeight: 700,
-                      color: '#856404',
+                      color: '#d97706',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      mb: 1,
+                      mb: 2,
+                      letterSpacing: '-0.02em'
                     }}>
-                      {reconciliationData.MonthOrdersAwaitedSettlement.SalesOrders}
+                      {reconciliationData.monthOrdersAwaitedSettlement?.salesOrders || 0}
                     </Typography>
                     <Typography variant="body2" sx={{
-                      color: '#856404',
+                      color: '#d97706',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontWeight: 500,
+                      fontWeight: 600,
+                      mb: 1
                     }}>
-                      {formatCurrency(parseAmount(reconciliationData.MonthOrdersAwaitedSettlement.SalesAmount))}
+                      {formatCurrency(parseAmount(reconciliationData.monthOrdersAwaitedSettlement?.salesAmount || '0'))}
                     </Typography>
                     <Typography variant="caption" sx={{
-                      color: '#856404',
+                      color: '#92400e',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      opacity: 0.8,
+                      opacity: 0.7,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontSize: '0.75rem'
                     }}>
                       Awaiting Settlement
-                    </Typography>
-                  </Box>
-
-                  {/* Unsettled Returns */}
-                  <Box sx={{
-                    p: 1,
-                    borderRadius: '8px',
-                    background: '#f8d7da',
-                    border: '1px solid #f5c6cb',
-                    textAlign: 'center',
-                  }}>
-                    <Typography variant="h6" sx={{
-                      fontWeight: 600,
-                      color: '#721c24',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      mb: 1,
-                    }}>
-                      Unsettled Returns
-                    </Typography>
-                    <Typography variant="h4" sx={{
-                      fontWeight: 700,
-                      color: '#721c24',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      mb: 1,
-                    }}>
-                      {reconciliationData.unsettledReturns.returnsOrders}
-                    </Typography>
-                    <Typography variant="body2" sx={{
-                      color: '#721c24',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontWeight: 500,
-                    }}>
-                      {formatCurrency(parseAmount(reconciliationData.unsettledReturns.returnAmount))}
-                    </Typography>
-                    <Typography variant="caption" sx={{
-                      color: '#721c24',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      opacity: 0.8,
-                    }}>
-                      Deduction Pending
                     </Typography>
                   </Box>
                 </Box>
@@ -1244,413 +1403,198 @@ const MarketplaceReconciliation: React.FC = () => {
             </Grid>
 
             {/* Settlement Summary */}
-            <Box sx={{ mt: 4, p: 4, borderRadius: '6px', background: '#f8f9fa', border: '1px solid #e9ecef' }}>
-              <Typography variant="h5" sx={{
-                fontWeight: 600,
-                color: '#1a1a1a',
-                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                mb: 3,
-                fontSize: '1.5rem',
-              }}>
-                Settlement Summary
-              </Typography>
-              <Grid container spacing={3}>
+            <Box sx={{ 
+              mt: 5, 
+              p: 5, 
+              borderRadius: '16px', 
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', 
+              border: '1px solid #e2e8f0'
+            }}>
+              <Grid container spacing={4}>
                 <Grid item xs={12} md={3}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="body1" sx={{ 
-                      color: '#666666', 
+                  <Box sx={{ 
+                    textAlign: 'center',
+                    p: 3,
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)',
+                    border: '1px solid #e5e7eb',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+                    }
+                  }}>
+                    <Typography variant="body2" sx={{ 
+                      color: '#6b7280', 
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '1rem',
+                      fontSize: '0.875rem',
                       fontWeight: 500,
-                      mb: 1,
+                      mb: 2,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>
                       Total Orders
                     </Typography>
-                    <Typography variant="h5" sx={{ 
-                      fontWeight: 600, 
-                      color: '#1a1a1a', 
+                    <Typography variant="h4" sx={{ 
+                      fontWeight: 700, 
+                      color: '#374151', 
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '1.75rem',
+                      letterSpacing: '-0.02em'
                     }}>
-                      {reconciliationData.ordersDelivered.number}
+                      {reconciliationData.summaryData.netSalesAsPerSalesReport.number}
                     </Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={12} md={3}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="body1" sx={{ 
-                      color: '#666666', 
+                  <Box sx={{ 
+                    textAlign: 'center',
+                    p: 3,
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                    border: '1px solid #bbf7d0',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 8px 25px rgba(16, 185, 129, 0.15)',
+                    }
+                  }}>
+                    <Typography variant="body2" sx={{ 
+                      color: '#065f46', 
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '1rem',
+                      fontSize: '0.875rem',
                       fontWeight: 500,
-                      mb: 1,
+                      mb: 2,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>
                       Settlement Rate
                     </Typography>
-                    <Typography variant="h5" sx={{ 
-                      fontWeight: 600, 
-                      color: '#14B8A6', 
+                    <Typography variant="h4" sx={{ 
+                      fontWeight: 700, 
+                      color: '#047857', 
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '1.75rem',
+                      letterSpacing: '-0.02em'
                     }}>
-                      {((reconciliationData.ordersDelivered.number - reconciliationData.MonthOrdersAwaitedSettlement.SalesOrders) / reconciliationData.ordersDelivered.number * 100).toFixed(1)}%
+                      {((reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number) / (reconciliationData.summaryData.netSalesAsPerSalesReport.number) * 100).toFixed(1)}%
                     </Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={12} md={3}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="body1" sx={{ 
-                      color: '#666666', 
+                  <Box sx={{ 
+                    textAlign: 'center',
+                    p: 3,
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                    border: '1px solid #fde68a',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 8px 25px rgba(245, 158, 11, 0.15)',
+                    }
+                  }}>
+                    <Typography variant="body2" sx={{ 
+                      color: '#92400e', 
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '1rem',
+                      fontSize: '0.875rem',
                       fontWeight: 500,
-                      mb: 1,
+                      mb: 2,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
                     }}>
                       Net Pending Amount
                     </Typography>
-                    <Typography variant="h5" sx={{ 
-                      fontWeight: 600, 
-                      color: '#F59E0B', 
+                    <Typography variant="h4" sx={{ 
+                      fontWeight: 700, 
+                      color: '#d97706', 
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '1.75rem',
+                      letterSpacing: '-0.02em'
                     }}>
-                      {formatCurrency(parseAmount(reconciliationData.MonthOrdersAwaitedSettlement.SalesAmount) - parseAmount(reconciliationData.unsettledReturns.returnAmount))}
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="body1" sx={{ 
-                      color: '#666666', 
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '1rem',
-                      fontWeight: 500,
-                      mb: 1,
-                    }}>
-                      Pending Returns
-                    </Typography>
-                    <Typography variant="h5" sx={{ 
-                      fontWeight: 600, 
-                      color: '#EF4444', 
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '1.75rem',
-                    }}>
-                      {reconciliationData.unsettledReturns.returnsOrders}
+                      {formatCurrency(parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount) - parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount))}
                     </Typography>
                   </Box>
                 </Grid>
               </Grid>
-            </Box>
-          </CardContent>
-        </Card>
-
-
-
-
-
-        {/* Sales Calculation */}
-        <Card sx={{ 
-          mb: 4,
-          background: 'white',
-          borderRadius: '8px',
-          border: '1px solid #e0e0e0',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
-        }}>
-          <CardContent sx={{ p: 4 }}>
-            <Typography variant="h5" sx={{ 
-              fontWeight: 600, 
-              mb: 3, 
-              color: '#1a1a1a',
-              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-              textAlign: 'left',
-            }}>
-              Sales Calculation
-            </Typography>
-            
-            {/* Sales Calculation - Boxed Sections with Separations */}
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 2,
-              flexWrap: 'wrap',
-              mt: 1,
-            }}>
-              {/* Section 1: Order Sales Value */}
-              <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                minWidth: 180,
-                p: 3,
-                borderRadius: '8px',
-                background: '#f8f9fa',
-                border: '1px solid #e9ecef',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease-in-out',
-                '&:hover': {
-                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-                  transform: 'translateY(-2px)',
-                },
-              }}>
-                <Typography variant="body1" sx={{
-                  fontWeight: 600,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  mb: 2,
-                  textAlign: 'center',
-                  fontSize: '0.875rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                }}>
-                  Order Sales Value
-                </Typography>
-                <Typography variant="h4" sx={{
-                  fontWeight: 700,
-                  color: '#14B8A6',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2.25rem',
-                  mb: 1,
-                  textAlign: 'center',
-                }}>
-                  {formatCurrency(parseAmount(reconciliationData.ordersDelivered.amount))}
-                </Typography>
-                <Typography variant="body2" sx={{
-                  color: '#666666',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  textAlign: 'center',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  background: '#e9ecef',
-                  px: 2,
-                  py: 0.5,
-                  borderRadius: '12px',
-                }}>
-                  {reconciliationData.ordersDelivered.number} orders
-                </Typography>
-              </Box>
-
-              {/* Minus Sign with Background */}
-              <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 60,
-                height: 60,
-                borderRadius: '50%',
-                background: '#f8f9fa',
-                border: '2px solid #e9ecef',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-              }}>
-                <Typography variant="h3" sx={{
-                  fontWeight: 700,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2rem',
-                }}>
-                  −
-                </Typography>
-              </Box>
-
-              {/* Section 2: Returns Value */}
-              <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                minWidth: 180,
-                p: 3,
-                borderRadius: '8px',
-                background: '#fff5f5',
-                border: '1px solid #fed7d7',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease-in-out',
-                '&:hover': {
-                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-                  transform: 'translateY(-2px)',
-                },
-              }}>
-                <Typography variant="body1" sx={{
-                  fontWeight: 600,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  mb: 2,
-                  textAlign: 'center',
-                  fontSize: '0.875rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                }}>
-                  Returns Value
-                </Typography>
-                <Typography variant="h4" sx={{
-                  fontWeight: 700,
-                  color: '#EF4444',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2.25rem',
-                  mb: 1,
-                  textAlign: 'center',
-                }}>
-                  {formatCurrency(parseAmount(reconciliationData.ordersReturned.amount))}
-                </Typography>
-                <Typography variant="body2" sx={{
-                  color: '#666666',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  textAlign: 'center',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  background: '#fed7d7',
-                  px: 2,
-                  py: 0.5,
-                  borderRadius: '12px',
-                }}>
-                  {reconciliationData.ordersReturned.number} returns
-                </Typography>
-              </Box>
-
-              {/* Equals Sign with Background */}
-              <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 60,
-                height: 60,
-                borderRadius: '50%',
-                background: '#f8f9fa',
-                border: '2px solid #e9ecef',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-              }}>
-                <Typography variant="h3" sx={{
-                  fontWeight: 700,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2rem',
-                }}>
-                  =
-                </Typography>
-              </Box>
-
-              {/* Section 3: Gross Sales */}
-              <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                minWidth: 180,
-                p: 3,
-                borderRadius: '8px',
-                background: '#f0f9ff',
-                border: '1px solid #bae6fd',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-                transition: 'all 0.2s ease-in-out',
-                '&:hover': {
-                  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-                  transform: 'translateY(-2px)',
-                },
-              }}>
-                <Typography variant="body1" sx={{
-                  fontWeight: 600,
-                  color: '#1a1a1a',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  mb: 2,
-                  textAlign: 'center',
-                  fontSize: '0.875rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                }}>
-                  Gross Sales
-                </Typography>
-                <Typography variant="h4" sx={{
-                  fontWeight: 700,
-                  color: '#3B82F6',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  fontSize: '2.25rem',
-                  mb: 1,
-                  textAlign: 'center',
-                }}>
-                  {formatCurrency(parseAmount(reconciliationData.grossSales))}
-                </Typography>
-                <Typography variant="body2" sx={{
-                  color: '#666666',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  textAlign: 'center',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  background: '#bae6fd',
-                  px: 2,
-                  py: 0.5,
-                  borderRadius: '12px',
-                }}>
-                  Net Revenue
-                </Typography>
-              </Box>
             </Box>
           </CardContent>
         </Card>
 
         {/* Tax Breakdown */}
         <Card sx={{ 
-          mb: 4,
-          background: 'white',
-          borderRadius: '8px',
-          border: '1px solid #e0e0e0',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+          mb: 6,
+          background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+          borderRadius: '16px',
+          border: '1px solid #f1f3f4',
+          boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+          overflow: 'hidden',
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+            transform: 'translateY(-2px)',
+          }
         }}>
-          <CardContent sx={{ p: 4 }}>
-            <Typography variant="h5" sx={{ 
-              fontWeight: 600, 
-              mb: 3, 
-              color: '#1a1a1a',
-              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-            }}>
-              Tax Breakdown
-            </Typography>
-            
-            <Grid container spacing={3}>
+          <CardContent sx={{ p: 5 }}>
+            <Grid container spacing={4}>
               <Grid item xs={12} md={6}>
                 <Box sx={{ 
-                  p: 3, 
-                  borderRadius: '6px', 
-                  background: '#e3f2fd',
-                  border: '1px solid #bbdefb',
+                  p: 4, 
+                  borderRadius: '12px', 
+                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                  border: '1px solid #bfdbfe',
                   textAlign: 'center',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 25px rgba(59, 130, 246, 0.15)',
+                  }
                 }}>
                   <Typography variant="h6" sx={{ 
                     fontWeight: 600, 
-                    color: '#1565c0', 
-                    mb: 2,
+                    color: '#1e40af', 
+                    mb: 3,
                     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                    letterSpacing: '-0.025em'
                   }}>
                     TCS (Tax Collected at Source)
                   </Typography>
                   <Typography variant="h4" sx={{ 
                     fontWeight: 700, 
-                    color: '#1565c0',
+                    color: '#1d4ed8',
                     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                    letterSpacing: '-0.02em'
                   }}>
-                    {formatCurrency(parseAmount(reconciliationData.TotalTDA))}
+                    {formatCurrency(parseAmount(reconciliationData.totalTDA))}
                   </Typography>
                 </Box>
               </Grid>
               <Grid item xs={12} md={6}>
                 <Box sx={{ 
-                  p: 3, 
-                  borderRadius: '6px', 
-                  background: '#f3e5f5',
-                  border: '1px solid #e1bee7',
+                  p: 4, 
+                  borderRadius: '12px', 
+                  background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
+                  border: '1px solid #e9d5ff',
                   textAlign: 'center',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 25px rgba(168, 85, 247, 0.15)',
+                  }
                 }}>
                   <Typography variant="h6" sx={{ 
                     fontWeight: 600, 
-                    color: '#7b1fa2', 
-                    mb: 2,
+                    color: '#7c2d12', 
+                    mb: 3,
                     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                    letterSpacing: '-0.025em'
                   }}>
                     TDS (Tax Deducted at Source)
                   </Typography>
                   <Typography variant="h4" sx={{ 
                     fontWeight: 700, 
-                    color: '#7b1fa2',
+                    color: '#a855f7',
                     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                    letterSpacing: '-0.02em'
                   }}>
-                    {formatCurrency(parseAmount(reconciliationData.TotalTDS))}
+                    {formatCurrency(parseAmount(reconciliationData.totalTDS))}
                   </Typography>
                 </Box>
               </Grid>

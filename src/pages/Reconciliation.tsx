@@ -1,4 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../services/api';
+
+/**
+ * Marketplace Reconciliation Dashboard
+ * 
+ * This component is now fully integrated with the /fetchstate API endpoint
+ * and displays reconciliation summary data from the backend response.
+ * 
+ * Key features:
+ * - Fetches data from /recon/fetchStats API endpoint
+ * - Maps summaryData from backend response to UI components
+ * - Displays comprehensive reconciliation metrics
+ * - Shows real-time data for orders, payments, and settlements
+ */
 import {
   Box,
   Typography,
@@ -36,6 +50,7 @@ import {
   CardActionArea,
   Alert,
   LinearProgress,
+  Grid,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -58,6 +73,12 @@ import {
   PendingActions as PendingActionsIcon,
   Flag as FlagIcon,
   Report as ReportIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  AccountBalanceWallet as AccountBalanceWalletIcon,
+  Receipt as ReceiptIcon,
+  Payment as PaymentIcon,
+  SwapHoriz as SwapHorizIcon,
 } from '@mui/icons-material';
 import CircularProgress from '@mui/material/CircularProgress';
 
@@ -402,6 +423,83 @@ const disputedTransactions = [
   }
 ];
 
+// Backend response data structure - using the correct interface from API types
+import { MarketplaceReconciliationResponse } from '../services/api/types';
+
+// Sample backend data (replace with actual API call)
+const sampleBackendData: MarketplaceReconciliationResponse = {
+  "grossSales": "34106829",
+  "ordersDelivered": {
+    "amount": "35870817.44",
+    "number": 46167
+  },
+  "ordersReturned": {
+    "amount": "5979389",
+    "number": 6649
+  },
+  "commission": {
+    "totalCommission": "-6487615.37",
+    "commissionRate": "-23.12221997449134"
+  },
+  "settledSales": "28057926",
+  "summaryData": {
+    "totalTransaction": {
+      "amount": "37056829",
+      "number": 46875
+    },
+    "netSalesAsPerSalesReport": {
+      "amount": "30603032",
+      "number": 39345
+    },
+    "paymentReceivedAsPerSettlementReport": {
+      "amount": "15468377.66",
+      "number": 46973
+    },
+    "totalUnreconciled": {
+      "amount": "0",
+      "number": 0,
+      "lessPaymentReceivedFromFlipkart": {
+        "amount": "0",
+        "number": 0
+      },
+      "excessPaymentReceivedFromFlipkart": {
+        "amount": "0",
+        "number": 0
+      }
+    },
+    "totalReconciled": {
+      "amount": "28057926",
+      "number": 34845
+    },
+    "pendingPaymentFromMarketplace": {
+      "amount": "8163376.24",
+      "number": 10912
+    },
+    "pendingDeductions": {
+      "amount": "803",
+      "number": 2
+    },
+    "returnedOrCancelledOrders": {
+      "amount": "6453797",
+      "number": 7530
+    }
+  },
+  "totalTDS": "-20056.92",
+  "totalTDA": "-100269.6",
+  "monthOrdersPayoutReceived": "15468377.66",
+  "monthOrdersAwaitedSettlement": {
+    "salesAmount": "8163376.24",
+    "salesOrders": 10912
+  },
+  "unsettledReturns": {
+    "returnAmount": "-803",
+    "returnsOrders": 2
+  },
+  "difference": "8162573.24",
+  "returnRate": "12.15472643182275",
+  "commissionRate": "-23.12221997449134"
+};
+
 const Reconciliation: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<number>(6); // 6 = July
   const [syncModalOpen, setSyncModalOpen] = useState(false);
@@ -411,7 +509,54 @@ const Reconciliation: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<'all' | 'matched' | 'unmatched'>('all');
   const [disputeDialogOpen, setDisputeDialogOpen] = useState(false);
   const [selectedDisputeTransaction, setSelectedDisputeTransaction] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'reconciliation' | 'fees' | 'disputes'>('reconciliation');
+  const [activeTab, setActiveTab] = useState<'overview' | 'reconciliation' | 'fees' | 'disputes'>('overview');
+  const [backendData, setBackendData] = useState<MarketplaceReconciliationResponse>(sampleBackendData);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch reconciliation data from API
+  const fetchReconciliationData = async (month: number) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Calculate date range for the selected month
+      const year = 2025; // You can make this dynamic
+      const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+      const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${new Date(year, month + 1, 0).getDate()}`;
+      
+      // Use the stats API which maps to /recon/fetchStats endpoint
+      const response = await api.stats.getStats({ startDate, endDate });
+      
+      console.log('API Response from /fetchstate:', response);
+      console.log('Response data:', response.data);
+      console.log('Response success:', response.success);
+      console.log('Response statusCode:', response.statusCode);
+      
+      // Check if we have data from the API response
+      if (response.data) {
+        console.log('Setting backend data from /fetchstate:', response.data);
+        setBackendData(response.data);
+        setError(null); // Clear any previous errors
+      } else {
+        // Fallback to sample data if API fails
+        console.log('API failed, using sample data');
+        setBackendData(sampleBackendData);
+        setError('Failed to fetch data from /fetchstate API, showing sample data');
+      }
+    } catch (err) {
+      console.error('Error fetching reconciliation data from /fetchstate:', err);
+      setBackendData(sampleBackendData);
+      setError('Network error, showing sample data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load data when component mounts or month changes
+  useEffect(() => {
+    fetchReconciliationData(selectedMonth);
+  }, [selectedMonth]);
 
   const handleSyncClick = () => {
     setSyncModalOpen(true);
@@ -433,6 +578,7 @@ const Reconciliation: React.FC = () => {
     }
   };
 
+  // Use the old mock data for the reconciliation table since it has the required structure
   const filteredReconciliationData = reconciliationData.filter(item => {
     if (filterStatus === 'all') return true;
     return item.status === filterStatus;
@@ -445,9 +591,25 @@ const Reconciliation: React.FC = () => {
 
   const currentReportData = selectedReport === 'payment' ? paymentReportData : settlementReportData;
 
-  const formatCurrency = (amount: number | null) => {
-    if (amount === null) return 'N/A';
-    return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+  const formatCurrency = (amount: string | number | null) => {
+    if (amount === null || amount === undefined) return 'N/A';
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    if (isNaN(numAmount)) return 'N/A';
+    return `₹${numAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+  };
+
+  const formatNumber = (num: string | number | null) => {
+    if (num === null || num === undefined) return 'N/A';
+    const number = typeof num === 'string' ? parseFloat(num) : num;
+    if (isNaN(number)) return 'N/A';
+    return number.toLocaleString('en-IN');
+  };
+
+  const formatPercentage = (rate: string | number | null) => {
+    if (rate === null || rate === undefined) return 'N/A';
+    const numRate = typeof rate === 'string' ? parseFloat(rate) : rate;
+    if (isNaN(numRate)) return 'N/A';
+    return `${numRate.toFixed(2)}%`;
   };
 
   const getStatusIcon = (status: string) => {
@@ -470,7 +632,10 @@ const Reconciliation: React.FC = () => {
       <Paper sx={{ mb: 2, p: 1, borderRadius: 3 }}>
         <Tabs
           value={selectedMonth}
-          onChange={(_, v) => setSelectedMonth(v)}
+          onChange={(_, v) => {
+            setSelectedMonth(v);
+            fetchReconciliationData(v);
+          }}
           variant="scrollable"
           scrollButtons="auto"
         >
@@ -484,7 +649,7 @@ const Reconciliation: React.FC = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Typography variant="h5" sx={{ fontWeight: 600, color: 'primary.main' }}>
-            Reconciliation Dashboard
+            Marketplace Reconciliation Dashboard
           </Typography>
           <Chip label={`${monthNames[selectedMonth]} 2025`} variant="outlined" sx={{ fontWeight: 500 }} />
         </Box>
@@ -497,113 +662,29 @@ const Reconciliation: React.FC = () => {
             variant="outlined"
             sx={{ borderRadius: 2 }}
             onClick={handleSyncClick}
+            disabled={loading}
           >
-            Sync Data
+            {loading ? 'Syncing...' : 'Sync Data'}
           </Button>
         </Box>
       </Box>
 
-      {/* Summary Cards */}
-      <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: 'wrap' }}>
-        <Box sx={{ flex: '1 1 300px' }}>
-          <Card sx={{ p: 2, bgcolor: 'success.light', color: 'success.contrastText' }}>
-            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <DoneIcon sx={{ fontSize: 40 }} />
-                <Box>
-                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                    {matchedTransactions}
-                  </Typography>
-                  <Typography variant="body2">
-                    Automatically Matched
-                  </Typography>
-                </Box>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Box>
-        
-        <Box sx={{ flex: '1 1 300px' }}>
-          <Card sx={{ p: 2, bgcolor: 'error.light', color: 'error.contrastText' }}>
-            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <ErrorIcon sx={{ fontSize: 40 }} />
-                <Box>
-                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                    {unmatchedTransactions}
-                  </Typography>
-                  <Typography variant="body2">
-                    Require Manual Review
-                  </Typography>
-                </Box>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Box>
-        
-        <Box sx={{ flex: '1 1 300px' }}>
-          <Card sx={{ p: 2, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
-            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <CheckCircleIcon sx={{ fontSize: 40 }} />
-                <Box>
-                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                    {matchPercentage}%
-                  </Typography>
-                  <Typography variant="body2">
-                    Match Accuracy
-                  </Typography>
-                </Box>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Box>
-      </Box>
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="warning" sx={{ mb: 3 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
 
-      {/* Progress Bar */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-          Reconciliation Progress
-        </Typography>
-        <Box sx={{ mb: 2 }}>
-          <LinearProgress 
-            variant="determinate" 
-            value={matchPercentage} 
-            sx={{ height: 8, borderRadius: 4 }}
-          />
+      {/* Loading State */}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+          <CircularProgress size={40} />
+          <Typography variant="body1" sx={{ ml: 2 }}>
+            Loading reconciliation data...
+          </Typography>
         </Box>
-        <Typography variant="body2" color="text.secondary">
-          {matchedTransactions} of {totalTransactions} transactions automatically reconciled
-        </Typography>
-      </Paper>
-
-      {/* Filters */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>Filter by status:</Typography>
-        <Button 
-          variant={filterStatus === 'all' ? 'contained' : 'outlined'}
-          onClick={() => setFilterStatus('all')}
-          size="small"
-        >
-          All ({totalTransactions})
-        </Button>
-        <Button 
-          variant={filterStatus === 'matched' ? 'contained' : 'outlined'}
-          onClick={() => setFilterStatus('matched')}
-          size="small"
-          color="success"
-        >
-          Matched ({matchedTransactions})
-        </Button>
-        <Button 
-          variant={filterStatus === 'unmatched' ? 'contained' : 'outlined'}
-          onClick={() => setFilterStatus('unmatched')}
-          size="small"
-          color="error"
-        >
-          Unmatched ({unmatchedTransactions})
-        </Button>
-      </Box>
+      )}
 
       {/* Navigation Tabs */}
       <Paper sx={{ mb: 2 }}>
@@ -612,15 +693,506 @@ const Reconciliation: React.FC = () => {
           onChange={(_, value) => setActiveTab(value)}
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
+          <Tab label="Overview" value="overview" />
           <Tab label="Reconciliation Results" value="reconciliation" />
           <Tab label="Razorpay Fee Structure" value="fees" />
           <Tab label="Disputed Transactions" value="disputes" />
         </Tabs>
       </Paper>
 
+      {/* Overview Section */}
+      {activeTab === 'overview' && (
+        <>
+          {/* Key Metrics Cards */}
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ p: 2, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <TrendingUpIcon sx={{ fontSize: 40 }} />
+                    <Box>
+                                             <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                         {formatCurrency(backendData.grossSales)}
+                       </Typography>
+                      <Typography variant="body2">
+                        Gross Sales
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ p: 2, bgcolor: 'success.light', color: 'success.contrastText' }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <DoneIcon sx={{ fontSize: 40 }} />
+                    <Box>
+                                             <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                         {formatCurrency(backendData.settledSales)}
+                       </Typography>
+                      <Typography variant="body2">
+                        Settled Sales
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ p: 2, bgcolor: 'warning.light', color: 'warning.contrastText' }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <PendingActionsIcon sx={{ fontSize: 40 }} />
+                    <Box>
+                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                        {formatCurrency(backendData.summaryData.pendingPaymentFromMarketplace.amount)}
+                      </Typography>
+                      <Typography variant="body2">
+                        Pending Payment
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ p: 2, bgcolor: 'error.light', color: 'error.contrastText' }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <TrendingDownIcon sx={{ fontSize: 40 }} />
+                    <Box>
+                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                        {formatCurrency(backendData.summaryData.returnedOrCancelledOrders.amount)}
+                      </Typography>
+                      <Typography variant="body2">
+                        Returns & Cancellations
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* Detailed Summary Cards */}
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            <Grid item xs={12} md={6}>
+              <Card sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: 'primary.main' }}>
+                  Orders Summary
+                </Typography>
+                <Stack spacing={2}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body1">Orders Delivered:</Typography>
+                    <Box sx={{ textAlign: 'right' }}>
+                      <Typography variant="h6" color="success.main">
+                        {formatCurrency(backendData.ordersDelivered.amount)}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {formatNumber(backendData.ordersDelivered.number)} orders
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body1">Orders Returned:</Typography>
+                    <Box sx={{ textAlign: 'right' }}>
+                      <Typography variant="h6" color="error.main">
+                        {formatCurrency(backendData.ordersReturned.amount)}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {formatNumber(backendData.ordersReturned.number)} orders
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body1">Return Rate:</Typography>
+                    <Typography variant="h6" color="warning.main">
+                      {formatPercentage(backendData.returnRate)}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Card sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: 'primary.main' }}>
+                  Commission & Deductions
+                </Typography>
+                <Stack spacing={2}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body1">Total Commission:</Typography>
+                    <Typography variant="h6" color="error.main">
+                      {formatCurrency(backendData.commission.totalCommission)}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body1">Commission Rate:</Typography>
+                                      <Typography variant="h6" color="error.main">
+                    {formatPercentage(backendData.commission.commissionRate)}
+                  </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body1">TDS:</Typography>
+                    <Typography variant="h6" color="warning.main">
+                      {formatCurrency(backendData.totalTDS)}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body1">TDA:</Typography>
+                    <Typography variant="h6" color="warning.main">
+                      {formatCurrency(backendData.totalTDA)}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* Reconciliation Status */}
+          <Card sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: 'primary.main' }}>
+              Reconciliation Status
+            </Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={4}>
+                <Box sx={{ textAlign: 'center', p: 2 }}>
+                  <Typography variant="h4" color="success.main" sx={{ fontWeight: 700 }}>
+                    {formatCurrency(backendData.summaryData.totalReconciled.amount)}
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    Total Reconciled
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatNumber(backendData.summaryData.totalReconciled.number)} transactions
+                  </Typography>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} md={4}>
+                <Box sx={{ textAlign: 'center', p: 2 }}>
+                  <Typography variant="h4" color="warning.main" sx={{ fontWeight: 700 }}>
+                    {formatCurrency(backendData.summaryData.pendingPaymentFromMarketplace.amount)}
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    Pending from Marketplace
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatNumber(backendData.summaryData.pendingPaymentFromMarketplace.number)} orders
+                  </Typography>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} md={4}>
+                <Box sx={{ textAlign: 'center', p: 2 }}>
+                  <Typography variant="h4" color="error.main" sx={{ fontWeight: 700 }}>
+                    {formatCurrency(backendData.summaryData.pendingDeductions.amount)}
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    Pending Deductions
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatNumber(backendData.summaryData.pendingDeductions.number)} items
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </Card>
+
+          {/* Settlement Summary */}
+          <Card sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: 'primary.main' }}>
+              Settlement Summary
+            </Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ p: 2, border: '1px solid', borderColor: 'success.main', borderRadius: 2 }}>
+                  <Typography variant="h6" color="success.main" sx={{ fontWeight: 600 }}>
+                    Payout Received
+                  </Typography>
+                  <Typography variant="h4" color="success.main" sx={{ fontWeight: 700 }}>
+                    {formatCurrency(backendData.monthOrdersPayoutReceived)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    This month's payout from marketplace
+                  </Typography>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <Box sx={{ p: 2, border: '1px solid', borderColor: 'warning.main', borderRadius: 2 }}>
+                  <Typography variant="h6" color="warning.main" sx={{ fontWeight: 600 }}>
+                    Awaiting Settlement
+                  </Typography>
+                  <Typography variant="h4" color="success.main" sx={{ fontWeight: 700 }}>
+                    {formatCurrency(backendData.monthOrdersAwaitedSettlement.salesAmount)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatNumber(backendData.monthOrdersAwaitedSettlement.salesOrders)} orders pending
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </Card>
+
+          {/* Difference Analysis */}
+          <Card sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: 'primary.main' }}>
+              Difference Analysis
+            </Typography>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                Total Difference: {formatCurrency(backendData.difference)}
+              </Typography>
+              <Typography variant="body2">
+                This represents the variance between expected and actual settlements. A positive value indicates excess payment received, while a negative value indicates shortfall.
+              </Typography>
+            </Alert>
+            
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ p: 2, bgcolor: 'success.light', borderRadius: 2 }}>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    Net Sales (Sales Report):
+                  </Typography>
+                  <Typography variant="h6" color="success.main">
+                    {formatCurrency(backendData.summaryData.netSalesAsPerSalesReport.amount)}
+                  </Typography>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <Box sx={{ p: 2, bgcolor: 'info.light', borderRadius: 2 }}>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    Payment Received (Settlement):
+                  </Typography>
+                  <Typography variant="h6" color="info.main">
+                    {formatCurrency(backendData.summaryData.paymentReceivedAsPerSettlementReport.amount)}
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </Card>
+
+          {/* Complete Summary Data from Backend */}
+          <Card sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: 'primary.main' }}>
+              Complete Reconciliation Summary
+            </Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Card sx={{ p: 2, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                      Total Transactions
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {formatCurrency(backendData.summaryData.totalTransaction.amount)}
+                    </Typography>
+                    <Typography variant="body2">
+                      {formatNumber(backendData.summaryData.totalTransaction.number)} transactions
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <Card sx={{ p: 2, bgcolor: 'info.light', color: 'info.contrastText' }}>
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                      Unreconciled Amount
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {formatCurrency(backendData.summaryData.totalUnreconciled.amount)}
+                    </Typography>
+                    <Typography variant="body2">
+                      {formatNumber(backendData.summaryData.totalUnreconciled.number)} items
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <Card sx={{ p: 2, bgcolor: 'warning.light', color: 'warning.contrastText' }}>
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                      Returned/Cancelled Orders
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {formatCurrency(backendData.summaryData.returnedOrCancelledOrders.amount)}
+                    </Typography>
+                    <Typography variant="body2">
+                      {formatNumber(backendData.summaryData.returnedOrCancelledOrders.number)} orders
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <Card sx={{ p: 2, bgcolor: 'success.light', color: 'success.contrastText' }}>
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                      Net Sales (Sales Report)
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {formatCurrency(backendData.summaryData.netSalesAsPerSalesReport.amount)}
+                    </Typography>
+                    <Typography variant="body2">
+                      {formatNumber(backendData.summaryData.netSalesAsPerSalesReport.number)} orders
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+            
+            {/* Additional Summary Details */}
+            <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+                Additional Details
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">Payment Received (Settlement):</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {formatCurrency(backendData.summaryData.paymentReceivedAsPerSettlementReport.amount)} 
+                      ({formatNumber(backendData.summaryData.paymentReceivedAsPerSettlementReport.number)} orders)
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">Pending Payment from Marketplace:</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {formatCurrency(backendData.summaryData.pendingPaymentFromMarketplace.amount)} 
+                      ({formatNumber(backendData.summaryData.pendingPaymentFromMarketplace.number)} orders)
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">Pending Deductions:</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {formatCurrency(backendData.summaryData.pendingDeductions.amount)} 
+                      ({formatNumber(backendData.summaryData.pendingDeductions.number)} items)
+                    </Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+            </Box>
+          </Card>
+        </>
+      )}
+
       {/* Reconciliation Results Section */}
       {activeTab === 'reconciliation' && (
         <>
+          {/* Summary Cards */}
+          <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: 'wrap' }}>
+            <Box sx={{ flex: '1 1 300px' }}>
+              <Card sx={{ p: 2, bgcolor: 'success.light', color: 'success.contrastText' }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <DoneIcon sx={{ fontSize: 40 }} />
+                    <Box>
+                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                        {matchedTransactions}
+                      </Typography>
+                      <Typography variant="body2">
+                        Automatically Matched
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Box>
+            
+            <Box sx={{ flex: '1 1 300px' }}>
+              <Card sx={{ p: 2, bgcolor: 'error.light', color: 'error.contrastText' }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <ErrorIcon sx={{ fontSize: 40 }} />
+                    <Box>
+                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                        {unmatchedTransactions}
+                      </Typography>
+                      <Typography variant="body2">
+                        Require Manual Review
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Box>
+            
+            <Box sx={{ flex: '1 1 300px' }}>
+              <Card sx={{ p: 2, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <CheckCircleIcon sx={{ fontSize: 40 }} />
+                    <Box>
+                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                        {matchPercentage}%
+                      </Typography>
+                      <Typography variant="body2">
+                        Match Accuracy
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Box>
+          </Box>
+
+          {/* Progress Bar */}
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+              Reconciliation Progress
+            </Typography>
+            <Box sx={{ mb: 2 }}>
+              <LinearProgress 
+                variant="determinate" 
+                value={matchPercentage} 
+                sx={{ height: 8, borderRadius: 4 }}
+              />
+            </Box>
+            <Typography variant="body2" color="text.secondary">
+              {matchedTransactions} of {totalTransactions} transactions automatically reconciled
+            </Typography>
+          </Paper>
+
+          {/* Filters */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>Filter by status:</Typography>
+            <Button 
+              variant={filterStatus === 'all' ? 'contained' : 'outlined'}
+              onClick={() => setFilterStatus('all')}
+              size="small"
+            >
+              All ({totalTransactions})
+            </Button>
+            <Button 
+              variant={filterStatus === 'matched' ? 'contained' : 'outlined'}
+              onClick={() => setFilterStatus('matched')}
+              size="small"
+              color="success"
+            >
+              Matched ({matchedTransactions})
+            </Button>
+            <Button 
+              variant={filterStatus === 'unmatched' ? 'contained' : 'outlined'}
+              onClick={() => setFilterStatus('unmatched')}
+              size="small"
+              color="error"
+            >
+              Unmatched ({unmatchedTransactions})
+            </Button>
+          </Box>
+
           {/* Reconciliation Results Table */}
           <Paper sx={{ overflow: 'hidden' }}>
             <TableContainer>
@@ -689,8 +1261,6 @@ const Reconciliation: React.FC = () => {
           )}
         </>
       )}
-
-
 
       {/* Fee Structure Section */}
       {activeTab === 'fees' && (

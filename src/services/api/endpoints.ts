@@ -48,7 +48,7 @@ export const userAPI = {
 export const reconciliationAPI = {
   // Get reconciliation summary
   getSummary: (params?: DateRangeParams) =>
-    apiService.get<ReconciliationData>(API_CONFIG.ENDPOINTS.RECONCILIATION_SUMMARY, params),
+    apiService.get<MarketplaceReconciliationResponse>(API_CONFIG.ENDPOINTS.FETCH_STATS, params),
 
   // Get detailed reconciliation data
   getDetails: (params?: DateRangeParams & PaginationParams & FilterParams) =>
