@@ -51,9 +51,10 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   MoreVert as MoreVertIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
 
-// Type definitions for transaction data
+// Type definitions for transaction data based on actual API response
 interface TransactionRow {
   "Order Item ID": string;
   "Order Value": number;
@@ -63,7 +64,38 @@ interface TransactionRow {
   "Difference": number;
   "Remark": string;
   "Event Type": string;
-  [key: string]: any; // Allow dynamic access
+  // Preserve original API response data for popup access
+  originalData?: TransactionApiResponse;
+}
+
+// API Response structure based on actual data
+interface TransactionApiResponse {
+  calculation: {
+    inputs: {
+      customer_addons_amount: string;
+      marketplace_fee: string;
+      offer_adjustments: string;
+      refund: string;
+      reverse: string;
+      seller_share_offer: string;
+      settlement_sale_value: string;
+      settlement_value: string;
+      taxes: string;
+      total_offer_amount: string;
+    };
+  };
+  context: {
+    buyer_invoice_amount: string;
+    tcs: string;
+    tds: string;
+  };
+  diff: string;
+  order_date: string;
+  order_item_id: string;
+  order_value: string;
+  settlement_date: string | null;
+  settlement_value: string;
+  status: string;
 }
 
 interface TransactionData {
@@ -71,50 +103,93 @@ interface TransactionData {
   rows: TransactionRow[];
 }
 
+// API Response metadata types
+interface TransactionMetadata {
+  counts: {
+    excess_received: number;
+    settlement_matched: number;
+    settled: number
+    short_received: number;
+    unsettled: number;
+  };
+  pagination: {
+    current_count: number;
+    has_next: boolean;
+    has_prev: boolean;
+    limit: number;
+    page: number;
+    total_count: number;
+    total_pages: number;
+  };
+  totals: {
+    total_diff: string;
+    total_sales_value: string;
+    total_settlement_value: string;
+  };
+}
+
+// Query parameters interface
+interface TransactionQueryParams {
+  page?: number;
+  limit?: number;
+  status_in?: string;
+  order_date_from?: string;
+  order_date_to?: string;
+  diff_min?: number;
+  diff_max?: number;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+  order_item_id?: string;
+  remark?: string;
+}
+
 // Transform API data to TransactionRow format
-const transformOrderItemToTransactionRow = (orderItem: OrderItem): TransactionRow => {
-  const orderValue = parseFloat(orderItem.buyer_invoice_amount);
-  const settlementValue = parseFloat(orderItem.settlement_value);
-  const difference = parseFloat(orderItem.diff);
-  
+const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   // Debug logging to see what we're getting from the API
-  console.log('payment_date from API:', orderItem.payment_date);
   console.log('OrderItem from API:', orderItem);
-  console.log('order_item_id:', orderItem.order_item_id);
+  console.log('Available fields in OrderItem:', Object.keys(orderItem));
+  
+  // Check for the new API structure
+  if (orderItem.calculation?.inputs) {
+    console.log('New API structure found - calculation.inputs:', orderItem.calculation.inputs);
+  }
+  if (orderItem.context) {
+    console.log('New API structure found - context:', orderItem.context);
+  }
+  
+  // Helper function to parse currency/numeric strings
+  const parseNumericValue = (value: any): number => {
+    if (value === null || value === undefined || value === '') {
+      return 0;
+    }
+    
+    // Convert to string and clean it
+    const cleanedValue = String(value)
+      .replace(/[₹$,\s]/g, '') // Remove currency symbols, commas, and spaces
+      .replace(/[^\d.-]/g, '') // Keep only digits, dots, and minus signs
+      .trim();
+    
+    const parsed = parseFloat(cleanedValue);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  // Extract values from the new API structure
+  const orderValue = parseNumericValue(orderItem.order_value || orderItem.buyer_invoice_amount);
+  const settlementValue = parseNumericValue(orderItem.settlement_value);
+  const difference = parseNumericValue(orderItem.diff);
+  
+  console.log('Parsed values - orderValue:', orderValue, 'settlementValue:', settlementValue, 'difference:', difference);
   
   // Handle missing or empty order_item_id
   let orderItemId = orderItem.order_item_id;
   if (!orderItemId || orderItemId.trim() === '') {
-    // Try alternative field names that might be used in the API
-    const alternativeFields = [
-      'id',
-      'item_id', 
-      'orderItemId',
-      'orderItem_id',
-      'order_itemId',
-      'itemId',
-      'orderId',
-      'order_id'
-    ];
-    
-    for (const field of alternativeFields) {
-      if ((orderItem as any)[field] && (orderItem as any)[field].toString().trim() !== '') {
-        orderItemId = (orderItem as any)[field].toString();
-        console.log(`Found order item ID in alternative field '${field}':`, orderItemId);
-        break;
-      }
-    }
-    
-    // If still no ID found, generate a fallback
-    if (!orderItemId || orderItemId.trim() === '') {
-      orderItemId = `ITEM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      console.warn('No order item ID found in any field, using fallback:', orderItemId);
-    }
+    orderItemId = `ITEM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.warn('No order item ID found, using fallback:', orderItemId);
   }
   
   // Determine remark based on API response
-  let remark = "Pending Settlement";
-  if (orderItem.remark === "settlement_matched") {
+  let remark = "unsettled";
+  if (orderItem.status === "settlement_matched") {
     if (difference === 0) {
       remark = "Matched";
     } else if (difference > 0) {
@@ -122,21 +197,17 @@ const transformOrderItemToTransactionRow = (orderItem: OrderItem): TransactionRo
     } else {
       remark = "Excess Amount Received";
     }
-  } else if (orderItem.event_type === "Return") {
-    remark = "Return Initiated";
   }
   
   // Determine settlement date from API response
   let settlementDate = "";
-  if (orderItem.payment_date && orderItem.payment_date.trim() !== '') {
-    // Use the actual payment_date from API if available
+  if (orderItem.settlement_date && orderItem.settlement_date.trim() !== '') {
     try {
-      settlementDate = new Date(orderItem.payment_date).toISOString().split('T')[0];
+      settlementDate = new Date(orderItem.settlement_date).toISOString().split('T')[0];
     } catch (error) {
       settlementDate = "Invalid Date";
     }
   } else {
-    // Show "Invalid Date" when payment_date is null or empty
     settlementDate = "Invalid Date";
   }
   
@@ -148,7 +219,9 @@ const transformOrderItemToTransactionRow = (orderItem: OrderItem): TransactionRo
     "Settlement Date": settlementDate,
     "Difference": difference,
     "Remark": remark,
-    "Event Type": orderItem.event_type,
+    "Event Type": orderItem.event_type || "Sale", // Default to "Sale" if not provided
+    // Preserve the original API response data for popup access
+    originalData: orderItem as TransactionApiResponse,
   };
 };
 
@@ -719,39 +792,117 @@ const TransactionDetailsPopup: React.FC<{
   formatDate: (dateString: string) => string;
   anchorEl: HTMLElement | null;
 }> = ({ transaction, onClose, formatCurrency, formatDate, anchorEl }) => {
+  const [formulaAnchorEl, setFormulaAnchorEl] = useState<HTMLElement | null>(null);
+  
   if (!transaction || !anchorEl) return null;
+
+  // Extract calculation data from the transaction
+  // Access the preserved original API response data
+  const originalData = (transaction as any)?.originalData || {};
+  
+  // Debug logging to see what data we have
+  console.log('Transaction for popup:', transaction);
+  console.log('Original API data:', originalData);
+  console.log('Available fields in originalData:', Object.keys(originalData));
+  
+  // Get values from the actual API response structure
+  const orderValue = transaction["Order Value"] || 0;
+
+  // Extract values from calculation.inputs
+  const calculationInputs = originalData.calculation?.inputs || {};
+  const context = originalData.context || {};
+  
+  // Map the exact fields from the API response
+  const collectionReceived = parseFloat(calculationInputs.settlement_value || 0);
+  const marketplaceFee = parseFloat(calculationInputs.marketplace_fee || 0);
+  const taxes = parseFloat(calculationInputs.taxes || 0);
+  const totalOfferAmount = parseFloat(calculationInputs.total_offer_amount || 0);
+  const sellerShareOffer = parseFloat(calculationInputs.seller_share_offer || 0);
+  const offerAdjustments = parseFloat(calculationInputs.offer_adjustments || 0);
+  const customerAddonsAmount = parseFloat(calculationInputs.customer_addons_amount || 0);
+  const refund = parseFloat(calculationInputs.refund || 0);
+  const reverse = parseFloat(calculationInputs.reverse || 0);
+  
+  // Extract from context
+  const tdsDeducted = parseFloat(context.tds || 0);
+  const tcsDeducted = parseFloat(context.tds || 0);
+  
+  const difference = parseFloat(originalData.diff || 0);
+  const status = transaction["Remark"] || "Nan";
+  
+  // Debug logging for individual field values
+  console.log('Field values extracted:');
+  console.log('- Collection Received:', {
+    settlement_value: calculationInputs.settlement_value,
+    final: collectionReceived
+  });
+  console.log('- Marketplace Fee:', {
+    marketplace_fee: calculationInputs.marketplace_fee,
+    final: marketplaceFee
+  });
+  console.log('- Taxes:', {
+    taxes: calculationInputs.taxes,
+    final: taxes
+  });
+  console.log('- Total Offer Amount:', {
+    total_offer_amount: calculationInputs.total_offer_amount,
+    final: totalOfferAmount
+  });
+  console.log('- Seller Share Offer:', {
+    seller_share_offer: calculationInputs.seller_share_offer,
+    final: sellerShareOffer
+  });
+  console.log('- TDS Deducted:', {
+    tds: context.tds,
+    final: tdsDeducted
+  });
+  console.log('- TCS Deducted:', {
+    tcs: context.tcs,
+    final: tcsDeducted
+  });
+  console.log('- Difference:', {
+    diff: originalData.diff,
+    final: difference
+  });
 
   // Calculate smart positioning
   const getPopupPosition = () => {
     const rect = anchorEl.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
-    const popupHeight = 500; // Increased estimated popup height
-    const popupWidth = 380;
+    const popupHeight = 280; // Much smaller height for compact popup
+    const popupWidth = 320;
     const offset = 12;
 
-    // Calculate vertical position
+    // Calculate vertical position with better viewport awareness
     let top: number;
     let animationDirection: 'up' | 'down' = 'down';
     let maxHeight: number | undefined;
     
-    if (rect.bottom + popupHeight + offset <= viewportHeight) {
+    // Check available space above and below
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    
+    if (spaceBelow >= popupHeight + offset) {
       // Enough space below - show below
       top = rect.bottom + offset;
-    } else if (rect.top - popupHeight - offset >= 0) {
+      animationDirection = 'down';
+    } else if (spaceAbove >= popupHeight + offset) {
       // Enough space above - show above
       top = rect.top - popupHeight - offset;
       animationDirection = 'up';
     } else {
-      // Not enough space either way - position optimally and make scrollable
-      if (rect.bottom + offset < viewportHeight / 2) {
-        // More space below - show below with limited height
-        top = rect.bottom + offset;
-        maxHeight = viewportHeight - top - offset;
+      // Not enough space either way - find optimal position
+      if (spaceBelow > spaceAbove) {
+        // More space below - position at bottom with scroll
+        top = Math.max(offset, viewportHeight - popupHeight - offset);
+        maxHeight = popupHeight;
+        animationDirection = 'down';
       } else {
-        // More space above - show above with limited height
+        // More space above - position at top with scroll
         top = offset;
-        maxHeight = rect.top - offset * 2;
+        maxHeight = popupHeight;
+        animationDirection = 'up';
       }
     }
 
@@ -770,13 +921,21 @@ const TransactionDetailsPopup: React.FC<{
       left = Math.max(offset, viewportWidth - popupWidth - offset);
     }
 
-    // Fallback: ensure modal is always visible
+    // Final validation: ensure popup is always within viewport bounds
     if (top < offset) {
       top = offset;
-      maxHeight = viewportHeight - offset * 2;
+      maxHeight = Math.min(popupHeight, viewportHeight - offset * 2);
     }
     if (top + (maxHeight || popupHeight) > viewportHeight - offset) {
-      top = viewportHeight - (maxHeight || popupHeight) - offset;
+      top = Math.max(offset, viewportHeight - (maxHeight || popupHeight) - offset);
+    }
+
+    // Ensure horizontal position is also within viewport
+    if (left < offset) {
+      left = offset;
+    }
+    if (left + popupWidth > viewportWidth - offset) {
+      left = viewportWidth - popupWidth - offset;
     }
 
     return { top, left, animationDirection, maxHeight };
@@ -816,12 +975,12 @@ const TransactionDetailsPopup: React.FC<{
           position: 'fixed',
           top: position.top,
           left: position.left,
-          width: '380px',
+          width: '320px',
           maxHeight: position.maxHeight ? `${position.maxHeight}px` : 'auto',
           background: '#ffffff',
           border: '1px solid #e5e7eb',
           borderRadius: '12px',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           zIndex: 1400,
           animation: position.animationDirection === 'down' 
             ? 'fadeInScaleDown 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
@@ -853,7 +1012,7 @@ const TransactionDetailsPopup: React.FC<{
       >
       {/* Header */}
       <Box sx={{ 
-        p: 2.5, 
+        p: 1.5, 
         borderBottom: '1px solid #e5e7eb',
         background: '#f9fafb',
         display: 'flex',
@@ -861,15 +1020,16 @@ const TransactionDetailsPopup: React.FC<{
         alignItems: 'center',
       }}>
         <Box>
-          <Typography variant="subtitle1" sx={{ 
+          <Typography variant="body2" sx={{ 
             fontWeight: 700, 
             color: '#111827',
             mb: 0.5,
+            fontSize: '0.9rem',
           }}>
             Transaction Details
           </Typography>
-          <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>
-            Order Item ID: {transaction["Order Item ID"]}
+          <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.75rem' }}>
+            Order ID: {transaction["Order Item ID"]}
           </Typography>
         </Box>
         <IconButton
@@ -878,6 +1038,7 @@ const TransactionDetailsPopup: React.FC<{
           sx={{
             background: '#f3f4f6',
             color: '#374151',
+            p: 0.5,
             '&:hover': {
               background: '#e5e7eb',
               transform: 'scale(1.05)',
@@ -885,25 +1046,25 @@ const TransactionDetailsPopup: React.FC<{
             transition: 'all 0.2s ease',
           }}
         >
-          <CloseIcon fontSize="small" />
+          <CloseIcon sx={{ fontSize: '1rem' }} />
         </IconButton>
       </Box>
 
       {/* Content */}
       <Box sx={{ 
-        p: 2.5, 
+        p: 1.5, 
         flex: 1,
         overflowY: 'auto',
         '&::-webkit-scrollbar': {
-          width: '6px',
+          width: '4px',
         },
         '&::-webkit-scrollbar-track': {
           background: '#f1f5f9',
-          borderRadius: '3px',
+          borderRadius: '2px',
         },
         '&::-webkit-scrollbar-thumb': {
           background: '#cbd5e1',
-          borderRadius: '3px',
+          borderRadius: '2px',
           '&:hover': {
             background: '#94a3b8',
           },
@@ -911,86 +1072,198 @@ const TransactionDetailsPopup: React.FC<{
       }}>
         {/* Order Value - Primary Information */}
         <Box sx={{ 
-          p: 2.5, 
+          p: 1.5, 
           background: '#f8fafc',
-          borderRadius: '8px',
+          borderRadius: '6px',
           border: '1px solid #e2e8f0',
-          mb: 2.5,
+          mb: 1.5,
         }}>
-          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Order Value
+          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
+            ORDER VALUE
           </Typography>
-          <Typography variant="h5" sx={{ 
+          <Typography variant="body1" sx={{ 
             fontWeight: 800, 
-            color: '#0f172a',
-            mt: 1,
+            color: orderValue < 0 ? '#dc2626' : '#0f172a',
+            mt: 0.25,
+            fontSize: '1rem',
           }}>
-            {formatCurrency(transaction["Order Value"])}
+            {formatCurrency(orderValue)}
           </Typography>
         </Box>
 
         {/* Transaction Details */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-              Settlement Value
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+              Collection Received
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a' }}>
-              {formatCurrency(transaction["Settlement Value"])}
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+              {formatCurrency(collectionReceived)}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+            Marketplace Fee
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+              {formatCurrency(marketplaceFee)}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+            Taxes
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+              {formatCurrency(taxes)}
+            </Typography>
+          </Box>
+          
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+            TDS
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+              {formatCurrency(tdsDeducted)}
+            </Typography>
+          </Box>
+          
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+            TCS
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+              {formatCurrency(tcsDeducted)}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+            Total Offer Amount
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+              {formatCurrency(totalOfferAmount)}
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-              Commission
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+            Seller Share Offer
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a' }}>
-              {formatCurrency(transaction["Order Value"] * 0.02)}
-            </Typography>
-          </Box>
-
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-              TDS Deducted
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a' }}>
-              {formatCurrency(transaction["Order Value"] * 0.01)}
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+              {formatCurrency(sellerShareOffer)}
             </Typography>
           </Box>
-
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-              TCS Deducted
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+            Offer Adjustments
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a' }}>
-              {formatCurrency(transaction["Order Value"] * 0.005)}
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+              {formatCurrency(offerAdjustments)}
             </Typography>
           </Box>
-
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-              Difference
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+            Customer Addons Amount
             </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+              {formatCurrency(customerAddonsAmount)}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+              Refund
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+              {formatCurrency(refund)}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+              Reverse
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+              {formatCurrency(reverse)}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                Difference
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('Info icon clicked!');
+                  console.log('Current formulaAnchorEl:', formulaAnchorEl);
+                  console.log('Setting new anchor:', e.currentTarget);
+                  setFormulaAnchorEl(e.currentTarget);
+                  console.log('After setting - formulaAnchorEl:', e.currentTarget);
+                }}
+                sx={{
+                  p: 0,
+                  color: '#64748b',
+                  '&:hover': {
+                    color: '#0f172a',
+                    backgroundColor: 'transparent',
+                  },
+                }}
+              >
+                <InfoIcon sx={{ fontSize: '0.8rem' }} />
+              </IconButton>
+            </Box>
             <Typography variant="body2" sx={{ 
               fontWeight: 600, 
-              color: transaction["Difference"] === 0 ? '#059669' : '#dc2626'
+              color: difference === 0 ? '#059669' : '#dc2626',
+              fontSize: '0.75rem'
             }}>
-              {formatCurrency(transaction["Difference"])}
+              {formatCurrency(difference)}
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1 }}>
-            <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
               Status
             </Typography>
             <Typography variant="body2" sx={{ 
               fontWeight: 600, 
-              color: transaction["Remark"] === 'Matched' ? '#059669' : '#dc2626'
+              color: status === 'Matched' ? '#059669' : '#dc2626',
+              fontSize: '0.75rem'
             }}>
-              {transaction["Remark"]}
+              {status}
             </Typography>
           </Box>
         </Box>
+        
+        {/* Formula Popover */}
+        <Popover
+          open={Boolean(formulaAnchorEl)}
+          anchorEl={formulaAnchorEl}
+          onClose={() => {
+            console.log('Closing formula popover');
+            setFormulaAnchorEl(null);
+          }}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'center',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'center',
+          }}
+          sx={{
+            zIndex: 9999,
+          }}
+        >
+          <Box sx={{ p: 2, maxWidth: '300px', bgcolor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#0f172a', mb: 1, fontSize: '0.7rem' }}>
+              Formula
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.6rem', lineHeight: 1.5 }}>
+              abs(buyer_invoice_amount) + marketplace_fee + taxes + customer_addons_amount + total_offer_amount + seller_share_offer + offer_adjustments + refund + reverse - settlement_value
+            </Typography>
+          </Box>
+        </Popover>
       </Box>
     </Box>
     </>
@@ -1009,6 +1282,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [dateRange, setDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
   // Column filters can be string (contains), number range {min,max}, date range {from,to}, or enum string[]
   const [columnFilters, setColumnFilters] = useState<{ [key: string]: any }>({});
+  // Pending filters that haven't been applied yet
+  const [pendingColumnFilters, setPendingColumnFilters] = useState<{ [key: string]: any }>({});
+  const [pendingDateRange, setPendingDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
   const [filteredData, setFilteredData] = useState<TransactionRow[]>([]);
   const [allTransactionData, setAllTransactionData] = useState<TransactionRow[]>([]);
   const [page, setPage] = useState(0);
@@ -1024,10 +1300,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HTMLElement | null>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const [tabCounts, setTabCounts] = useState<{ settled: number | null; unsettled: number | null }>({ settled: null, unsettled: null });
+  const [metadata, setMetadata] = useState<TransactionMetadata | null>(null);
   
   // Dropdown menu state for Status column
-  const [statusDropdownAnchor, setStatusDropdownAnchor] = useState<HTMLElement | null>(null);
-  const [selectedStatusRow, setSelectedStatusRow] = useState<TransactionRow | null>(null);
+
 
   // Format currency values
   const formatCurrency = (amount: number) => {
@@ -1147,6 +1423,210 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
 
   // Fetch orders from API with pagination
+  // Build query parameters from filters
+  const buildQueryParams = (
+    pageNumber: number = 1, 
+    remark?: string, 
+    overrideFilters?: { [key: string]: any }, 
+    overrideDateRange?: {start: string, end: string}
+  ): TransactionQueryParams => {
+    const params: TransactionQueryParams = {
+      page: pageNumber,
+      limit: 50
+    };
+
+    // Set status based on remark or activeTab
+    const remarkToUse = remark || (activeTab === 0 ? 'settlement_matched' : 'unsettled');
+    if (remarkToUse === 'settlement_matched') {
+      params.status_in = 'settlement_matched';
+      console.log('Setting API parameter: status_in = settlement_matched (for Settled tab)');
+    } else if (remarkToUse === 'unsettled') {
+      params.status_in = 'unsettled';
+      console.log('Setting API parameter: status_in = unsettled (for Unsettled tab)');
+    }
+
+    // Only add additional parameters if filters are explicitly applied
+    if (overrideFilters || Object.keys(columnFilters).some(key => columnFilters[key])) {
+      // Add sorting
+      params.sort_by = 'order_date';
+      params.sort_order = 'desc';
+      
+      // Apply column filters (use override filters if provided, otherwise use current state)
+      const filtersToUse = overrideFilters || columnFilters;
+      Object.entries(filtersToUse).forEach(([columnKey, filterValue]) => {
+        if (!filterValue) return;
+
+        switch (columnKey) {
+          case 'Order Item ID':
+            if (typeof filterValue === 'string' && filterValue.trim()) {
+              params.order_item_id = filterValue.trim();
+            }
+            break;
+          
+          case 'Order Date':
+            if (filterValue.from && filterValue.to) {
+              params.order_date_from = filterValue.from;
+              params.order_date_to = filterValue.to;
+            }
+            break;
+          
+          case 'Difference':
+            if (typeof filterValue === 'object') {
+              if (filterValue.min !== undefined && filterValue.min !== '') {
+                params.diff_min = parseFloat(filterValue.min);
+              }
+              if (filterValue.max !== undefined && filterValue.max !== '') {
+                params.diff_max = parseFloat(filterValue.max);
+              }
+            }
+            break;
+        }
+      });
+
+      // Apply date range filter if set
+      const dateRangeToUse = overrideDateRange || dateRange;
+      if (dateRangeToUse.start && dateRangeToUse.end) {
+        params.order_date_from = dateRangeToUse.start;
+        params.order_date_to = dateRangeToUse.end;
+      }
+    }
+
+    return params;
+  };
+
+  // Fetch orders with specific filters (used when applying filters)
+  const fetchOrdersWithFilters = async (
+    pageNumber: number = 1, 
+    remark?: string, 
+    filters?: { [key: string]: any }, 
+    dateRangeFilter?: {start: string, end: string}
+  ) => {
+    const isInitialLoad = pageNumber === 1 && allTransactionData.length === 0;
+    
+    if (!isInitialLoad) {
+      setPaginationLoading(true);
+    }
+    setError(null);
+    
+    try {
+      const queryParams = buildQueryParams(pageNumber, remark, filters, dateRangeFilter);
+      console.log(`Fetching orders with applied filters:`, queryParams);
+      
+      // Example query string that would be sent to API:
+      // status_in=unsettled&order_date_from=2025-04-01&order_date_to=2025-04-30&diff_min=-500&diff_max=0&sort_by=order_date&sort_order=desc&order_item_id=333981993553920100
+      const queryString = Object.entries(queryParams)
+        .filter(([_, value]) => value !== undefined && value !== null && value !== '')
+        .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+        .join('&');
+      console.log(`Query string with applied filters:`, queryString);
+      
+      const response = await api.transactions.getTransactions(queryParams as any);
+      
+      if (response.success && response.data) {
+        // Debug: Log the API response structure
+        console.log('API Response:', response.data);
+        const responseData = response.data as any;
+        const transactionData = responseData.transactions || responseData.orders || responseData;
+        console.log('Transactions:', transactionData);
+        
+        // Handle metadata if available
+        if ((response.data as any).meta) {
+          const meta = (response.data as any).meta as TransactionMetadata;
+          setMetadata(meta);
+          
+          // Update tab counts from metadata
+          setTabCounts({
+            settled: meta.counts.settlement_matched,
+            unsettled: meta.counts.unsettled
+          });
+          
+          // Update total count from metadata
+          if (meta.pagination) {
+            setTotalCount(meta.pagination.total_count);
+          }
+        }
+        
+        // Transform all transaction/order items to transaction rows
+        const transactionRows: TransactionRow[] = [];
+        
+        if (Array.isArray(transactionData)) {
+          // If transactionData is directly an array of transactions
+          transactionData.forEach((transaction: any, transactionIndex: number) => {
+            console.log(`Transaction ${transactionIndex}:`, transaction);
+            if (transaction.order_items) {
+              // If it's in the old orders format
+              transaction.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
+                console.log(`OrderItem ${itemIndex} in Transaction ${transactionIndex}:`, orderItem);
+                transactionRows.push(transformOrderItemToTransactionRow(orderItem));
+              });
+            } else {
+              // If it's a direct transaction item
+              transactionRows.push(transformOrderItemToTransactionRow(transaction));
+            }
+          });
+        } else if (transactionData && typeof transactionData === 'object') {
+          // If transactionData is an object, check if it has array properties
+          console.log('TransactionData is an object:', transactionData);
+          
+          // Try to find array properties that might contain the actual data
+          const possibleArrays = ['transactions', 'orders', 'data', 'items'];
+          let foundData = false;
+          
+          for (const key of possibleArrays) {
+            if (Array.isArray(transactionData[key])) {
+              console.log(`Found data array in property: ${key}`);
+              transactionData[key].forEach((item: any, index: number) => {
+                console.log(`${key} ${index}:`, item);
+                if (item.order_items) {
+                  // If it's in the old orders format
+                  item.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
+                    console.log(`OrderItem ${itemIndex} in ${key} ${index}:`, orderItem);
+                    transactionRows.push(transformOrderItemToTransactionRow(orderItem));
+                  });
+                } else {
+                  // If it's a direct transaction item
+                  transactionRows.push(transformOrderItemToTransactionRow(item));
+                }
+              });
+              foundData = true;
+              break;
+            }
+          }
+          
+          if (!foundData) {
+            console.warn('No recognizable data array found in response');
+          }
+        } else {
+          console.error('TransactionData is neither an array nor an object:', transactionData);
+        }
+        
+        // For pagination, we show only the current page data
+        setAllTransactionData(transactionRows);
+        setFilteredData(transactionRows);
+        setCurrentPage(pageNumber);
+        
+        // Fallback total count if metadata not available
+        if (!metadata?.pagination && (response.data as any).pagination) {
+          setTotalCount((response.data as any).pagination.total);
+        } else if (!metadata?.pagination) {
+          // Estimate total count based on current data
+          setTotalCount(transactionRows.length);
+        }
+      } else {
+        setError('Failed to fetch orders data');
+      }
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      setError('Failed to load transaction data. Please try again.');
+    } finally {
+      if (isInitialLoad) {
+        setLoading(false);
+      } else {
+        setPaginationLoading(false);
+      }
+    }
+  };
+
   const fetchOrders = async (pageNumber: number = 1, remark?: string) => {
     const isInitialLoad = pageNumber === 1 && allTransactionData.length === 0;
     
@@ -1156,42 +1636,106 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setError(null);
     
     try {
-      // Use provided remark or determine from activeTab
-      const remarkToUse = remark || (activeTab === 0 ? 'settlement_matched' : 'unsettled');
-      console.log(`Fetching orders with remark: ${remarkToUse}, page: ${pageNumber}, activeTab: ${activeTab}`);
-      const response = await api.orders.getOrders({
-        page: pageNumber,
-        limit: 100,
-        remark: remarkToUse
-      } as any);
+      const queryParams = buildQueryParams(pageNumber, remark);
+      console.log(`Fetching orders with params:`, queryParams);
       
-      if (response.success && response.data.orders) {
+      // Example query string that would be sent to API:
+      // status_in=unsettled&order_date_from=2025-04-01&order_date_to=2025-04-30&diff_min=-500&diff_max=0&sort_by=order_date&sort_order=desc&order_item_id=333981993553920100
+      const queryString = Object.entries(queryParams)
+        .filter(([_, value]) => value !== undefined && value !== null && value !== '')
+        .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+        .join('&');
+      console.log(`Query string:`, queryString);
+      
+      const response = await api.transactions.getTransactions(queryParams as any);
+      
+      if (response.success && response.data) {
         // Debug: Log the API response structure
         console.log('API Response:', response.data);
-        console.log('Orders:', response.data.orders);
+        const responseData = response.data as any;
+        const transactionData = responseData.transactions || responseData.orders || responseData;
+        console.log('Transactions:', transactionData);
         
-        // Transform all order items to transaction rows
+        // Handle metadata if available
+        if ((response.data as any).meta) {
+          const meta = (response.data as any).meta as TransactionMetadata;
+          setMetadata(meta);
+          
+          // Update tab counts from metadata
+          setTabCounts({
+            settled: meta.counts.settled,
+            unsettled: meta.counts.unsettled
+          });
+          
+          // Update total count from metadata
+          if (meta.pagination) {
+            setTotalCount(meta.pagination.total_count);
+          }
+        }
+        
+        // Transform all transaction/order items to transaction rows
         const transactionRows: TransactionRow[] = [];
         
-        response.data.orders.forEach((order: any, orderIndex: number) => {
-          console.log(`Order ${orderIndex}:`, order);
-          console.log(`Order items for order ${orderIndex}:`, order.order_items);
-          
-          order.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
-            console.log(`OrderItem ${itemIndex} in Order ${orderIndex}:`, orderItem);
-            transactionRows.push(transformOrderItemToTransactionRow(orderItem));
+        if (Array.isArray(transactionData)) {
+          // If transactionData is directly an array of transactions
+          transactionData.forEach((transaction: any, transactionIndex: number) => {
+            console.log(`Transaction ${transactionIndex}:`, transaction);
+            if (transaction.order_items) {
+              // If it's in the old orders format
+              transaction.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
+                console.log(`OrderItem ${itemIndex} in Transaction ${transactionIndex}:`, orderItem);
+                transactionRows.push(transformOrderItemToTransactionRow(orderItem));
+              });
+            } else {
+              // If it's a direct transaction item
+              transactionRows.push(transformOrderItemToTransactionRow(transaction));
+            }
           });
-        });
+        } else if (transactionData && typeof transactionData === 'object') {
+          // If transactionData is an object, check if it has array properties
+          console.log('TransactionData is an object:', transactionData);
+          
+          // Try to find array properties that might contain the actual data
+          const possibleArrays = ['transactions', 'orders', 'data', 'items'];
+          let foundData = false;
+          
+          for (const key of possibleArrays) {
+            if (Array.isArray(transactionData[key])) {
+              console.log(`Found data array in property: ${key}`);
+              transactionData[key].forEach((item: any, index: number) => {
+                console.log(`${key} ${index}:`, item);
+                if (item.order_items) {
+                  // If it's in the old orders format
+                  item.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
+                    console.log(`OrderItem ${itemIndex} in ${key} ${index}:`, orderItem);
+                    transactionRows.push(transformOrderItemToTransactionRow(orderItem));
+                  });
+                } else {
+                  // If it's a direct transaction item
+                  transactionRows.push(transformOrderItemToTransactionRow(item));
+                }
+              });
+              foundData = true;
+              break;
+            }
+          }
+          
+          if (!foundData) {
+            console.warn('No recognizable data array found in response');
+          }
+        } else {
+          console.error('TransactionData is neither an array nor an object:', transactionData);
+        }
         
         // For pagination, we show only the current page data
         setAllTransactionData(transactionRows);
         setFilteredData(transactionRows);
         setCurrentPage(pageNumber);
         
-        // Update total count if available in response
-        if ((response.data as any).pagination) {
+        // Fallback total count if metadata not available
+        if (!metadata?.pagination && (response.data as any).pagination) {
           setTotalCount((response.data as any).pagination.total);
-        } else {
+        } else if (!metadata?.pagination) {
           // Estimate total count based on current data
           setTotalCount(transactionRows.length);
         }
@@ -1220,6 +1764,31 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     fetchTabCount('unsettled');
   }, []);
 
+  // Apply filters function - called when Apply button is clicked
+  const applyFilters = () => {
+    // Copy pending filters to active filters
+    setColumnFilters(pendingColumnFilters);
+    setDateRange(pendingDateRange);
+    
+    // Trigger API call with pending filters (don't wait for state update)
+    const currentRemark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+    fetchOrdersWithFilters(1, currentRemark, pendingColumnFilters, pendingDateRange);
+    // Also refresh tab counts with pending filters
+    fetchTabCountWithFilters('settlement_matched', pendingColumnFilters, pendingDateRange);
+    fetchTabCountWithFilters('unsettled', pendingColumnFilters, pendingDateRange);
+    
+    // Close the filter popover
+    closeFilterPopover();
+  };
+
+  // Only refresh data when rowsPerPage changes (not filters)
+  useEffect(() => {
+    if (allTransactionData.length > 0) { // Only refetch if data has been loaded initially
+      const currentRemark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+      fetchOrders(1, currentRemark);
+    }
+  }, [rowsPerPage]);
+
   // Close filter on outside click with proper event handling
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1243,18 +1812,69 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   }, [headerFilterAnchor]);
 
-  // Fetch only the count for a given remark without altering the table data
-  const fetchTabCount = async (remark: 'settlement_matched' | 'unsettled') => {
+  // Fetch tab count with specific filters (used when applying filters)
+  const fetchTabCountWithFilters = async (
+    remark: 'settlement_matched' | 'unsettled', 
+    filters?: { [key: string]: any }, 
+    dateRangeFilter?: {start: string, end: string}
+  ) => {
     try {
-      const response = await api.orders.getOrders({ page: 1, limit: 1, remark } as any);
+      const queryParams = buildQueryParams(1, remark, filters, dateRangeFilter);
+      queryParams.limit = 1; // Only need metadata, not actual data
+      
+      const response = await api.transactions.getTransactions(queryParams as any);
       let count = 0;
-      if ((response.data as any)?.pagination?.total != null) {
+      
+      // Try to get count from metadata first
+      if ((response.data as any)?.meta?.counts) {
+        const meta = (response.data as any).meta as TransactionMetadata;
+        count = remark === 'settlement_matched' ? meta.counts.settled : meta.counts.unsettled;
+      } else if ((response.data as any)?.pagination?.total != null) {
         count = (response.data as any).pagination.total;
+      } else if (Array.isArray((response.data as any)?.transactions)) {
+        // Fallback to number of transactions if pagination not provided
+        const transactions = (response.data as any).transactions;
+        count = transactions.length;
       } else if (Array.isArray((response.data as any)?.orders)) {
         // Fallback to number of order_items across first order if pagination not provided
         const orders = (response.data as any).orders;
         count = orders.reduce((acc: number, o: any) => acc + (Array.isArray(o?.order_items) ? o.order_items.length : 0), 0);
       }
+      
+      setTabCounts(prev => ({
+        ...prev,
+        [remark === 'settlement_matched' ? 'settled' : 'unsettled']: count,
+      }));
+    } catch (e) {
+      // Ignore count errors
+    }
+  };
+
+  // Fetch only the count for a given remark without altering the table data
+  const fetchTabCount = async (remark: 'settlement_matched' | 'unsettled') => {
+    try {
+      const queryParams = buildQueryParams(1, remark);
+      queryParams.limit = 1; // Only need metadata, not actual data
+      
+      const response = await api.transactions.getTransactions(queryParams as any);
+      let count = 0;
+      
+      // Try to get count from metadata first
+      if ((response.data as any)?.meta?.counts) {
+        const meta = (response.data as any).meta as TransactionMetadata;
+        count = remark === 'settlement_matched' ? meta.counts.settled : meta.counts.unsettled;
+      } else if ((response.data as any)?.pagination?.total != null) {
+        count = (response.data as any).pagination.total;
+      } else if (Array.isArray((response.data as any)?.transactions)) {
+        // Fallback to number of transactions if pagination not provided
+        const transactions = (response.data as any).transactions;
+        count = transactions.length;
+      } else if (Array.isArray((response.data as any)?.orders)) {
+        // Fallback to number of order_items across first order if pagination not provided
+        const orders = (response.data as any).orders;
+        count = orders.reduce((acc: number, o: any) => acc + (Array.isArray(o?.order_items) ? o.order_items.length : 0), 0);
+      }
+      
       setTabCounts(prev => ({
         ...prev,
         [remark === 'settlement_matched' ? 'settled' : 'unsettled']: count,
@@ -1271,7 +1891,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Handle date range change
   const handleDateRangeChange = (field: 'start' | 'end') => (event: React.ChangeEvent<HTMLInputElement>) => {
-    setDateRange(prev => ({
+    setPendingDateRange(prev => ({
       ...prev,
       [field]: event.target.value
     }));
@@ -1279,7 +1899,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Handle string contains filter
   const handleStringFilterChange = (columnKey: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    setColumnFilters(prev => ({
+    setPendingColumnFilters(prev => ({
       ...prev,
       [columnKey]: event.target.value,
     }));
@@ -1288,7 +1908,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Handle number range filter
   const handleNumberRangeChange = (columnKey: string, bound: 'min' | 'max') => (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
-    setColumnFilters(prev => ({
+    setPendingColumnFilters(prev => ({
       ...prev,
       [columnKey]: {
         ...(prev[columnKey] || {}),
@@ -1300,7 +1920,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Handle date range filter
   const handleDateRangeFilterChange = (columnKey: string, bound: 'from' | 'to') => (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
-    setColumnFilters(prev => ({
+    setPendingColumnFilters(prev => ({
       ...prev,
       [columnKey]: {
         ...(prev[columnKey] || {}),
@@ -1312,7 +1932,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Handle enum multi-select filter
   const handleEnumFilterChange = (columnKey: string) => (event: SelectChangeEvent<string[]>) => {
     const value = event.target.value as string[];
-    setColumnFilters(prev => ({
+    setPendingColumnFilters(prev => ({
       ...prev,
       [columnKey]: value,
     }));
@@ -1320,7 +1940,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Clear specific column filter
   const clearColumnFilter = (columnKey: string) => {
-    setColumnFilters(prev => {
+    setPendingColumnFilters(prev => {
       const next = { ...prev };
       delete next[columnKey];
       return next;
@@ -1331,6 +1951,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const openFilterPopover = (columnKey: string, target: HTMLElement) => {
     console.log('openFilterPopover called:', columnKey, target);
     console.log('Setting state - activeFilterColumn:', columnKey, 'headerFilterAnchor:', !!target);
+    
+    // Initialize pending filters with current active filters
+    setPendingColumnFilters(columnFilters);
+    setPendingDateRange(dateRange);
+    
     setActiveFilterColumn(columnKey);
     setHeaderFilterAnchor(target);
     
@@ -1361,29 +1986,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     return false;
   };
 
-  // Dropdown menu handlers for Status column
-  const handleStatusDropdownOpen = (event: React.MouseEvent<HTMLElement>, row: TransactionRow) => {
+  // Transaction details popup handlers for Status column
+  const handleTransactionDetailsOpen = (event: React.MouseEvent<HTMLElement>, row: TransactionRow) => {
     event.preventDefault();
     event.stopPropagation();
-    setStatusDropdownAnchor(event.currentTarget);
-    setSelectedStatusRow(row);
-  };
-
-  const handleStatusDropdownClose = () => {
-    setStatusDropdownAnchor(null);
-    setSelectedStatusRow(null);
-  };
-
-  const handleStatusAction = (action: string) => {
-    if (selectedStatusRow) {
-      console.log(`Action ${action} for row:`, selectedStatusRow);
-      // Here you can implement specific actions like:
-      // - Update status
-      // - Send to backend
-      // - Show confirmation dialog
-      // - etc.
-    }
-    handleStatusDropdownClose();
+    
+    // Debug logging to see what data we're passing to the popup
+    console.log('Opening popup for row:', row);
+    console.log('Row data structure:', Object.keys(row));
+    console.log('Original data in row:', (row as any).originalData);
+    
+    setSelectedTransaction(row);
+    setAnchorEl(event.currentTarget);
   };
 
   // Filter data based on search, date range, and column filters
@@ -1845,7 +2459,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                           <TextField size="small" value={val} onChange={handleStringFilterChange(column)} placeholder={`Filter ${column}`} />
                                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
                                             <Button size="small" onClick={() => clearColumnFilter(column)}>Clear</Button>
-                                            <Button size="small" variant="contained" onClick={closeFilterPopover}>Apply</Button>
+                                            <Button size="small" variant="contained" onClick={applyFilters}>Apply</Button>
                                           </Box>
                                         </Box>
                                       );
@@ -1862,7 +2476,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                           </Box>
                                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
                                             <Button size="small" onClick={() => clearColumnFilter(column)}>Clear</Button>
-                                          <Button size="small" variant="contained" onClick={closeFilterPopover}>Apply</Button>
+                                          <Button size="small" variant="contained" onClick={applyFilters}>Apply</Button>
                                           </Box>
                                         </Box>
                                       );
@@ -1874,12 +2488,74 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                                           <Typography variant="caption" sx={{ color: '#6b7280' }}>Between dates</Typography>
                                           <Box sx={{ display: 'flex', gap: 1 }}>
-                                            <TextField size="small" type="date" value={fromVal} onChange={handleDateRangeFilterChange(column, 'from')} />
-                                            <TextField size="small" type="date" value={toVal} onChange={handleDateRangeFilterChange(column, 'to')} />
+                                                                        <TextField 
+                              size="small" 
+                              type="date" 
+                              value={fromVal} 
+                              onChange={handleDateRangeFilterChange(column, 'from')}
+                              InputLabelProps={{ shrink: true }}
+                              sx={{
+                                '& input[type="date"]::-webkit-datetime-edit-text': {
+                                  color: 'transparent',
+                                },
+                                '& input[type="date"]::-webkit-datetime-edit-month-field': {
+                                  color: 'transparent',
+                                },
+                                '& input[type="date"]::-webkit-datetime-edit-day-field': {
+                                  color: 'transparent',
+                                },
+                                '& input[type="date"]::-webkit-datetime-edit-year-field': {
+                                  color: 'transparent',
+                                },
+                                '& input[type="date"]:valid': {
+                                  '&::-webkit-datetime-edit-text, &::-webkit-datetime-edit-month-field, &::-webkit-datetime-edit-day-field, &::-webkit-datetime-edit-year-field': {
+                                    color: 'inherit',
+                                  }
+                                },
+                                '& input[type="date"]::-webkit-input-placeholder': {
+                                  color: 'transparent',
+                                },
+                                '& input[type="date"]::-moz-placeholder': {
+                                  color: 'transparent',
+                                }
+                              }}
+                            />
+                            <TextField 
+                              size="small" 
+                              type="date" 
+                              value={toVal} 
+                              onChange={handleDateRangeFilterChange(column, 'to')}
+                              InputLabelProps={{ shrink: true }}
+                              sx={{
+                                '& input[type="date"]::-webkit-datetime-edit-text': {
+                                  color: 'transparent',
+                                },
+                                '& input[type="date"]::-webkit-datetime-edit-month-field': {
+                                  color: 'transparent',
+                                },
+                                '& input[type="date"]::-webkit-datetime-edit-day-field': {
+                                  color: 'transparent',
+                                },
+                                '& input[type="date"]::-webkit-datetime-edit-year-field': {
+                                  color: 'transparent',
+                                },
+                                '& input[type="date"]:valid': {
+                                  '&::-webkit-datetime-edit-text, &::-webkit-datetime-edit-month-field, &::-webkit-datetime-edit-day-field, &::-webkit-datetime-edit-year-field': {
+                                    color: 'inherit',
+                                  }
+                                },
+                                '& input[type="date"]::-webkit-input-placeholder': {
+                                  color: 'transparent',
+                                },
+                                '& input[type="date"]::-moz-placeholder': {
+                                  color: 'transparent',
+                                }
+                              }}
+                            />
                                           </Box>
                                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
                                             <Button size="small" onClick={() => clearColumnFilter(column)}>Clear</Button>
-                                            <Button size="small" variant="contained" onClick={closeFilterPopover}>Apply</Button>
+                                            <Button size="small" variant="contained" onClick={applyFilters}>Apply</Button>
                                           </Box>
                                         </Box>
                                       );
@@ -1909,7 +2585,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                           </FormControl>
                                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
                                             <Button size="small" onClick={() => clearColumnFilter(column)}>Clear</Button>
-                                            <Button size="small" variant="contained" onClick={closeFilterPopover}>Apply</Button>
+                                            <Button size="small" variant="contained" onClick={applyFilters}>Apply</Button>
                                           </Box>
                                         </Box>
                                       );
@@ -2037,10 +2713,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         '& .MuiChip-label': { px: 1 },
                                       }}
                                     />
-                                    {/* Dropdown menu button */}
+                                    {/* Transaction details button */}
                                     <IconButton
                                       size="small"
-                                      onClick={(e) => handleStatusDropdownOpen(e, row)}
+                                      onClick={(e) => handleTransactionDetailsOpen(e, row)}
                                       sx={{
                                         p: 0.5,
                                         minWidth: 20,
@@ -2178,7 +2854,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   const meta = (COLUMN_META as any)[activeFilterColumn]?.type || 'string';
                   
                   if (meta === 'string') {
-                    const val = (columnFilters[activeFilterColumn] || '') as string;
+                                            const val = (pendingColumnFilters[activeFilterColumn] || '') as string;
                     return (
                       <>
                         <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Contains</Typography>
@@ -2191,15 +2867,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         />
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, gap: 1 }}>
                           <Button size="small" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, color: '#666', '&:hover': { backgroundColor: '#f5f5f5' } }} onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
-                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={closeFilterPopover}>Apply</Button>
+                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={applyFilters}>Apply</Button>
                         </Box>
                       </>
                     );
                   }
                   
                   if (meta === 'number') {
-                    const minVal = (columnFilters[activeFilterColumn]?.min ?? '') as string;
-                    const maxVal = (columnFilters[activeFilterColumn]?.max ?? '') as string;
+                                            const minVal = (pendingColumnFilters[activeFilterColumn]?.min ?? '') as string;
+                        const maxVal = (pendingColumnFilters[activeFilterColumn]?.max ?? '') as string;
                     return (
                       <>
                         <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Between</Typography>
@@ -2223,15 +2899,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, gap: 1 }}>
                           <Button size="small" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, color: '#666', '&:hover': { backgroundColor: '#f5f5f5' } }} onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
-                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={closeFilterPopover}>Apply</Button>
+                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={applyFilters}>Apply</Button>
                         </Box>
                       </>
                     );
                   }
                   
                   if (meta === 'date') {
-                    const fromVal = (columnFilters[activeFilterColumn]?.from ?? '') as string;
-                    const toVal = (columnFilters[activeFilterColumn]?.to ?? '') as string;
+                                            const fromVal = (pendingColumnFilters[activeFilterColumn]?.from ?? '') as string;
+                        const toVal = (pendingColumnFilters[activeFilterColumn]?.to ?? '') as string;
                     return (
                       <>
                         <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Between dates</Typography>
@@ -2239,23 +2915,73 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           <TextField 
                             size="small" 
                             type="date" 
-                            label="From"
+                            label=""
                             value={fromVal} 
                             onChange={handleDateRangeFilterChange(activeFilterColumn, 'from')}
-                            sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 } }}
+                            sx={{ 
+                              '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 },
+                              '& input[type="date"]::-webkit-datetime-edit-text': {
+                                color: 'transparent',
+                              },
+                              '& input[type="date"]::-webkit-datetime-edit-month-field': {
+                                color: 'transparent',
+                              },
+                              '& input[type="date"]::-webkit-datetime-edit-day-field': {
+                                color: 'transparent',
+                              },
+                              '& input[type="date"]::-webkit-datetime-edit-year-field': {
+                                color: 'transparent',
+                              },
+                              '& input[type="date"]:valid': {
+                                '&::-webkit-datetime-edit-text, &::-webkit-datetime-edit-month-field, &::-webkit-datetime-edit-day-field, &::-webkit-datetime-edit-year-field': {
+                                  color: 'inherit',
+                                }
+                              },
+                              '& input[type="date"]::-webkit-input-placeholder': {
+                                color: 'transparent',
+                              },
+                              '& input[type="date"]::-moz-placeholder': {
+                                color: 'transparent',
+                              }
+                            }}
                           />
                           <TextField 
                             size="small" 
                             type="date" 
-                            label="To"
+                            label=""
                             value={toVal} 
                             onChange={handleDateRangeFilterChange(activeFilterColumn, 'to')}
-                            sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 } }}
+                            sx={{ 
+                              '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 },
+                              '& input[type="date"]::-webkit-datetime-edit-text': {
+                                color: 'transparent',
+                              },
+                              '& input[type="date"]::-webkit-datetime-edit-month-field': {
+                                color: 'transparent',
+                              },
+                              '& input[type="date"]::-webkit-datetime-edit-day-field': {
+                                color: 'transparent',
+                              },
+                              '& input[type="date"]::-webkit-datetime-edit-year-field': {
+                                color: 'transparent',
+                              },
+                              '& input[type="date"]:valid': {
+                                '&::-webkit-datetime-edit-text, &::-webkit-datetime-edit-month-field, &::-webkit-datetime-edit-day-field, &::-webkit-datetime-edit-year-field': {
+                                  color: 'inherit',
+                                }
+                              },
+                              '& input[type="date"]::-webkit-input-placeholder': {
+                                color: 'transparent',
+                              },
+                              '& input[type="date"]::-moz-placeholder': {
+                                color: 'transparent',
+                              }
+                            }}
                           />
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, gap: 1 }}>
                           <Button size="small" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, color: '#666', '&:hover': { backgroundColor: '#f5f5f5' } }} onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
-                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={closeFilterPopover}>Apply</Button>
+                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={applyFilters}>Apply</Button>
                         </Box>
                       </>
                     );
@@ -2263,7 +2989,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   
                   if (meta === 'enum') {
                     const rawOptions = getUniqueValuesForColumn(activeFilterColumn);
-                    const value: string[] = Array.isArray(columnFilters[activeFilterColumn]) ? columnFilters[activeFilterColumn] : [];
+                                            const value: string[] = Array.isArray(pendingColumnFilters[activeFilterColumn]) ? pendingColumnFilters[activeFilterColumn] : [];
                     // For Status, we show both Remark and Event Type distincts, grouped with badges
                     const isStatus = activeFilterColumn === 'Status';
                     const options = isStatus
@@ -2352,7 +3078,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, gap: 1 }}>
                           <Button size="small" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, color: '#666', '&:hover': { backgroundColor: '#f5f5f5' } }} onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
-                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={closeFilterPopover}>Apply</Button>
+                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={applyFilters}>Apply</Button>
                         </Box>
                       </>
                     );

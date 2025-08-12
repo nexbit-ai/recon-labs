@@ -52,10 +52,10 @@ export const API_CONFIG = {
     RECONCILIATION_UPLOAD: '/recon/upload',
     
     // Transactions
-    TRANSACTIONS: '/transactions',
-    TRANSACTION_DETAILS: '/transactions/:id',
-    TRANSACTION_UPDATE: '/transactions/:id',
-    TRANSACTION_DELETE: '/transactions/:id',
+    TRANSACTIONS: '/recon/transactions',
+    TRANSACTION_DETAILS: '/recon/transactions/:id',
+    TRANSACTION_UPDATE: '/recon/transactions/:id',
+    TRANSACTION_DELETE: '/recon/transactions/:id',
     
     // Orders
     ORDERS: '/recon/orders',

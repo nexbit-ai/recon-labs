@@ -236,7 +236,7 @@ export interface OrderItem {
   seller_share_offer: string;
   offer_adjustments: string;
   diff: string;
-  remark: string;
+  status: string;
 }
 
 export interface CommissionBreakdown {

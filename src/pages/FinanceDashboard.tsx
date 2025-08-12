@@ -46,6 +46,8 @@ import {
   Sync as SyncIcon,
   KeyboardArrowDown as KeyboardArrowDownIcon,
   CalendarToday as CalendarTodayIcon,
+  TrendingUp as TrendingUpIcon,
+  AssignmentReturn as AssignmentReturnIcon,
 } from '@mui/icons-material';
 import { Platform } from '../data/mockData';
 import { apiService } from '../services/api/apiService';
@@ -250,20 +252,36 @@ const FinanceDashboard: React.FC = () => {
     return value.toLocaleString('en-IN');
   };
 
+  // Get KPI icon based on title
+  const getKpiIcon = (title: string) => {
+    switch (title) {
+      case 'Total Sales':
+        return <TrendingUpIcon />;
+      case 'Total Orders':
+        return <ShoppingCartIcon />;
+      case 'Average Order Value':
+        return <AttachMoneyIcon />;
+      case 'Returns':
+        return <AssignmentReturnIcon />;
+      default:
+        return <TrendingUpIcon />;
+    }
+  };
+
   // Simple fallback data
   const fallbackKPIs = [
-    { title: 'Total Sales', value: 1250000, change: 15, icon: iconMap.totalRevenue },
-    { title: 'Total Orders', value: 1250, change: 12, icon: iconMap.orders },
-    { title: 'Average Order Value', value: 1000, change: 8, icon: iconMap.aov },
-    { title: 'Returns', value: 125, change: 5, icon: iconMap.returns },
+    { title: 'Total Sales', value: 1250000},
+    { title: 'Total Orders', value: 1250},
+    { title: 'Average Order Value', value: 1000},
+    { title: 'Returns', value: 125},
   ];
 
   // Use API data if available, otherwise use fallback
   const kpis = apiData?.kpis ? [
-    { title: 'Total Sales', value: parseFloat(apiData.kpis.totalSales), change: 15, icon: iconMap.totalRevenue },
-    { title: 'Total Orders', value: apiData.kpis.totalOrders, change: 12, icon: iconMap.orders },
-    { title: 'Average Order Value', value: parseFloat(apiData.kpis.aov), change: 8, icon: iconMap.aov },
-    { title: 'Returns', value: apiData.kpis.returns, change: 5, icon: iconMap.returns },
+    { title: 'Total Sales', value: parseFloat(apiData.kpis.totalSales)},
+    { title: 'Total Orders', value: apiData.kpis.totalOrders},
+    { title: 'Average Order Value', value: parseFloat(apiData.kpis.aov)},
+    { title: 'Returns', value: apiData.kpis.returns},
   ] : fallbackKPIs;
 
   // Chart data
@@ -403,9 +421,25 @@ const FinanceDashboard: React.FC = () => {
           
           {/* Platform selector */}
           <Box>
-            <Typography variant="body2" color="text.secondary" mb={1}>
-              Selected Platforms: {selectedPlatforms.join(', ')}
-            </Typography>
+            <Button
+              variant="outlined"
+              sx={{
+                borderColor: '#e2e8f0',
+                color: '#64748b',
+                textTransform: 'none',
+                borderRadius: '8px',
+                px: 2,
+                py: 1,
+                fontSize: '0.875rem',
+                '&:hover': {
+                  borderColor: '#0ea5e9',
+                  color: '#0ea5e9',
+                  backgroundColor: 'rgba(14, 165, 233, 0.04)',
+                },
+              }}
+            >
+              Platform: Flipkart
+            </Button>
           </Box>
         </Box>
 
@@ -419,18 +453,18 @@ const FinanceDashboard: React.FC = () => {
               transition={{ duration: 0.25 }}
             >
             {/* KPI Cards */}
-            <Grid container spacing={3} mb={3}>
-              {kpis.map((kpi, index) => (
-                <Grid item xs={12} sm={6} md={3} key={index}>
-                  <KPICard
-                    title={kpi.title}
-                    value={kpi.value}
-                    change={kpi.change}
-                    icon={kpi.icon}
-                  />
-                </Grid>
-              ))}
-            </Grid>
+            <Box sx={{ mb: 4 }}>
+              <Grid container spacing={3}>
+                {kpis.map((kpi, index) => (
+                  <Grid item xs={12} sm={6} md={3} key={index}>
+                    <KPICard
+                      title={kpi.title}
+                      value={kpi.value}
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
 
             {/* Sales Over Time Chart */}
             <Paper sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}>
@@ -524,9 +558,16 @@ const FinanceDashboard: React.FC = () => {
               </Box>
             </Paper>
 
-            {/* Revenue Overview Charts */}
-            <Paper sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}>
-              <Typography variant="h6" mb={3}>
+                        {/* Revenue Overview Charts */}
+            <Paper sx={{ 
+              p: 3, 
+              mb: 3, 
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              border: '1px solid #e2e8f0',
+              borderRadius: '16px',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+            }}>
+              <Typography variant="h6" mb={3} sx={{ color: '#0f172a', fontWeight: 600 }}>
                 Revenue Overview
               </Typography>
               <Grid container spacing={3}>
@@ -541,12 +582,12 @@ const FinanceDashboard: React.FC = () => {
                               { 
                                 name: 'Sales Orders', 
                                 value: apiData.kpis.totalOrders - apiData.kpis.returns,
-                                color: '#14B8A6'
+                                color: '#0ea5e9'
                               },
                               { 
                                 name: 'Return Orders', 
                                 value: apiData.kpis.returns,
-                                color: '#EF4444'
+                                color: '#64748b'
                               }
                             ]}
                             cx="50%"
@@ -556,10 +597,17 @@ const FinanceDashboard: React.FC = () => {
                             label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}
                             labelLine={false}
                           >
-                            <Cell fill="#14B8A6" />
-                            <Cell fill="#EF4444" />
+                            <Cell fill="#0ea5e9" />
+                            <Cell fill="#64748b" />
                           </Pie>
-                          <Tooltip formatter={(value: any) => [formatNumber(value), 'Orders']} />
+                          <Tooltip 
+                            formatter={(value: any) => [formatNumber(value), 'Orders']}
+                            contentStyle={{ 
+                              borderRadius: '8px', 
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                              border: '1px solid #e2e8f0'
+                            }}
+                          />
                         </PieChart>
                       </ResponsiveContainer>
                     ) : (
@@ -583,29 +631,33 @@ const FinanceDashboard: React.FC = () => {
                         >
                           <XAxis 
                             dataKey="name" 
-                            tick={{ fontSize: 11, fill: '#888' }}
+                            tick={{ fontSize: 11, fill: '#64748b' }}
                             tickFormatter={(value) => value.length > 15 ? value.substring(0, 15) + '...' : value}
                             angle={-45}
                             textAnchor="end"
                             height={80}
                           />
                           <YAxis 
-                            tick={{ fontSize: 11, fill: '#888' }}
+                            tick={{ fontSize: 11, fill: '#64748b' }}
                             tickFormatter={(value) => formatNumber(value)}
                             axisLine={false}
                             tickLine={false}
                           />
                           <Tooltip 
                             formatter={(value: any) => [formatNumber(value), 'Units Sold']}
-                            labelStyle={{ color: '#333' }}
+                            contentStyle={{ 
+                              borderRadius: '8px', 
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                              border: '1px solid #e2e8f0'
+                            }}
                           />
                           <Bar 
                             dataKey="unitsSold" 
-                            fill="#10B981"
+                            fill="#0ea5e9"
                             radius={[4, 4, 0, 0]}
                           >
                             {topProducts.slice(0, 5).map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'][index]} />
+                              <Cell key={`cell-${index}`} fill={['#0ea5e9', '#64748b', '#94a3b8', '#cbd5e1', '#e2e8f0'][index]} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -659,7 +711,12 @@ const FinanceDashboard: React.FC = () => {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
             >
+            {/* KPI Cards moved to Overview tab */}
+
             <Paper sx={{ p: 3, bgcolor: 'background.paper' }}>
+              <Typography variant="h5" sx={{ mb: 3, color: '#0f172a', fontWeight: 600 }}>
+                Product Performance
+              </Typography>
               <Typography variant="h6" mb={2}>
                 Top SKUs
               </Typography>
