@@ -10,7 +10,6 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Checklist from './pages/Checklist';
 import RecentActivities from './pages/RecentActivities';
-import Reconciliation from './pages/Reconciliation';
 import Reports from './pages/Reports';
 import AIWorkflows from './pages/AIWorkflows';
 import AIReconciliation from './pages/AIReconciliation';
@@ -227,7 +226,6 @@ function App() {
             <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
             <Route path="/checklist" element={<Layout><Checklist /></Layout>} />
             <Route path="/recent-activities" element={<Layout><RecentActivities /></Layout>} />
-            <Route path="/reconciliation" element={<Layout><Reconciliation /></Layout>} />
             <Route path="/marketplace-reconciliation" element={<Layout><MarketplaceReconciliation /></Layout>} />
             <Route path="/dispute" element={<Layout><DisputePage /></Layout>} />
             <Route path="/reports" element={<Layout><Reports /></Layout>} />

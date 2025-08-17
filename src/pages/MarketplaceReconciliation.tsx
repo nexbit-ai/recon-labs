@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -48,6 +48,7 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   Menu,
+  TextField,
 } from '@mui/material';
 import {
   PieChart,
@@ -120,6 +121,314 @@ const MarketplaceReconciliation: React.FC = () => {
   
   // Month selector menu state
   const [monthMenuAnchorEl, setMonthMenuAnchorEl] = useState<null | HTMLElement>(null);
+  
+  // Date range filter state
+  const [selectedDateRange, setSelectedDateRange] = useState('this-month');
+  const [dateRangeMenuAnchor, setDateRangeMenuAnchor] = useState<null | HTMLElement>(null);
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+
+  // Calendar popup state
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
+  const [tempStartDate, setTempStartDate] = useState<string>('');
+  const [tempEndDate, setTempEndDate] = useState<string>('');
+  const calendarPopupRef = useRef<HTMLDivElement>(null);
+
+  // Date range options
+  const dateRangeOptions = [
+    { value: 'today', label: 'Today', dates: 'Today' },
+    { value: 'this-week', label: 'This week', dates: 'This week' },
+    { value: 'this-month', label: 'This month', dates: 'This month' },
+    { value: 'this-year', label: 'This year', dates: 'This year' },
+    { value: 'custom', label: 'Custom date range', dates: 'Custom' }
+  ];
+
+  // Get current date range display text
+  const getCurrentDateRangeText = () => {
+    if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
+      return `${customStartDate} to ${customEndDate}`;
+    }
+    
+    const today = new Date();
+    let startDate, endDate;
+    
+    if (selectedDateRange === 'today') {
+      startDate = endDate = today.toISOString().split('T')[0];
+    } else if (selectedDateRange === 'this-week') {
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay());
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      startDate = startOfWeek.toISOString().split('T')[0];
+      endDate = endOfWeek.toISOString().split('T')[0];
+    } else if (selectedDateRange === 'this-month') {
+      startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      endDate = endOfMonth.toISOString().split('T')[0];
+    } else if (selectedDateRange === 'this-year') {
+      startDate = `${today.getFullYear()}-01-01`;
+      endDate = `${today.getFullYear()}-12-31`;
+    }
+    
+    return startDate && endDate ? `${startDate} to ${endDate}` : 'Select date';
+  };
+
+  // Handle date range selection
+  const handleDateRangeSelect = (value: string) => {
+    console.log('handleDateRangeSelect called with:', value);
+    setSelectedDateRange(value);
+    if (value !== 'custom') {
+      // Fetch data based on the selected date range
+      fetchReconciliationDataByDateRange(value);
+      setDateRangeMenuAnchor(null);
+    } else {
+      console.log('Setting showCustomDatePicker to true');
+      setShowCustomDatePicker(true);
+      setDateRangeMenuAnchor(null);
+    }
+  };
+
+
+
+  // Initialize calendar dates when custom picker opens
+  useEffect(() => {
+    console.log('showCustomDatePicker changed to:', showCustomDatePicker);
+    if (showCustomDatePicker) {
+      // Only set calendar date if it hasn't been set before
+      if (!currentCalendarDate || currentCalendarDate.getTime() === 0) {
+        const today = new Date();
+        setCurrentCalendarDate(today);
+        if (!customStartDate) {
+          setCustomStartDate(today.toISOString().split('T')[0]);
+        }
+      } else if (!customStartDate) {
+        // If calendar date is already set but no custom start date, set it
+        const today = new Date();
+        setCustomStartDate(today.toISOString().split('T')[0]);
+      }
+    }
+  }, [showCustomDatePicker, customStartDate, currentCalendarDate]);
+
+  // Handle click outside calendar popup
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (calendarPopupRef.current && !calendarPopupRef.current.contains(event.target as Node)) {
+        setShowCustomDatePicker(false);
+      }
+    };
+
+    if (showCustomDatePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCustomDatePicker]);
+
+  // Calendar helper functions
+  const currentCalendarMonth = currentCalendarDate.toLocaleDateString('en-US', { 
+    month: 'long', 
+    year: 'numeric' 
+  });
+
+  const handleCalendarMonthChange = (direction: number) => {
+    setCurrentCalendarDate(new Date(
+      currentCalendarDate.getFullYear(),
+      currentCalendarDate.getMonth() + direction,
+      1
+    ));
+  };
+
+  // Function to jump to a specific month (useful for selecting dates from different months)
+  const jumpToMonth = (year: number, month: number) => {
+    setCurrentCalendarDate(new Date(year, month, 1));
+  };
+
+  // Helper function to calculate the actual date from calendar grid position
+  const getDateFromCalendarPosition = (day: string) => {
+    if (!day) return null;
+    
+    // The day parameter is the actual day number (1-31) from the current month
+    // We need to create the correct date object
+    const year = currentCalendarDate.getFullYear();
+    const month = currentCalendarDate.getMonth();
+    
+    // Create the date for the clicked day in the current month
+    const clickedDate = new Date(year, month, parseInt(day));
+    
+    return clickedDate;
+  };
+
+  const getCalendarDays = () => {
+    const year = currentCalendarDate.getFullYear();
+    const month = currentCalendarDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());
+    
+    const days = [];
+    for (let i = 0; i < 42; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      
+      if (date.getMonth() === month) {
+        days.push(date.getDate().toString());
+      } else {
+        days.push('');
+      }
+    }
+    return days;
+  };
+
+  const handleCalendarDateClick = (day: string) => {
+    if (!day) return;
+    
+    const clickedDate = getDateFromCalendarPosition(day);
+    if (!clickedDate) return;
+    
+    // Use toLocaleDateString to avoid timezone issues with toISOString
+    const dateString = clickedDate.toLocaleDateString('en-CA'); // Returns YYYY-MM-DD format
+    
+    console.log('Calendar date clicked:', { 
+      day, 
+      dateString, 
+      tempStartDate, 
+      tempEndDate, 
+      clickedDate,
+      currentCalendarDate: currentCalendarDate.toISOString(),
+      clickedDateMonth: clickedDate.getMonth(),
+      clickedDateDate: clickedDate.getDate(),
+      clickedDateYear: clickedDate.getFullYear()
+    });
+    
+    if (!tempStartDate || (tempStartDate && tempEndDate)) {
+      // Start new selection
+      setTempStartDate(dateString);
+      setTempEndDate('');
+      setCustomStartDate(dateString);
+      setCustomEndDate('');
+      console.log('Started new selection with:', dateString);
+    } else {
+      // Complete selection
+      if (new Date(dateString) < new Date(tempStartDate)) {
+        setTempEndDate(tempStartDate);
+        setTempStartDate(dateString);
+        setCustomStartDate(dateString);
+        setCustomEndDate(tempStartDate);
+        console.log('Completed selection (reversed):', { start: dateString, end: tempStartDate });
+        
+        // Auto-call API when selection is completed
+        fetchReconciliationDataByDateRange('custom');
+        setShowCustomDatePicker(false); // Hide popup
+      } else {
+        setTempEndDate(dateString);
+        setCustomEndDate(dateString);
+        console.log('Completed selection:', { start: tempStartDate, end: dateString });
+        
+        // Auto-call API when selection is completed
+        fetchReconciliationDataByDateRange('custom');
+        setShowCustomDatePicker(false); // Hide popup
+      }
+    }
+    
+    // Keep the calendar on the same month when selecting dates
+    // Don't change currentCalendarDate here
+  };
+
+  const isDateSelected = (day: string) => {
+    if (!day) return false;
+    const clickedDate = getDateFromCalendarPosition(day);
+    if (!clickedDate) return false;
+    
+    // Use toLocaleDateString to avoid timezone issues with toISOString
+    const dateString = clickedDate.toLocaleDateString('en-CA'); // Returns YYYY-MM-DD format
+    return dateString === customStartDate || dateString === customEndDate;
+  };
+
+  const isDateInRange = (day: string) => {
+    if (!day || !customStartDate || !customEndDate) return false;
+    const clickedDate = getDateFromCalendarPosition(day);
+    if (!clickedDate) return false;
+    
+    // Use toLocaleDateString to avoid timezone issues with toISOString
+    const dateString = clickedDate.toLocaleDateString('en-CA'); // Returns YYYY-MM-DD format
+    const date = new Date(dateString);
+    const start = new Date(customStartDate);
+    const end = new Date(customEndDate);
+    return date >= start && date <= end;
+  };
+
+  // Fetch reconciliation data based on date range
+  const fetchReconciliationDataByDateRange = async (dateRange: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      let startDate: string;
+      let endDate: string;
+      
+      if (dateRange === 'custom') {
+        startDate = customStartDate;
+        endDate = customEndDate;
+        console.log('Custom date range selected:', { customStartDate, customEndDate, startDate, endDate });
+      } else if (dateRange === 'today') {
+        const today = new Date();
+        startDate = today.toISOString().split('T')[0];
+        endDate = today.toISOString().split('T')[0];
+      } else if (dateRange === 'this-week') {
+        const today = new Date();
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        startDate = startOfWeek.toISOString().split('T')[0];
+        endDate = endOfWeek.toISOString().split('T')[0];
+      } else if (dateRange === 'this-month') {
+        const today = new Date();
+        startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        endDate = endOfMonth.toISOString().split('T')[0];
+              } else if (dateRange === 'this-year') {
+          const today = new Date();
+          startDate = `${today.getFullYear()}-01-01`;
+          endDate = `${today.getFullYear()}-12-31`;
+                } else {
+          // Fallback to current month
+          const today = new Date();
+          startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+          const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+          endDate = endOfMonth.toISOString().split('T')[0];
+        }
+      
+      // Call the backend API with date range
+      console.log('API call with dates:', { start_date: startDate, end_date: endDate });
+      const response = await apiService.get('/recon/fetchStats', {
+        start_date: startDate,
+        end_date: endDate
+      });
+      
+      if (response.success && response.data) {
+        setReconciliationData(response.data);
+        setUsingMockData(false);
+      } else {
+        // Fallback to mock data if API fails
+        setReconciliationData(mockReconciliationData);
+        setUsingMockData(true);
+        setError('Failed to fetch data from API, showing sample data');
+      }
+    } catch (err) {
+      console.error('Error fetching reconciliation data:', err);
+      // Fallback to mock data on error
+      setReconciliationData(mockReconciliationData);
+      setUsingMockData(true);
+      setError('Network error, showing sample data');
+    } finally {
+      setLoading(false);
+    }
+  };
   
   // Platform selector state
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['flipkart']);
@@ -323,6 +632,7 @@ const MarketplaceReconciliation: React.FC = () => {
       background: '#fafafa',
       position: 'relative',
       overflow: 'hidden',
+      mt: -4
     }}>
 
       {/* View Detailed Transactions Button */}
@@ -379,22 +689,22 @@ const MarketplaceReconciliation: React.FC = () => {
                 Reconciliation
               </Typography>
               
-              {/* Month Selector */}
+              {/* Date Range Filter */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {loading && (
                   <CircularProgress size={24} sx={{ color: '#1a1a1a' }} />
                 )}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
                 <Button
                   variant="outlined"
                   endIcon={<KeyboardArrowDownIcon />}
                   startIcon={<CalendarTodayIcon />}
-                  onClick={(event) => setMonthMenuAnchorEl(event.currentTarget)}
+                  onClick={(event) => setDateRangeMenuAnchor(event.currentTarget)}
                   sx={{
                     borderColor: '#6B7280',
                     color: '#6B7280',
                     textTransform: 'none',
-                    minWidth: 'auto',
+                    minWidth: 200,
                     minHeight: 36,
                     px: 1.5,
                     fontSize: '0.7875rem',
@@ -404,55 +714,155 @@ const MarketplaceReconciliation: React.FC = () => {
                     },
                   }}
                 >
-                  {availableMonths.find(month => month.value === selectedMonth)?.label || 'Select Month'}
+                  <Box sx={{ textAlign: 'left' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
+                      {getCurrentDateRangeText()}
+                    </Typography>
+                  </Box>
                 </Button>
                 <Menu
-                  anchorEl={monthMenuAnchorEl}
-                  open={Boolean(monthMenuAnchorEl)}
-                  onClose={() => setMonthMenuAnchorEl(null)}
-                  MenuListProps={{
-                    'aria-labelledby': 'month-select-button',
-                  }}
+                  anchorEl={dateRangeMenuAnchor}
+                  open={Boolean(dateRangeMenuAnchor)}
+                  onClose={() => setDateRangeMenuAnchor(null)}
                   PaperProps={{
                     sx: {
                       mt: 1,
-                      minWidth: 280,
-                      maxWidth: 320,
+                      minWidth: 250,
+                      borderRadius: 0.5, // Reduced from 2 to 0.5 for less rounded corners
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      border: '1px solid #e5e7eb'
                     }
                   }}
                 >
-                  {availableMonths.map((month) => (
+                  {dateRangeOptions.map((option) => (
                     <MenuItem
-                      key={month.value}
-                      onClick={() => {
-                        handleMonthChange(month.value);
-                        setMonthMenuAnchorEl(null);
-                      }}
+                      key={option.value}
+                      onClick={() => handleDateRangeSelect(option.value)}
                       sx={{
                         py: 1.5,
                         px: 2,
                         '&:hover': {
-                          backgroundColor: 'rgba(99, 102, 241, 0.08)',
-                        },
+                          backgroundColor: '#f9fafb'
+                        }
                       }}
                     >
-                      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                        <CalendarTodayIcon sx={{ mr: 2, fontSize: 20, color: '#6B7280' }} />
-                        <Typography variant="body2" sx={{ flex: 1 }}>
-                          {month.label}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
+                          {option.label}
                         </Typography>
-                        {selectedMonth === month.value && (
-                          <Chip 
-                            label="Selected" 
-                            size="small" 
-                            color="primary" 
-                            sx={{ ml: 1 }}
-                          />
-                        )}
+                        <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                          {option.dates}
+                        </Typography>
                       </Box>
                     </MenuItem>
                   ))}
                 </Menu>
+
+                {/* Custom Calendar Popup - Appears below date range filter */}
+                {showCustomDatePicker && (
+                  <Box 
+                    ref={calendarPopupRef}
+                    sx={{ 
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      zIndex: 1000,
+                      mt: 1,
+                      bgcolor: 'white',
+                      borderRadius: 2,
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      border: '1px solid #e5e7eb',
+                      p: 1.8, // Reduced from 2 to 1.8 (10% reduction)
+                      minWidth: 270 // Reduced from 300 to 270 (10% reduction)
+                    }}
+                  >
+                    {/* Calendar Header */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between', 
+                      mb: 1.8, // Reduced from 2 to 1.8 (10% reduction)
+                      px: 0.9 // Reduced from 1 to 0.9 (10% reduction)
+                    }}>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleCalendarMonthChange(-1)}
+                        sx={{ color: '#6b7280' }}
+                      >
+                        <KeyboardArrowDownIcon sx={{ transform: 'rotate(90deg)' }} />
+                      </IconButton>
+                      <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f2937', fontSize: '1.0125rem' }}>
+                        {currentCalendarMonth}
+                      </Typography>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleCalendarMonthChange(1)}
+                        sx={{ color: '#6b7280' }}
+                      >
+                        <KeyboardArrowDownIcon sx={{ transform: 'rotate(-90deg)' }} />
+                      </IconButton>
+                    </Box>
+
+                    {/* Days of Week */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.9, mb: 0.9 }}>
+                      {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
+                        <Typography 
+                          key={day} 
+                          variant="caption" 
+                          sx={{ 
+                            textAlign: 'center', 
+                            color: '#6b7280', 
+                            fontWeight: 500,
+                            py: 1
+                          }}
+                        >
+                          {day}
+                        </Typography>
+                      ))}
+                    </Box>
+
+                    {/* Calendar Grid */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.9 }}>
+                      {getCalendarDays().map((day, index) => (
+                        <Box
+                          key={index}
+                          onClick={() => handleCalendarDateClick(day)}
+                          sx={{
+                            aspectRatio: '1',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: day ? 'pointer' : 'default',
+                            borderRadius: 1,
+                            fontSize: '0.7875rem', // Reduced from 0.875rem (10% reduction)
+                            fontWeight: 500,
+                            color: day ? '#1f2937' : 'transparent',
+                            backgroundColor: day ? 'transparent' : 'transparent',
+                            border: day && isDateInRange(day) ? '1px solid #3b82f6' : 'none',
+                            '&:hover': day ? {
+                              backgroundColor: '#f3f4f6'
+                            } : {},
+                            ...(day && isDateSelected(day) && {
+                              color: '#1d4ed8',
+                              fontWeight: 700
+                            }),
+                            ...(day && isDateInRange(day) && !isDateSelected(day) && {
+                              color: '#3b82f6'
+                            })
+                          }}
+                        >
+                          {day}
+                        </Box>
+                      ))}
+                    </Box>
+
+
+
+
+
+
+                  </Box>
+                )}
 
                 {/* Platform Selector */}
                 <Button
@@ -1016,36 +1426,36 @@ const MarketplaceReconciliation: React.FC = () => {
                             name: 'Settled Orders',
                             value: reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number,
                             amount: parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount),
-                            color: '#059669',
+                            color: '#7A5DBF',
                             type: 'settled'
                           },
                           {
                             name: 'Unsettled Orders',
                             value: reconciliationData.summaryData.netSalesAsPerSalesReport.number,
                             amount: parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount),
-                            color: '#F59E0B',
+                            color: '#A79CDB',
                             type: 'unsettled'
                           },
                           {
                             name: 'cancelled Orders',
                             value: reconciliationData.summaryData.returnedOrCancelledOrders.number,
                             amount: parseAmount(reconciliationData.summaryData.returnedOrCancelledOrders.amount),
-                            color: '#EF4444',
+                            color: '#D3C8EC',
                             type: 'returns'
                           }
                         ]}
                         cx="50%"
                         cy="50%"
-                        innerRadius={115}
+                        innerRadius={125}
                         outerRadius={140}
-                        paddingAngle={10}
-                        cornerRadius={8}
+                        paddingAngle={1}
+                        cornerRadius={1}
                         dataKey="value"
                       >
                         {[
-                          { name: 'Settled Orders', value: reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number, color: '#047857' },
-                          { name: 'Unsettled Orders', value: reconciliationData.summaryData.netSalesAsPerSalesReport.number, color: '#F59E0B' },
-                          { name: 'cancelled Returns', value: reconciliationData.summaryData.returnedOrCancelledOrders.number, color: '#EF4444' }
+                          { name: 'Settled Orders', value: reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number, color: '#7A5DBF' },
+                          { name: 'Unsettled Orders', value: reconciliationData.summaryData.netSalesAsPerSalesReport.number, color: '#A79CDB' },
+                          { name: 'cancelled Returns', value: reconciliationData.summaryData.returnedOrCancelledOrders.number, color: '#D3C8EC' }
                         ].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
@@ -1660,6 +2070,8 @@ const MarketplaceReconciliation: React.FC = () => {
         />
         </Box>
       )}
+
+
     </Box>
   );
 };

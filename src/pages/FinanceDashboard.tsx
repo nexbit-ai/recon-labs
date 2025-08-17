@@ -35,6 +35,7 @@ import {
   Cell,
   AreaChart,
   Area,
+  Legend,
 } from 'recharts';
 import KPICard from '../components/KPICard';
 import {
@@ -113,6 +114,47 @@ const mockMarketplaceData: MarketplaceOverviewResponse = {
   ]
 };
 
+// Enhanced mock data for the new sales dashboard
+const enhancedMockData = {
+  // Enhanced KPIs with growth indicators
+  enhancedKPIs: {
+    netRevenue: {
+      value: 3857600,
+      growth: 10,
+      trend: 'up',
+      label: 'Net Revenue'
+    },
+    grossRevenue: {
+      value: 4030000,
+      growth: -8,
+      trend: 'down',
+      label: 'Gross Revenue'
+    },
+    returns: {
+      value: 172399,
+      growth: 10,
+      trend: 'up',
+      label: 'Returns'
+    }
+  },
+  
+  // Monthly data for the 3-line graph (Oct 2024 - Sep 2024)
+  monthlyData: [
+    { month: 'Oct 2024', gross: 1000000, net: 500000, returns: 0 },
+    { month: 'Nov 2024', gross: 1200000, net: 600000, returns: 0 },
+    { month: 'Dec 2024', gross: 4000000, net: 2500000, returns: 800000 },
+    { month: 'Jan 2024', gross: 3000000, net: 2000000, returns: 1200000 },
+    { month: 'Feb 2024', gross: 3500000, net: 2200000, returns: 1200000 },
+    { month: 'Mar 2024', gross: 4200000, net: 3200000, returns: 800000 },
+    { month: 'Apr 2024', gross: 3800000, net: 2800000, returns: 600000 },
+    { month: 'May 2024', gross: 3500000, net: 2200000, returns: 1000000 },
+    { month: 'Jun 2024', gross: 4000000, net: 2800000, returns: 800000 },
+    { month: 'Jul 2024', gross: 4200000, net: 3000000, returns: 600000 },
+    { month: 'Aug 2024', gross: 4400000, net: 3200000, returns: 400000 },
+    { month: 'Sep 2024', gross: 4500000, net: 3000000, returns: 200000 }
+  ]
+};
+
 const iconMap: Record<string, React.ReactNode> = {
   totalRevenue: <AttachMoneyIcon />,
   orders: <ShoppingCartIcon />,
@@ -133,7 +175,7 @@ const FinanceDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['flipkart', 'amazon']);
-  const [apiData, setApiData] = useState<MarketplaceOverviewResponse>(mockMarketplaceData);
+  const [apiData, setApiData] = useState<MarketplaceOverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [apiLoading, setApiLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -162,11 +204,17 @@ const FinanceDashboard: React.FC = () => {
   // Get start and end dates for a given month
   const getMonthDateRange = (monthString: string) => {
     const [year, month] = monthString.split('-').map(Number);
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0);
     
+    // Create dates explicitly
+    const startDate = new Date(year, month - 1, 1); // First day of month
+    const endDate = new Date(year, month, 0);       // Last day of month
+    
+    // Format dates manually to avoid timezone issues
     const formatDate = (date: Date) => {
-      return date.toISOString().split('T')[0];
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     };
     
     return {
@@ -198,24 +246,111 @@ const FinanceDashboard: React.FC = () => {
           retryAttempts: 3
         }
       );
-      
+
       if (response.success && response.data) {
+        console.log("Raw API Response:", response);
         setApiData(response.data);
+        setUsingMockData(false);
+        setLoading(false);
+        setApiLoading(false);
       } else {
-        // API call failed, use mock data
-        setApiData(mockMarketplaceData);
-        setUsingMockData(true);
-        setApiError('Failed to fetch data from API, showing mock data');
+        // API succeeded but no data - wait longer before showing mock
+        console.log("API succeeded but no data received");
+        setApiError('API returned no data, retrying...');
+        
+        // Wait additional time and retry once more
+        setTimeout(async () => {
+          try {
+            const retryResponse = await apiService.get<MarketplaceOverviewResponse>(
+              '/recon/stats/sales',
+              { start_date: startDate, end_date: endDate },
+              {
+                headers: {
+                  'X-API-Key': API_CONFIG.API_KEY,
+                  'X-Org-ID': API_CONFIG.ORG_ID,
+                  'Content-Type': 'application/json'
+                },
+                timeout: 15000,
+                retryAttempts: 1
+              }
+            );
+            
+            if (retryResponse.success && retryResponse.data) {
+              setApiData(retryResponse.data);
+              setUsingMockData(false);
+              setApiError(null);
+            } else {
+              // After retry, still no data - show mock data
+              setApiData(mockMarketplaceData);
+              setUsingMockData(true);
+              setApiError('API returned no data after retry, showing mock data');
+            }
+          } catch (retryErr) {
+            // Retry also failed - show mock data
+            setApiData(mockMarketplaceData);
+            setUsingMockData(true);
+            setApiError('API retry failed, showing mock data');
+          } finally {
+            setLoading(false);
+            setApiLoading(false);
+          }
+        }, 5000); // Wait 5 seconds before retry
+        
+        return; // Don't set loading to false yet, wait for retry
       }
     } catch (err) {
       console.error('Error fetching marketplace data:', err);
-      // API call failed, use mock data
-      setApiData(mockMarketplaceData);
-      setUsingMockData(true);
-      setApiError('Network error, showing mock data for demonstration');
-    } finally {
-      setLoading(false);
-      setApiLoading(false);
+      
+      // On first load, wait longer before showing mock data
+      if (!apiData) {
+        setApiError('API request failed, retrying in 10 seconds...');
+        
+        setTimeout(async () => {
+          try {
+            const retryResponse = await apiService.get<MarketplaceOverviewResponse>(
+              '/recon/stats/sales',
+              { start_date: startDate, end_date: endDate },
+              {
+                headers: {
+                  'X-API-Key': API_CONFIG.API_KEY,
+                  'X-Org-ID': API_CONFIG.ORG_ID,
+                  'Content-Type': 'application/json'
+                },
+                timeout: 20000,
+                retryAttempts: 2
+              }
+            );
+            
+            if (retryResponse.success && retryResponse.data) {
+              setApiData(retryResponse.data);
+              setUsingMockData(false);
+              setApiError(null);
+            } else {
+              // After retry, still no data - show mock data
+              setApiData(mockMarketplaceData);
+              setUsingMockData(true);
+              setApiError('API failed after retry, showing mock data');
+            }
+          } catch (retryErr) {
+            // Retry also failed - show mock data
+            setApiData(mockMarketplaceData);
+            setUsingMockData(true);
+            setApiError('API retry failed, showing mock data');
+          } finally {
+            setLoading(false);
+            setApiLoading(false);
+          }
+        }, 10000); // Wait 10 seconds before retry
+        
+        return; // Don't set loading to false yet, wait for retry
+      } else {
+        // Not first load, show mock data immediately
+        setApiData(mockMarketplaceData);
+        setUsingMockData(true);
+        setApiError('Network error, showing mock data for demonstration');
+        setLoading(false);
+        setApiLoading(false);
+      }
     }
   };
 
@@ -293,7 +428,7 @@ const FinanceDashboard: React.FC = () => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-      <Box sx={{ p: 4, minHeight: '100vh' }}>
+      <Box sx={{ p: 4, minHeight: '100vh', mt: -2 }}>
         {/* Alerts */}
         {apiError && (
           <Alert severity="warning" sx={{ mb: 2 }}>
@@ -466,99 +601,216 @@ const FinanceDashboard: React.FC = () => {
               </Grid>
             </Box>
 
-            {/* Sales Over Time Chart */}
-            <Paper sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}>
-              <Typography variant="h6" mb={2}>
-                Sales Over Time
+            {/* Enhanced Sales Dashboard with 3-Line Graph and KPI Cards */}
+            <Paper sx={{ 
+              p: 3, 
+              mb: 3, 
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              border: '1px solid #e2e8f0',
+              borderRadius: '16px',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+            }}>
+              <Typography variant="h6" mb={3} sx={{ color: '#1f2937', fontWeight: 600 }}>
+                Enhanced Sales Dashboard
               </Typography>
-              <Box sx={{ height: 300 }}>
-                {salesChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={salesChartData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#14B8A6" stopOpacity={0.6} />
-                          <stop offset="100%" stopColor="#14B8A6" stopOpacity={0.1} />
-                        </linearGradient>
-                      </defs>
-                      <XAxis 
-                        dataKey="date" 
-                        tick={{ fontSize: 12, fill: '#888' }}
-                        tickFormatter={(value) => {
-                          const d = new Date(value);
-                          return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              
+              {/* Enhanced KPI Cards */}
+              <Box sx={{ mb: 4 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  gap: 1.5, 
+                  justifyContent: 'flex-start',
+                  alignItems: 'stretch',
+                  maxWidth: 'fit-content'
+                }}>
+                  {Object.entries(enhancedMockData.enhancedKPIs).map(([key, kpi]) => (
+                    <Paper 
+                      key={key}
+                      sx={{ 
+                        flex: '0 0 auto',
+                        width: 140,
+                        p: 2, 
+                        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                        borderRadius: '14px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        textAlign: 'center',
+                        minHeight: 70
+                      }}
+                    >
+                      {/* KPI Content */}
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          color: '#6b7280', 
+                          fontWeight: 500, 
+                          mb: 0.5,
+                          fontSize: '0.75rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.3px'
                         }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 12, fill: '#888' }}
-                        tickFormatter={(value) => formatCurrency(value)}
-                        axisLine={false}
-                        tickLine={false}
-                        width={60}
-                      />
-                      <Tooltip formatter={(value: any) => [formatCurrency(value), 'Sales']} labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} contentStyle={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }} />
-                      <Area type="monotone" dataKey="value" stroke="#14B8A6" strokeWidth={2} fill="url(#colorSales)" dot={false} activeDot={{ r: 4 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      No sales data available
-                    </Typography>
-                  </Box>
-                )}
+                      >
+                        {kpi.label}
+                      </Typography>
+                      
+                      <Typography 
+                        variant="h6" 
+                        sx={{ 
+                          color: key === 'grossRevenue' ? '#a79cdb' : 
+                                 key === 'netRevenue' ? '#F59E0B ' : '#1f2937',
+                          fontWeight: 700,
+                          fontSize: '1.125rem',
+                          lineHeight: 1.2,
+                          mb: 0.5
+                        }}
+                      >
+                        ₹{(kpi.value / 100000).toFixed(1)}L
+                      </Typography>
+                      
+                    </Paper>
+                  ))}
+                </Box>
+                
+                {/* Tax note */}
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    color: '#6b7280', 
+                    fontStyle: 'italic',
+                    mt: 1.5,
+                    display: 'block',
+                    fontSize: '0.625rem'
+                  }}
+                >
+                  * Amount represented are exclusive of taxes
+                </Typography>
+              </Box>
+              
+              {/* Enhanced 3-Line Graph */}
+              <Box sx={{ height: 400 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={enhancedMockData.monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                    
+                    <XAxis 
+                      dataKey="month" 
+                      tick={{ fontSize: 12, fill: '#6b7280' }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    
+                    <YAxis 
+                      tick={{ fontSize: 12, fill: '#6b7280' }}
+                      axisLine={false}
+                      tickLine={false}
+                      label={{ 
+                        value: 'In Lakhs', 
+                        angle: -90, 
+                        position: 'insideLeft',
+                        style: { textAnchor: 'middle', fill: '#6b7280' }
+                      }}
+                      tickFormatter={(value) => `${(value / 100000).toFixed(0)}L`}
+                    />
+                    
+                    <Tooltip 
+                      formatter={(value: any, name: string) => [
+                        `₹${(value / 100000).toFixed(1)}L`, 
+                        name === 'gross' ? 'Gross Revenue' : 
+                        name === 'net' ? 'Net Revenue' : 'Returns'
+                      ]}
+                      contentStyle={{ 
+                        borderRadius: 8, 
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                        border: '1px solid #e5e7eb'
+                      }}
+                    />
+                    
+                    
+                    {/* Gross Revenue Line (Purple) */}
+                    <Line 
+                      type="monotone" 
+                      dataKey="gross" 
+                      stroke="#a79cdb" 
+                      strokeWidth={3} 
+                      dot={false}
+                      activeDot={{ r: 6, stroke: '#a79cdb', strokeWidth: 2, fill: '#a79cdb' }}
+                      name="gross"
+                    />
+                    
+                    {/* Net Revenue Line (Green) */}
+                    <Line 
+                      type="monotone" 
+                      dataKey="net" 
+                      stroke="#F59E0B" 
+                      strokeWidth={3} 
+                      dot={false}
+                      activeDot={{ r: 6, stroke: '#F59E0B', strokeWidth: 2, fill: '#F59E0B' }}
+                      name="net"
+                    />
+                    
+                    {/* Returns Line (Black) */}
+                    <Line 
+                      type="monotone" 
+                      dataKey="returns" 
+                      stroke="#1f2937" 
+                      strokeWidth={3} 
+                      dot={false}
+                      activeDot={{ r: 6, stroke: '#1f2937', strokeWidth: 2, fill: '#1f2937' }}
+                      name="returns"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Box>
+              
+              {/* Graph Labels Below */}
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                gap: 4, 
+                mt: 2,
+                flexWrap: 'wrap'
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ 
+                    width: 16, 
+                    height: 3, 
+                    backgroundColor: '#a79cdb', 
+                    borderRadius: '2px' 
+                  }} />
+                  <Typography variant="body2" sx={{ color: '#a79cdb', fontWeight: 500, fontSize: '0.875rem' }}>
+                    Gross Revenue
+                  </Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ 
+                    width: 16, 
+                    height: 3, 
+                    backgroundColor: '#F59E0B', 
+                    borderRadius: '2px' 
+                  }} />
+                  <Typography variant="body2" sx={{ color: '#F59E0B', fontWeight: 500, fontSize: '0.875rem' }}>
+                    Net Revenue
+                  </Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ 
+                    width: 16, 
+                    height: 3, 
+                    backgroundColor: '#1f2937', 
+                    borderRadius: '2px' 
+                  }} />
+                  <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.875rem' }}>
+                    Returns
+                  </Typography>
+                </Box>
               </Box>
             </Paper>
 
-            {/* Shipping Over Time Chart */}
-            <Paper sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}>
-              <Typography variant="h6" mb={2}>
-                Shipping Over Time
-              </Typography>
-              <Box sx={{ height: 300 }}>
-                {shippingChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={shippingChartData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorShipping" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#F59E0B" stopOpacity={0.6} />
-                          <stop offset="100%" stopColor="#F59E0B" stopOpacity={0.1} />
-                        </linearGradient>
-                      </defs>
-                      <XAxis 
-                        dataKey="date" 
-                        tick={{ fontSize: 12, fill: '#888' }}
-                        tickFormatter={(value) => {
-                          const d = new Date(value);
-                          return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                        }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 12, fill: '#888' }}
-                        tickFormatter={(value) => formatNumber(value)}
-                        axisLine={false}
-                        tickLine={false}
-                        width={60}
-                      />
-                      <Tooltip formatter={(value: any) => [formatNumber(value), 'Shipping']} labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} contentStyle={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }} />
-                      <Area type="monotone" dataKey="value" stroke="#F59E0B" strokeWidth={2} fill="url(#colorShipping)" dot={false} activeDot={{ r: 4 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      No shipping data available
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            </Paper>
-
-                        {/* Revenue Overview Charts */}
+            {/* Revenue Overview Charts */}
             <Paper sx={{ 
               p: 3, 
               mb: 3, 
@@ -582,30 +834,31 @@ const FinanceDashboard: React.FC = () => {
                               { 
                                 name: 'Sales Orders', 
                                 value: apiData.kpis.totalOrders - apiData.kpis.returns,
-                                color: '#0ea5e9'
+                                color: '#a79cdb'
                               },
                               { 
                                 name: 'Return Orders', 
                                 value: apiData.kpis.returns,
-                                color: '#64748b'
+                                color: '#D3C8EC'
                               }
                             ]}
                             cx="50%"
                             cy="50%"
-                            outerRadius={100}
+                            stroke="none" 
+                            innerRadius={100} 
+                            outerRadius={125}
+                            paddingAngle={1}
                             dataKey="value"
                             label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}
                             labelLine={false}
                           >
-                            <Cell fill="#0ea5e9" />
-                            <Cell fill="#64748b" />
+                            <Cell fill="#a79cdb" />
+                            <Cell fill="#D3C8EC" />
                           </Pie>
                           <Tooltip 
                             formatter={(value: any) => [formatNumber(value), 'Orders']}
                             contentStyle={{ 
                               borderRadius: '8px', 
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                              border: '1px solid #e2e8f0'
                             }}
                           />
                         </PieChart>

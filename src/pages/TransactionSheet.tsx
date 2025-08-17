@@ -2392,8 +2392,22 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 maxHeight: 'calc(100vh - 200px)',
                 overflowX: 'auto',
               }}>
-                <Table stickyHeader>
-                  <TableHead>
+                <Table stickyHeader sx={{ 
+                  borderCollapse: 'separate', 
+                  borderSpacing: 0,
+                  '& .MuiTableCell-root': {
+                    border: 'none !important',
+                  },
+                  '& .MuiTableCell-head': {
+                    border: 'none !important',
+                    borderBottom: '0.5px solid #e5e7eb !important',
+                  },
+                  '& .MuiTableCell-body': {
+                    border: 'none !important',
+                    borderBottom: '0.5px solid #e5e7eb !important',
+                  }
+                }}>
+                  <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
                     <TableRow>
                                               {visibleColumns.map((column, index) => (
                           <TableCell
@@ -2402,7 +2416,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             fontWeight: 700,
                             color: '#111827',
                             background: '#f9fafb',
-                            border: '1px solid #e5e7eb',
                             textAlign: 'center',
                             minWidth: 160,
                             transition: 'all 0.3s ease',
@@ -2664,7 +2677,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             <TableCell
                               key={`${row["Order Item ID"]}-${column}-${colIndex}`}
                               sx={{
-                                border: '1px solid #e5e7eb',
                                 background: '#ffffff',
                                 textAlign: 'center',
                                 minWidth: 160,

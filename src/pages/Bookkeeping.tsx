@@ -230,7 +230,7 @@ const Bookkeeping: React.FC = () => {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', background: '#fafafa' }}>
+    <Box sx={{ minHeight: '100vh', background: '#fafafa', mt: -2 }}>
       <Box sx={{ p: { xs: 2, md: 6 } }}>
         {/* Header */}
         <Box sx={{ 
