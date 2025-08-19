@@ -15,7 +15,6 @@ import AIWorkflows from './pages/AIWorkflows';
 import AIReconciliation from './pages/AIReconciliation';
 import Security from './pages/Security';
 import Pricing from './pages/Pricing';
-import FinanceDashboard from './pages/FinanceDashboard';
 import ConnectDataSources from './pages/ConnectDataSources';
 import Assistant from './pages/Assistant';
 import MarketplaceReconciliation from './pages/MarketplaceReconciliation';
@@ -222,14 +221,14 @@ function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             
             {/* Main application routes with Layout */}
-            <Route path="/" element={<Layout><FinanceDashboard /></Layout>} />
+            <Route path="/" element={<Layout><MarketplaceReconciliation /></Layout>} />
             <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
             <Route path="/checklist" element={<Layout><Checklist /></Layout>} />
             <Route path="/recent-activities" element={<Layout><RecentActivities /></Layout>} />
             <Route path="/marketplace-reconciliation" element={<Layout><MarketplaceReconciliation /></Layout>} />
             <Route path="/dispute" element={<Layout><DisputePage /></Layout>} />
             <Route path="/reports" element={<Layout><Reports /></Layout>} />
-            <Route path="/finance-dashboard" element={<Layout><FinanceDashboard /></Layout>} />
+            <Route path="/finance-dashboard" element={<Layout><MarketplaceReconciliation /></Layout>} />
             <Route path="/connect-data-sources" element={<Layout><ConnectDataSources /></Layout>} />
             <Route path="/ai-workflows" element={<Layout><AIWorkflows /></Layout>} />
             <Route path="/assistant" element={<Layout><Assistant /></Layout>} />

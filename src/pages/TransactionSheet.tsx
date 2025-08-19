@@ -37,6 +37,10 @@ import {
   Tab,
   Alert,
   CircularProgress,
+  List,
+  ListItemButton,
+  ListItemText,
+  ListSubheader,
 } from '@mui/material';
 import { api } from '../services/api';
 import { OrdersResponse, OrderItem, MarketplaceReconciliationResponse } from '../services/api/types';
@@ -52,6 +56,7 @@ import {
   ExpandLess as ExpandLessIcon,
   MoreVert as MoreVertIcon,
   Info as InfoIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 
 // Type definitions for transaction data based on actual API response
@@ -1275,9 +1280,10 @@ interface TransactionSheetProps {
   open?: boolean;
   transaction?: any;
   statsData?: MarketplaceReconciliationResponse | null;
+  initialTab?: number;
 }
 
-const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData }) => {
+const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
   // Column filters can be string (contains), number range {min,max}, date range {from,to}, or enum string[]
@@ -1292,14 +1298,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [loading, setLoading] = useState(false);
   const [paginationLoading, setPaginationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionRow | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HTMLElement | null>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
-  const [tabCounts, setTabCounts] = useState<{ settled: number | null; unsettled: number | null }>({ settled: null, unsettled: null });
+  const [tabCounts, setTabCounts] = useState<{ settled: number | null; unsettled: number | null; unreconciled?: number | null }>({ settled: null, unsettled: null, unreconciled: null });
   const [metadata, setMetadata] = useState<TransactionMetadata | null>(null);
   
   // Dropdown menu state for Status column
@@ -1349,6 +1355,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     'Settlement Date': { type: 'date' },
     'Difference': { type: 'number' },
     'Status': { type: 'enum' },
+    'Reason': { type: 'string' },
+    'Action': { type: 'string' },
   };
 
   // Helpers to get enum options from current data
@@ -1443,6 +1451,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     } else if (remarkToUse === 'unsettled') {
       params.status_in = 'unsettled';
       console.log('Setting API parameter: status_in = unsettled (for Unsettled tab)');
+    } else if (remarkToUse === 'unreconciled') {
+      params.status_in = 'unreconciled';
+      console.log('Setting API parameter: status_in = unreconciled (for Unreconciled Orders tab)');
     }
 
     // Only add additional parameters if filters are explicitly applied
@@ -1536,8 +1547,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           
           // Update tab counts from metadata
           setTabCounts({
-            settled: meta.counts.settlement_matched,
-            unsettled: meta.counts.unsettled
+            settled: (meta.counts as any).settlement_matched ?? meta.counts.settled,
+            unsettled: meta.counts.unsettled,
+            unreconciled: (meta.counts as any).unreconciled ?? null,
           });
           
           // Update total count from metadata
@@ -1664,7 +1676,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           // Update tab counts from metadata
           setTabCounts({
             settled: meta.counts.settled,
-            unsettled: meta.counts.unsettled
+            unsettled: meta.counts.unsettled,
+            unreconciled: (meta.counts as any).unreconciled ?? null,
           });
           
           // Update total count from metadata
@@ -1843,7 +1856,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       
       setTabCounts(prev => ({
         ...prev,
-        [remark === 'settlement_matched' ? 'settled' : 'unsettled']: count,
+        [remark === 'settlement_matched' ? 'settled' : remark === 'unsettled' ? 'unsettled' : 'unreconciled']: count,
       }));
     } catch (e) {
       // Ignore count errors
@@ -1851,7 +1864,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   };
 
   // Fetch only the count for a given remark without altering the table data
-  const fetchTabCount = async (remark: 'settlement_matched' | 'unsettled') => {
+  const fetchTabCount = async (remark: 'settlement_matched' | 'unsettled' | 'unreconciled') => {
     try {
       const queryParams = buildQueryParams(1, remark);
       queryParams.limit = 1; // Only need metadata, not actual data
@@ -1877,7 +1890,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       
       setTabCounts(prev => ({
         ...prev,
-        [remark === 'settlement_matched' ? 'settled' : 'unsettled']: count,
+        [remark === 'settlement_matched' ? 'settled' : remark === 'unsettled' ? 'unsettled' : 'unreconciled']: count,
       }));
     } catch (e) {
       // Ignore count errors
@@ -2086,7 +2099,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleChangePage = (event: unknown, newPage: number) => {
     const newPageNumber = newPage + 1; // Convert from 0-based to 1-based
     setPage(newPage);
-    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+    const remark = activeTab === 0 ? 'settlement_matched' : activeTab === 1 ? 'unsettled' : 'unreconciled';
     fetchOrders(newPageNumber, remark);
   };
 
@@ -2095,7 +2108,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setRowsPerPage(newRowsPerPage);
     setPage(0);
     // Reset to first page when changing rows per page
-    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+    const remark = activeTab === 0 ? 'settlement_matched' : activeTab === 1 ? 'unsettled' : 'unreconciled';
     fetchOrders(1, remark);
   };
 
@@ -2157,7 +2170,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setColumnFilters({});
     setPage(0);
     setCurrentPage(1);
-    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+    const remark = activeTab === 0 ? 'settlement_matched' : activeTab === 1 ? 'unsettled' : 'unreconciled';
     fetchOrders(1, remark);
   };
 
@@ -2169,7 +2182,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setCurrentPage(1); // Reset current page
     
     // Determine the correct remark based on the new tab value
-    const remark = newValue === 0 ? 'settlement_matched' : 'unsettled';
+    const remark = newValue === 0 ? 'settlement_matched' : newValue === 1 ? 'unsettled' : 'unreconciled';
     console.log(`Fetching data for tab ${newValue} with remark: ${remark}`);
     fetchOrders(1, remark); // Fetch first page data with correct remark
   };
@@ -2190,15 +2203,20 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Get visible columns
   const getVisibleColumns = () => {
-    return [
+    const base = [
       "Order Item ID",
       "Order Value",
       "Settlement Value",
       "Order Date",
       "Settlement Date",
       "Difference",
-      "Status"
+      "Status",
     ];
+    // Only show Reason/Action on Unreconciled tab (index 2)
+    if (activeTab === 2) {
+      return [...base, "Reason", "Action"];
+    }
+    return base;
   };
 
   const visibleColumns = getVisibleColumns();
@@ -2275,12 +2293,26 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     >
                       <Tab label={`Settled${tabCounts.settled != null ? ` (${tabCounts.settled})` : ''}`} />
                       <Tab label={`Unsettled${tabCounts.unsettled != null ? ` (${tabCounts.unsettled})` : ''}`} />
+                      <Tab label={`Unreconciled Orders${tabCounts.unreconciled != null ? ` (${tabCounts.unreconciled})` : ''}`} />
                     </Tabs>
+                    
+                  
                   </Box>
                   
-                  <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                    
                     <Button
                       variant="outlined"
+                      startIcon={<FilterIcon />}
+                      onClick={(e) => openFilterPopover('Order Item ID', e.currentTarget as any)}
+                      sx={{ textTransform: 'none', borderColor: '#1f2937', color: '#1f2937' }}
+                    >
+                      Filters
+                    </Button>
+                    
+                    <Button
+                      variant="outlined"
+                      startIcon={<RefreshIcon />}
                       onClick={() => {
                         const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
                         fetchOrders(1, remark);
@@ -2300,9 +2332,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         },
                         transition: 'all 0.3s ease',
                       }}
-                    >
-                      Refresh
-                    </Button>
+                    />
                     <Button
                       variant="contained"
                       startIcon={<ExportIcon />}
@@ -2327,6 +2357,33 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     </Button>
                   </Box>
                 </Box>
+
+                {/* Active filter chips row directly under the header row, aligned under back button */}
+                {!!Object.keys(columnFilters).filter(k => columnFilters[k]).length && (
+                  <Box sx={{ml: 6, display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                    {Object.entries(columnFilters).filter(([_, v]) => !!v).map(([key, val]) => (
+                      <Chip
+                        key={key}
+                        size="small"
+                        label={`${key}: ${typeof val === 'object' ? (Array.isArray(val) ? val.join(',') : Object.values(val).filter(Boolean).join('~')) : val}`}
+                        onDelete={() => {
+                          const next = { ...columnFilters } as any;
+                          delete next[key as any];
+                          setColumnFilters(next);
+                          // Also update pending to reflect removal
+                          setPendingColumnFilters((prev) => {
+                            const p = { ...prev } as any;
+                            delete p[key as any];
+                            return p;
+                          });
+                          // Re-apply after deletion
+                          const remark = activeTab === 0 ? 'settlement_matched' : activeTab === 1 ? 'unsettled' : 'unreconciled';
+                          fetchOrdersWithFilters(1, remark, next, pendingDateRange);
+                        }}
+                      />
+                    ))}
+                  </Box>
+                )}
               </CardContent>
             </Card>
           </Fade>
@@ -2663,7 +2720,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           
                           // Format value based on type
                           let displayValue = value;
-                          if (typeof value === 'number') {
+                          if (column === 'Reason') {
+                            // Default reason to the remark for now
+                            displayValue = (row as any)['Remark'] || value || '-';
+                          } else if (typeof value === 'number') {
                             if (column === 'Order Value' || column === 'Settlement Value' || column === 'Difference') {
                               displayValue = formatCurrency(value);
                             } else {
@@ -2679,7 +2739,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               sx={{
                                 background: '#ffffff',
                                 textAlign: 'center',
-                                minWidth: 160,
+                                minWidth: column === 'Action' ? 220 : 160,
                                 fontWeight: 600,
                                 color: column === 'Status' ? '#111827' : '#111827',
                                 '&:hover': {
@@ -2742,6 +2802,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     >
                                       <MoreVertIcon fontSize="small" />
                                     </IconButton>
+                                  </Box>
+                                ) : column === 'Action' ? (
+                                  <Box sx={{ display: 'flex', gap: 1 }}>
+                                    <Button size="small" variant="outlined" onClick={() => console.log('Reconcile', row["Order Item ID"]) } sx={{ textTransform: 'none', px: 1.5, py: 0.5, borderColor: '#10b981', color: '#065f46', '&:hover': { borderColor: '#059669', background: '#ecfdf5' } }}>Reconcile</Button>
+                                    <Button size="small" variant="outlined" onClick={() => console.log('Raise Dispute', row["Order Item ID"]) } sx={{ textTransform: 'none', px: 1.5, py: 0.5, borderColor: '#ef4444', color: '#991b1b', '&:hover': { borderColor: '#dc2626', background: '#fef2f2' } }}>Raise Dispute</Button>
                                   </Box>
                                 ) : (
                                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -2820,32 +2885,36 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     if (spaceBelow < popupHeight) {
                       return rect.top - popupHeight - 5;
                     }
-                    return rect.bottom + 5;
+                    // Offset 5% lower for better spacing
+                    return rect.bottom + Math.round(window.innerHeight * 0.02);
                   }
                   return 100;
                 })(),
                 left: (() => {
                   if (headerFilterAnchor) {
                     const rect = headerFilterAnchor.getBoundingClientRect();
-                    const popupWidth = 250;
+                    // Match the wider popup; keep a little margin
+                    const popupWidth = 520;
+                    const margin = 10;
                     const spaceRight = window.innerWidth - rect.left;
                     
-                    // If not enough space on right, align to right edge
+                    // If not enough space on right, align to right edge with margin
                     if (spaceRight < popupWidth) {
-                      return Math.max(10, rect.right - popupWidth);
+                      return Math.max(margin, rect.right - popupWidth);
                     }
-                    return rect.left;
+                    // Otherwise clamp within viewport
+                    return Math.max(margin, Math.min(rect.left, window.innerWidth - popupWidth - margin));
                   }
                   return 100;
                 })(),
                 zIndex: 9999,
                 backgroundColor: 'white',
                 border: '1px solid #e0e0e0',
-                borderRadius: '8px',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-                p: 1.5,
-                minWidth: 220,
-                maxWidth: 300,
+                borderRadius: '10px',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+                p: 2,
+                minWidth: 480,
+                maxWidth: 560,
                 animation: 'filterPopupFadeIn 0.15s ease-out',
                 '@keyframes filterPopupFadeIn': {
                   '0%': {
@@ -2860,7 +2929,40 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
+                {/* Left: Full column list */}
+                <Box sx={{ width: 240, maxHeight: 320, overflowY: 'auto', borderRight: '1px solid #eee', pr: 1.5, pl: 0.5 }}>
+                  <List dense subheader={<ListSubheader disableSticky sx={{ bgcolor: 'transparent', px: 0, fontSize: '0.75rem', color: '#6b7280' }}>Columns</ListSubheader>}>
+                    {Object.keys(COLUMN_META).map((col) => (
+                      <ListItemButton
+                        key={col}
+                        selected={activeFilterColumn === col}
+                        onClick={() => setActiveFilterColumn(col)}
+                        sx={{ borderRadius: 0.75, py: 0.75, px: 1 }}
+                      >
+                        <ListItemText primary={col} primaryTypographyProps={{ fontSize: '0.82rem' }} />
+                      </ListItemButton>
+                    ))}
+                  </List>
+                </Box>
+                {/* Right: Controls for selected column */}
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.25, pr: 0.5 }}>
+                {/* Column selector */}
+                <FormControl size="small" sx={{ mb: 1 }}>
+                  <InputLabel id="filter-column-select">Column</InputLabel>
+                  <Select
+                    labelId="filter-column-select"
+                    label="Column"
+                    value={activeFilterColumn || ''}
+                    onChange={(e) => setActiveFilterColumn(String(e.target.value))}
+                    input={<OutlinedInput />}
+                    sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.85rem', height: 38, marginTop: 1 } }}
+                  >
+                    {Object.keys(COLUMN_META).map((col) => (
+                      <MenuItem key={col} value={col}>{col}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
                 {(() => {
                   if (!activeFilterColumn) return null;
                   const meta = (COLUMN_META as any)[activeFilterColumn]?.type || 'string';
@@ -3099,6 +3201,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   return null;
                 })()}
               </Box>
+            </Box>
             </Box>
           </Portal>
         )}

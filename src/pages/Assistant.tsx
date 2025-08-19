@@ -18,6 +18,7 @@ import {
   Menu,
   MenuItem,
 } from '@mui/material';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 import {
   Send as SendIcon,
   History as HistoryIcon,
@@ -28,6 +29,7 @@ import {
   Star as StarIcon,
   Settings as SettingsIcon,
   Add as AddIcon,
+  Menu as MenuIcon,
 } from '@mui/icons-material';
 
 interface Message {
@@ -86,6 +88,7 @@ const Assistant: React.FC = () => {
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // history sidebar collapsed by default
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -230,9 +233,14 @@ const Assistant: React.FC = () => {
           borderBottom: '1px solid #e0e0e0',
         }}
       >
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          Assistant
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <IconButton size="small" onClick={() => setSidebarOpen((v) => !v)} aria-label={sidebarOpen ? 'Collapse history' : 'Expand history'}>
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            Chat
+          </Typography>
+        </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button
             startIcon={<SettingsIcon />}
@@ -270,11 +278,12 @@ const Assistant: React.FC = () => {
         {/* Chat History Bar */}
         <Box
           sx={{
-            width: 320,
-            borderRight: '1px solid #e0e0e0',
+            width: sidebarOpen ? 320 : 0,
+            borderRight: sidebarOpen ? '1px solid #e0e0e0' : 'none',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
+            transition: 'width 0.3s ease',
           }}
         >
           <List sx={{ p: 0, flex: 1, overflow: 'auto' }}>
@@ -350,27 +359,35 @@ const Assistant: React.FC = () => {
             }}
           >
           {!currentSession ? (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                textAlign: 'center',
-              }}
-            >
-              <Box>
-                <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-                  Welcome to AI Assistant
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+              <Box sx={{ width: '100%', maxWidth: 900, px: 2 }}>
+                <Typography variant="h3" sx={{ textAlign: 'center', fontWeight: 800, mb: 4 }}>
+                  What can I help with?
                 </Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                  Ask me anything about finance, accounting, or business processes.
-                </Typography>
-                <Stack direction="row" spacing={1} justifyContent="center">
-                  <Chip label="Reconciliation" variant="outlined" />
-                  <Chip label="Month-end Close" variant="outlined" />
-                  <Chip label="Reports" variant="outlined" />
-                </Stack>
+                <Paper elevation={0} sx={{
+                  mx: 'auto',
+                  p: 2,
+                  borderRadius: 1,
+                  border: '1px solid #e5e7eb',
+                  background: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                }}>
+                  <TextField
+                    fullWidth
+                    placeholder="Ask anything"
+                    value={message}
+                    sx={{ borderRadius: 2 }}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    variant="standard"
+                    InputProps={{ disableUnderline: true, sx: { fontSize: 18 } }}
+                  />
+                  <IconButton color="primary" onClick={handleSendMessage} sx={{color: '#111', '&:hover': { bgcolor: '#000' } }}>
+                    <SendIcon />
+                  </IconButton>
+                </Paper>
               </Box>
             </Box>
           ) : (
@@ -435,38 +452,7 @@ const Assistant: React.FC = () => {
           )}
         </Box>
 
-        {/* Message Input */}
-        <Box sx={{ p: 2, borderTop: '1px solid #e0e0e0' }}>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
-            <TextField
-              fullWidth
-              multiline
-              maxRows={4}
-              placeholder="Ask me anything about finance and accounting..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 3,
-                },
-              }}
-            />
-            <IconButton
-              color="primary"
-              onClick={handleSendMessage}
-              disabled={!message.trim()}
-              sx={{
-                bgcolor: 'primary.main',
-                color: 'white',
-                '&:hover': { bgcolor: 'primary.dark' },
-                '&:disabled': { bgcolor: 'grey.300' },
-              }}
-            >
-              <SendIcon />
-            </IconButton>
-          </Box>
-        </Box>
+      
         </Box>
       </Box>
 

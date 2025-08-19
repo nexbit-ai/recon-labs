@@ -6,19 +6,39 @@ import {
   CardActionArea, 
   Button, 
   Alert, 
-  TextField,
   Chip,
   Grid,
   Paper,
   Divider,
-  Stack
+  Stack,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import { 
   Storefront as StorefrontIcon, 
   CloudUpload as CloudUploadIcon,
   CheckCircle as CheckCircleIcon,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Description as ReportIcon
 } from '@mui/icons-material';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Table from '@mui/material/Table';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import TableCell from '@mui/material/TableCell';
+import TableBody from '@mui/material/TableBody';
+import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import { Search as SearchIcon, Refresh as RefreshIcon, Download as DownloadIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
 import { reconciliationAPI } from '../services/api';
 
 interface DataSource {
@@ -66,6 +86,9 @@ const ConnectDataSources: React.FC = () => {
   const [salesReport, setSalesReport] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [uploadMessage, setUploadMessage] = useState<string>('');
+  const [reportsOpen, setReportsOpen] = useState(false);
+  const [reportType, setReportType] = useState<'all' | 'Sales' | 'Settlement' | 'System'>('all');
+  const [reportQuery, setReportQuery] = useState('');
 
   const toggleSelect = (id: string) => {
     setSelected((prev) =>
@@ -184,29 +207,10 @@ const ConnectDataSources: React.FC = () => {
       px: { xs: 2, md: 4 }
     }}>
       <Box maxWidth="1200px" mx="auto">
-        {/* Header Section */}
-        <Box textAlign="center" mb={6}>
-          <Typography 
-            variant="h3" 
-            fontWeight={700} 
-            mb={2}
-            sx={{ 
-              background: 'linear-gradient(135deg, #1e293b 0%, #475569 100%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              fontSize: { xs: '2rem', md: '2.5rem' }
-            }}
-          >
+        {/* Page Title aligned left like other screens */}
+        <Box mb={3}>
+          <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
             Connect Your Data Sources
-          </Typography>
-          <Typography 
-            variant="h6" 
-            color="text.secondary" 
-            fontWeight={400}
-            sx={{ maxWidth: 600, mx: 'auto' }}
-          >
-            Seamlessly integrate with your existing platforms and upload reports for automated reconciliation
           </Typography>
         </Box>
 
@@ -216,14 +220,10 @@ const ConnectDataSources: React.FC = () => {
           sx={{ 
             p: 4, 
             mb: 4, 
-            borderRadius: 3,
-            background: 'rgba(255, 255, 255, 0.8)',
-            backdropFilter: 'blur(10px)',
             border: '1px solid rgba(255, 255, 255, 0.2)'
           }}
         >
           <Box display="flex" alignItems="center" mb={3}>
-            <CheckCircleIcon sx={{ color: '#10b981', mr: 2, fontSize: 28 }} />
             <Typography variant="h5" fontWeight={600} color="#1e293b">
               Connected Sources
             </Typography>
@@ -234,31 +234,12 @@ const ConnectDataSources: React.FC = () => {
                 <Card
                   sx={{
                     height: '100%',
-                    background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                    border: '2px solid #10b981',
-                    borderRadius: 3,
-                    boxShadow: '0 4px 20px rgba(16, 185, 129, 0.15)',
+                    borderRadius: 1.5,
                     position: 'relative',
                     overflow: 'visible'
                   }}
                 >
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: -8,
-                      right: -8,
-                      background: '#10b981',
-                      borderRadius: '50%',
-                      width: 32,
-                      height: 32,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
-                    }}
-                  >
-                    <CheckCircleIcon sx={{ color: 'white', fontSize: 20 }} />
-                  </Box>
+                  
                   <CardActionArea
                     sx={{
                       height: '100%',
@@ -267,8 +248,9 @@ const ConnectDataSources: React.FC = () => {
                       justifyContent: 'center',
                       alignItems: 'center',
                       p: 4,
-                      cursor: 'default'
+                      cursor: 'pointer'
                     }}
+                    onClick={() => setReportsOpen(true)}
                   >
                     <img 
                       src={ds.logo} 
@@ -331,7 +313,7 @@ const ConnectDataSources: React.FC = () => {
                         ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)'
                         : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
                       border: isSelected ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                      borderRadius: 3,
+                      borderRadius: 1.5,
                       boxShadow: isSelected 
                         ? '0 8px 25px rgba(59, 130, 246, 0.15)'
                         : '0 4px 20px rgba(0, 0, 0, 0.08)',
@@ -520,12 +502,12 @@ const ConnectDataSources: React.FC = () => {
                 disabled={isSubmitDisabled}
                 size="large"
                 sx={{ 
-                  px: 6, 
-                  py: 1.5,
+                  px: 4, 
+                  py: 1.25,
                   background: 'linear-gradient(135deg, #1e293b 0%, #475569 100%)',
-                  borderRadius: 2,
+                  borderRadius: 1.5,
                   fontWeight: 600,
-                  fontSize: '1.1rem',
+                  fontSize: '1rem',
                   '&:hover': {
                     background: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)',
                     transform: 'translateY(-1px)',
@@ -545,6 +527,76 @@ const ConnectDataSources: React.FC = () => {
           </Paper>
         )}
       </Box>
+      {/* Flipkart Reports dialog - enterprise styled */}
+      <Dialog open={reportsOpen} onClose={() => setReportsOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <img src="https://cdn.worldvectorlogo.com/logos/flipkart.svg" alt="Flipkart" style={{ width: 24, height: 24 }} />
+            <Typography variant="h6" fontWeight={700}>Flipkart — Past fetched reports</Typography>
+          </Box>
+          <Box>
+            <Tooltip title="Refresh"><IconButton size="small"><RefreshIcon /></IconButton></Tooltip>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+            <TextField
+              placeholder="Search reports"
+              size="small"
+              value={reportQuery}
+              onChange={(e) => setReportQuery(e.target.value)}
+              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+            />
+            <Select size="small" value={reportType} onChange={(e) => setReportType(e.target.value as any)}>
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="Sales">Sales</MenuItem>
+              <MenuItem value="Settlement">Settlement</MenuItem>
+              <MenuItem value="System">System</MenuItem>
+            </Select>
+          </Box>
+          <Table size="small" sx={{ '& td, & th': { borderBottom: '1px solid #eee' } }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Type</TableCell>
+                <TableCell>Period</TableCell>
+                <TableCell>Fetched at</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {[
+                { id: 1, type: 'Sales', period: 'March 2025', fetchedAt: 'Apr 1, 2025 10:15 AM', status: 'Success'},
+                { id: 2, type: 'Sales', period: 'April 2025', fetchedAt: 'May 1, 2025 10:10 AM', status: 'Success'},
+                { id: 3, type: 'Settlement', period: 'March 2025', fetchedAt: 'Apr 2, 2025 11:40 AM', status: 'Success'},
+                { id: 4, type: 'Settlement', period: 'April 2025', fetchedAt: 'May 2, 2025 11:20 AM', status: 'Success'},
+                { id: 5, type: 'System', period: 'March 2025', fetchedAt: 'Apr 2, 2025 12:10 PM', status: 'Completed: Reconciliation'},
+                { id: 6, type: 'System', period: 'March 2025', fetchedAt: 'Apr 2, 2025 12:15 PM', status: 'Found 1000 unreconciled'},
+              ]
+                .filter(r => (reportType === 'all' || r.type === reportType) && (reportQuery === '' || `${r.type} ${r.period} ${r.status}`.toLowerCase().includes(reportQuery.toLowerCase())))
+                .map((r) => (
+                <TableRow key={r.id} hover>
+                  <TableCell>{r.type}</TableCell>
+                  <TableCell>{r.period}</TableCell>
+                  <TableCell>{r.fetchedAt}</TableCell>
+                  <TableCell>{r.status}</TableCell>
+                  <TableCell align="right">
+                    <Tooltip title="Preview">
+                      <IconButton size="small"><VisibilityIcon fontSize="small" /></IconButton>
+                    </Tooltip>
+                    <Tooltip title="Download">
+                      <IconButton size="small"><DownloadIcon fontSize="small" /></IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReportsOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

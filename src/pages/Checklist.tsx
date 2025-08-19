@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -25,8 +26,21 @@ import {
   ListItemText as MUIListItemText,
   Select,
   FormControl,
+  Input,
+  InputAdornment,
+  Link,
+  ButtonBase,
   MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
+import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
+import Badge from '@mui/material/Badge';
+import Popover from '@mui/material/Popover';
 import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
@@ -38,6 +52,9 @@ import {
   Share as ShareIcon,
   Close as CloseIcon,
   Add as AddIcon,
+  Flag as FlagIcon,
+  TableChart as TableIcon,
+  OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
@@ -152,7 +169,6 @@ const initialComments = [
 ];
 
 const Checklist: React.FC = () => {
-  const [showOverdue, setShowOverdue] = useState(true);
   const [showUpcoming, setShowUpcoming] = useState(true);
   const [search, setSearch] = useState('');
   const [expandedTask, setExpandedTask] = useState<number | null>(null);
@@ -161,10 +177,94 @@ const Checklist: React.FC = () => {
   const [newComment, setNewComment] = useState<{ [taskId: number]: string }>({});
   const [aiPanel, setAIPanel] = useState<{ open: boolean; taskId: number | null; loading: boolean; answer: string[]; prompt: string; generated: boolean }>({ open: false, taskId: null, loading: false, answer: [], prompt: '', generated: false });
 
+  // Task creation modal state
+  type TaskType = 'manual_recon' | 'exception_review' | 'data_validation' | 'custom';
+  const [createOpen, setCreateOpen] = useState(false);
+  const [taskType, setTaskType] = useState<TaskType>('manual_recon');
+  const [taskTitle, setTaskTitle] = useState<string>('');
+  const [period, setPeriod] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`; // YYYY-MM
+  });
+  const [marketplace, setMarketplace] = useState<string>('flipkart');
+  const [amountMin, setAmountMin] = useState<string>('');
+  const [amountMax, setAmountMax] = useState<string>('');
+  const [remark, setRemark] = useState<string>('');
+  const [assignee, setAssignee] = useState<number | ''>('');
+  const [dueDate, setDueDate] = useState<string>('');
+  const [priority, setPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
+  const [instructions, setInstructions] = useState<string>('');
+  const [autoClose, setAutoClose] = useState<boolean>(true);
+  const [customTitle, setCustomTitle] = useState<string>('');
+  const [customDescription, setCustomDescription] = useState<string>('');
+  const [subtasks, setSubtasks] = useState<string[]>([]);
+  const [newSubtask, setNewSubtask] = useState<string>('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [newTag, setNewTag] = useState<string>('');
+  const [fetchingUnreconciled, setFetchingUnreconciled] = useState<boolean>(false);
+  const [unreconciledCount, setUnreconciledCount] = useState<number | null>(null);
+  const [notifAnchor, setNotifAnchor] = useState<HTMLElement | null>(null);
+
+  const navigate = useNavigate();
+
+  const assigneeOptions = useMemo(() => users.map(u => ({ id: u.id, name: u.name })), []);
+
+  const resetCreateForm = () => {
+    setTaskType('manual_recon');
+    setTaskTitle('');
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    setPeriod(`${y}-${m}`);
+    setMarketplace('flipkart');
+    setAmountMin('');
+    setAmountMax('');
+    setRemark('');
+    setAssignee('');
+    setDueDate('');
+    setPriority('medium');
+    setInstructions('');
+    setAutoClose(true);
+    setCustomTitle('');
+    setCustomDescription('');
+    setSubtasks([]);
+    setNewSubtask('');
+    setTags([]);
+    setNewTag('');
+  };
+
+  const handleCreateTasks = () => {
+    // Stub: Replace with API call POST /tasks/bulk
+    console.log('Create tasks payload', {
+      taskType,
+      period,
+      filters: { marketplace, amountMin, amountMax, remark },
+      assignee,
+      dueDate,
+      priority,
+      instructions,
+      autoClose,
+    });
+    // Add a new pending task locally
+    const newTask = {
+      id: Date.now(),
+      title: (taskType === 'custom' ? customTitle : taskTitle) || 'Untitled task',
+      tag: marketplace?.toUpperCase?.().slice(0, 3) || 'GEN',
+      due: dueDate ? new Date(dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'No due',
+      users: assignee ? [users.find((u) => u.id === assignee) || users[0]] : [users[0]],
+      status: 'upcoming',
+    } as any;
+    upcomingTasks.push(newTask);
+    setShowUpcoming(true);
+    setCreateOpen(false);
+    resetCreateForm();
+  };
+
   // For demo, use same tasks for all months
-  const getMonthTasks = (monthIdx: number) => ({ overdue: overdueTasks, upcoming: upcomingTasks });
-  const { overdue: monthOverdue, upcoming: monthUpcoming } = getMonthTasks(selectedMonth);
-  const filteredOverdue = monthOverdue.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()));
+  const getMonthTasks = (monthIdx: number) => ({ upcoming: upcomingTasks });
+  const { upcoming: monthUpcoming } = getMonthTasks(selectedMonth);
   const filteredUpcoming = monthUpcoming.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()));
 
   // Helper for rendering links
@@ -223,45 +323,23 @@ const Checklist: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 1, md: 3 } }}>
-      {/* Progress Bar Section */}
-      <Paper sx={{ mb: 3, p: 3, borderRadius: 3, boxShadow: 'none', border: '1.5px solid #e5e7eb' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Close Month Progress
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            3/15 tasks completed
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box sx={{ flex: 1 }}>
-            <Box sx={{ width: '100%', height: 10, bgcolor: '#f3f3f3', borderRadius: 5, overflow: 'hidden', mb: 1 }}>
-              <Box sx={{ width: '20%', height: '100%', bgcolor: '#22c55e' }} />
-            </Box>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              20% complete
-            </Typography>
-          </Box>
-          <Chip label="In progress" icon={<span style={{ display: 'flex', alignItems: 'center', color: '#f59e42', fontSize: 18, marginRight: 4 }}>⏲️</span>} sx={{ bgcolor: 'rgba(245, 158, 66, 0.08)', color: '#f59e42', fontWeight: 700, fontSize: 15, borderRadius: 2, height: 32 }} />
-        </Box>
-        <Box sx={{ mt: 2, bgcolor: '#fffbe6', borderRadius: 2, p: 1.5, border: '1px solid #ffe58f' }}>
-          <Typography variant="body2" sx={{ color: '#b26a00', fontWeight: 600 }}>
-            Note: You need to complete all pre-lock tasks before you can lock this period.
-          </Typography>
-        </Box>
-      </Paper>
       {/* Title Row and Actions */}
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, mt: 1 }}>
         <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main', mr: 2 }}>
-          Month-end close
+          Checklist
         </Typography>
         <Box sx={{ flex: 1 }} />
+        <IconButton color="inherit" sx={{ mr: 1 }} onClick={(e) => setNotifAnchor(e.currentTarget)}>
+          <Badge color="error" badgeContent={5} overlap="circular">
+            <NotificationsNoneIcon />
+          </Badge>
+        </IconButton>
         <FormControl size="small" sx={{ mr: 2, minWidth: 120 }}>
           <Select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value as number)}
             displayEmpty
-            sx={{ borderRadius: 2 }}
+            sx={{ borderRadius: 2}}
           >
             {monthNames.map((month, index) => (
               <MenuItem key={index} value={index}>
@@ -270,50 +348,62 @@ const Checklist: React.FC = () => {
             ))}
           </Select>
         </FormControl>
-        <Button startIcon={<FilterListIcon />} variant="outlined" sx={{ borderRadius: 2, mr: 2 }}>
-          Filters
-        </Button>
-        <Button startIcon={<ShareIcon />} variant="outlined" sx={{ borderRadius: 2, mr: 2 }}>
-          Share
-        </Button>
-        <Button startIcon={<CloseIcon />} variant="outlined" sx={{ borderRadius: 2 }}>
-          Close period
+        <Button startIcon={<AddIcon />} variant="contained" sx={{ borderRadius: 2 }} onClick={() => setCreateOpen(true)}>
+          Create New Task
         </Button>
       </Box>
+      <Popover
+        open={Boolean(notifAnchor)}
+        anchorEl={notifAnchor}
+        onClose={() => setNotifAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        sx={{ '& .MuiPaper-root': { p: 2, borderRadius: 2 } }}
+      >
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Notifications</Typography>
+        <List dense sx={{ width: 320 }}>
+          {[
+            'Fetched Flipkart March sales data',
+            'Fetched Flipkart April sales data',
+            'Fetched Flipkart March settlement data',
+            'Fetched Flipkart April sales data',
+            'Reconciliation for March orders done',
+            'Found 1000 unreconciled orders',
+          ].map((text, idx) => (
+            <ListItem key={idx} sx={{ px: 0 }}>
+              <ListItemIcon sx={{ minWidth: 28 }}>
+                <RadioButtonUncheckedIcon fontSize="small" color="disabled" />
+              </ListItemIcon>
+              <ListItemText primary={text} />
+            </ListItem>
+          ))}
+        </List>
+      </Popover>
       <Paper sx={{ p: 0, overflow: 'hidden' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1 }}>
-          <TextField
-            placeholder="Search"
-            size="small"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ width: 240, background: '#fff', borderRadius: 2 }}
-          />
-        </Box>
-        <Divider />
-        {/* Overdue Group */}
+        {/* Overdue group removed */}
+        {/* Upcoming Group */}
         <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, bgcolor: '#fafbfc', cursor: 'pointer' }} onClick={() => setShowOverdue((v) => !v)}>
+          <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, bgcolor: '#fafbfc', cursor: 'pointer' }} onClick={() => setShowUpcoming((v) => !v)}>
             <IconButton size="small">
-              {showOverdue ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              {showUpcoming ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             </IconButton>
-            <Typography sx={{ fontWeight: 600 }}>Overdue {filteredOverdue.length}</Typography>
+            <Typography sx={{ fontWeight: 600 }}>Pending {filteredUpcoming.length}</Typography>
           </Box>
-          <Collapse in={showOverdue}>
+          <Collapse in={showUpcoming}>
             <List disablePadding>
-              {filteredOverdue.map((task) => (
+              {filteredUpcoming.map((task) => (
                 <React.Fragment key={task.id}>
                   <ListItem
                     sx={{ pl: 8, pr: 2, py: 1, borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
                     onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
                     secondaryAction={
-                      <IconButton edge="end" size="small" onClick={e => { e.stopPropagation(); setExpandedTask(expandedTask === task.id ? null : task.id); }}>
+                      <IconButton edge="end" size="small" onClick={(e) => { e.stopPropagation(); setExpandedTask(expandedTask === task.id ? null : task.id); }}>
                         {expandedTask === task.id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                       </IconButton>
                     }
                   >
                     <ListItemIcon sx={{ minWidth: 32 }}>
-                      <ErrorOutlineIcon color="warning" />
+                      <RadioButtonUncheckedIcon color="disabled" />
                     </ListItemIcon>
                     <ListItemText primary={task.title} />
                     <Chip label={task.tag} size="small" sx={{ mr: 1, bgcolor: '#f5f5f7', fontWeight: 500 }} />
@@ -408,34 +498,6 @@ const Checklist: React.FC = () => {
             </List>
           </Collapse>
         </Box>
-        {/* Upcoming Group */}
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, bgcolor: '#fafbfc', cursor: 'pointer' }} onClick={() => setShowUpcoming((v) => !v)}>
-            <IconButton size="small">
-              {showUpcoming ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            </IconButton>
-            <Typography sx={{ fontWeight: 600 }}>Upcoming {filteredUpcoming.length}</Typography>
-          </Box>
-          <Collapse in={showUpcoming}>
-            <List disablePadding>
-              {filteredUpcoming.map((task) => (
-                <ListItem key={task.id} sx={{ pl: 8, pr: 2, py: 1, borderBottom: '1px solid #f0f0f0' }}>
-                  <ListItemIcon sx={{ minWidth: 32 }}>
-                    <RadioButtonUncheckedIcon color="disabled" />
-                  </ListItemIcon>
-                  <ListItemText primary={task.title} />
-                  <Chip label={task.tag} size="small" sx={{ mr: 1, bgcolor: '#f5f5f7', fontWeight: 500 }} />
-                  <Chip icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />} label={task.due} size="small" sx={{ mr: 1, bgcolor: '#f5f5f7' }} />
-                  <Stack direction="row" spacing={-1} sx={{ mr: 1 }}>
-                    {task.users.map((user) => (
-                      <Avatar key={user.id} src={user.avatar} sx={{ width: 28, height: 28, border: '2px solid #fff' }} />
-                    ))}
-                  </Stack>
-                </ListItem>
-              ))}
-            </List>
-          </Collapse>
-        </Box>
       </Paper>
       {/* Drawer for AskAI */}
       {currentTask && (
@@ -491,6 +553,171 @@ const Checklist: React.FC = () => {
           </Box>
         </Drawer>
       )}
+
+      {/* Create Task Modal */}
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3, boxShadow: '0 12px 40px rgba(16,24,40,0.12)' } }}>
+        <DialogTitle sx={{ py: 2, px: 3, position: 'sticky', top: 0, zIndex: 2, bgcolor: 'background.paper', borderBottom: '1px solid #eee' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1, whiteSpace: 'nowrap' }}>Create New Task</Typography>
+              <Input
+                placeholder="Add title"
+                value={taskType === 'custom' ? customTitle : taskTitle}
+                onChange={(e) => taskType === 'custom' ? setCustomTitle(e.target.value) : setTaskTitle(e.target.value)}
+                sx={{ flex: 1 }}
+                disableUnderline
+              />
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Button onClick={() => setCreateOpen(false)} color="inherit">Cancel</Button>
+              <Button
+                variant="contained"
+                onClick={handleCreateTasks}
+                disabled={(taskType === 'manual_recon' && (!assignee || !dueDate))}
+              >
+                Save
+              </Button>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 0 }}>
+          {/* Two-column layout inspired by reference */}
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={7}>
+              {/* Task type selector moved into left column to allow sidebar to sit at top */}
+              <Box sx={{ mb: 2, mt: 1 }}>
+                <FormControl  size="small" variant="standard">
+                  <Select value={taskType} onChange={(e) => setTaskType(e.target.value as TaskType)} displayEmpty disableUnderline>
+                    <MenuItem value={'manual_recon'}>Assign Manual Reconciliation</MenuItem>
+                    <MenuItem value={'exception_review'}>Exception Review</MenuItem>
+                    <MenuItem value={'data_validation'}>Data Validation</MenuItem>
+                    <MenuItem value={'custom'}>Custom</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+
+                <TextField label="Description" value={customDescription} onChange={(e) => setCustomDescription(e.target.value)} fullWidth multiline minRows={4} sx={{ mb: 2 }} />
+
+              {taskType === 'manual_recon' && (
+                <Box sx={{ mb: 2 }}>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mt: 1 }}>
+                    <TextField type="month" value={period} onChange={(e) => { setPeriod(e.target.value); setFetchingUnreconciled(true); setUnreconciledCount(null); setTimeout(() => { setFetchingUnreconciled(false); setUnreconciledCount(1000); }, 1200); }} variant="standard" InputLabelProps={{ shrink: true }} />
+                    <FormControl fullWidth variant="standard">
+                      <Select value={marketplace} onChange={(e) => setMarketplace(e.target.value)} displayEmpty disableUnderline>
+                        <MenuItem value="flipkart">Flipkart</MenuItem>
+                        <MenuItem value="amazon">Amazon</MenuItem>
+                        <MenuItem value="website">Website</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
+                  {fetchingUnreconciled && (
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
+                      <CircularProgress size={14} />
+                      <Typography variant="caption" color="text.secondary">Fetching orders...</Typography>
+                    </Stack>
+                  )}
+                  {unreconciledCount !== null && (
+                    <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1.5} sx={{ mt: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>Total {unreconciledCount.toLocaleString()} unreconciled orders found</Typography>
+                      <ButtonBase onClick={() => navigate('/marketplace-reconciliation?openTs=1&tab=unreconciled')} sx={{ borderRadius: 1 }}>
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ p: 1, pr: 1.25, bgcolor: '#F3F4F6', borderRadius: 1, '&:hover': { bgcolor: '#E5E7EB' } }}>
+                          <Box sx={{ width: 28, height: 20, borderRadius: 0.5, bgcolor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e5e7eb' }}>
+                            <TableIcon sx={{ fontSize: 14, color: '#6b7280' }} />
+                          </Box>
+                          <Typography variant="body2" sx={{ color: '#111827', fontWeight: 600 }}>Open in Transaction Sheet</Typography>
+                          <OpenInNewIcon sx={{ fontSize: 16, color: '#6b7280' }} />
+                        </Stack>
+                      </ButtonBase>
+                    </Stack>
+                  )}
+                </Box>
+              )}
+
+              {/* Comment input */}
+              <TextField placeholder="Add a comment" fullWidth multiline minRows={2} />
+              <FormControlLabel sx={{ mt: 1 }} control={<Switch checked={autoClose} onChange={(e) => setAutoClose(e.target.checked)} />} label="Auto-close task on resolution" />
+            
+            </Grid>
+
+            <Grid item xs={12} md={5}>
+              <Box sx={{ p: 1.5, borderRadius: 0, position: 'sticky', top: 0, bgcolor: '#F9FAFB' }}>
+                {/* Created by */}
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                  <Avatar src={users[0].avatar} sx={{ width: 28, height: 28 }} />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Created by</Typography>
+                    <Typography variant="body2">{users[0].name}</Typography>
+                  </Box>
+                </Stack>
+                <Divider sx={{ my: 2, borderColor: '#eee' }} />
+
+                {/* Assignee */}
+                <Typography variant="caption" color="text.secondary">Assignee</Typography>
+                <FormControl fullWidth sx={{ mt: 0.5, mb: 2 }} variant="standard">
+                  <Select value={assignee} onChange={(e) => setAssignee(e.target.value as number | '')} displayEmpty disableUnderline>
+                    <MenuItem value=""><em>Select assignee</em></MenuItem>
+                    {assigneeOptions.map(a => (
+                      <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Divider sx={{ my: 2, borderColor: '#eee' }} />
+
+                {/* Due date */}
+                <Typography variant="caption" color="text.secondary">Due Date</Typography>
+                <TextField
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  fullWidth
+                  variant="standard"
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <CalendarTodayIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{ mt: 0.5, mb: 2 }}
+                />
+                <Divider sx={{ my: 2, borderColor: '#eee' }} />
+
+                {/* Priority */}
+                <Typography variant="caption" color="text.secondary">Set Priority</Typography>
+                <FormControl fullWidth sx={{ mt: 0.5, mb: 2 }} variant="standard">
+                  <Select value={priority} onChange={(e) => setPriority(e.target.value as any)} displayEmpty disableUnderline>
+                    <MenuItem value={'urgent'}><FlagIcon sx={{ mr: 1, color: '#ef4444' }} />Urgent</MenuItem>
+                    <MenuItem value={'high'}><FlagIcon sx={{ mr: 1, color: '#f59e0b' }} />High</MenuItem>
+                    <MenuItem value={'medium'}><FlagIcon sx={{ mr: 1, color: '#3b82f6' }} />Medium</MenuItem>
+                    <MenuItem value={'low'}><FlagIcon sx={{ mr: 1, color: '#10b981' }} />Low</MenuItem>
+                  </Select>
+                </FormControl>
+                <Divider sx={{ my: 2, borderColor: '#eee' }} />
+
+                {/* Tags */}
+                <Typography variant="caption" color="text.secondary">Tags</Typography>
+                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1, my: 1 }}>
+                  {tags.map((t, i) => (
+                    <Chip key={i} label={t} onDelete={() => setTags(tags.filter((_, idx) => idx !== i))} size="small" />
+                  ))}
+                </Stack>
+                <TextField
+                  size="small"
+                  placeholder="Add tag and press Enter"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (newTag.trim()) { setTags([...tags, newTag.trim()]); setNewTag(''); } } }}
+                  fullWidth
+                  variant="standard"
+                  sx={{ mb: 2 }}
+                />
+              </Box>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        
+      </Dialog>
     </Box>
   );
 };

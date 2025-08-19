@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -57,7 +58,35 @@ import {
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
   Legend,
+  LineChart,
+  Line,
+  CartesianGrid,
+  XAxis,
+  YAxis,
 } from 'recharts';
+
+// Enhanced mock data for the new sales dashboard
+const enhancedMockData = {
+  enhancedKPIs: {
+    netRevenue: { value: 3857600, growth: 10, trend: 'up', label: 'Net Revenue' },
+    grossRevenue: { value: 4030000, growth: -8, trend: 'down', label: 'Gross Revenue' },
+    returns: { value: 172399, growth: 10, trend: 'up', label: 'Returns' }
+  },
+  monthlyData: [
+    { month: 'Oct 2024', gross: 1000000, net: 500000, returns: 0 },
+    { month: 'Nov 2024', gross: 1200000, net: 600000, returns: 0 },
+    { month: 'Dec 2024', gross: 4000000, net: 2500000, returns: 800000 },
+    { month: 'Jan 2024', gross: 3000000, net: 2000000, returns: 1200000 },
+    { month: 'Feb 2024', gross: 3500000, net: 2200000, returns: 1200000 },
+    { month: 'Mar 2024', gross: 4200000, net: 3200000, returns: 800000 },
+    { month: 'Apr 2024', gross: 3800000, net: 2800000, returns: 600000 },
+    { month: 'May 2024', gross: 3500000, net: 2200000, returns: 1000000 },
+    { month: 'Jun 2024', gross: 4000000, net: 2800000, returns: 800000 },
+    { month: 'Jul 2024', gross: 4200000, net: 3000000, returns: 600000 },
+    { month: 'Aug 2024', gross: 4400000, net: 3200000, returns: 400000 },
+    { month: 'Sep 2024', gross: 4500000, net: 3000000, returns: 200000 }
+  ]
+};
 import {
   StorefrontOutlined as StorefrontIcon,
   TrendingUp as TrendingUpIcon,
@@ -99,6 +128,9 @@ import { Platform } from '../data/mockData';
 
 const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
+  const [initialTsTab, setInitialTsTab] = useState<number>(0);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
   const [reconciliationData, setReconciliationData] = useState<MarketplaceReconciliationResponse>(mockReconciliationData);
   const [loading, setLoading] = useState(false);
@@ -624,6 +656,16 @@ const MarketplaceReconciliation: React.FC = () => {
   // Load initial data
   useEffect(() => {
     fetchReconciliationData(selectedMonth);
+    const params = new URLSearchParams(location.search);
+    const openTs = params.get('openTs') || params.get('openTransactionSheet');
+    const tabParam = params.get('tab');
+    if (openTs && !showTransactionSheet) {
+      if (tabParam === 'unreconciled') setInitialTsTab(2);
+      else if (tabParam === 'unsettled') setInitialTsTab(1);
+      else setInitialTsTab(0);
+      setShowTransactionSheet(true);
+      navigate('/marketplace-reconciliation', { replace: true });
+    }
   }, []);
 
   return (
@@ -1014,7 +1056,7 @@ const MarketplaceReconciliation: React.FC = () => {
         </Fade>
 
         <Grid container spacing={3} sx={{ mb: 6 }}>
-          <Grid item xs={12} md={7}>
+          <Grid item xs={12}>
             <Card sx={{ 
               background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
               borderRadius: '16px',
@@ -1028,13 +1070,13 @@ const MarketplaceReconciliation: React.FC = () => {
                 transform: 'translateY(-2px)',
               }
             }}>
-              <CardContent sx={{ p: 0, minHeight: 520 }}>
+              <CardContent sx={{ p: 0 }}>
                 {/* Title */}
                 <Box sx={{ 
                   px: 4, 
                   py: 3,
-                  background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
-                  borderBottom: '1px solid #f1f3f4'
+                  background: 'transparent',
+                  borderBottom: 'none'
                 }}>
                   <Typography variant="h6" sx={{ 
                     fontWeight: 600,
@@ -1045,130 +1087,79 @@ const MarketplaceReconciliation: React.FC = () => {
                     Reconciliation Summary
                   </Typography>
                 </Box>
-                <TableContainer sx={{ px: 4, pb: 4 }}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ 
-                          fontWeight: 600, 
-                          background: 'transparent',
-                          color: '#6b7280',
-                          fontSize: '0.875rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          border: 'none',
-                          py: 2
-                        }}>
-                          Buckets
-                        </TableCell>
-                        <TableCell align="right" sx={{ 
-                          fontWeight: 600, 
-                          background: 'transparent',
-                          color: '#6b7280',
-                          fontSize: '0.875rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          border: 'none',
-                          py: 2
-                        }}>
-                          Count
-                        </TableCell>
-                        <TableCell align="right" sx={{ 
-                          fontWeight: 600, 
-                          background: 'transparent',
-                          color: '#6b7280',
-                          fontSize: '0.875rem',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          border: 'none',
-                          py: 2
-                        }}>
-                          Amount
-                        </TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {(() => {
-                        const totalTransactions = (reconciliationData.ordersDelivered?.number || 0) + (reconciliationData.ordersReturned?.number || 0);
-                        const totalTransactionsAmount = parseAmount(reconciliationData.summaryData.totalTransaction.amount);
-                        const totalTransactionsCount = reconciliationData.summaryData.totalTransaction.number;
-                        const netSalesSalesReports = parseAmount(reconciliationData.grossSales);
-                        const netSalesSalesReportsCount = reconciliationData.summaryData.netSalesAsPerSalesReport.number;
-                        const netSalesSalesReportsAmount = parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount);
-                        const netPaymentReceivedAsPerPaymentAmount = parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount);
-                        const netPaymentReceivedAsPerPaymentCount = reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number;
-                        const pendingPaymentCount = reconciliationData.summaryData?.pendingPaymentFromMarketplace?.number || 0;
-                        const pendingPaymentAmount = parseAmount(reconciliationData.summaryData?.pendingPaymentFromMarketplace?.amount || '0');
-                        const reconciledOrdersAmount = parseAmount(reconciliationData.summaryData?.totalReconciled?.amount || '0');
-                        const reconciledOrdersCount = reconciliationData.summaryData?.totalReconciled?.number || 0;
-                        const lessPaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.amount || '0');
-                        const lessPaymentCount = reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.number || 0;
-                        const morePaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.amount || '0');
-                        const morePaymentCount = reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.number || 0;
-                        const totalUnrecAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.amount || '0');
-                        const totalUnrecCount = reconciliationData.summaryData?.totalUnreconciled?.number || 0;
-                        const cancelledOrdersCount = reconciliationData.summaryData.returnedOrCancelledOrders.number;
-                        const cancelledOrdersAmount = parseAmount(reconciliationData.summaryData?.returnedOrCancelledOrders?.amount || '0');
-                        const rows = [
-                          { label: 'Total Transactions', count: totalTransactionsCount, amount: totalTransactionsAmount, highlight: false },
-                          { label: 'Net Sales as per Sales Reports', count: netSalesSalesReportsCount, amount: netSalesSalesReportsAmount, highlight: false },
-                          { label: 'Payment Received as per Payment Report', count: netPaymentReceivedAsPerPaymentCount, amount: netPaymentReceivedAsPerPaymentAmount, highlight: false },
-                          { label: 'Total Unreconciled Amount', count: totalUnrecCount, amount: totalUnrecAmount, highlight: false },
-                          { label: 'Reconciled Orders', count: reconciledOrdersCount, amount: reconciledOrdersAmount, highlight: false },
-                          { label: 'Less Payment Received', count: lessPaymentCount, amount: lessPaymentAmount, highlight: false },
-                          { label: 'More Payment Received', count: morePaymentCount, amount: morePaymentAmount, highlight: false },
-                          { label: 'Pending Payment', count: pendingPaymentCount, amount: pendingPaymentAmount, highlight: false },
-                          { label: 'Cancelled Orders', count: cancelledOrdersCount, amount: cancelledOrdersAmount, highlight: false },
-                        ];
-                        return rows.map((r, idx) => (
-                          <TableRow key={idx} sx={{ 
-                            background: r.highlight ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' : 'transparent',
-                            borderBottom: idx === rows.length - 1 ? 'none' : '1px solid #f3f4f6',
-                            transition: 'all 0.2s ease',
-                            '&:hover': {
-                              backgroundColor: r.highlight ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : '#f9fafb',
-                            }
+                <Box sx={{ px: 4, pb: 2 }}>
+                  {(() => {
+                    const totalTransactions = (reconciliationData.ordersDelivered?.number || 0) + (reconciliationData.ordersReturned?.number || 0);
+                    const totalTransactionsAmount = parseAmount(reconciliationData.summaryData.totalTransaction.amount);
+                    const totalTransactionsCount = reconciliationData.summaryData.totalTransaction.number;
+                    const netSalesSalesReports = parseAmount(reconciliationData.grossSales);
+                    const netSalesSalesReportsCount = reconciliationData.summaryData.netSalesAsPerSalesReport.number;
+                    const netSalesSalesReportsAmount = parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount);
+                    const netPaymentReceivedAsPerPaymentAmount = parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount);
+                    const netPaymentReceivedAsPerPaymentCount = reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number;
+                    const pendingPaymentCount = reconciliationData.summaryData?.pendingPaymentFromMarketplace?.number || 0;
+                    const pendingPaymentAmount = parseAmount(reconciliationData.summaryData?.pendingPaymentFromMarketplace?.amount || '0');
+                    const reconciledOrdersAmount = parseAmount(reconciliationData.summaryData?.totalReconciled?.amount || '0');
+                    const reconciledOrdersCount = reconciliationData.summaryData?.totalReconciled?.number || 0;
+                    const lessPaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.amount || '0');
+                    const lessPaymentCount = reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.number || 0;
+                    const morePaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.amount || '0');
+                    const morePaymentCount = reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.number || 0;
+                    const totalUnrecAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.amount || '0');
+                    const totalUnrecCount = reconciliationData.summaryData?.totalUnreconciled?.number || 0;
+                    const cancelledOrdersCount = reconciliationData.summaryData.returnedOrCancelledOrders.number;
+                    const cancelledOrdersAmount = parseAmount(reconciliationData.summaryData?.returnedOrCancelledOrders?.amount || '0');
+                    const cards = [
+                      { label: 'Total Transactions', count: totalTransactionsCount, amount: totalTransactionsAmount },
+                      { label: 'Net Sales as per Sales Reports', count: netSalesSalesReportsCount, amount: netSalesSalesReportsAmount },
+                      { label: 'Payment Received as per Payment Report', count: netPaymentReceivedAsPerPaymentCount, amount: netPaymentReceivedAsPerPaymentAmount },
+                      { label: 'Total Unreconciled Amount', count: totalUnrecCount, amount: totalUnrecAmount },
+                      { label: 'Reconciled Orders', count: reconciledOrdersCount, amount: reconciledOrdersAmount },
+                      { label: 'Less Payment Received', count: lessPaymentCount, amount: lessPaymentAmount },
+                      // Removed: More Payment Received
+                      { label: 'Pending Payment', count: pendingPaymentCount, amount: pendingPaymentAmount },
+                      { label: 'Cancelled Orders', count: cancelledOrdersCount, amount: cancelledOrdersAmount },
+                    ];
+                    return (
+                      <Box sx={{
+                        display: 'grid',
+                        gap: 2,
+                        gridTemplateColumns: {
+                          xs: 'repeat(1, minmax(220px, 1fr))',
+                          sm: 'repeat(2, minmax(220px, 1fr))',
+                          md: 'repeat(4, minmax(220px, 1fr))',
+                        },
+                      }}>
+                        {cards.map((r, idx) => (
+                          <Box key={idx} sx={{
+                            p: 1.5,
+                            borderRadius: 0,
+                            background: 'transparent',
+                            border: 'none',
+                            boxShadow: 'none',
                           }}>
-                            <TableCell sx={{ 
-                              fontWeight: 500, 
-                              color: r.highlight ? 'white' : '#374151',
-                              border: 'none',
-                              py: 2.5,
-                              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                              fontSize: '0.875rem'
-                            }}>
-                              {r.label}
-                            </TableCell>
-                            <TableCell align="right" sx={{ 
-                              fontWeight: 600, 
-                              color: r.highlight ? 'white' : '#1f2937',
-                              border: 'none',
-                              py: 2.5,
-                              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                              fontSize: '0.875rem'
-                            }}>
-                              {r.count.toLocaleString('en-IN')}
-                            </TableCell>
-                            <TableCell align="right" sx={{ 
-                              fontWeight: 600, 
-                              color: r.highlight ? 'white' : '#1f2937',
-                              border: 'none',
-                              py: 2.5,
-                              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                              fontSize: '0.875rem'
-                            }}>
-                              {formatCurrency(r.amount)}
-                            </TableCell>
-                          </TableRow>
-                        ));
-                      })()}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                            <Box sx={{ mb: 0.5 }}>
+                              <Typography 
+                                variant="caption" 
+                                sx={{ fontWeight: 600, color: '#9ca3af', letterSpacing: '0.02em' }}
+                              >
+                                {r.label}
+                              </Typography>
+                            </Box>
+                            <Typography variant="h3" sx={{ fontWeight: 700, color: '#1f2937', lineHeight: 1.1 }}>
+                              {`₹${Math.round(r.amount).toLocaleString('en-IN')}`}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    );
+                  })()}
+                </Box>
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} md={5}>
+          <Grid item xs={12} md={6}>
+            <Box sx={{ display: 'grid', gap: 2 }}>
             <Card sx={{ 
               mb: 3, 
               background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
@@ -1281,7 +1272,72 @@ const MarketplaceReconciliation: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Reconciliation Status */}
+            {/* Pending payment (new card) */}
+            <Card sx={{ 
+              mb: 3, 
+              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+              borderRadius: '16px',
+              border: '1px solid #f1f3f4',
+              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+                transform: 'translateY(-2px)',
+              }
+            }}>
+              <CardContent sx={{ p: 5 }}>
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 600, 
+                  mb: 4, 
+                  color: '#1f2937', 
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif', 
+                  textAlign: 'center',
+                  letterSpacing: '-0.025em'
+                }}>
+                  Pending payment
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 1 }}>
+                  <Box sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': { transform: 'scale(1.02)' }
+                  }}>
+                    <Typography variant="h2" sx={{
+                      fontWeight: 300,
+                      color: '#0f172a',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontSize: '3rem',
+                      mb: 2,
+                      textAlign: 'center',
+                      lineHeight: 1,
+                      letterSpacing: '-0.02em',
+                    }}>
+                      {formatCurrency(parseAmount(reconciliationData.summaryData?.pendingPaymentFromMarketplace?.amount || '0'))}
+                    </Typography>
+                    <Typography variant="body1" sx={{
+                      color: '#6b7280',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      textAlign: 'center',
+                      fontWeight: 500,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      fontSize: '0.875rem',
+                      opacity: 0.9,
+                    }}>
+                      Awaiting settlement
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+            </Box>
+          </Grid>
+
+          {/* Reconciliation Status */}
+          <Grid item xs={12} md={6}>
             <Card sx={{ 
               background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
               borderRadius: '16px',
@@ -1766,6 +1822,155 @@ const MarketplaceReconciliation: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Enhanced Sales Dashboard with 3-Line Graph and KPI Cards */}
+        <Paper sx={{ 
+          p: 3, 
+          mb: 6, 
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          border: '1px solid #e2e8f0',
+          borderRadius: '16px',
+          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+        }}>
+          <Typography variant="h6" mb={3} sx={{ color: '#1f2937', fontWeight: 600 }}>
+            Enhanced Sales Dashboard
+          </Typography>
+
+          {/* Enhanced KPI Cards */}
+          <Box sx={{ mb: 4 }}>
+            <Box sx={{ 
+              display: 'flex', 
+              gap: 1.5, 
+              justifyContent: 'flex-start',
+              alignItems: 'stretch',
+              maxWidth: 'fit-content'
+            }}>
+              {Object.entries(enhancedMockData.enhancedKPIs).map(([key, kpi]) => (
+                <Paper 
+                  key={key}
+                  sx={{ 
+                    flex: '0 0 auto',
+                    width: 140,
+                    p: 2, 
+                    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                    borderRadius: '14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    minHeight: 70
+                  }}
+                >
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: '#6b7280', 
+                      fontWeight: 500, 
+                      mb: 0.5,
+                      fontSize: '0.75rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.3px'
+                    }}
+                  >
+                    {kpi.label as any}
+                  </Typography>
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      color: key === 'grossRevenue' ? '#a79cdb' : 
+                             key === 'netRevenue' ? '#F59E0B' : '#1f2937',
+                      fontWeight: 700,
+                      fontSize: '1.125rem',
+                      lineHeight: 1.2,
+                      mb: 0.5
+                    }}
+                  >
+                    ₹{((kpi as any).value / 100000).toFixed(1)}L
+                  </Typography>
+                </Paper>
+              ))}
+            </Box>
+            <Typography 
+              variant="caption" 
+              sx={{ 
+                color: '#6b7280', 
+                fontStyle: 'italic',
+                mt: 1.5,
+                display: 'block',
+                fontSize: '0.625rem'
+              }}
+            >
+              * Amount represented are exclusive of taxes
+            </Typography>
+          </Box>
+
+          {/* Enhanced 3-Line Graph */}
+          <Box sx={{ height: 400 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={enhancedMockData.monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis 
+                  dataKey="month" 
+                  tick={{ fontSize: 12, fill: '#6b7280' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis 
+                  tick={{ fontSize: 12, fill: '#6b7280' }}
+                  axisLine={false}
+                  tickLine={false}
+                  label={{ 
+                    value: 'In Lakhs', 
+                    angle: -90, 
+                    position: 'insideLeft',
+                    style: { textAnchor: 'middle', fill: '#6b7280' } as any
+                  }}
+                  tickFormatter={(value: number) => `${(value / 100000).toFixed(0)}L`}
+                />
+                <RechartsTooltip 
+                  formatter={(value: any, name: string) => [
+                    `₹${(Number(value) / 100000).toFixed(1)}L`, 
+                    name === 'gross' ? 'Gross Revenue' : 
+                    name === 'net' ? 'Net Revenue' : 'Returns'
+                  ]}
+                  contentStyle={{ 
+                    borderRadius: 8, 
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    border: '1px solid #e5e7eb'
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="gross" 
+                  stroke="#a79cdb" 
+                  strokeWidth={3} 
+                  dot={false}
+                  activeDot={{ r: 6, stroke: '#a79cdb', strokeWidth: 2, fill: '#a79cdb' }}
+                  name="gross"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="net" 
+                  stroke="#F59E0B" 
+                  strokeWidth={3} 
+                  dot={false}
+                  activeDot={{ r: 6, stroke: '#F59E0B', strokeWidth: 2, fill: '#F59E0B' }}
+                  name="net"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="returns" 
+                  stroke="#1f2937" 
+                  strokeWidth={3} 
+                  dot={false}
+                  activeDot={{ r: 6, stroke: '#1f2937', strokeWidth: 2, fill: '#1f2937' }}
+                  name="returns"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </Box>
+        </Paper>
+
         {/* Tax Breakdown */}
         <Card sx={{ 
           mb: 6,
@@ -2065,9 +2270,10 @@ const MarketplaceReconciliation: React.FC = () => {
           }}
         >
           <TransactionSheet 
-          onBack={() => setShowTransactionSheet(false)} 
-          statsData={reconciliationData}
-        />
+            onBack={() => setShowTransactionSheet(false)} 
+            statsData={reconciliationData}
+            initialTab={initialTsTab}
+          />
         </Box>
       )}
 

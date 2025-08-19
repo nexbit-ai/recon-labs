@@ -231,28 +231,15 @@ const Bookkeeping: React.FC = () => {
 
   return (
     <Box sx={{ minHeight: '100vh', background: '#fafafa', mt: -2 }}>
-      <Box sx={{ p: { xs: 2, md: 6 } }}>
+      <Box sx={{ p: { xs: 1, md: 4 } }}>
         {/* Header */}
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'space-between',
-          mb: 4,
-          background: 'white',
-          borderRadius: '8px',
-          p: 4,
-          border: '1px solid #e0e0e0',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+          p: 2,
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Box sx={{
-              background: '#1a1a1a',
-              borderRadius: '6px',
-              p: 2,
-              mr: 3,
-            }}>
-              <AccountBalanceIcon sx={{ fontSize: 28, color: 'white' }} />
-            </Box>
             <Box>
               <Typography variant="h4" sx={{ 
                 fontWeight: 600, 
@@ -260,13 +247,7 @@ const Bookkeeping: React.FC = () => {
                 mb: 1,
                 fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
               }}>
-                Bookkeeping & ERP Integration
-              </Typography>
-              <Typography variant="body1" sx={{ 
-                color: '#666666',
-                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-              }}>
-                Seamlessly sync your financial data with Zoho Books
+                Accounting
               </Typography>
             </Box>
           </Box>
@@ -290,23 +271,6 @@ const Bookkeeping: React.FC = () => {
             >
               Download Excel Sheet
             </Button>
-            
-            <Button
-              variant="outlined"
-              startIcon={<SettingsIcon />}
-              onClick={() => setShowSettings(true)}
-              sx={{
-                borderRadius: '6px',
-                borderColor: '#1a1a1a',
-                color: '#1a1a1a',
-                textTransform: 'none',
-                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                fontWeight: 500,
-              }}
-            >
-              Settings
-            </Button>
-
             <Button
               variant="contained"
               startIcon={<SyncIcon />}
@@ -356,7 +320,6 @@ const Bookkeeping: React.FC = () => {
             >
               <Tab label="Transactions" icon={<ReceiptIcon />} iconPosition="start" />
               <Tab label="Chart of Accounts" icon={<AccountTreeIcon />} iconPosition="start" />
-              <Tab label="Integration Status" icon={<ApiIcon />} iconPosition="start" />
             </Tabs>
           </Box>
 

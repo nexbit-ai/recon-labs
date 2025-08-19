@@ -34,6 +34,7 @@ import {
   LogoutOutlined as LogoutIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
 } from '@mui/icons-material';
+import { Badge } from '@mui/material';
 // import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
 // @ts-ignore
 import logo from '../assets/logo.png';
@@ -43,12 +44,11 @@ import userPhoto from '../assets/user-photo.jpg';
 const drawerWidth = 240;
 
 const menuItems = [
-  { text: 'Sales', icon: <StorefrontIcon />, path: '/finance-dashboard' },
   { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation' },
   { text: 'Dispute', icon: <ReportProblemIcon />, path: '/dispute' },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping' },
-  { text: 'Month-end close', icon: <ChecklistIcon />, path: '/checklist' },
-  { text: 'Assistant', icon: <ChatIcon />, path: '/assistant' },
+  { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist' },
+  { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -122,7 +122,35 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 {item.icon}
               </ListItemIcon>
               <ListItemText
-                primary={item.text}
+                primary={
+                  item.text === 'Checklist' ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box component="span">Checklist</Box>
+                      <Box sx={{ ml: 1 }}>
+                        <Badge
+                          badgeContent={5}
+                          overlap="rectangular"
+                          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                          sx={{
+                            '& .MuiBadge-badge': {
+                              fontSize: 12,
+                              height: 16,
+                              minWidth: 16,
+                              bgcolor: '#111',
+                              color: '#fff',
+                              borderRadius: 0.2,
+                              top: -2,
+                            },
+                          }}
+                        >
+                          <Box sx={{ width: 12, height: 12 }} />
+                        </Badge>
+                      </Box>
+                    </Box>
+                  ) : (
+                    item.text
+                  )
+                }
                 sx={{
                   color: location.pathname === item.path ? theme.palette.primary.main : 'inherit',
                 }}

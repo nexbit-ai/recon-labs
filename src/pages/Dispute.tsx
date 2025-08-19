@@ -341,11 +341,11 @@ const DisputePage: React.FC = () => {
               )}
               {/* Clear All Filters Button */}
               {Object.keys(columnFilters).length > 0 && (
-                <Button
+              <Button
                   size="small"
-                  variant="outlined"
+                variant="outlined"
                   onClick={() => setColumnFilters({})}
-                  sx={{
+                sx={{
                     fontSize: '0.75rem',
                     py: 0.5,
                     px: 1,
@@ -359,7 +359,7 @@ const DisputePage: React.FC = () => {
                   }}
                 >
                   Clear Filters
-                </Button>
+              </Button>
               )}
               <Button
                 variant="outlined"
