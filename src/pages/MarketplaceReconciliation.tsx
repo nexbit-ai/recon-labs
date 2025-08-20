@@ -119,6 +119,7 @@ import {
   Schedule as ScheduleIcon,
   KeyboardArrowDown as KeyboardArrowDownIcon,
   CalendarToday as CalendarTodayIcon,
+  ArrowRight,
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
 import { apiService } from '../services/api/apiService';
@@ -656,17 +657,30 @@ const MarketplaceReconciliation: React.FC = () => {
   // Load initial data
   useEffect(() => {
     fetchReconciliationData(selectedMonth);
+  }, []);
+
+  // Open Transaction Sheet overlay when query params indicate so
+  useEffect(() => {
     const params = new URLSearchParams(location.search);
     const openTs = params.get('openTs') || params.get('openTransactionSheet');
     const tabParam = params.get('tab');
+
     if (openTs && !showTransactionSheet) {
-      if (tabParam === 'unreconciled') setInitialTsTab(2);
-      else if (tabParam === 'unsettled') setInitialTsTab(1);
-      else setInitialTsTab(0);
+      const normalizedTab = (tabParam || '').toLowerCase().trim();
+      if (normalizedTab === 'unreconciled' || normalizedTab === 'unreconciled orders') {
+        setInitialTsTab(0);
+      } else if (normalizedTab === 'settled') {
+        setInitialTsTab(1);
+      } else if (normalizedTab === 'unsettled') {
+        setInitialTsTab(2);
+      } else {
+        setInitialTsTab(0);
+      }
       setShowTransactionSheet(true);
+      // Clear query params after opening to avoid re-triggering
       navigate('/marketplace-reconciliation', { replace: true });
     }
-  }, []);
+  }, [location.search, showTransactionSheet, navigate]);
 
   return (
     <Box sx={{ 
@@ -699,14 +713,14 @@ const MarketplaceReconciliation: React.FC = () => {
           textOrientation: 'mixed',
           height: 180,
           width: 50,
-          borderRadius: '25px',
+          borderRadius: '20px',
         }}
         onClick={() => {
           console.log('Button clicked, setting showTransactionSheet to true');
           setShowTransactionSheet(true);
         }}
       >
-        <ArrowForwardIcon sx={{ mb: 1, transform: 'rotate(90deg)', color: 'white' }} />
+        <ArrowUpIcon sx={{ mb: 1, transform: 'rotate(90deg)', color: 'white' }} />
         <Typography variant="body2" sx={{ fontWeight: 500, color: 'white', fontSize: '0.75rem' }}>
           View Transactions
         </Typography>
@@ -1338,20 +1352,24 @@ const MarketplaceReconciliation: React.FC = () => {
 
           {/* Reconciliation Status */}
           <Grid item xs={12} md={6}>
-            <Card sx={{ 
-              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
-              borderRadius: '16px',
-              border: '1px solid #f1f3f4',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
-              minHeight: 'fit-content',
-              maxHeight: '520px',
-              overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                transform: 'translateY(-2px)',
-              }
-            }}>
+                          <Card 
+                onClick={() => navigate('/marketplace-reconciliation?openTs=1&tab=unreconciled')}
+                sx={{ 
+                background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+                borderRadius: '16px',
+                border: '1px solid #f1f3f4',
+                boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+                minHeight: 'fit-content',
+                maxHeight: '520px',
+                overflow: 'hidden',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer',
+                '&:hover': {
+                  boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+                  transform: 'translateY(-2px)',
+                }
+              }}
+            >
               <CardContent sx={{ p: 4 }}>
                 <Typography variant="h6" sx={{ 
                   fontWeight: 600, 

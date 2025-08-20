@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -57,7 +58,13 @@ import {
   MoreVert as MoreVertIcon,
   Info as InfoIcon,
   Refresh as RefreshIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
+  UnfoldMore as UnfoldMoreIcon,
+  InfoOutlined,
 } from '@mui/icons-material';
+import { p } from 'framer-motion/client';
+import { width } from '@mui/system';
 
 // Type definitions for transaction data based on actual API response
 interface TransactionRow {
@@ -1284,6 +1291,16 @@ interface TransactionSheetProps {
 }
 
 const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0 }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // Get initialTab from navigation state or props
+  const getInitialTab = () => {
+    if (location.state?.initialTab !== undefined) {
+      return location.state.initialTab;
+    }
+    return initialTab;
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
   // Column filters can be string (contains), number range {min,max}, date range {from,to}, or enum string[]
@@ -1298,15 +1315,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [loading, setLoading] = useState(false);
   const [paginationLoading, setPaginationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState(getInitialTab() === 0 ? 0 : getInitialTab() === 1 ? 1 : getInitialTab() === 2 ? 2 : 0);
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionRow | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HTMLElement | null>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [tabCounts, setTabCounts] = useState<{ settled: number | null; unsettled: number | null; unreconciled?: number | null }>({ settled: null, unsettled: null, unreconciled: null });
   const [metadata, setMetadata] = useState<TransactionMetadata | null>(null);
+  // Action menu state (for Action column ellipsis)
+  const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(null);
+  const [actionMenuRow, setActionMenuRow] = useState<TransactionRow | null>(null);
+
+  // Rely on MUI Menu's built-in outside click handling
   
   // Dropdown menu state for Status column
 
@@ -1357,6 +1380,53 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     'Status': { type: 'enum' },
     'Reason': { type: 'string' },
     'Action': { type: 'string' },
+  };
+
+  // Sorting functions
+  const handleSort = (columnKey: string) => {
+    setSortConfig(prevConfig => {
+      if (prevConfig?.key === columnKey) {
+        if (prevConfig.direction === 'asc') {
+          return { key: columnKey, direction: 'desc' };
+        } else {
+          return null; // Remove sorting
+        }
+      } else {
+        return { key: columnKey, direction: 'asc' };
+      }
+    });
+  };
+
+  const getSortIcon = (columnKey: string) => {
+    if (sortConfig?.key !== columnKey) {
+      return <UnfoldMoreIcon fontSize="small" />;
+    }
+    return sortConfig.direction === 'asc' 
+      ? <ArrowUpwardIcon fontSize="small" /> 
+      : <ArrowDownwardIcon fontSize="small" />;
+  };
+
+  const sortData = (data: TransactionRow[]) => {
+    if (!sortConfig) return data;
+    
+    return [...data].sort((a, b) => {
+      const aValue = a[sortConfig.key as keyof TransactionRow];
+      const bValue = b[sortConfig.key as keyof TransactionRow];
+      
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+      
+      let comparison = 0;
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        comparison = aValue.localeCompare(bValue);
+      } else if (typeof aValue === 'number' && typeof bValue === 'number') {
+        comparison = aValue - bValue;
+      } else if (aValue instanceof Date && bValue instanceof Date) {
+        comparison = aValue.getTime() - bValue.getTime();
+      }
+      
+      return sortConfig.direction === 'asc' ? comparison : -comparison;
+    });
   };
 
   // Helpers to get enum options from current data
@@ -1767,12 +1837,23 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   };
 
+  // Handle navigation state changes
+  useEffect(() => {
+    if (location.state?.initialTab !== undefined) {
+      const newTab = location.state.initialTab;
+      setActiveTab(newTab);
+      // Clear the state to prevent re-triggering on re-renders
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate]);
+
   // Fetch data on component mount
   useEffect(() => {
     setLoading(true);
-    // Start with settled transactions (activeTab = 0)
-    fetchOrders(1, 'settlement_matched');
-    // Prefetch counts for both tabs
+    // Start with unreconciled orders (activeTab = 0)
+    fetchOrders(1, 'unreconciled');
+    // Prefetch counts for all tabs
+    fetchTabCount('unreconciled');
     fetchTabCount('settlement_matched');
     fetchTabCount('unsettled');
   }, []);
@@ -2091,15 +2172,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         });
       });
       
-      setFilteredData(filtered);
+      // Apply sorting
+      const sortedData = sortData(filtered);
+      setFilteredData(sortedData);
     }
-  }, [searchTerm, dateRange, columnFilters, activeTab, allTransactionData]);
+  }, [searchTerm, dateRange, columnFilters, activeTab, allTransactionData, sortConfig]);
 
   // Handle pagination
   const handleChangePage = (event: unknown, newPage: number) => {
     const newPageNumber = newPage + 1; // Convert from 0-based to 1-based
     setPage(newPage);
-    const remark = activeTab === 0 ? 'settlement_matched' : activeTab === 1 ? 'unsettled' : 'unreconciled';
+    const remark = activeTab === 0 ? 'unreconciled' : activeTab === 1 ? 'settlement_matched' : 'unsettled';
     fetchOrders(newPageNumber, remark);
   };
 
@@ -2108,7 +2191,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setRowsPerPage(newRowsPerPage);
     setPage(0);
     // Reset to first page when changing rows per page
-    const remark = activeTab === 0 ? 'settlement_matched' : activeTab === 1 ? 'unsettled' : 'unreconciled';
+    const remark = activeTab === 0 ? 'unreconciled' : activeTab === 1 ? 'settlement_matched' : 'unsettled';
     fetchOrders(1, remark);
   };
 
@@ -2148,7 +2231,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const url = URL.createObjectURL(blob);
       
       link.setAttribute('href', url);
-      link.setAttribute('download', `transaction_sheet_${activeTab === 0 ? 'settled' : 'unsettled'}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `transaction_sheet_${activeTab === 0 ? 'unreconciled' : activeTab === 1 ? 'settled' : 'unsettled'}_${new Date().toISOString().split('T')[0]}.csv`);
       link.style.visibility = 'hidden';
       
       document.body.appendChild(link);
@@ -2170,7 +2253,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setColumnFilters({});
     setPage(0);
     setCurrentPage(1);
-    const remark = activeTab === 0 ? 'settlement_matched' : activeTab === 1 ? 'unsettled' : 'unreconciled';
+    const remark = activeTab === 0 ? 'unreconciled' : activeTab === 1 ? 'settlement_matched' : 'unsettled';
     fetchOrders(1, remark);
   };
 
@@ -2182,7 +2265,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setCurrentPage(1); // Reset current page
     
     // Determine the correct remark based on the new tab value
-    const remark = newValue === 0 ? 'settlement_matched' : newValue === 1 ? 'unsettled' : 'unreconciled';
+    const remark = newValue === 0 ? 'unreconciled' : newValue === 1 ? 'settlement_matched' : 'unsettled';
     console.log(`Fetching data for tab ${newValue} with remark: ${remark}`);
     fetchOrders(1, remark); // Fetch first page data with correct remark
   };
@@ -2212,8 +2295,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       "Difference",
       "Status",
     ];
-    // Only show Reason/Action on Unreconciled tab (index 2)
-    if (activeTab === 2) {
+    // Only show Reason/Action on Unreconciled tab (index 0)
+    if (activeTab === 0) {
       return [...base, "Reason", "Action"];
     }
     return base;
@@ -2237,18 +2320,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               mb: 1,
               background: '#ffffff',
               borderRadius: '12px',
-              border: '1px solid #e5e7eb',
-              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+              border: '1px solid #e5e7eb'
             }}>
               <CardContent sx={{ p: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap:  2}}>
                     <IconButton
                       onClick={onBack}
                       size="small"
                       sx={{
                         background: '#1f2937',
                         color: 'white',
+                        mt: -2,
                         '&:hover': {
                           background: '#374151',
                           transform: 'scale(1.05)',
@@ -2262,6 +2345,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       fontWeight: 700, 
                       color: '#111827',
                       letterSpacing: '-0.02em',
+                      py: 0.5,
+                      mt: -2,
                     }}>
                       Transaction Sheet
                     </Typography>
@@ -2291,15 +2376,32 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         },
                       }}
                     >
+                      <Tab label={`Unreconciled Orders${tabCounts.unreconciled != null ? ` (${tabCounts.unreconciled})` : ''}`} />
                       <Tab label={`Settled${tabCounts.settled != null ? ` (${tabCounts.settled})` : ''}`} />
                       <Tab label={`Unsettled${tabCounts.unsettled != null ? ` (${tabCounts.unsettled})` : ''}`} />
-                      <Tab label={`Unreconciled Orders${tabCounts.unreconciled != null ? ` (${tabCounts.unreconciled})` : ''}`} />
                     </Tabs>
                     
                   
                   </Box>
                   
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                    
+                    <IconButton
+                      onClick={() => {
+                        const remark = activeTab === 0 ? 'unreconciled' : activeTab === 1 ? 'settlement_matched' : 'unsettled';
+                        fetchOrders(1, remark);
+                      }}
+                      disabled={loading}
+                      sx={{
+                        color: '#1f2937',
+                        '&:hover': {
+                          background: '#f9fafb',
+                        },
+                        transition: 'all 0.3s ease',
+                      }}
+                    >
+                      <RefreshIcon />
+                    </IconButton>
                     
                     <Button
                       variant="outlined"
@@ -2312,48 +2414,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     
                     <Button
                       variant="outlined"
-                      startIcon={<RefreshIcon />}
-                      onClick={() => {
-                        const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-                        fetchOrders(1, remark);
-                      }}
-                      disabled={loading}
-                      sx={{
-                        borderColor: '#1f2937',
-                        color: '#1f2937',
-                        borderRadius: '8px',
-                        px: 2,
-                        py: 1,
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        '&:hover': {
-                          borderColor: '#374151',
-                          background: '#f9fafb',
-                        },
-                        transition: 'all 0.3s ease',
-                      }}
-                    />
-                    <Button
-                      variant="contained"
                       startIcon={<ExportIcon />}
                       onClick={handleExport}
                       sx={{
-                        background: '#1f2937',
-                        borderRadius: '8px',
-                        px: 2,
-                        py: 1,
-                        fontWeight: 600,
+                        borderColor: '#1f2937', 
+                        color: '#1f2937',
                         textTransform: 'none',
-                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-                        '&:hover': {
-                          background: '#374151',
-                          transform: 'translateY(-1px)',
-                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                        },
-                        transition: 'all 0.3s ease',
                       }}
                     >
-                      Export to Excel
+                      Export
                     </Button>
                   </Box>
                 </Box>
@@ -2448,6 +2517,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               <TableContainer sx={{ 
                 maxHeight: 'calc(100vh - 200px)',
                 overflowX: 'auto',
+                position: 'relative',
+                zIndex: 1,
               }}>
                 <Table stickyHeader sx={{ 
                   borderCollapse: 'separate', 
@@ -2458,10 +2529,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   '& .MuiTableCell-head': {
                     border: 'none !important',
                     borderBottom: '0.5px solid #e5e7eb !important',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 2,
                   },
                   '& .MuiTableCell-body': {
                     border: 'none !important',
                     borderBottom: '0.5px solid #e5e7eb !important',
+                    // paddingTop: '2px',
+                    // paddingBottom: '2px',
                   }
                 }}>
                   <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
@@ -2472,8 +2548,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           sx={{
                             fontWeight: 700,
                             color: '#111827',
-                            background: '#f9fafb',
+                            background: '#f3f4f6',
                             textAlign: 'center',
+                            py: 0.75,
                             minWidth: 160,
                             transition: 'all 0.3s ease',
                             position: 'relative',
@@ -2487,189 +2564,26 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               </Typography>
                                     <IconButton 
                                       size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                console.log('Filter icon clicked for column:', column);
-                                openFilterPopover(column, e.currentTarget);
-                              }}
-                              sx={{
-                                ml: 0.5,
-                                color: isFilterActive(column) ? '#1f2937' : '#6b7280',
-                                background: isFilterActive(column) ? '#e5e7eb' : 'transparent',
-                                '&:hover': { background: '#f3f4f6' },
-                              }}
-                              aria-label={`Filter ${column}`}
-                            >
-                                                            <FilterIcon fontSize="small" />
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleSort(column);
+                                      }}
+                                      sx={{
+                                        ml: 0.5,
+                                        color: sortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                        background: sortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                        '&:hover': { background: '#f3f4f6' },
+                                      }}
+                                      aria-label={`Sort ${column}`}
+                                    >
+                                      {getSortIcon(column)}
                                     </IconButton>
-                                <Popover
-                                  open={Boolean(headerFilterAnchor) && activeFilterColumn === column}
-                                  anchorEl={headerFilterAnchor}
-                                  onClose={closeFilterPopover}
-                                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-                                  slotProps={{
-                                    paper: {
-                                      sx: {
-                                        p: 2,
-                                        minWidth: 280,
-                                        zIndex: (theme) => theme.zIndex.modal + 1,
-                                      },
-                                    },
-                                  }}
-                                >
-                                  {(() => {
-                                    const meta = (COLUMN_META as any)[column]?.type || 'string';
-                                    if (meta === 'string') {
-                                      const val = (columnFilters[column] || '') as string;
-                                      return (
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Contains</Typography>
-                                          <TextField size="small" value={val} onChange={handleStringFilterChange(column)} placeholder={`Filter ${column}`} />
-                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                                            <Button size="small" onClick={() => clearColumnFilter(column)}>Clear</Button>
-                                            <Button size="small" variant="contained" onClick={applyFilters}>Apply</Button>
-                                          </Box>
-                                        </Box>
-                                      );
-                                    }
-                                    if (meta === 'number') {
-                                      const minVal = (columnFilters[column]?.min ?? '') as string;
-                                      const maxVal = (columnFilters[column]?.max ?? '') as string;
-                                      return (
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Between</Typography>
-                                          <Box sx={{ display: 'flex', gap: 1 }}>
-                                            <TextField size="small" type="number" placeholder="Min" value={minVal} onChange={handleNumberRangeChange(column, 'min')} />
-                                            <TextField size="small" type="number" placeholder="Max" value={maxVal} onChange={handleNumberRangeChange(column, 'max')} />
-                                          </Box>
-                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                                            <Button size="small" onClick={() => clearColumnFilter(column)}>Clear</Button>
-                                          <Button size="small" variant="contained" onClick={applyFilters}>Apply</Button>
-                                          </Box>
-                                        </Box>
-                                      );
-                                    }
-                                    if (meta === 'date') {
-                                      const fromVal = (columnFilters[column]?.from ?? '') as string;
-                                      const toVal = (columnFilters[column]?.to ?? '') as string;
-                                      return (
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Between dates</Typography>
-                                          <Box sx={{ display: 'flex', gap: 1 }}>
-                                                                        <TextField 
-                              size="small" 
-                              type="date" 
-                              value={fromVal} 
-                              onChange={handleDateRangeFilterChange(column, 'from')}
-                              InputLabelProps={{ shrink: true }}
-                              sx={{
-                                '& input[type="date"]::-webkit-datetime-edit-text': {
-                                  color: 'transparent',
-                                },
-                                '& input[type="date"]::-webkit-datetime-edit-month-field': {
-                                  color: 'transparent',
-                                },
-                                '& input[type="date"]::-webkit-datetime-edit-day-field': {
-                                  color: 'transparent',
-                                },
-                                '& input[type="date"]::-webkit-datetime-edit-year-field': {
-                                  color: 'transparent',
-                                },
-                                '& input[type="date"]:valid': {
-                                  '&::-webkit-datetime-edit-text, &::-webkit-datetime-edit-month-field, &::-webkit-datetime-edit-day-field, &::-webkit-datetime-edit-year-field': {
-                                    color: 'inherit',
-                                  }
-                                },
-                                '& input[type="date"]::-webkit-input-placeholder': {
-                                  color: 'transparent',
-                                },
-                                '& input[type="date"]::-moz-placeholder': {
-                                  color: 'transparent',
-                                }
-                              }}
-                            />
-                            <TextField 
-                              size="small" 
-                              type="date" 
-                              value={toVal} 
-                              onChange={handleDateRangeFilterChange(column, 'to')}
-                              InputLabelProps={{ shrink: true }}
-                              sx={{
-                                '& input[type="date"]::-webkit-datetime-edit-text': {
-                                  color: 'transparent',
-                                },
-                                '& input[type="date"]::-webkit-datetime-edit-month-field': {
-                                  color: 'transparent',
-                                },
-                                '& input[type="date"]::-webkit-datetime-edit-day-field': {
-                                  color: 'transparent',
-                                },
-                                '& input[type="date"]::-webkit-datetime-edit-year-field': {
-                                  color: 'transparent',
-                                },
-                                '& input[type="date"]:valid': {
-                                  '&::-webkit-datetime-edit-text, &::-webkit-datetime-edit-month-field, &::-webkit-datetime-edit-day-field, &::-webkit-datetime-edit-year-field': {
-                                    color: 'inherit',
-                                  }
-                                },
-                                '& input[type="date"]::-webkit-input-placeholder': {
-                                  color: 'transparent',
-                                },
-                                '& input[type="date"]::-moz-placeholder': {
-                                  color: 'transparent',
-                                }
-                              }}
-                            />
-                                          </Box>
-                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                                            <Button size="small" onClick={() => clearColumnFilter(column)}>Clear</Button>
-                                            <Button size="small" variant="contained" onClick={applyFilters}>Apply</Button>
-                                          </Box>
-                                        </Box>
-                                      );
-                                    }
-                                    if (meta === 'enum') {
-                                      const options = getUniqueValuesForColumn(column);
-                                      const value: string[] = Array.isArray(columnFilters[column]) ? columnFilters[column] : [];
-                                      return (
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                          <Typography variant="caption" sx={{ color: '#6b7280' }}>Select values</Typography>
-                                          <FormControl size="small">
-                                            <Select
-                                              multiple
-                                              value={value}
-                                              onChange={handleEnumFilterChange(column)}
-                                              input={<OutlinedInput />}
-                                              renderValue={(selected) => (selected as string[]).join(', ')}
-                                              MenuProps={{ PaperProps: { style: { maxHeight: 240 } } }}
-                                            >
-                                              {options.map((opt) => (
-                                                <MenuItem key={opt} value={opt}>
-                                                  <Checkbox checked={value.indexOf(opt) > -1} />
-                                                  <Typography variant="caption">{opt}</Typography>
-                                                </MenuItem>
-                                              ))}
-                                            </Select>
-                                          </FormControl>
-                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                                            <Button size="small" onClick={() => clearColumnFilter(column)}>Clear</Button>
-                                            <Button size="small" variant="contained" onClick={applyFilters}>Apply</Button>
-                                          </Box>
-                                        </Box>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
-                                </Popover>
                               </Box>
-                            
-                            {/* Removed duplicate column filter icon */}
-                          </Box>
-                        </TableCell>
-                      ))}
-                    </TableRow>
+                            </Box>
+                          </TableCell>
+                        ))}
+                      </TableRow>
                   </TableHead>
                   <TableBody>
                     {loading && allTransactionData.length === 0 ? (
@@ -2710,7 +2624,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           <React.Fragment key={rowIndex}>
                             <TableRow 
                               sx={{ 
-                                borderLeft: `4px solid ${activeTab === 0 ? '#10b981' : '#ef4444'}`,
+                                borderLeft: `4px solid ${activeTab === 0 ? '#ef4444' : activeTab === 1 ? '#10b981' : '#ef4444'}`,
                                 background: '#ffffff',
                                 position: 'relative',
                               }}
@@ -2739,9 +2653,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               sx={{
                                 background: '#ffffff',
                                 textAlign: 'center',
-                                minWidth: column === 'Action' ? 220 : 160,
+                                minWidth: column === 'Action' ? 140 : 150,
                                 fontWeight: 600,
                                 color: column === 'Status' ? '#111827' : '#111827',
+                                pr: column === 'Action' ? 0 : undefined,
+                                pl: column === 'Action' ? 0 : undefined,
                                 '&:hover': {
                                   background: '#f9fafb',
                                 },
@@ -2793,20 +2709,38 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         p: 0.5,
                                         minWidth: 20,
                                         height: 20,
-                                        color: '#6b7280',
                                         '&:hover': {
                                           background: '#f3f4f6',
                                           color: '#374151',
                                         },
                                       }}
                                     >
-                                      <MoreVertIcon fontSize="small" />
+                                      <InfoOutlined fontSize="small" sx={{ color: '#6b7280' }}/>
                                     </IconButton>
                                   </Box>
                                 ) : column === 'Action' ? (
-                                  <Box sx={{ display: 'flex', gap: 1 }}>
-                                    <Button size="small" variant="outlined" onClick={() => console.log('Reconcile', row["Order Item ID"]) } sx={{ textTransform: 'none', px: 1.5, py: 0.5, borderColor: '#10b981', color: '#065f46', '&:hover': { borderColor: '#059669', background: '#ecfdf5' } }}>Reconcile</Button>
-                                    <Button size="small" variant="outlined" onClick={() => console.log('Raise Dispute', row["Order Item ID"]) } sx={{ textTransform: 'none', px: 1.5, py: 0.5, borderColor: '#ef4444', color: '#991b1b', '&:hover': { borderColor: '#dc2626', background: '#fef2f2' } }}>Raise Dispute</Button>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}>
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      onClick={() => console.log('Reconcile', row["Order Item ID"]) }
+                                      sx={{
+                                        textTransform: 'none',
+                                        px: 1.5,
+                                        py: 0.5,
+                                        '&:hover': { backgroundColor: '#f3f4f6' }
+                                      }}
+                                    >
+                                      Reconcile
+                                    </Button>
+                                    <IconButton
+                                      data-action-menu
+                                      size="small"
+                                      onClick={(e) => { e.stopPropagation(); setActionMenuAnchor(e.currentTarget); setActionMenuRow(row); }}
+                                      sx={{ color: '#6b7280', '&:hover': { background: '#f3f4f6', color: '#374151' } }}
+                                    >
+                                      <MoreVertIcon fontSize="small" />
+                                    </IconButton>
                                   </Box>
                                 ) : (
                                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -2827,7 +2761,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               </TableContainer>
               
               {/* Pagination */}
-              <Box sx={{ p: 2, borderTop: '1px solid #e5e7eb' }}>
+              <Box sx={{  borderTop: '0.1px solid #e5e7eb' }}>
                 <TablePagination
                   rowsPerPageOptions={[100]}
                   component="div"
@@ -2847,6 +2781,48 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
             </Card>
           </Fade>
         </Box>
+
+        {/* Row Action Menu (global) */}
+        <Menu
+          anchorEl={actionMenuAnchor}
+          open={Boolean(actionMenuAnchor)}
+          onClose={() => { setActionMenuAnchor(null); setActionMenuRow(null); }}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          slotProps={{
+            paper: {
+              sx: {
+                minWidth: 150,
+                p: 0.1,
+                mt: 1,
+                width: '10px',
+                borderRadius: 0.5,
+                backgroundColor: '#f3f4f6',
+                overflow: 'hidden',
+              }
+            },
+          } as any}
+          sx={{
+            zIndex: 11000,
+          }}
+        >
+          <Box sx={{ p: 2, width: '100%' }}>
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={() => {
+                if (actionMenuRow) {
+                  console.log('Raise Dispute', actionMenuRow["Order Item ID"]);
+                }
+                setActionMenuAnchor(null);
+                setActionMenuRow(null);
+              }}
+              sx={{ textTransform: 'none', fontWeight: 400 , width: '100%', fontSize: '0.8rem', p: 0.4}}
+            >
+              Raise Dispute
+            </Button>
+          </Box>
+        </Menu>
         
         {/* Transaction Details Popup */}
         <TransactionDetailsPopup
