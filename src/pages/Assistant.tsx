@@ -79,6 +79,20 @@ const mockChatHistory: ChatSession[] = [
     lastMessage: new Date(Date.now() - 259200000),
     starred: false,
   },
+  {
+    id: '4',
+    title: 'Compliance Queries',
+    messages: [
+      { id: '7', text: 'What are the GST filing deadlines we should track monthly and quarterly?', sender: 'user', timestamp: new Date(Date.now() - 3600 * 1000 * 12) },
+      { id: '8', text: 'GST timelines (India):\n\n- GSTR-1: 11th of next month (monthly) or 13th after quarter (QRMP)\n- GSTR-3B: 20th of next month (monthly) or 22nd/24th after quarter (QRMP, state-dependent)\n- GSTR-9 (Annual): By Dec 31 following the FY\n\nTip: Set reminders 3 days prior; reconcile outward supplies with e-invoices before filing.', sender: 'assistant', timestamp: new Date(Date.now() - 3600 * 1000 * 11.8) },
+      { id: '9', text: 'What TDS thresholds apply for vendor payments so we avoid interest/penalties?', sender: 'user', timestamp: new Date(Date.now() - 3600 * 1000 * 10) },
+      { id: '10', text: 'Common TDS thresholds (brief):\n\n- 194C (Contracts): 1% (individual/HUF) or 2% (others) when annual aggregate > ₹1,00,000\n- 194J (Professional fees): 10% when annual aggregate > ₹30,000\n- 194H (Commission): 5% when annual aggregate > ₹15,000\n- 194Q (Purchase of goods): 0.1% on purchases > ₹50L per seller in FY (buyer turnover > ₹10Cr prev FY)\n\nAlways reconcile PAN, nature-of-payment, and exemption declarations before deduction.', sender: 'assistant', timestamp: new Date(Date.now() - 3600 * 1000 * 9.8) },
+      { id: '11', text: 'How do we prepare for SOC 2 and audit evidence around revenue recognition?', sender: 'user', timestamp: new Date(Date.now() - 3600 * 1000 * 8) },
+      { id: '12', text: 'SOC 2 prep (revenue):\n\n1) Controls: order-to-cash approvals, segregation of duties, and change management\n2) Evidence: signed contracts, performance obligation mapping, invoicing rules, delivery confirmations, reconciliation logs\n3) Monitoring: exception reports (credit notes, write-offs), access reviews\n4) Retention: maintain immutable logs and tie to GL with monthly reconciliations.\n\nI can generate a checklist tailored to your systems if you tell me the ERP and gateway.', sender: 'assistant', timestamp: new Date(Date.now() - 3600 * 1000 * 7.7) },
+    ],
+    lastMessage: new Date(Date.now() - 3600 * 1000 * 7.7),
+    starred: true,
+  },
 ];
 
 const Assistant: React.FC = () => {
@@ -217,6 +231,30 @@ const Assistant: React.FC = () => {
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
     return date.toLocaleDateString();
+  };
+
+  // Render helper: convert **bold** markdown segments into highlighted spans
+  const renderHighlightedText = (text: string) => {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, idx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        const content = part.slice(2, -2);
+        return (
+          <Box
+            component="span"
+            key={idx}
+            sx={{
+              fontWeight: 700,
+              color: 'inherit',
+              whiteSpace: 'pre-line',
+            }}
+          >
+            {content}
+          </Box>
+        );
+      }
+      return part;
+    });
   };
 
   return (
@@ -404,38 +442,47 @@ const Assistant: React.FC = () => {
                   <Box
                     sx={{
                       display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: 1,
-                      maxWidth: '70%',
+                      alignItems: 'flex-end',
+                      gap: 1.25,
+                      maxWidth: '72%',
                       flexDirection: msg.sender === 'user' ? 'row-reverse' : 'row',
                     }}
                   >
                     <Avatar
                       sx={{
-                        width: 32,
-                        height: 32,
-                        bgcolor: msg.sender === 'user' ? 'primary.main' : 'grey.300',
+                        width: 28,
+                        height: 28,
+                        bgcolor: msg.sender === 'user' ? '#111' : '#f3f4f6',
+                        color: msg.sender === 'user' ? '#fff' : '#111',
+                        fontSize: 12,
+                        fontWeight: 700,
                       }}
                     >
                       {msg.sender === 'user' ? 'U' : 'AI'}
                     </Avatar>
                     <Paper
+                      elevation={0}
                       sx={{
-                        p: 2,
-                        bgcolor: msg.sender === 'user' ? 'primary.main' : 'grey.100',
-                        color: msg.sender === 'user' ? 'white' : 'text.primary',
-                        borderRadius: 0,
+                        px: 1.75,
+                        py: 1.25,
+                        bgcolor: msg.sender === 'user' ? '#111' : '#f9fafb',
+                        color: msg.sender === 'user' ? '#fff' : '#111827',
+                        border: '1px solid',
+                        borderColor: msg.sender === 'user' ? '#111' : '#eef2f7',
+                        borderRadius: msg.sender === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px',
+                        boxShadow: '0 1px 2px rgba(17,24,39,0.04)'
                       }}
                     >
-                      <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
-                        {msg.text}
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-line', fontSize: 14, lineHeight: 1.5 }}>
+                        {renderHighlightedText(msg.text)}
                       </Typography>
                       <Typography
                         variant="caption"
                         sx={{
-                          opacity: 0.7,
+                          opacity: 0.6,
                           display: 'block',
                           mt: 0.5,
+                          fontSize: 10,
                         }}
                       >
                         {msg.timestamp.toLocaleTimeString([], {
