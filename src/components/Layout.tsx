@@ -116,7 +116,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <ListItemIcon
                 sx={{
                   color: location.pathname === item.path ? theme.palette.primary.main : 'inherit',
-                  minWidth: 36,
+                  minWidth: 30,
+                  '& .MuiSvgIcon-root': {
+                    fontSize: 18, // force smaller px size
+                  },
                 }}
               >
                 {item.icon}
@@ -134,16 +137,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                           sx={{
                             '& .MuiBadge-badge': {
                               fontSize: 12,
-                              height: 16,
-                              minWidth: 16,
+                              height: 24,
+                              minWidth: 24,
                               bgcolor: '#111',
                               color: '#fff',
                               borderRadius: 0.2,
-                              top: -2,
+                              top: 10,
+                              right: 6,
                             },
                           }}
                         >
-                          <Box sx={{ width: 12, height: 12 }} />
+                          <Box sx={{ width: 24, height: 24 }} />
                         </Badge>
                       </Box>
                     </Box>

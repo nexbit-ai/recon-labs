@@ -30,7 +30,7 @@ const Login: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Dummy login - just navigate to home
-    navigate('/home', { replace: true });
+    navigate('/', { replace: true });
   };
 
   const handleResetPassword = () => {

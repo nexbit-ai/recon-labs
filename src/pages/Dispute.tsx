@@ -331,7 +331,7 @@ const DisputePage: React.FC = () => {
         <CardContent sx={{ p: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Tabs value={disputeSubTab} onChange={(_, v) => setDisputeSubTab(v)} sx={{ '& .MuiTab-root': { textTransform: 'none', minHeight: 32 } }}>
-              <Tab label="Unreconciled Transactions" />
+              <Tab label="Dispute Found" />
               <Tab label="Dispute Raised" />
             </Tabs>
             {/* Right controls: date range + platform + send button */}

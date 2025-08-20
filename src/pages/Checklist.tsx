@@ -114,6 +114,33 @@ const upcomingTasks = [
   },
 ];
 
+const completedTasks = [
+  {
+    id: 6,
+    title: 'Reconcile HSBC operating bank account #100013',
+    tag: 'INC.',
+    completedDate: '1 Feb',
+    users: [users[2], users[3]],
+    status: 'completed',
+  },
+  {
+    id: 7,
+    title: 'Post payroll and benefits from payroll system',
+    tag: 'INC.',
+    completedDate: '31 Jan',
+    users: [users[1], users[0]],
+    status: 'completed',
+  },
+  {
+    id: 8,
+    title: 'Monthly tax calculations and submissions',
+    tag: 'LTD',
+    completedDate: '30 Jan',
+    users: [users[4], users[2]],
+    status: 'completed',
+  },
+];
+
 // Mock progress data
 const progressData = [
   { name: 'Jan 1', completed: 10 },
@@ -170,6 +197,7 @@ const initialComments = [
 
 const Checklist: React.FC = () => {
   const [showUpcoming, setShowUpcoming] = useState(true);
+  const [showCompleted, setShowCompleted] = useState(true);
   const [search, setSearch] = useState('');
   const [expandedTask, setExpandedTask] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth()); // default to current month
@@ -325,7 +353,13 @@ const Checklist: React.FC = () => {
     <Box sx={{ p: { xs: 1, md: 3 } }}>
       {/* Title Row and Actions */}
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, mt: 1 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main', mr: 2 }}>
+        <Typography variant="h4" sx={{ 
+          fontWeight: 700, 
+          color: '#1a1a1a',
+          letterSpacing: '-0.01em',
+          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+          mr: 2 
+        }}>
           Checklist
         </Typography>
         <Box sx={{ flex: 1 }} />
@@ -339,7 +373,23 @@ const Checklist: React.FC = () => {
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value as number)}
             displayEmpty
-            sx={{ borderRadius: 2}}
+            sx={{ 
+              borderRadius: '6px',
+              borderColor: '#6B7280',
+              '& .MuiOutlinedInput-root': {
+                height: 20, 
+                color: '#6B7280',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                fontWeight: 500,
+                minHeight: 36,
+                fontSize: '0.7875rem',
+              },
+              '& .MuiSelect-select': {
+                paddingY: 0.3,               // control vertical spacing of text
+                paddingX: 1,                 // control horizontal padding
+                minHeight: 'unset !important', // remove default min height
+              },
+            }}
           >
             {monthNames.map((month, index) => (
               <MenuItem key={index} value={index}>
@@ -348,7 +398,26 @@ const Checklist: React.FC = () => {
             ))}
           </Select>
         </FormControl>
-        <Button startIcon={<AddIcon />} variant="contained" sx={{ borderRadius: 2 }} onClick={() => setCreateOpen(true)}>
+        <Button 
+          startIcon={<AddIcon />} 
+          variant="outlined" 
+          onClick={() => setCreateOpen(true)}
+          sx={{
+            borderRadius: '6px',
+            borderColor: '#6B7280',
+            color: '#6B7280',
+            textTransform: 'none',
+            fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+            fontWeight: 500,
+            minHeight: 36,
+            px: 1.5,
+            fontSize: '0.7875rem',
+            '&:hover': {
+              borderColor: '#4B5563',
+              backgroundColor: 'rgba(107, 114, 128, 0.04)',
+            },
+          }}
+        >
           Create New Task
         </Button>
       </Box>
@@ -379,126 +448,362 @@ const Checklist: React.FC = () => {
           ))}
         </List>
       </Popover>
-      <Paper sx={{ p: 0, overflow: 'hidden' }}>
-        {/* Overdue group removed */}
-        {/* Upcoming Group */}
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, bgcolor: '#fafbfc', cursor: 'pointer' }} onClick={() => setShowUpcoming((v) => !v)}>
-            <IconButton size="small">
-              {showUpcoming ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            </IconButton>
-            <Typography sx={{ fontWeight: 600 }}>Pending {filteredUpcoming.length}</Typography>
-          </Box>
-          <Collapse in={showUpcoming}>
-            <List disablePadding>
-              {filteredUpcoming.map((task) => (
-                <React.Fragment key={task.id}>
-                  <ListItem
-                    sx={{ pl: 8, pr: 2, py: 1, borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
-                    onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
-                    secondaryAction={
-                      <IconButton edge="end" size="small" onClick={(e) => { e.stopPropagation(); setExpandedTask(expandedTask === task.id ? null : task.id); }}>
-                        {expandedTask === task.id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                      </IconButton>
-                    }
-                  >
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      <RadioButtonUncheckedIcon color="disabled" />
-                    </ListItemIcon>
-                    <ListItemText primary={task.title} />
-                    <Chip label={task.tag} size="small" sx={{ mr: 1, bgcolor: '#f5f5f7', fontWeight: 500 }} />
-                    <Chip icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />} label={task.due} size="small" sx={{ mr: 1, bgcolor: '#f5f5f7' }} />
-                    <Stack direction="row" spacing={-1} sx={{ mr: 1 }}>
-                      {task.users.map((user) => (
-                        <Avatar key={user.id} src={user.avatar} sx={{ width: 28, height: 28, border: '2px solid #fff' }} />
-                      ))}
-                    </Stack>
-                  </ListItem>
-                  <Collapse in={expandedTask === task.id} timeout="auto" unmountOnExit>
-                    <Box sx={{ mx: 8, my: 2, p: 2, bgcolor: '#fff', borderRadius: 2, boxShadow: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
-                          {task.title}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Button variant="outlined" color="inherit">Reject</Button>
-                          <Button variant="contained" color="primary" sx={{ boxShadow: 'none' }}>Approve</Button>
-                          <Button variant="outlined" color="secondary" onClick={() => handleAskAI(task)}>
-                            AskAI
-                          </Button>
-                        </Box>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                        <Chip label="Waiting for review" color="info" />
-                        <Chip label="Assigned to you" color="success" size="small" sx={{ fontWeight: 600, bgcolor: '#e6f4ea', color: '#15803d' }} />
-                        <Chip icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />} label={task.due} size="small" sx={{ bgcolor: '#f5f5f7' }} />
-                      </Box>
-                      <Divider sx={{ mb: 2 }} />
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Links</Typography>
-                      <Box>
-                        {(taskLinks[task.id] || []).map((link, idx) => (
-                          <Paper key={idx} sx={{ display: 'flex', alignItems: 'center', p: 1.5, mb: 1, borderRadius: 2, boxShadow: 0 }}>
-                            <Box sx={{ flex: 1 }}>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{link.label}</Typography>
-                              <Typography variant="body2" color="text.secondary">{link.url}</Typography>
-                            </Box>
-                            {renderLinkIcon(link.icon)}
-                          </Paper>
-                        ))}
-                        <Button startIcon={<AddIcon />} variant="text" sx={{ mt: 1 }}>
-                          Add link
-                        </Button>
-                      </Box>
-                      {/* Comments Section */}
-                      <Box sx={{ mt: 3 }}>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Comments</Typography>
-                        <Box sx={{ maxHeight: 180, overflowY: 'auto', mb: 2 }}>
-                          {(comments[task.id] || initialComments).map((comment) => (
-                            <Box key={comment.id} sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
-                              <Avatar src={comment.user.avatar} sx={{ width: 32, height: 32, mr: 1 }} />
-                              <Box sx={{ flex: 1 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mr: 1 }}>{comment.user.name}</Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    {new Date(comment.timestamp).toLocaleString()}
-                                  </Typography>
-                                </Box>
-                                <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>{comment.text}</Typography>
-                              </Box>
-                            </Box>
+      <Grid container spacing={3}>
+        {/* Left side - Pending Tasks (reduced width) */}
+        <Grid item xs={12} md={7}>
+          <Paper sx={{ p: 0, overflow: 'hidden' }}>
+            {/* Upcoming Group */}
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, bgcolor: '#fafbfc', cursor: 'pointer' }} onClick={() => setShowUpcoming((v) => !v)}>
+                <IconButton size="small">
+                  {showUpcoming ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+                <Typography sx={{ fontWeight: 600 }}>Pending {filteredUpcoming.length}</Typography>
+              </Box>
+              <Collapse in={showUpcoming}>
+                <List disablePadding>
+                  {filteredUpcoming.map((task) => (
+                    <React.Fragment key={task.id}>
+                      <ListItem
+                        sx={{ pl: 8, pr: 2, py: 1, borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
+                        onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
+                        secondaryAction={
+                          <IconButton edge="end" size="small" onClick={(e) => { e.stopPropagation(); setExpandedTask(expandedTask === task.id ? null : task.id); }}>
+                            {expandedTask === task.id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                          </IconButton>
+                        }
+                      >
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <RadioButtonUncheckedIcon color="disabled" />
+                        </ListItemIcon>
+                        <ListItemText primary={task.title} />
+                        <Chip label={task.tag} size="small" sx={{ mr: 1, bgcolor: '#f5f5f7', fontWeight: 500 }} />
+                        <Chip icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />} label={task.due} size="small" sx={{ mr: 1, bgcolor: '#f5f5f7' }} />
+                        <Stack direction="row" spacing={-1} sx={{ mr: 1 }}>
+                          {task.users.map((user) => (
+                            <Avatar key={user.id} src={user.avatar} sx={{ width: 28, height: 28, border: '2px solid #fff' }} />
                           ))}
+                        </Stack>
+                      </ListItem>
+                      <Collapse in={expandedTask === task.id} timeout="auto" unmountOnExit>
+                        <Box sx={{ mx: 8, my: 2, p: 2, bgcolor: '#fff', borderRadius: 2, boxShadow: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
+                              {task.title}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Button variant="outlined" color="inherit">Reject</Button>
+                              <Button variant="contained" color="primary" sx={{ boxShadow: 'none' }}>Approve</Button>
+                              <Button variant="outlined" color="secondary" onClick={() => handleAskAI(task)}>
+                                AskAI
+                              </Button>
+                            </Box>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                            <Chip label="Waiting for review" color="info" />
+                            <Chip label="Assigned to you" color="success" size="small" sx={{ fontWeight: 600, bgcolor: '#e6f4ea', color: '#15803d' }} />
+                            <Chip icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />} label={task.due} size="small" sx={{ bgcolor: '#f5f5f7' }} />
+                          </Box>
+                          <Divider sx={{ mb: 2 }} />
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Links</Typography>
+                          <Box>
+                            {(taskLinks[task.id] || []).map((link, idx) => (
+                              <Paper key={idx} sx={{ display: 'flex', alignItems: 'center', p: 1.5, mb: 1, borderRadius: 2, boxShadow: 0 }}>
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{link.label}</Typography>
+                                  <Typography variant="body2" color="text.secondary">{link.url}</Typography>
+                                </Box>
+                                {renderLinkIcon(link.icon)}
+                              </Paper>
+                            ))}
+                            <Button startIcon={<AddIcon />} variant="text" sx={{ mt: 1 }}>
+                              Add link
+                            </Button>
+                          </Box>
+                          {/* Comments Section */}
+                          <Box sx={{ mt: 3 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Comments</Typography>
+                            <Box sx={{ maxHeight: 180, overflowY: 'auto', mb: 2 }}>
+                              {(comments[task.id] || initialComments).map((comment) => (
+                                <Box key={comment.id} sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
+                                  <Avatar src={comment.user.avatar} sx={{ width: 32, height: 32, mr: 1 }} />
+                                  <Box sx={{ flex: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mr: 1 }}>{comment.user.name}</Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        {new Date(comment.timestamp).toLocaleString()}
+                                      </Typography>
+                                    </Box>
+                                    <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>{comment.text}</Typography>
+                                  </Box>
+                                </Box>
+                              ))}
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1 }}>
+                              <Avatar src={users[0].avatar} sx={{ width: 32, height: 32 }} />
+                              <TextField
+                                fullWidth
+                                multiline
+                                minRows={1}
+                                maxRows={4}
+                                placeholder="Add a comment..."
+                                value={newComment[task.id] || ''}
+                                onChange={(e) => setNewComment((prev) => ({ ...prev, [task.id]: e.target.value }))}
+                                sx={{ flex: 1 }}
+                                size="small"
+                              />
+                              <Button
+                                variant="contained"
+                                sx={{ minWidth: 0, px: 2, py: 1, borderRadius: 2 }}
+                                disabled={!(newComment[task.id] && newComment[task.id].trim())}
+                                onClick={() => handleAddComment(task.id)}
+                              >
+                                Post
+                              </Button>
+                            </Box>
+                          </Box>
                         </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1 }}>
-                          <Avatar src={users[0].avatar} sx={{ width: 32, height: 32 }} />
-                          <TextField
-                            fullWidth
-                            multiline
-                            minRows={1}
-                            maxRows={4}
-                            placeholder="Add a comment..."
-                            value={newComment[task.id] || ''}
-                            onChange={(e) => setNewComment((prev) => ({ ...prev, [task.id]: e.target.value }))}
-                            sx={{ flex: 1 }}
-                            size="small"
-                          />
-                          <Button
-                            variant="contained"
-                            sx={{ minWidth: 0, px: 2, py: 1, borderRadius: 2 }}
-                            disabled={!(newComment[task.id] && newComment[task.id].trim())}
-                            onClick={() => handleAddComment(task.id)}
-                          >
-                            Post
-                          </Button>
+                      </Collapse>
+                    </React.Fragment>
+                  ))}
+                </List>
+              </Collapse>
+            </Box>
+          </Paper>
+
+          {/* Completed Tasks Group */}
+          <Paper sx={{ p: 0, overflow: 'hidden' }}>
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, bgcolor: '#f0fdf4', cursor: 'pointer' }} onClick={() => setShowCompleted((v) => !v)}>
+                <IconButton size="small">
+                  {showCompleted ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+                <Typography sx={{ fontWeight: 600, color: '#15803d' }}>Completed {completedTasks.length}</Typography>
+              </Box>
+              <Collapse in={showCompleted}>
+                <List disablePadding>
+                  {completedTasks.map((task) => (
+                    <React.Fragment key={task.id}>
+                      <ListItem
+                        sx={{ pl: 8, pr: 2, py: 1, borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
+                        onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
+                        secondaryAction={
+                          <IconButton edge="end" size="small" onClick={(e) => { e.stopPropagation(); setExpandedTask(expandedTask === task.id ? null : task.id); }}>
+                            {expandedTask === task.id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                          </IconButton>
+                        }
+                      >
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <CheckCircleIcon sx={{ color: '#10b981' }} />
+                        </ListItemIcon>
+                        <ListItemText primary={task.title} />
+                        <Chip label={task.tag} size="small" sx={{ mr: 1, bgcolor: '#f0fdf4', color: '#15803d', fontWeight: 500 }} />
+                        <Chip icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />} label={task.completedDate} size="small" sx={{ mr: 1, bgcolor: '#f0fdf4', color: '#15803d' }} />
+                        <Stack direction="row" spacing={-1} sx={{ mr: 1 }}>
+                          {task.users.map((user) => (
+                            <Avatar key={user.id} src={user.avatar} sx={{ width: 28, height: 28, border: '2px solid #fff' }} />
+                          ))}
+                        </Stack>
+                      </ListItem>
+                      <Collapse in={expandedTask === task.id} timeout="auto" unmountOnExit>
+                        <Box sx={{ mx: 8, my: 2, p: 2, bgcolor: '#fff', borderRadius: 2, boxShadow: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
+                              {task.title}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Chip label="Completed" color="success" size="small" />
+                              <Button variant="outlined" color="secondary" onClick={() => handleAskAI(task)}>
+                                AskAI
+                              </Button>
+                            </Box>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                            <Chip label="Completed on time" color="success" size="small" sx={{ fontWeight: 600, bgcolor: '#f0fdf4', color: '#15803d' }} />
+                            <Chip icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />} label={task.completedDate} size="small" sx={{ mr: 1, bgcolor: '#f0fdf4', color: '#15803d' }} />
+                          </Box>
+                          <Divider sx={{ mb: 2 }} />
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Completion Summary</Typography>
+                          <Box sx={{ mb: 2 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              Task was completed successfully within the allocated timeframe. All required documentation and approvals have been obtained.
+                            </Typography>
+                          </Box>
+                          {/* Comments Section */}
+                          <Box sx={{ mt: 3 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Comments</Typography>
+                            <Box sx={{ maxHeight: 180, overflowY: 'auto', mb: 2 }}>
+                              {(comments[task.id] || initialComments).map((comment) => (
+                                <Box key={comment.id} sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
+                                  <Avatar src={comment.user.avatar} sx={{ width: 32, height: 32, mr: 1 }} />
+                                  <Box sx={{ flex: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mr: 1 }}>{comment.user.name}</Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        {new Date(comment.timestamp).toLocaleString() }
+                                      </Typography>
+                                    </Box>
+                                    <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>{comment.text}</Typography>
+                                  </Box>
+                                </Box>
+                              ))}
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1 }}>
+                              <Avatar src={users[0].avatar} sx={{ width: 32, height: 32 }} />
+                              <TextField
+                                fullWidth
+                                multiline
+                                minRows={1}
+                                maxRows={4}
+                                placeholder="Add a comment..."
+                                value={newComment[task.id] || ''}
+                                onChange={(e) => setNewComment((prev) => ({ ...prev, [task.id]: e.target.value }))}
+                                sx={{ flex: 1 }}
+                                size="small"
+                              />
+                              <Button
+                                variant="contained"
+                                sx={{ minWidth: 0, px: 2, py: 1, borderRadius: 2 }}
+                                disabled={!(newComment[task.id] && newComment[task.id].trim())}
+                                onClick={() => handleAddComment(task.id)}
+                              >
+                                Post
+                              </Button>
+                            </Box>
+                          </Box>
                         </Box>
-                      </Box>
-                    </Box>
-                  </Collapse>
-                </React.Fragment>
+                      </Collapse>
+                    </React.Fragment>
+                  ))}
+                </List>
+              </Collapse>
+            </Box>
+          </Paper>
+        </Grid>
+
+        {/* Right side - Task Tracker and Recent Activities */}
+        <Grid item xs={12} md={5}>
+          {/* Task Tracker Donut Graph */}
+          <Paper sx={{ 
+            p: 3, 
+            mb: 3,
+            background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+            borderRadius: '16px',
+            border: '1px solid #f1f3f4',
+            boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+              transform: 'translateY(-2px)',
+            }
+          }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600, 
+              color: '#1a1a1a',
+              mb: 2,
+              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+            }}>
+              Progress
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+              <Box sx={{ position: 'relative', width: 140, height: 140 }}>
+                <CircularProgress
+                  variant="determinate"
+                  value={50}
+                  size={140}
+                  thickness={2}
+                  sx={{
+                    color: '#3b82f6',
+                    position: 'absolute',
+                    left: 0,
+                    '& .MuiCircularProgress-circle': {
+                      strokeLinecap: 'round',
+                    },
+                  }}
+                />
+                <Box sx={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  textAlign: 'center',
+                }}>
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#1a1a1a' }}>
+                    1/4
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                    tasks
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#3b82f6' }}>
+                  1
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                  Pending
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#10b981' }}>
+                  3
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                  Completed
+                </Typography>
+              </Box>
+            </Box>
+          </Paper>
+
+          {/* Recent Activities */}
+          <Paper sx={{ 
+            p: 3,
+            background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+            borderRadius: '16px',
+            border: '1px solid #f1f3f4',
+            boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+              transform: 'translateY(-2px)',
+            }
+          }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600, 
+              color: '#1a1a1a',
+              mb: 2,
+              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+            }}>
+              Recent Activities
+            </Typography>
+            <Stack spacing={2}>
+              {[
+                { text: 'Task "Reconcile HSBC account" marked as completed', time: '2 hours ago', icon: <CheckCircleIcon sx={{ color: '#10b981', fontSize: 20 }} /> },
+                { text: 'New comment added to "Post payroll" task', time: '4 hours ago', icon: <ErrorOutlineIcon sx={{ color: '#f59e0b', fontSize: 20 }} /> },
+                { text: 'Task "Data validation" assigned to Alice', time: '6 hours ago', icon: <RadioButtonUncheckedIcon sx={{ color: '#3b82f6', fontSize: 20 }} /> },
+                { text: 'Monthly reconciliation report generated', time: '1 day ago', icon: <TableIcon sx={{ color: '#8b5cf6', fontSize: 20 }} /> },
+                { text: 'Task "Exception review" due date updated', time: '2 days ago', icon: <CalendarTodayIcon sx={{ color: '#ef4444', fontSize: 20 }} /> },
+              ].map((activity, idx) => (
+                <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                  <Box sx={{ mt: 0.5 }}>
+                    {activity.icon}
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" sx={{ color: '#374151', lineHeight: 1.4 }}>
+                      {activity.text}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                      {activity.time}
+                    </Typography>
+                  </Box>
+                </Box>
               ))}
-            </List>
-          </Collapse>
-        </Box>
-      </Paper>
+            </Stack>
+          </Paper>
+        </Grid>
+      </Grid>
       {/* Drawer for AskAI */}
       {currentTask && (
         <Drawer
@@ -555,11 +860,11 @@ const Checklist: React.FC = () => {
       )}
 
       {/* Create Task Modal */}
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3, boxShadow: '0 12px 40px rgba(16,24,40,0.12)' } }}>
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 1 } }}>
         <DialogTitle sx={{ py: 2, px: 3, position: 'sticky', top: 0, zIndex: 2, bgcolor: 'background.paper', borderBottom: '1px solid #eee' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1, whiteSpace: 'nowrap' }}>Create New Task</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1, whiteSpace: 'nowrap' }}>Create New Task </Typography>
               <Input
                 placeholder="Add title"
                 value={taskType === 'custom' ? customTitle : taskTitle}
@@ -582,26 +887,32 @@ const Checklist: React.FC = () => {
         </DialogTitle>
         <DialogContent sx={{ pt: 0 }}>
           {/* Two-column layout inspired by reference */}
-          <Grid container spacing={2}>
+          <Grid container spacing={8}>
             <Grid item xs={12} md={7}>
               {/* Task type selector moved into left column to allow sidebar to sit at top */}
               <Box sx={{ mb: 2, mt: 1 }}>
-                <FormControl  size="small" variant="standard">
+                <FormControl  size="small" variant="standard" sx={{ p: 1 }}>
                   <Select value={taskType} onChange={(e) => setTaskType(e.target.value as TaskType)} displayEmpty disableUnderline>
-                    <MenuItem value={'manual_recon'}>Assign Manual Reconciliation</MenuItem>
+                    <MenuItem value={'manual_recon'}> Manual Reconciliation</MenuItem>
                     <MenuItem value={'exception_review'}>Exception Review</MenuItem>
-                    <MenuItem value={'data_validation'}>Data Validation</MenuItem>
+                    <MenuItem value={'journal_entry'}>Journal Entry</MenuItem>
                     <MenuItem value={'custom'}>Custom</MenuItem>
                   </Select>
                 </FormControl>
               </Box>
 
-                <TextField label="Description" value={customDescription} onChange={(e) => setCustomDescription(e.target.value)} fullWidth multiline minRows={4} sx={{ mb: 2 }} />
+                <TextField placeholder="Details"value={customDescription} onChange={(e) => setCustomDescription(e.target.value)} fullWidth multiline minRows={4}  variant="standard"   InputProps={{
+    disableUnderline: true,   // ✅ removes the underline
+  }} sx={{ mb: 2, p: 1, '& .MuiInputBase-input': {
+      padding: '2px',   // inner padding for textarea
+    }, }} />
 
-              {taskType === 'manual_recon' && (
-                <Box sx={{ mb: 2 }}>
+          
+                <Box sx={{ mb: 2, p: 1 }}>
                   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mt: 1 }}>
-                    <TextField type="month" value={period} onChange={(e) => { setPeriod(e.target.value); setFetchingUnreconciled(true); setUnreconciledCount(null); setTimeout(() => { setFetchingUnreconciled(false); setUnreconciledCount(1000); }, 1200); }} variant="standard" InputLabelProps={{ shrink: true }} />
+                    <TextField type="month"  InputProps={{
+    disableUnderline: true,   // ✅ removes the underline
+  }} value={period} onChange={(e) => { setPeriod(e.target.value); setFetchingUnreconciled(true); setUnreconciledCount(null); setTimeout(() => { setFetchingUnreconciled(false); setUnreconciledCount(1000); }, 1200); }} variant="standard" InputLabelProps={{ shrink: true }} />
                     <FormControl fullWidth variant="standard">
                       <Select value={marketplace} onChange={(e) => setMarketplace(e.target.value)} displayEmpty disableUnderline>
                         <MenuItem value="flipkart">Flipkart</MenuItem>
@@ -631,19 +942,21 @@ const Checklist: React.FC = () => {
                     </Stack>
                   )}
                 </Box>
-              )}
+
 
               {/* Comment input */}
-              <TextField placeholder="Add a comment" fullWidth multiline minRows={2} />
+              <TextField placeholder="Add a comment" fullWidth multiline minRows={2} sx={{ p: 1 }} variant='standard' InputProps={{
+    disableUnderline: true,   // ✅ removes the underline
+  }} />
               <FormControlLabel sx={{ mt: 1 }} control={<Switch checked={autoClose} onChange={(e) => setAutoClose(e.target.checked)} />} label="Auto-close task on resolution" />
             
             </Grid>
 
             <Grid item xs={12} md={5}>
-              <Box sx={{ p: 1.5, borderRadius: 0, position: 'sticky', top: 0, bgcolor: '#F9FAFB' }}>
+              <Box sx={{ p: 4, borderRadius: 1, position: 'sticky', bgcolor: '#F9FAFB' }}>
                 {/* Created by */}
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-                  <Avatar src={users[0].avatar} sx={{ width: 28, height: 28 }} />
+                <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+                  <Avatar src={users[0].avatar} sx={{ width: 32, height:32 }} />
                   <Box>
                     <Typography variant="caption" color="text.secondary">Created by</Typography>
                     <Typography variant="body2">{users[0].name}</Typography>
@@ -652,7 +965,7 @@ const Checklist: React.FC = () => {
                 <Divider sx={{ my: 2, borderColor: '#eee' }} />
 
                 {/* Assignee */}
-                <Typography variant="caption" color="text.secondary">Assignee</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ p: 2 }}>Assignee</Typography>
                 <FormControl fullWidth sx={{ mt: 0.5, mb: 2 }} variant="standard">
                   <Select value={assignee} onChange={(e) => setAssignee(e.target.value as number | '')} displayEmpty disableUnderline>
                     <MenuItem value=""><em>Select assignee</em></MenuItem>
@@ -664,7 +977,7 @@ const Checklist: React.FC = () => {
                 <Divider sx={{ my: 2, borderColor: '#eee' }} />
 
                 {/* Due date */}
-                <Typography variant="caption" color="text.secondary">Due Date</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ p: 2 }}>Due Date</Typography>
                 <TextField
                   type="date"
                   value={dueDate}
@@ -673,6 +986,7 @@ const Checklist: React.FC = () => {
                   variant="standard"
                   InputLabelProps={{ shrink: true }}
                   InputProps={{
+                    disableUnderline: true, 
                     startAdornment: (
                       <InputAdornment position="start">
                         <CalendarTodayIcon fontSize="small" sx={{ color: 'text.secondary' }} />
@@ -684,7 +998,7 @@ const Checklist: React.FC = () => {
                 <Divider sx={{ my: 2, borderColor: '#eee' }} />
 
                 {/* Priority */}
-                <Typography variant="caption" color="text.secondary">Set Priority</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ p: 2 }}>Set Priority</Typography>
                 <FormControl fullWidth sx={{ mt: 0.5, mb: 2 }} variant="standard">
                   <Select value={priority} onChange={(e) => setPriority(e.target.value as any)} displayEmpty disableUnderline>
                     <MenuItem value={'urgent'}><FlagIcon sx={{ mr: 1, color: '#ef4444' }} />Urgent</MenuItem>
@@ -695,23 +1009,6 @@ const Checklist: React.FC = () => {
                 </FormControl>
                 <Divider sx={{ my: 2, borderColor: '#eee' }} />
 
-                {/* Tags */}
-                <Typography variant="caption" color="text.secondary">Tags</Typography>
-                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1, my: 1 }}>
-                  {tags.map((t, i) => (
-                    <Chip key={i} label={t} onDelete={() => setTags(tags.filter((_, idx) => idx !== i))} size="small" />
-                  ))}
-                </Stack>
-                <TextField
-                  size="small"
-                  placeholder="Add tag and press Enter"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (newTag.trim()) { setTags([...tags, newTag.trim()]); setNewTag(''); } } }}
-                  fullWidth
-                  variant="standard"
-                  sx={{ mb: 2 }}
-                />
               </Box>
             </Grid>
           </Grid>
