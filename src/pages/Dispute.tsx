@@ -98,6 +98,7 @@ interface TransactionQueryParams {
   sort_order?: 'asc' | 'desc';
   order_item_id?: string;
   remark?: string;
+  pagination?: boolean;
 }
 
 // Transform API data to TransactionRow format
@@ -255,6 +256,7 @@ const DisputePage: React.FC = () => {
     // Set status for unreconciled orders (short_received, excess_received)
     if (disputeSubTab === 0) {
       params.status_in = 'short_received,excess_received';
+      params.pagination = false; // Disable pagination to get all unreconciled orders
     }
 
     // Set date range based on selected date range
@@ -480,6 +482,19 @@ const DisputePage: React.FC = () => {
       if (disputeSubTab === 1) return r.status === 'open';
       return r.status === 'raised';
     });
+  };
+
+  // Calculate total count for unreconciled orders
+  const getUnreconciledTotalCount = () => {
+    if (disputeSubTab === 0 && Array.isArray(apiRows)) {
+      return apiRows.reduce((total, item) => {
+        if (item && typeof item === 'object' && 'count' in item) {
+          return total + (item.count || 0);
+        }
+        return total;
+      }, 0);
+    }
+    return 0;
   };
 
   const current = getCurrentRows();
@@ -754,7 +769,7 @@ const DisputePage: React.FC = () => {
         <CardContent sx={{ p: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Tabs value={disputeSubTab} onChange={(_, v) => setDisputeSubTab(v)} sx={{ '& .MuiTab-root': { textTransform: 'none', minHeight: 32 } }}>
-              <Tab label="Unreconciled Orders" />
+              <Tab label={`Unreconciled Orders (${getUnreconciledTotalCount()})`} />
               <Tab label="Dispute Raised" />
             </Tabs>
             {/* Right controls: date range + platform + send button */}
