@@ -1314,92 +1314,21 @@ const MarketplaceReconciliation: React.FC = () => {
                   textAlign: 'center',
                   letterSpacing: '-0.025em'
                 }}>
-                  Reconciled Difference
+                 Cancelled Orders
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 1 }}>
-                  <Tooltip
-                  title={
-                    <Box sx={{ p: 1 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'white' }}>
-                        Reconciliation Calculation:
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                        <Typography variant="body2" sx={{ color: 'white' }}>
-                          Total Sales: {formatCurrency(parseAmount(reconciliationData.grossSales))}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: 'white' }}>
-                          - Collection: {formatCurrency(parseAmount(reconciliationData.summaryData?.paymentReceivedAsPerSettlementReport?.amount || '0'))}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: 'white' }}>
-                          - Platform Commissions: {formatCurrency(parseAmount(reconciliationData.commission?.totalCommission || '0'))}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: 'white' }}>
-                          - TDS (Tax Deducted): {formatCurrency(parseAmount(reconciliationData.totalTDS))}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: 'white' }}>
-                          - TCS (Tax Collected): {formatCurrency(parseAmount(reconciliationData.totalTDA))}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: 'white', fontWeight: 600, mt: 1 }}>
-                          = Difference: {formatCurrency(parseAmount(reconciliationData.difference))}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  }
-                arrow
-                placement="top"
-                enterDelay={1000}
-                leaveDelay={0}
-                PopperProps={{
-                  sx: {
-                    '& .MuiTooltip-tooltip': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.9)',
-                      borderRadius: '8px',
-                      fontSize: '0.875rem',
-                      padding: '12px',
-                      maxWidth: 350,
-                    },
-                    '& .MuiTooltip-arrow': {
-                      color: 'rgba(0, 0, 0, 0.9)',
-                    },
-                  },
-                }}
-              >
-                <Box sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  cursor: 'help',
-                  transition: 'all 0.2s ease-in-out',
-                  '&:hover': {
-                    transform: 'scale(1.02)',
-                  },
-                }}>
-                  <Typography variant="h2" sx={{
-                    fontWeight: 300,
-                    color: parseAmount(reconciliationData.difference) === 0 ? '#059669' : '#dc2626',
-                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                    fontSize: '3rem',
-                    mb: 2,
-                    textAlign: 'center',
-                    lineHeight: 1,
-                    letterSpacing: '-0.02em',
-                  }}>
-                    {formatCurrency(parseAmount(reconciliationData.difference))}
-                  </Typography>
-                  <Typography variant="body1" sx={{
-                    color: parseAmount(reconciliationData.difference) === 0 ? '#065f46' : '#991b1b',
-                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                    textAlign: 'center',
-                    fontWeight: 500,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.1em',
-                    fontSize: '0.875rem',
-                    opacity: 0.8,
-                  }}>
-                    {parseAmount(reconciliationData.difference) === 0 ? 'Perfectly Reconciled' : 'Reconciliation Required'}
-                  </Typography>
-                </Box>
-                  </Tooltip>
+                <Typography variant="h2" sx={{
+                      fontWeight: 300,
+                      color: '#FF7276',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      fontSize: '3rem',
+                      mb: 2,
+                      textAlign: 'center',
+                      lineHeight: 1,
+                      letterSpacing: '-0.02em',
+                    }}>
+                      {formatCurrency(parseAmount(reconciliationData.summaryData?.returnedOrCancelledOrders?.amount || '0'))}
+                    </Typography>
                 </Box>
               </CardContent>
             </Card>
