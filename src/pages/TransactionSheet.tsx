@@ -215,10 +215,10 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
     try {
       settlementDate = new Date(orderItem.settlement_date).toISOString().split('T')[0];
     } catch (error) {
-      settlementDate = "Invalid Date";
+      settlementDate = "Pending";
     }
   } else {
-    settlementDate = "Invalid Date";
+    settlementDate = "Pending";
   }
   
   return {
