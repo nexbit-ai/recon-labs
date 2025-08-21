@@ -55,7 +55,6 @@ import {
   Close as CloseIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  MoreVert as MoreVertIcon,
   Info as InfoIcon,
   Refresh as RefreshIcon,
   ArrowUpward as ArrowUpwardIcon,
@@ -63,8 +62,7 @@ import {
   UnfoldMore as UnfoldMoreIcon,
   InfoOutlined,
 } from '@mui/icons-material';
-import { p } from 'framer-motion/client';
-import { width } from '@mui/system';
+
 
 // Type definitions for transaction data based on actual API response
 interface TransactionRow {
@@ -1315,7 +1313,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [loading, setLoading] = useState(false);
   const [paginationLoading, setPaginationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(getInitialTab() === 0 ? 0 : getInitialTab() === 1 ? 1 : getInitialTab() === 2 ? 2 : 0);
+  const [activeTab, setActiveTab] = useState(getInitialTab() === 0 ? 0 : getInitialTab() === 1 ? 1 : 0);
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionRow | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [totalCount, setTotalCount] = useState(0);
@@ -1323,11 +1321,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HTMLElement | null>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
-  const [tabCounts, setTabCounts] = useState<{ settled: number | null; unsettled: number | null; unreconciled?: number | null }>({ settled: null, unsettled: null, unreconciled: null });
+  const [tabCounts, setTabCounts] = useState<{ settled: number | null; unsettled: number | null }>({ settled: null, unsettled: null });
   const [metadata, setMetadata] = useState<TransactionMetadata | null>(null);
-  // Action menu state (for Action column ellipsis)
-  const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(null);
-  const [actionMenuRow, setActionMenuRow] = useState<TransactionRow | null>(null);
+
 
   // Rely on MUI Menu's built-in outside click handling
   
@@ -1521,9 +1517,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     } else if (remarkToUse === 'unsettled') {
       params.status_in = 'unsettled';
       console.log('Setting API parameter: status_in = unsettled (for Unsettled tab)');
-    } else if (remarkToUse === 'unreconciled') {
-      params.status_in = 'unreconciled';
-      console.log('Setting API parameter: status_in = unreconciled (for Unreconciled Orders tab)');
     }
 
     // Only add additional parameters if filters are explicitly applied
@@ -1619,7 +1612,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           setTabCounts({
             settled: (meta.counts as any).settlement_matched ?? meta.counts.settled,
             unsettled: meta.counts.unsettled,
-            unreconciled: (meta.counts as any).unreconciled ?? null,
           });
           
           // Update total count from metadata
@@ -1747,7 +1739,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           setTabCounts({
             settled: meta.counts.settled,
             unsettled: meta.counts.unsettled,
-            unreconciled: (meta.counts as any).unreconciled ?? null,
           });
           
           // Update total count from metadata
@@ -1850,10 +1841,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Fetch data on component mount
   useEffect(() => {
     setLoading(true);
-    // Start with unreconciled orders (activeTab = 0)
-    fetchOrders(1, 'unreconciled');
+    // Start with settled transactions (activeTab = 0)
+    fetchOrders(1, 'settlement_matched');
     // Prefetch counts for all tabs
-    fetchTabCount('unreconciled');
     fetchTabCount('settlement_matched');
     fetchTabCount('unsettled');
   }, []);
@@ -2182,7 +2172,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleChangePage = (event: unknown, newPage: number) => {
     const newPageNumber = newPage + 1; // Convert from 0-based to 1-based
     setPage(newPage);
-    const remark = activeTab === 0 ? 'unreconciled' : activeTab === 1 ? 'settlement_matched' : 'unsettled';
+    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
     fetchOrders(newPageNumber, remark);
   };
 
@@ -2191,7 +2181,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setRowsPerPage(newRowsPerPage);
     setPage(0);
     // Reset to first page when changing rows per page
-    const remark = activeTab === 0 ? 'unreconciled' : activeTab === 1 ? 'settlement_matched' : 'unsettled';
+    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
     fetchOrders(1, remark);
   };
 
@@ -2231,7 +2221,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const url = URL.createObjectURL(blob);
       
       link.setAttribute('href', url);
-      link.setAttribute('download', `transaction_sheet_${activeTab === 0 ? 'unreconciled' : activeTab === 1 ? 'settled' : 'unsettled'}_${new Date().toISOString().split('T')[0]}.csv`);
+              link.setAttribute('download', `transaction_sheet_${activeTab === 0 ? 'settled' : 'unsettled'}_${new Date().toISOString().split('T')[0]}.csv`);
       link.style.visibility = 'hidden';
       
       document.body.appendChild(link);
@@ -2253,7 +2243,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setColumnFilters({});
     setPage(0);
     setCurrentPage(1);
-    const remark = activeTab === 0 ? 'unreconciled' : activeTab === 1 ? 'settlement_matched' : 'unsettled';
+    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
     fetchOrders(1, remark);
   };
 
@@ -2265,7 +2255,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setCurrentPage(1); // Reset current page
     
     // Determine the correct remark based on the new tab value
-    const remark = newValue === 0 ? 'unreconciled' : newValue === 1 ? 'settlement_matched' : 'unsettled';
+    const remark = newValue === 0 ? 'settlement_matched' : 'unsettled';
     console.log(`Fetching data for tab ${newValue} with remark: ${remark}`);
     fetchOrders(1, remark); // Fetch first page data with correct remark
   };
@@ -2295,10 +2285,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       "Difference",
       "Status",
     ];
-    // Only show Reason/Action on Unreconciled tab (index 0)
-    if (activeTab === 0) {
-      return [...base, "Reason", "Action"];
-    }
+    // No special columns for any tab now
     return base;
   };
 
@@ -2376,7 +2363,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         },
                       }}
                     >
-                      <Tab label={`Unreconciled Orders${tabCounts.unreconciled != null ? ` (${tabCounts.unreconciled})` : ''}`} />
                       <Tab label={`Settled${tabCounts.settled != null ? ` (${tabCounts.settled})` : ''}`} />
                       <Tab label={`Unsettled${tabCounts.unsettled != null ? ` (${tabCounts.unsettled})` : ''}`} />
                     </Tabs>
@@ -2388,7 +2374,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     
                     <IconButton
                       onClick={() => {
-                        const remark = activeTab === 0 ? 'unreconciled' : activeTab === 1 ? 'settlement_matched' : 'unsettled';
+                        const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
                         fetchOrders(1, remark);
                       }}
                       disabled={loading}
@@ -2445,9 +2431,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             delete p[key as any];
                             return p;
                           });
-                          // Re-apply after deletion
-                          const remark = activeTab === 0 ? 'settlement_matched' : activeTab === 1 ? 'unsettled' : 'unreconciled';
-                          fetchOrdersWithFilters(1, remark, next, pendingDateRange);
+                                                      // Re-apply after deletion
+                            const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+                            fetchOrdersWithFilters(1, remark, next, pendingDateRange);
                         }}
                       />
                     ))}
@@ -2622,13 +2608,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         const isSelected = selectedTransaction?.["Order Item ID"] === row["Order Item ID"];
                         return (
                           <React.Fragment key={rowIndex}>
-                            <TableRow 
-                              sx={{ 
-                                borderLeft: `4px solid ${activeTab === 0 ? '#ef4444' : activeTab === 1 ? '#10b981' : '#ef4444'}`,
-                                background: '#ffffff',
-                                position: 'relative',
-                              }}
-                            >
+                                                          <TableRow 
+                                sx={{ 
+                                  borderLeft: `4px solid ${activeTab === 0 ? '#10b981' : '#ef4444'}`,
+                                  background: '#ffffff',
+                                  position: 'relative',
+                                }}
+                              >
                         {visibleColumns.map((column, colIndex) => {
                           const value = (row as any)[column];
                           
@@ -2718,30 +2704,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       <InfoOutlined fontSize="small" sx={{ color: '#6b7280' }}/>
                                     </IconButton>
                                   </Box>
-                                ) : column === 'Action' ? (
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}>
-                                    <Button
-                                      size="small"
-                                      variant="outlined"
-                                      onClick={() => console.log('Reconcile', row["Order Item ID"]) }
-                                      sx={{
-                                        textTransform: 'none',
-                                        px: 1.5,
-                                        py: 0.5,
-                                        '&:hover': { backgroundColor: '#f3f4f6' }
-                                      }}
-                                    >
-                                      Reconcile
-                                    </Button>
-                                    <IconButton
-                                      data-action-menu
-                                      size="small"
-                                      onClick={(e) => { e.stopPropagation(); setActionMenuAnchor(e.currentTarget); setActionMenuRow(row); }}
-                                      sx={{ color: '#6b7280', '&:hover': { background: '#f3f4f6', color: '#374151' } }}
-                                    >
-                                      <MoreVertIcon fontSize="small" />
-                                    </IconButton>
-                                  </Box>
+
                                 ) : (
                                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                                     {displayValue}
@@ -2782,47 +2745,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           </Fade>
         </Box>
 
-        {/* Row Action Menu (global) */}
-        <Menu
-          anchorEl={actionMenuAnchor}
-          open={Boolean(actionMenuAnchor)}
-          onClose={() => { setActionMenuAnchor(null); setActionMenuRow(null); }}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-          slotProps={{
-            paper: {
-              sx: {
-                minWidth: 150,
-                p: 0.1,
-                mt: 1,
-                width: '10px',
-                borderRadius: 0.5,
-                backgroundColor: '#f3f4f6',
-                overflow: 'hidden',
-              }
-            },
-          } as any}
-          sx={{
-            zIndex: 11000,
-          }}
-        >
-          <Box sx={{ p: 2, width: '100%' }}>
-            <Button
-              variant="outlined"
-              color="primary"
-              onClick={() => {
-                if (actionMenuRow) {
-                  console.log('Raise Dispute', actionMenuRow["Order Item ID"]);
-                }
-                setActionMenuAnchor(null);
-                setActionMenuRow(null);
-              }}
-              sx={{ textTransform: 'none', fontWeight: 400 , width: '100%', fontSize: '0.8rem', p: 0.4}}
-            >
-              Raise Dispute
-            </Button>
-          </Box>
-        </Menu>
+
         
         {/* Transaction Details Popup */}
         <TransactionDetailsPopup

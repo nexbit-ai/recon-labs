@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, Fragment } from 'react';
 import { 
   Box, 
   Card, 
@@ -11,6 +11,7 @@ import {
   TableCell, 
   TableBody, 
   TableContainer, 
+  Fade,
   Button, 
   Checkbox, 
   Snackbar, 
@@ -34,36 +35,173 @@ import {
   StorefrontOutlined as StorefrontIcon,
   FilterList as FilterIcon
 } from '@mui/icons-material';
+import { api } from '../services/api';
+
+// Type definitions for transaction data based on API response
+interface TransactionRow {
+  "Order Item ID": string;
+  "Order Value": number;
+  "Settlement Value": number;
+  "Order Date": string;
+  "Settlement Date": string;
+  "Difference": number;
+  "Remark": string;
+  "Event Type": string;
+  // Preserve original API response data for popup access
+  originalData?: any;
+}
+
+// Interface for grouped unreconciled data
+interface GroupedUnreconciledData {
+  reason: string;
+  count: number;
+  amount: number;
+  orderIds: string[];
+  transactions: any[]; // Store full transaction data for expansion
+}
+
+// API Response metadata types
+interface TransactionMetadata {
+  counts: {
+    excess_received: number;
+    settlement_matched: number;
+    settled: number;
+    short_received: number;
+    unsettled: number;
+  };
+  pagination: {
+    current_count: number;
+    has_next: boolean;
+    has_prev: boolean;
+    limit: number;
+    page: number;
+    total_count: number;
+    total_pages: number;
+  };
+  totals: {
+    total_diff: string;
+    total_sales_value: string;
+    total_settlement_value: string;
+  };
+}
+
+// Query parameters interface
+interface TransactionQueryParams {
+  page?: number;
+  limit?: number;
+  status_in?: string;
+  order_date_from?: string;
+  order_date_to?: string;
+  diff_min?: number;
+  diff_max?: number;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+  order_item_id?: string;
+  remark?: string;
+}
+
+// Transform API data to TransactionRow format
+const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
+  // Helper function to parse currency/numeric strings
+  const parseNumericValue = (value: any): number => {
+    if (value === null || value === undefined || value === '') {
+      return 0;
+    }
+    
+    // Convert to string and clean it
+    const cleanedValue = String(value)
+      .replace(/[₹$,\s]/g, '') // Remove currency symbols, commas, and spaces
+      .replace(/[^\d.-]/g, '') // Keep only digits, dots, and minus signs
+      .trim();
+    
+    const parsed = parseFloat(cleanedValue);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  // Extract values from the API structure
+  const orderValue = parseNumericValue(orderItem.order_value || orderItem.buyer_invoice_amount);
+  const settlementValue = parseNumericValue(orderItem.settlement_value);
+  const difference = parseNumericValue(orderItem.diff);
+  
+  // Handle missing or empty order_item_id
+  let orderItemId = orderItem.order_item_id;
+  if (!orderItemId || orderItemId.trim() === '') {
+    orderItemId = `ITEM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+  
+  // Determine remark based on API response
+  let remark = "unsettled";
+  if (orderItem.status === "settlement_matched") {
+    if (difference === 0) {
+      remark = "Matched";
+    } else if (difference > 0) {
+      remark = "Short Amount Received";
+    } else {
+      remark = "Excess Amount Received";
+    }
+  }
+  
+  // Determine settlement date from API response
+  let settlementDate = "";
+  if (orderItem.settlement_date && orderItem.settlement_date.trim() !== '') {
+    try {
+      settlementDate = new Date(orderItem.settlement_date).toISOString().split('T')[0];
+    } catch (error) {
+      settlementDate = "Invalid Date";
+    }
+  } else {
+    settlementDate = "Invalid Date";
+  }
+  
+  return {
+    "Order Item ID": orderItemId,
+    "Order Value": orderValue,
+    "Settlement Value": settlementValue,
+    "Order Date": new Date(orderItem.order_date).toISOString().split('T')[0],
+    "Settlement Date": settlementDate,
+    "Difference": difference,
+    "Remark": remark,
+    "Event Type": orderItem.event_type || "Sale", // Default to "Sale" if not provided
+    // Preserve the original API response data for popup access
+    originalData: orderItem,
+  };
+};
 
 const DisputePage: React.FC = () => {
   const [disputeSubTab, setDisputeSubTab] = useState<number>(0); // 0: unreconciled, 1: open, 2: raised
   
-  // Date range filter state
-  const [selectedDateRange, setSelectedDateRange] = useState('this-month');
-  const [dateRangeMenuAnchor, setDateRangeMenuAnchor] = useState<null | HTMLElement>(null);
-  const [customStartDate, setCustomStartDate] = useState<string>('');
-  const [customEndDate, setCustomEndDate] = useState<string>('');
+  // State for date filtering
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  const [selectedDateRange, setSelectedDateRange] = useState<'this-month' | 'last-month' | 'this-year' | 'custom'>('this-month');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [tempStartDate, setTempStartDate] = useState('');
+  const [tempEndDate, setTempEndDate] = useState('');
 
   // Calendar popup state
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
-  const [tempStartDate, setTempStartDate] = useState<string>('');
-  const [tempEndDate, setTempEndDate] = useState<string>('');
   const calendarPopupRef = useRef<HTMLDivElement>(null);
+  
+  // Date range menu state
+  const [dateRangeMenuAnchor, setDateRangeMenuAnchor] = useState<HTMLElement | null>(null);
 
   // Date range options
   const dateRangeOptions = [
     { value: 'today', label: 'Today', dates: 'Today' },
     { value: 'this-week', label: 'This week', dates: 'This week' },
     { value: 'this-month', label: 'This month', dates: 'This month' },
-    { value: 'this-year', label: 'This year', dates: 'This year' },
+    { value: 'this-year', label: 'This year', dates: 'Jan 1 - Dec 31' },
     { value: 'custom', label: 'Custom date range', dates: 'Custom' }
   ];
 
-  const [rows, setRows] = useState<Array<{ id: string; orderItemId: string; orderDate: string; difference: number; remark: string; eventType: string; status: 'unreconciled' | 'open' | 'raised'; }>>([]);
+  // API data state - can be either TransactionRow[] or grouped data for unreconciled tab
+  const [apiRows, setApiRows] = useState<TransactionRow[] | GroupedUnreconciledData[]>([]);
+  const [mockRows, setMockRows] = useState<Array<{ id: string; orderItemId: string; orderDate: string; difference: number; remark: string; eventType: string; status: 'unreconciled' | 'open' | 'raised'; }>>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [apiLoading, setApiLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Column filter state
   const [columnFilters, setColumnFilters] = useState<Record<string, any>>({});
@@ -83,8 +221,223 @@ const DisputePage: React.FC = () => {
     'Status': { type: 'enum' }
   };
 
+  // Get current date range text for display
+  const getCurrentDateRangeText = () => {
+    if (selectedDateRange === 'this-month') {
+      const now = new Date();
+      return `${now.toLocaleString('default', { month: 'long' })} ${now.getFullYear()}`;
+    } else if (selectedDateRange === 'last-month') {
+      const now = new Date();
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      return `${lastMonth.toLocaleString('default', { month: 'long' })} ${lastMonth.getFullYear()}`;
+    } else if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
+      return `${customStartDate} to ${customEndDate}`;
+    }
+    return 'This Month';
+  };
+
+  // Handle date range selection
+  const handleDateRangeSelect = (value: string) => {
+    if (value === 'custom') {
+      setShowCustomDatePicker(true);
+    } else {
+      setSelectedDateRange(value as 'this-month' | 'last-month' | 'this-year' | 'custom');
+      if (value === 'this-month' || value === 'last-month' || value === 'this-year') {
+        fetchUnreconciledOrders();
+      }
+    }
+    setDateRangeMenuAnchor(null);
+  };
+
+  // Build query parameters for API calls
+  const buildQueryParams = (): TransactionQueryParams => {
+    const params: TransactionQueryParams = {};
+    // Set status for unreconciled orders (short_received, excess_received)
+    if (disputeSubTab === 0) {
+      params.status_in = 'short_received,excess_received';
+    }
+
+    // Set date range based on selected date range
+    if (selectedDateRange === 'this-month') {
+      const now = new Date();
+      const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+      const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
+      params.order_date_from = firstDay.toISOString().split('T')[0];
+      params.order_date_to = lastDay.toISOString().split('T')[0];
+    } else if (selectedDateRange === 'last-month') {
+      const now = new Date();
+      const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1));
+      const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 0));
+      params.order_date_from = firstDay.toISOString().split('T')[0];
+      params.order_date_to = lastDay.toISOString().split('T')[0];
+    } else if (selectedDateRange === 'this-year') {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      
+      // Use UTC dates to avoid timezone issues
+      const firstDay = new Date(Date.UTC(currentYear, 0, 1)); // January 1st (month 0)
+      const lastDay = new Date(Date.UTC(currentYear, 11, 31)); // December 31st (month 11)
+      
+      // Format dates as YYYY-MM-DD using UTC methods
+      params.order_date_from = firstDay.toISOString().split('T')[0];
+      params.order_date_to = lastDay.toISOString().split('T')[0];
+      
+      // Debug logging for this-year selection
+      console.log('This year date calculation:', {
+        currentYear: currentYear,
+        firstDay: firstDay.toISOString().split('T')[0],
+        lastDay: lastDay.toISOString().split('T')[0],
+        firstDayDate: firstDay,
+        lastDayDate: lastDay,
+        firstDayMonth: firstDay.getUTCMonth(), // Should be 0 (January)
+        lastDayMonth: lastDay.getUTCMonth()    // Should be 11 (December)
+      });
+    } else if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
+      params.order_date_from = customStartDate;
+      params.order_date_to = customEndDate;
+    }
+    
+    // Ensure we always have default dates if none are set
+    if (!params.order_date_from || !params.order_date_to) {
+      const now = new Date();
+      const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+      const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
+      params.order_date_from = firstDay.toISOString().split('T')[0];
+      params.order_date_to = lastDay.toISOString().split('T')[0];
+    }
+
+    return params;
+  };
+
+  // Fetch unreconciled orders from API
+  const fetchUnreconciledOrders = async () => {
+    if (disputeSubTab !== 0) return; // Only fetch for unreconciled tab
+    
+    setApiLoading(true);
+    setError(null);
+    
+    try {
+      const queryParams = buildQueryParams();
+      console.log('Fetching unreconciled orders with params:', queryParams);
+      console.log('Date range:', queryParams.order_date_from, 'to', queryParams.order_date_to);
+      console.log('Selected date range:', selectedDateRange);
+      console.log('Full queryParams object:', JSON.stringify(queryParams, null, 2));
+      
+      // Use the existing API service for transactions - pass queryParams directly like TransactionSheet does
+      const response = await api.transactions.getTransactions(queryParams as any);
+      
+      if (response.success && response.data) {
+        const responseData = response.data;
+        console.log('API Response:', responseData);
+        console.log('Response data type:', typeof responseData);
+        console.log('Response data keys:', Object.keys(responseData));
+        
+        // The data is directly in responseData.data array
+        const transactionData = responseData.data;
+        
+        console.log('Transaction data to process:', transactionData);
+        console.log('Transaction data length:', transactionData.length);
+        
+        if (Array.isArray(transactionData) && transactionData.length > 0) {
+          // Log first transaction to see structure
+          console.log('First transaction structure:', transactionData[0]);
+          console.log('Total transactions to process:', transactionData.length);
+          
+          // Check if we have the expected fields
+          const sampleTransaction = transactionData[0];
+          console.log('Sample transaction fields:', {
+            reason: sampleTransaction.reason,
+            status: sampleTransaction.status,
+            context: sampleTransaction.context,
+            buyer_invoice_amount: sampleTransaction.context?.buyer_invoice_amount,
+            order_value: sampleTransaction.order_value,
+            order_item_id: sampleTransaction.order_item_id,
+            diff: sampleTransaction.diff,
+            order_date: sampleTransaction.order_date,
+            settlement_date: sampleTransaction.settlement_date
+          });
+          
+          // Log all available keys to see what we can use for grouping
+          console.log('All available transaction keys:', Object.keys(sampleTransaction));
+          
+          // Transform API data to grouped format for unreconciled tab
+          const groupedData = transactionData.reduce((acc: any, transaction: any, index: number) => {
+            // Group by the actual reason from API response
+            const reason = transaction.reason || 'Unknown';
+            
+            // Use buyer_invoice_amount from context
+            const amount = parseFloat(transaction.context?.buyer_invoice_amount || '0');
+            
+            console.log(`Processing transaction ${index + 1}/${transactionData.length}:`, { 
+              reason: transaction.reason, 
+              status: transaction.status, 
+              amount, 
+              order_item_id: transaction.order_item_id,
+              buyer_invoice_amount: transaction.context?.buyer_invoice_amount,
+              diff: transaction.diff
+            });
+            
+            if (!acc[reason]) {
+              acc[reason] = {
+                reason: reason, // Use the actual reason from API
+                count: 0,
+                amount: 0,
+                orderIds: [],
+                transactions: [] // Store full transaction data for expansion
+              };
+              console.log(`Created new group for reason: ${reason}`);
+            }
+            
+            acc[reason].count += 1;
+            acc[reason].amount += amount;
+            acc[reason].orderIds.push(transaction.order_item_id);
+            acc[reason].transactions.push(transaction); // Store full transaction
+            
+            console.log(`Updated group ${reason}: count=${acc[reason].count}, amount=${acc[reason].amount}`);
+            
+            return acc;
+          }, {});
+          
+          console.log('Final grouped data object:', groupedData);
+          console.log('Number of groups created:', Object.keys(groupedData).length);
+          
+          console.log('Grouped data before conversion:', groupedData);
+          
+          // Convert grouped data to array format
+          const groupedArray = Object.values(groupedData);
+          console.log('Final grouped array:', groupedArray);
+          
+          // Test: Log each item to verify structure
+          groupedArray.forEach((item: any, index) => {
+            console.log(`Item ${index}:`, {
+              reason: item.reason,
+              count: item.count,
+              amount: item.amount,
+              orderIds: item.orderIds
+            });
+          });
+          
+          setApiRows(groupedArray as GroupedUnreconciledData[]);
+          console.log('setApiRows called with:', groupedArray);
+        } else {
+          console.error('No valid transaction data found');
+          setError('No transaction data received from API');
+        }
+      } else {
+        console.error('API response not successful:', response);
+        setError('Failed to fetch unreconciled orders data');
+      }
+    } catch (err) {
+      console.error('Error fetching unreconciled orders:', err);
+      setError('Failed to load unreconciled orders data. Please try again.');
+    } finally {
+      setApiLoading(false);
+    }
+  };
+
+  // Load mock data for other tabs and fetch unreconciled orders on mount
   useEffect(() => {
-    if (rows.length === 0) {
+    if (mockRows.length === 0) {
       const remarks = ['Short Amount Received', 'Excess Amount Received', 'Pending Settlement'];
       const list: Array<{ id: string; orderItemId: string; orderDate: string; difference: number; remark: string; eventType: string; status: 'unreconciled' | 'open' | 'raised'; }> = [];
       for (let i = 0; i < 12; i++) {
@@ -98,21 +451,86 @@ const DisputePage: React.FC = () => {
           status: i % 3 === 0 ? 'raised' : i % 2 === 0 ? 'open' : 'unreconciled',
         });
       }
-      setRows(list);
+      setMockRows(list);
     }
   }, []);
 
+  // Fetch unreconciled orders on component mount
+  useEffect(() => {
+    if (disputeSubTab === 0) {
+      fetchUnreconciledOrders();
+    }
+  }, []);
+
+  // Fetch API data when switching to unreconciled tab
+  useEffect(() => {
+    if (disputeSubTab === 0) {
+      fetchUnreconciledOrders();
+    }
+  }, [disputeSubTab, selectedDateRange, customStartDate, customEndDate]);
+
+  // Get current rows based on active tab
+  const getCurrentRows = () => {
+    if (disputeSubTab === 0) {
+      // For unreconciled tab, return the grouped data directly
+      // The data is already grouped by the API call
+      return apiRows;
+    }
+    return mockRows.filter(r => {
+      if (disputeSubTab === 1) return r.status === 'open';
+      return r.status === 'raised';
+    });
+  };
+
+  const current = getCurrentRows();
+  
+  // Debug logging for data flow
+  useEffect(() => {
+    if (disputeSubTab === 0) {
+      console.log('Current apiRows:', apiRows);
+      console.log('Current rows for display:', current);
+      console.log('apiRows length:', apiRows.length);
+      console.log('current length:', current.length);
+      console.log('Column filters:', columnFilters);
+      console.log('Active filter column:', activeFilterColumn);
+    }
+  }, [apiRows, disputeSubTab, current, columnFilters, activeFilterColumn]);
+  
+  // Force re-render when apiRows changes
+  const [forceUpdate, setForceUpdate] = useState(0);
+  
+  useEffect(() => {
+    if (apiRows.length > 0) {
+      setForceUpdate(prev => prev + 1);
+    }
+  }, [apiRows]);
+  
+  // Track which rows are expanded
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  
+  const toggleRowExpansion = (reason: string) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(reason)) {
+        newSet.delete(reason);
+      } else {
+        newSet.add(reason);
+      }
+      return newSet;
+    });
+  };
+  
   // Action handlers for unreconciled transactions
   const handleMarkReconciled = (id: string) => {
-    setRows(prev => prev.map(row => 
-      row.id === id ? { ...row, status: 'open' } : row
-    ));
+    // For API data, we can't modify the status directly
+    // This would typically call an API to update the status
+    console.log('Marking as reconciled:', id);
   };
 
   const handleRaiseDispute = (id: string) => {
-    setRows(prev => prev.map(row => 
-      row.id === id ? { ...row, status: 'open' } : row
-    ));
+    // For API data, we can't modify the status directly
+    // This would typically call an API to update the status
+    console.log('Raising dispute:', id);
   };
 
   // Column filter handlers
@@ -189,7 +607,7 @@ const DisputePage: React.FC = () => {
 
   const getUniqueValuesForColumn = (column: string) => {
     const values = new Set<string>();
-    rows.forEach(row => {
+    mockRows.forEach(row => {
       let value: string;
       switch (column) {
         case 'Remark':
@@ -227,50 +645,57 @@ const DisputePage: React.FC = () => {
     };
   }, [showCustomDatePicker]);
 
-  const current = rows.filter(r => {
-    // First filter by tab
-    let statusMatch = false;
-    if (disputeSubTab === 0) statusMatch = r.status === 'unreconciled';
-    else if (disputeSubTab === 1) statusMatch = r.status === 'open';
-    else statusMatch = r.status === 'raised';
-    
-    if (!statusMatch) return false;
-
-    // Then apply column filters
+  // Apply column filters to current data
+  const filteredCurrent = current.filter(row => {
+    // Apply column filters
     for (const [column, filter] of Object.entries(columnFilters)) {
       if (!filter) continue;
       
       let value: any;
-      switch (column) {
-        case 'Order Item ID':
-          value = r.orderItemId;
-          break;
-        case 'Order Value':
-          value = Math.abs(r.difference) + 1000;
-          break;
-        case 'Settlement Value':
-          value = Math.abs(r.difference) + 900;
-          break;
-        case 'Order Date':
-          value = r.orderDate;
-          break;
-        case 'Settlement Date':
-          value = '-';
-          break;
-        case 'Difference':
-          value = Math.abs(r.difference);
-          break;
-        case 'Remark':
-          value = r.remark;
-          break;
-        case 'Event Type':
-          value = r.eventType;
-          break;
-        case 'Status':
-          value = r.status;
-          break;
-        default:
-          continue;
+      
+      // Handle both API data and mock data
+      if ('Order Item ID' in row) {
+        // API data (TransactionRow)
+        switch (column) {
+          case 'Order Item ID':
+            value = row['Order Item ID'];
+            break;
+          default:
+            continue;
+        }
+      } else if ('reason' in row) {
+        // Grouped data (unreconciled tab) - skip filtering for now
+        continue;
+      } else {
+        // Mock data (old structure)
+        switch (column) {
+          case 'Order Item ID':
+            value = (row as any).orderItemId;
+            break;
+          case 'Order Value':
+            value = Math.abs((row as any).difference) + 1000;
+            break;
+          case 'Settlement Value':
+            value = Math.abs((row as any).difference) + 900;
+            break;
+          case 'Order Date':
+            value = (row as any).orderDate;
+            break;
+          case 'Settlement Date':
+            value = '-';
+            break;
+          case 'Difference':
+            value = Math.abs((row as any).difference);
+            break;
+          case 'Remark':
+            value = (row as any).remark;
+            break;
+          case 'Event Type':
+            value = (row as any).eventType;
+            break;
+          default:
+            continue;
+        }
       }
 
       if (typeof filter === 'string') {
@@ -310,18 +735,16 @@ const DisputePage: React.FC = () => {
     return true;
   });
 
-  // Select all functionality
-  const allSelected = current.length > 0 && current.every(r => selectedIds.includes(r.id));
+ 
   
-  const toggleSelectAll = () => {
-    if (allSelected) setSelectedIds(prev => prev.filter(id => !current.some(r => r.id === id)));
-    else setSelectedIds(prev => Array.from(new Set([...prev, ...current.map(r => r.id)])));
-  };
   const toggleRow = (id: string) => setSelectedIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  
   const sendToFlipkart = () => {
     if (selectedIds.length === 0) return;
     setSnackbarOpen(true);
-    setRows(prev => prev.map(r => (selectedIds.includes(r.id) ? { ...r, status: 'raised' } : r)));
+    // For API data, we can't modify the status directly
+    // This would typically call an API to update the status
+    console.log('Sending to Flipkart:', selectedIds);
     setSelectedIds([]);
   };
 
@@ -331,7 +754,7 @@ const DisputePage: React.FC = () => {
         <CardContent sx={{ p: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Tabs value={disputeSubTab} onChange={(_, v) => setDisputeSubTab(v)} sx={{ '& .MuiTab-root': { textTransform: 'none', minHeight: 32 } }}>
-              <Tab label="Dispute Found" />
+              <Tab label="Unreconciled Orders" />
               <Tab label="Dispute Raised" />
             </Tabs>
             {/* Right controls: date range + platform + send button */}
@@ -364,6 +787,70 @@ const DisputePage: React.FC = () => {
               <Button
                 variant="outlined"
                 endIcon={<KeyboardArrowDownIcon />}
+                startIcon={<CalendarTodayIcon />}
+                onClick={(event) => setDateRangeMenuAnchor(event.currentTarget)}
+                sx={{
+                  borderColor: '#6B7280',
+                  color: '#6B7280',
+                  textTransform: 'none',
+                  minWidth: 200,
+                  minHeight: 36,
+                  px: 1.5,
+                  fontSize: '0.7875rem',
+                  '&:hover': {
+                    borderColor: '#4B5563',
+                    backgroundColor: 'rgba(107, 114, 128, 0.04)',
+                  },
+                }}
+              >
+                <Box sx={{ textAlign: 'left' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
+                    {getCurrentDateRangeText()}
+                  </Typography>
+                </Box>
+              </Button>
+              
+              <Menu
+                anchorEl={dateRangeMenuAnchor}
+                open={Boolean(dateRangeMenuAnchor)}
+                onClose={() => setDateRangeMenuAnchor(null)}
+                PaperProps={{
+                  sx: {
+                    mt: 1,
+                    minWidth: 250,
+                    borderRadius: 0.5,
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                    border: '1px solid #e5e7eb'
+                  }
+                }}
+              >
+                {dateRangeOptions.map((option) => (
+                  <MenuItem
+                    key={option.value}
+                    onClick={() => handleDateRangeSelect(option.value)}
+                    sx={{
+                      py: 1.5,
+                      px: 2,
+                      '&:hover': {
+                        backgroundColor: '#f9fafb'
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
+                        {option.label}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                        {option.dates}
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Menu>
+              
+              <Button
+                variant="outlined"
+                endIcon={<KeyboardArrowDownIcon />}
                 startIcon={<StorefrontIcon />}
                 sx={{
                   borderColor: '#6B7280', color: '#6B7280', textTransform: 'none',
@@ -379,6 +866,8 @@ const DisputePage: React.FC = () => {
           </Box>
         </CardContent>
       </Card>
+
+
 
       <Card sx={{ 
         background: '#ffffff',
@@ -409,476 +898,701 @@ const DisputePage: React.FC = () => {
             }}>
               <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
                 <TableRow>
-                  <TableCell 
-                    padding="checkbox" 
-                    sx={{
-                      fontWeight: 700,
-                      color: '#111827',
-                      background: '#f9fafb',
-                      textAlign: 'center',
-                      minWidth: 60,
-                      transition: 'all 0.3s ease',
-                      position: 'relative',
-                      py: 1,
-                    }}
-                  >
-                    <Checkbox
-                      checked={allSelected}
-                      indeterminate={current.length > 0 && !allSelected && selectedIds.length > 0}
-                      onChange={toggleSelectAll}
-                      sx={{
-                        color: '#6b7280',
-                        '&.Mui-checked': {
-                          color: '#1f2937',
-                        },
-                        '&.MuiCheckbox-indeterminate': {
-                          color: '#1f2937',
-                        },
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell sx={{
-                    fontWeight: 700,
-                    color: '#111827',
-                    background: '#f9fafb',
-                    textAlign: 'center',
-                    minWidth: 160,
-                    transition: 'all 0.3s ease',
-                    position: 'relative',
-                    py: 1,
-                  }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                          Order Item ID
-                        </Typography>
-                        <IconButton 
-                          size="small" 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openFilterPopover('Order Item ID', e.currentTarget);
-                          }}
+                  {disputeSubTab === 0 ? (
+                    // Unreconciled Orders tab - show only 4 columns
+                    <>
+                      <TableCell 
+                        padding="checkbox" 
+                        sx={{
+                          fontWeight: 700,
+                          color: '#111827',
+                          background: '#f9fafb',
+                          textAlign: 'center',
+                          minWidth: 60,
+                          transition: 'all 0.3s ease',
+                          position: 'relative',
+                          py: 1,
+                        }}
+                      >
+                        <Checkbox
+                          checked={false}
+                          disabled
                           sx={{
-                            ml: 0.5,
-                            color: isFilterActive('Order Item ID') ? '#1f2937' : '#6b7280',
-                            background: isFilterActive('Order Item ID') ? '#e5e7eb' : 'transparent',
-                            '&:hover': { background: '#f3f4f6' },
+                            color: '#6b7280',
                           }}
-                          aria-label="Filter Order Item ID"
-                        >
-                          <FilterIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{
-                    fontWeight: 700,
-                    color: '#111827',
-                    background: '#f9fafb',
-                    border: '0.5px solid #e5e7eb',
-                    borderRight: 'none',
-                    textAlign: 'center',
-                    minWidth: 140,
-                    transition: 'all 0.3s ease',
-                    position: 'relative',
-                    py: 1,
-                  }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                        />
+                      </TableCell>
+                      <TableCell sx={{
+                        fontWeight: 700,
+                        color: '#111827',
+                        background: '#f9fafb',
+                        textAlign: 'center',
+                        minWidth: 200,
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        py: 1,
+                      }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                          Order Value
+                          Reason
                         </Typography>
-                        <IconButton 
-                          size="small" 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openFilterPopover('Order Value', e.currentTarget);
-                          }}
-                          sx={{
-                            ml: 0.5,
-                            color: isFilterActive('Order Value') ? '#1f2937' : '#6b7280',
-                            background: isFilterActive('Order Value') ? '#e5e7eb' : 'transparent',
-                            '&:hover': { background: '#f3f4f6' },
-                          }}
-                          aria-label="Filter Order Value"
-                        >
-                          <FilterIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{
-                    fontWeight: 700,
-                    color: '#111827',
-                    background: '#f9fafb',
-                    border: '0.5px solid #e5e7eb',
-                    borderLeft: 'none',
-                    borderRight: 'none',
-                    borderTop: 'none',
-                    textAlign: 'center',
-                    minWidth: 140,
-                    transition: 'all 0.3s ease',
-                    position: 'relative',
-                    py: 1,
-                  }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                      </TableCell>
+                      <TableCell sx={{
+                        fontWeight: 700,
+                        color: '#111827',
+                        background: '#f9fafb',
+                        textAlign: 'center',
+                        minWidth: 120,
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        py: 1,
+                      }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                          Settlement Value
+                          Count
                         </Typography>
-                        <IconButton 
-                          size="small" 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openFilterPopover('Settlement Value', e.currentTarget);
-                          }}
-                          sx={{
-                            ml: 0.5,
-                            color: isFilterActive('Settlement Value') ? '#1f2937' : '#6b7280',
-                            background: isFilterActive('Settlement Value') ? '#e5e7eb' : 'transparent',
-                            '&:hover': { background: '#f3f4f6' },
-                          }}
-                          aria-label="Filter Settlement Value"
-                        >
-                          <FilterIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{
-                    fontWeight: 700,
-                    color: '#111827',
-                    background: '#f9fafb',
-                    border: '0.5px solid #e5e7eb',
-                    textAlign: 'center',
-                    minWidth: 140,
-                    transition: 'all 0.3s ease',
-                    position: 'relative',
-                    py: 1,
-                  }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                      </TableCell>
+                      <TableCell sx={{
+                        fontWeight: 700,
+                        color: '#111827',
+                        background: '#f9fafb',
+                        textAlign: 'center',
+                        minWidth: 150,
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        py: 1,
+                      }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                          Order Date
+                          Amount
                         </Typography>
-                        <IconButton 
-                          size="small" 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openFilterPopover('Order Date', e.currentTarget);
-                          }}
+                      </TableCell>
+                      <TableCell sx={{
+                        fontWeight: 700,
+                        color: '#111827',
+                        background: '#f9fafb',
+                        textAlign: 'center',
+                        minWidth: 200,
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        py: 1,
+                      }}>
+                        Action
+                      </TableCell>
+                    </>
+                  ) : (
+                    // Other tabs - show original columns with checkbox
+                    <>
+                      <TableCell 
+                        padding="checkbox" 
+                        sx={{
+                          fontWeight: 700,
+                          color: '#111827',
+                          background: '#f9fafb',
+                          textAlign: 'center',
+                          minWidth: 60,
+                          transition: 'all 0.3s ease',
+                          position: 'relative',
+                          py: 1,
+                        }}
+                      >
+                        <Checkbox
+                          checked={false}
+                          disabled
                           sx={{
-                            ml: 0.5,
-                            color: isFilterActive('Order Date') ? '#1f2937' : '#6b7280',
-                            background: isFilterActive('Order Date') ? '#e5e7eb' : 'transparent',
-                            '&:hover': { background: '#f3f4f6' },
+                            color: '#6b7280',
+                            '&.Mui-checked': {
+                              color: '#1f2937',
+                            },
+                            '&.MuiCheckbox-indeterminate': {
+                              color: '#1f2937',
+                            },
                           }}
-                          aria-label="Filter Order Date"
-                        >
-                          <FilterIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{
-                    fontWeight: 700,
-                    color: '#111827',
-                    background: '#f9fafb',
-                    border: '0.5px solid #e5e7eb',
-                    textAlign: 'center',
-                    minWidth: 140,
-                    transition: 'all 0.3s ease',
-                    position: 'relative',
-                    py: 1,
-                  }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                          Settlement Date
-                        </Typography>
-                        <IconButton 
-                          size="small" 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openFilterPopover('Settlement Date', e.currentTarget);
-                          }}
-                          sx={{
-                            ml: 0.5,
-                            color: isFilterActive('Settlement Date') ? '#1f2937' : '#6b7280',
-                            background: isFilterActive('Settlement Date') ? '#e5e7eb' : 'transparent',
-                            '&:hover': { background: '#f3f4f6' },
-                          }}
-                          aria-label="Filter Settlement Date"
-                        >
-                          <FilterIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{
-                    fontWeight: 700,
-                    color: '#111827',
-                    background: '#f9fafb',
-                    border: '0.5px solid #e5e7eb',
-                    textAlign: 'center',
-                    minWidth: 120,
-                    transition: 'all 0.3s ease',
-                    position: 'relative',
-                    py: 1,
-                  }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                          Difference
-                        </Typography>
-                        <IconButton 
-                          size="small" 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openFilterPopover('Difference', e.currentTarget);
-                          }}
-                          sx={{
-                            ml: 0.5,
-                            color: isFilterActive('Difference') ? '#1f2937' : '#6b7280',
-                            background: isFilterActive('Difference') ? '#e5e7eb' : 'transparent',
-                            '&:hover': { background: '#f3f4f6' },
-                          }}
-                          aria-label="Filter Difference"
-                        >
-                          <FilterIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{
-                    fontWeight: 700,
-                    color: '#111827',
-                    background: '#f9fafb',
-                    border: '0.5px solid #e5e7eb',
-                    textAlign: 'center',
-                    minWidth: 160,
-                    transition: 'all 0.3s ease',
-                    position: 'relative',
-                    py: 1,
-                  }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                          Remark
-                        </Typography>
-                        <IconButton 
-                          size="small" 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openFilterPopover('Remark', e.currentTarget);
-                          }}
-                          sx={{
-                            ml: 0.5,
-                            color: isFilterActive('Remark') ? '#1f2937' : '#6b7280',
-                            background: isFilterActive('Remark') ? '#e5e7eb' : 'transparent',
-                            '&:hover': { background: '#f3f4f6' },
-                          }}
-                          aria-label="Filter Remark"
-                        >
-                          <FilterIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{
-                    fontWeight: 700,
-                    color: '#111827',
-                    background: '#f9fafb',
-                    border: '0.5px solid #e5e7eb',
-                    textAlign: 'center',
-                    minWidth: 120,
-                    transition: 'all 0.3s ease',
-                    position: 'relative',
-                    py: 1,
-                  }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                          Event Type
-                        </Typography>
-                        <IconButton 
-                          size="small" 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openFilterPopover('Event Type', e.currentTarget);
-                          }}
-                          sx={{
-                            ml: 0.5,
-                            color: isFilterActive('Event Type') ? '#1f2937' : '#6b7280',
-                            background: isFilterActive('Event Type') ? '#e5e7eb' : 'transparent',
-                            '&:hover': { background: '#f3f4f6' },
-                          }}
-                          aria-label="Filter Event Type"
-                        >
-                          <FilterIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{
-                    fontWeight: 700,
-                    color: '#111827',
-                    background: '#f9fafb',
-                    border: '0.5px solid #e5e7eb',
-                    borderRight: 'none',
-                    textAlign: 'center',
-                    minWidth: 200,
-                    transition: 'all 0.3s ease',
-                    position: 'relative',
-                    py: 1,
-                  }}>
-                    Action
-                  </TableCell>
+                        />
+                      </TableCell>
+                      <TableCell sx={{
+                        fontWeight: 700,
+                        color: '#111827',
+                        background: '#f9fafb',
+                        textAlign: 'center',
+                        minWidth: 160,
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        py: 1,
+                      }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
+                              Order Item ID
+                            </Typography>
+                            <IconButton 
+                              size="small" 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openFilterPopover('Order Item ID', e.currentTarget);
+                              }}
+                              sx={{
+                                ml: 0.5,
+                                color: isFilterActive('Order Item ID') ? '#1f2937' : '#6b7280',
+                                background: isFilterActive('Order Item ID') ? '#e5e7eb' : 'transparent',
+                                '&:hover': { background: '#f3f4f6' },
+                              }}
+                              aria-label="Filter Order Item ID"
+                            >
+                              <FilterIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        fontWeight: 700,
+                        color: '#111827',
+                        background: '#f9fafb',
+                        border: '0.5px solid #e5e7eb',
+                        borderRight: 'none',
+                        textAlign: 'center',
+                        minWidth: 140,
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        py: 1,
+                      }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
+                              Order Value
+                            </Typography>
+                            <IconButton 
+                              size="small" 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openFilterPopover('Order Value', e.currentTarget);
+                              }}
+                              sx={{
+                                ml: 0.5,
+                                color: isFilterActive('Order Value') ? '#1f2937' : '#6b7280',
+                                background: isFilterActive('Order Value') ? '#e5e7eb' : 'transparent',
+                                '&:hover': { background: '#f3f4f6' },
+                              }}
+                              aria-label="Filter Order Value"
+                            >
+                              <FilterIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        fontWeight: 700,
+                        color: '#111827',
+                        background: '#f9fafb',
+                        border: '0.5px solid #e5e7eb',
+                        borderLeft: 'none',
+                        borderRight: 'none',
+                        borderTop: 'none',
+                        textAlign: 'center',
+                        minWidth: 140,
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        py: 1,
+                      }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
+                              Settlement Value
+                            </Typography>
+                            <IconButton 
+                              size="small" 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openFilterPopover('Settlement Value', e.currentTarget);
+                              }}
+                              sx={{
+                                ml: 0.5,
+                                color: isFilterActive('Settlement Value') ? '#1f2937' : '#6b7280',
+                                background: isFilterActive('Settlement Value') ? '#e5e7eb' : 'transparent',
+                                '&:hover': { background: '#f3f4f6' },
+                              }}
+                              aria-label="Filter Settlement Value"
+                            >
+                              <FilterIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        fontWeight: 700,
+                        color: '#111827',
+                        background: '#f9fafb',
+                        border: '0.5px solid #e5e7eb',
+                        textAlign: 'center',
+                        minWidth: 140,
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        py: 1,
+                      }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
+                              Order Date
+                            </Typography>
+                            <IconButton 
+                              size="small" 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openFilterPopover('Order Date', e.currentTarget);
+                              }}
+                              sx={{
+                                ml: 0.5,
+                                color: isFilterActive('Order Date') ? '#1f2937' : '#6b7280',
+                                background: isFilterActive('Order Date') ? '#e5e7eb' : 'transparent',
+                                '&:hover': { background: '#f3f4f6' },
+                              }}
+                              aria-label="Filter Order Date"
+                            >
+                              <FilterIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        fontWeight: 700,
+                        color: '#111827',
+                        background: '#f9fafb',
+                        border: '0.5px solid #e5e7eb',
+                        textAlign: 'center',
+                        minWidth: 140,
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        py: 1,
+                      }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
+                              Settlement Date
+                            </Typography>
+                            <IconButton 
+                              size="small" 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openFilterPopover('Settlement Date', e.currentTarget);
+                              }}
+                              sx={{
+                                ml: 0.5,
+                                color: isFilterActive('Settlement Date') ? '#1f2937' : '#6b7280',
+                                background: isFilterActive('Settlement Date') ? '#e5e7eb' : 'transparent',
+                                '&:hover': { background: '#f3f4f6' },
+                              }}
+                              aria-label="Filter Settlement Date"
+                            >
+                              <FilterIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        fontWeight: 700,
+                        color: '#111827',
+                        background: '#f9fafb',
+                        border: '0.5px solid #e5e7eb',
+                        textAlign: 'center',
+                        minWidth: 120,
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        py: 1,
+                      }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
+                              Difference
+                            </Typography>
+                            <IconButton 
+                              size="small" 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openFilterPopover('Difference', e.currentTarget);
+                              }}
+                              sx={{
+                                ml: 0.5,
+                                color: isFilterActive('Difference') ? '#1f2937' : '#6b7280',
+                                background: isFilterActive('Difference') ? '#e5e7eb' : 'transparent',
+                                '&:hover': { background: '#f3f4f6' },
+                              }}
+                              aria-label="Filter Difference"
+                            >
+                              <FilterIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        fontWeight: 700,
+                        color: '#111827',
+                        background: '#f9fafb',
+                        border: '0.5px solid #e5e7eb',
+                        textAlign: 'center',
+                        minWidth: 160,
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        py: 1,
+                      }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
+                              Remark
+                            </Typography>
+                            <IconButton 
+                              size="small" 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openFilterPopover('Remark', e.currentTarget);
+                              }}
+                              sx={{
+                                ml: 0.5,
+                                color: isFilterActive('Remark') ? '#1f2937' : '#6b7280',
+                                background: isFilterActive('Remark') ? '#e5e7eb' : 'transparent',
+                                '&:hover': { background: '#f3f4f6' },
+                              }}
+                              aria-label="Filter Remark"
+                            >
+                              <FilterIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        fontWeight: 700,
+                        color: '#111827',
+                        background: '#f9fafb',
+                        border: '0.5px solid #e5e7eb',
+                        textAlign: 'center',
+                        minWidth: 120,
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        py: 1,
+                      }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
+                              Event Type
+                            </Typography>
+                            <IconButton 
+                              size="small" 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openFilterPopover('Event Type', e.currentTarget);
+                              }}
+                              sx={{
+                                ml: 0.5,
+                                color: isFilterActive('Event Type') ? '#1f2937' : '#6b7280',
+                                background: isFilterActive('Event Type') ? '#e5e7eb' : 'transparent',
+                                '&:hover': { background: '#f3f4f6' },
+                              }}
+                              aria-label="Filter Event Type"
+                            >
+                              <FilterIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{
+                        fontWeight: 700,
+                        color: '#111827',
+                        background: '#f9fafb',
+                        border: '0.5px solid #e5e7eb',
+                        borderRight: 'none',
+                        textAlign: 'center',
+                        minWidth: 200,
+                        transition: 'all 0.3s ease',
+                        position: 'relative',
+                        py: 1,
+                      }}>
+                        Action
+                      </TableCell>
+                    </>
+                  )}
                 </TableRow>
               </TableHead>
               <TableBody>
-                {current.map(row => (
-                  <TableRow 
-                    key={row.id} 
-                    sx={{ 
-                      '&:hover': { background: '#f3f4f6' },
-                      transition: 'all 0.3s ease',
-                    }}
-                  >
-                    <TableCell 
-                      padding="checkbox"
-                      sx={{
-                        textAlign: 'center',
-                        verticalAlign: 'middle',
-                      }}
-                    >
-                      <Checkbox
-                        checked={selectedIds.includes(row.id)}
-                        onChange={() => toggleRow(row.id)}
-                        sx={{
-                          color: '#6b7280',
-                          '&.Mui-checked': {
-                            color: '#1f2937',
-                          },
-                        }}
-                      />
+                                 {current.map((row, index) => {
+                   // Check if this is grouped data (unreconciled tab) or mock data (other tabs)
+                   const isGroupedData = 'reason' in row && 'count' in row && 'amount' in row;
+                   
+                                      if (isGroupedData) {
+                     // Render grouped data for unreconciled tab
+                     return (
+                       <Fragment key={`grouped-${index}`}>
+                         <TableRow 
+                           sx={{ 
+                             '&:hover': { background: '#f3f4f6' },
+                             transition: 'all 0.3s ease',
+                           }}
+                         >
+                           <TableCell 
+                             padding="checkbox"
+                             sx={{
+                               textAlign: 'center',
+                               verticalAlign: 'middle',
+                             }}
+                           >
+                             <Checkbox
+                               checked={false}
+                               disabled
+                               sx={{
+                                 color: '#6b7280',
+                               }}
+                             />
                     </TableCell>
-                    <TableCell sx={{
-                      textAlign: 'center',
-                      verticalAlign: 'middle',
-                      fontWeight: 500,
-                    }}>
-                      {row.orderItemId}
-                    </TableCell>
-                    <TableCell sx={{
-                      textAlign: 'center',
-                      verticalAlign: 'middle',
-                      fontWeight: 500,
-                    }}>
-                      ₹{(Math.abs(row.difference) + 1000).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell sx={{
-                      textAlign: 'center',
-                      verticalAlign: 'middle',
-                      fontWeight: 500,
-                    }}>
-                      ₹{(Math.abs(row.difference) + 900).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell sx={{
-                      textAlign: 'center',
-                      verticalAlign: 'middle',
-                      fontWeight: 500,
-                    }}>
-                      {row.orderDate}
-                    </TableCell>
-                    <TableCell sx={{
-                      textAlign: 'center',
-                      verticalAlign: 'middle',
-                      fontWeight: 500,
-                    }}>
-                      -
-                    </TableCell>
-                    <TableCell sx={{
-                      textAlign: 'center',
-                      verticalAlign: 'middle',
-                      fontWeight: 500,
-                    }}>
-                      ₹{Math.abs(row.difference).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell sx={{
-                      textAlign: 'center',
-                      verticalAlign: 'middle',
-                      fontWeight: 500,
-                    }}>
-                      {row.remark}
-                    </TableCell>
-                    <TableCell sx={{
-                      textAlign: 'center',
-                      verticalAlign: 'middle',
-                      fontWeight: 500,
-                    }}>
-                      {row.eventType}
-                    </TableCell>
-                    <TableCell sx={{
-                      textAlign: 'center',
-                      verticalAlign: 'middle',
-                    }}>
-                      {row.status === 'unreconciled' && (
-                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => handleMarkReconciled(row.id)}
-                            sx={{
-                              fontSize: '0.75rem',
-                              py: 0.5,
-                              px: 1,
-                              minHeight: 28,
-                              borderColor: '#10b981',
-                              color: '#10b981',
-                              '&:hover': {
-                                borderColor: '#059669',
-                                backgroundColor: 'rgba(16, 185, 129, 0.04)',
-                              },
-                            }}
-                          >
-                            Mark Reconciled
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => handleRaiseDispute(row.id)}
-                            sx={{
-                              fontSize: '0.75rem',
-                              py: 0.5,
-                              px: 1,
-                              minHeight: 28,
-                              borderColor: '#f59e0b',
-                              color: '#f59e0b',
-                              '&:hover': {
-                                borderColor: '#d97706',
-                                backgroundColor: 'rgba(245, 158, 11, 0.04)',
-                              },
-                            }}
-                          >
-                            Raise Dispute
-                          </Button>
-                        </Box>
-                      )}
-                    </TableCell>
+                           <TableCell sx={{
+                             textAlign: 'center',
+                             verticalAlign: 'middle',
+                             fontWeight: 500,
+                           }}>
+                             {row.reason}
+                           </TableCell>
+                           <TableCell sx={{
+                             textAlign: 'center',
+                             verticalAlign: 'middle',
+                             fontWeight: 500,
+                           }}>
+                             {row.count}
+                           </TableCell>
+                           <TableCell sx={{
+                             textAlign: 'center',
+                             verticalAlign: 'middle',
+                             fontWeight: 500,
+                           }}>
+                             ₹{row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                           </TableCell>
+                           <TableCell sx={{
+                             textAlign: 'center',
+                             verticalAlign: 'middle',
+                           }}>
+                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                               <Button
+                                 size="small"
+                                 variant="outlined"
+                                 onClick={() => handleMarkReconciled(row.orderIds[0])}
+                                 sx={{
+                                   fontSize: '0.75rem',
+                                   py: 0.5,
+                                   px: 1,
+                                   minHeight: 28,
+                                   borderColor: '#10b981',
+                                   color: '#10b981',
+                                   '&:hover': {
+                                     borderColor: '#059669',
+                                     backgroundColor: 'rgba(16, 185, 129, 0.04)',
+                                   },
+                                 }}
+                               >
+                                 Mark Reconciled
+                               </Button>
+                               <Button
+                                 size="small"
+                                 variant="outlined"
+                                 onClick={() => handleRaiseDispute(row.orderIds[0])}
+                                 sx={{
+                                   fontSize: '0.75rem',
+                                   py: 0.5,
+                                   px: 1,
+                                   minHeight: 28,
+                                   borderColor: '#f59e0b',
+                                   color: '#f59e0b',
+                                   '&:hover': {
+                                     borderColor: '#d97706',
+                                     backgroundColor: 'rgba(245, 158, 11, 0.04)',
+                                   },
+                                 }}
+                               >
+                                 Raise Dispute
+                               </Button>
+                               <Button
+                                 size="small"
+                                 variant="outlined"
+                                 onClick={() => toggleRowExpansion(row.reason)}
+                                 sx={{
+                                   fontSize: '0.75rem',
+                                   py: 0.5,
+                                   px: 1,
+                                   minHeight: 28,
+                                   borderColor: '#6b7280',
+                                   color: '#6b7280',
+                                   '&:hover': {
+                                     borderColor: '#4b5563',
+                                     backgroundColor: 'rgba(107, 114, 128, 0.04)',
+                                   },
+                                 }}
+                               >
+                                 {expandedRows.has(row.reason) ? 'Collapse' : 'Expand'}
+                               </Button>
+                             </Box>
+                           </TableCell>
+                  </TableRow>
+                         
+                         {/* Expandable rows showing individual transactions */}
+                         {expandedRows.has(row.reason) && row.transactions && (
+                           <>
+                             {/* Column headers for expanded rows */}
+                             <TableRow sx={{ background: '#f1f5f9' }}>
+                               <TableCell sx={{ border: 'none' }} />
+                               <TableCell sx={{ 
+                                 textAlign: 'center', 
+                                 verticalAlign: 'middle',
+                                 pl: 4,
+                                 fontWeight: 600,
+                                 color: '#374151',
+                                 fontSize: '0.75rem',
+                                 py: 1
+                               }}>
+                                 Order Item ID
+                               </TableCell>
+                               <TableCell sx={{ 
+                                 textAlign: 'center', 
+                                 verticalAlign: 'middle',
+                                 fontWeight: 600,
+                                 color: '#374151',
+                                 fontSize: '0.75rem',
+                                 py: 1
+                               }}>
+                                 Amount
+                               </TableCell>
+                               <TableCell sx={{ 
+                                 textAlign: 'center', 
+                                 verticalAlign: 'middle',
+                                 fontWeight: 600,
+                                 color: '#374151',
+                                 fontSize: '0.75rem',
+                                 py: 1
+                               }}>
+                                 Order Date
+                               </TableCell>
+                               <TableCell sx={{ 
+                                 textAlign: 'center', 
+                                 verticalAlign: 'middle',
+                                 fontWeight: 600,
+                                 color: '#374151',
+                                 fontSize: '0.75rem',
+                                 py: 1
+                               }}>
+                                 Settlement Date
+                               </TableCell>
+                               <TableCell sx={{ 
+                                 textAlign: 'center', 
+                                 verticalAlign: 'middle',
+                                 fontWeight: 600,
+                                 color: '#374151',
+                                 fontSize: '0.75rem',
+                                 py: 1
+                               }}>
+                                 Difference
+                               </TableCell>
+                               <TableCell sx={{ 
+                                 textAlign: 'center', 
+                                 verticalAlign: 'middle',
+                                 fontWeight: 600,
+                                 color: '#374151',
+                                 fontSize: '0.75rem',
+                                 py: 1
+                               }}>
+                                 Reason
+                               </TableCell>
+                               <TableCell sx={{ 
+                                 textAlign: 'center', 
+                                 verticalAlign: 'middle',
+                                 fontWeight: 600,
+                                 color: '#374151',
+                                 fontSize: '0.75rem',
+                                 py: 1
+                               }}>
+                                 Status
+                               </TableCell>
+                               <TableCell sx={{ border: 'none' }} />
+                             </TableRow>
+                             
+                             {/* Individual transaction rows */}
+                             {row.transactions.map((transaction: any, transIndex: number) => (
+                               <TableRow 
+                                 key={`expanded-${row.reason}-${transIndex}`}
+                                 sx={{ 
+                                   background: '#f9fafb',
+                                   '&:hover': { background: '#f3f4f6' },
+                                   transition: 'all 0.3s ease',
+                                 }}
+                               >
+                                 <TableCell sx={{ border: 'none' }} />
+                                 <TableCell sx={{ 
+                                   textAlign: 'center', 
+                                   verticalAlign: 'middle',
+                                   pl: 4,
+                                   color: '#6b7280',
+                                   fontSize: '0.875rem'
+                                 }}>
+                                   {transaction.order_item_id}
+                                 </TableCell>
+                                 <TableCell sx={{ 
+                                   textAlign: 'center', 
+                                   verticalAlign: 'middle',
+                                   color: '#6b7280',
+                                   fontSize: '0.875rem'
+                                 }}>
+                                   ₹{parseFloat(transaction.context?.buyer_invoice_amount || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                 </TableCell>
+                                 <TableCell sx={{ 
+                                   textAlign: 'center', 
+                                   verticalAlign: 'middle',
+                                   color: '#6b7280',
+                                   fontSize: '0.875rem'
+                                 }}>
+                                   {transaction.order_date}
+                                 </TableCell>
+                                 <TableCell sx={{ 
+                                   textAlign: 'center', 
+                                   verticalAlign: 'middle',
+                                   color: '#6b7280',
+                                   fontSize: '0.875rem'
+                                 }}>
+                                   {transaction.settlement_date}
+                                 </TableCell>
+                                 <TableCell sx={{ 
+                                   textAlign: 'center', 
+                                   verticalAlign: 'middle',
+                                   color: '#6b7280',
+                                   fontSize: '0.875rem'
+                                 }}>
+                                   ₹{parseFloat(transaction.diff || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                 </TableCell>
+                                 <TableCell sx={{ 
+                                   textAlign: 'center', 
+                                   verticalAlign: 'middle',
+                                   color: '#6b7280',
+                                   fontSize: '0.875rem'
+                                 }}>
+                                   {transaction.reason || 'N/A'}
+                                 </TableCell>
+                                 <TableCell sx={{ 
+                                   textAlign: 'center', 
+                                   verticalAlign: 'middle',
+                                   color: '#6b7280',
+                                   fontSize: '0.875rem'
+                                 }}>
+                                   {transaction.status}
+                                 </TableCell>
+                                 <TableCell sx={{ border: 'none' }} />
                   </TableRow>
                 ))}
+                           </>
+                         )}
+                       </Fragment>
+                     );
+                   }
+                 })}
                 {current.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
+                    <TableCell colSpan={5} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -1077,6 +1791,98 @@ const DisputePage: React.FC = () => {
           return null;
         })()}
       </Popover>
+
+      {/* Custom Date Picker Popup */}
+      {showCustomDatePicker && (
+        <Box
+          onClick={(e) => e.stopPropagation()}
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.3)',
+            zIndex: 1399,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Box
+            onClick={(e) => e.stopPropagation()}
+            sx={{
+              background: '#ffffff',
+              borderRadius: '12px',
+              p: 3,
+              maxWidth: '400px',
+              width: '100%',
+              mx: 2,
+              boxShadow:
+                '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            }}
+          >
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#111827' }}>
+              Select Custom Date Range
+            </Typography>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
+              <TextField
+                label="Start Date"
+                type="date"
+                value={tempStartDate}
+                onChange={(e) => setTempStartDate(e.target.value)}
+                fullWidth
+                size="small"
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="End Date"
+                type="date"
+                value={tempEndDate}
+                onChange={(e) => setTempEndDate(e.target.value)}
+                fullWidth
+                size="small"
+                InputLabelProps={{ shrink: true }}
+              />
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setShowCustomDatePicker(false);
+                  setTempStartDate('');
+                  setTempEndDate('');
+                }}
+                sx={{ textTransform: 'none' }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  if (tempStartDate && tempEndDate) {
+                    setCustomStartDate(tempStartDate);
+                    setCustomEndDate(tempEndDate);
+                    setSelectedDateRange('custom');
+                    setShowCustomDatePicker(false);
+                    fetchUnreconciledOrders();
+                  }
+                }}
+                disabled={!tempStartDate || !tempEndDate}
+                sx={{
+                  textTransform: 'none',
+                  background: '#1f2937',
+                  '&:hover': { background: '#374151' },
+                }}
+              >
+                Apply
+              </Button>
+            </Box>
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 };

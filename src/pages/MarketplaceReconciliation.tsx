@@ -347,22 +347,41 @@ const MarketplaceReconciliation: React.FC = () => {
     } else {
       // Complete selection
       if (new Date(dateString) < new Date(tempStartDate)) {
+        // If second date is before first date, swap them
         setTempEndDate(tempStartDate);
         setTempStartDate(dateString);
         setCustomStartDate(dateString);
         setCustomEndDate(tempStartDate);
         console.log('Completed selection (reversed):', { start: dateString, end: tempStartDate });
         
-        // Auto-call API when selection is completed
-        fetchReconciliationDataByDateRange('custom');
+        // Auto-call API when selection is completed with current values
+        const currentStartDate = dateString;
+        const currentEndDate = tempStartDate;
+        
+        // Update the state first
+        setCustomStartDate(currentStartDate);
+        setCustomEndDate(currentEndDate);
+        
+        // Then call API with the current values
+        fetchReconciliationDataByDateRangeWithDates(currentStartDate, currentEndDate);
         setShowCustomDatePicker(false); // Hide popup
       } else {
+        // Normal case: second date is after first date
         setTempEndDate(dateString);
         setCustomEndDate(dateString);
         console.log('Completed selection:', { start: tempStartDate, end: dateString });
         
-        // Auto-call API when selection is completed
-        fetchReconciliationDataByDateRange('custom');
+        // Auto-call API when selection is completed with current values
+        // Use the current values directly instead of waiting for state update
+        const currentStartDate = tempStartDate;
+        const currentEndDate = dateString;
+        
+        // Update the state first
+        setCustomStartDate(currentStartDate);
+        setCustomEndDate(currentEndDate);
+        
+        // Then call API with the current values
+        fetchReconciliationDataByDateRangeWithDates(currentStartDate, currentEndDate);
         setShowCustomDatePicker(false); // Hide popup
       }
     }
@@ -438,6 +457,38 @@ const MarketplaceReconciliation: React.FC = () => {
       
       // Call the backend API with date range
       console.log('API call with dates:', { start_date: startDate, end_date: endDate });
+      const response = await apiService.get('/recon/fetchStats', {
+        start_date: startDate,
+        end_date: endDate
+      });
+      
+      if (response.success && response.data) {
+        setReconciliationData(response.data);
+        setUsingMockData(false);
+      } else {
+        // Fallback to mock data if API fails
+        setReconciliationData(mockReconciliationData);
+        setUsingMockData(true);
+        setError('Failed to fetch data from API, showing sample data');
+      }
+    } catch (err) {
+      console.error('Error fetching reconciliation data:', err);
+      // Fallback to mock data on error
+      setReconciliationData(mockReconciliationData);
+      setUsingMockData(true);
+      setError('Network error, showing sample data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch reconciliation data with specific start and end dates
+  const fetchReconciliationDataByDateRangeWithDates = async (startDate: string, endDate: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log('API call with specific dates:', { start_date: startDate, end_date: endDate });
       const response = await apiService.get('/recon/fetchStats', {
         start_date: startDate,
         end_date: endDate
@@ -1850,7 +1901,7 @@ const MarketplaceReconciliation: React.FC = () => {
           boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
         }}>
           <Typography variant="h6" mb={3} sx={{ color: '#1f2937', fontWeight: 600 }}>
-            Enhanced Sales Dashboard
+            Sales Dashboard
           </Typography>
 
           {/* Enhanced KPI Cards */}
