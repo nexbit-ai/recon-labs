@@ -27,7 +27,11 @@ import {
   FormControl,
   InputLabel,
   Select,
-  OutlinedInput
+  OutlinedInput,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import { 
   CalendarToday as CalendarTodayIcon, 
@@ -39,7 +43,7 @@ import { api } from '../services/api';
 
 // Type definitions for transaction data based on API response
 interface TransactionRow {
-  "Order Item ID": string;
+  "Order ID": string;
   "Order Value": number;
   "Settlement Value": number;
   "Order Date": string;
@@ -92,6 +96,8 @@ interface TransactionQueryParams {
   status_in?: string;
   order_date_from?: string;
   order_date_to?: string;
+  buyer_invoice_date_from?: string;
+  buyer_invoice_date_to?: string;
   diff_min?: number;
   diff_max?: number;
   sort_by?: string;
@@ -155,7 +161,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   }
   
   return {
-    "Order Item ID": orderItemId,
+    "Order ID": orderItemId,
     "Order Value": orderValue,
     "Settlement Value": settlementValue,
     "Order Date": new Date(orderItem.order_date).toISOString().split('T')[0],
@@ -173,9 +179,9 @@ const DisputePage: React.FC = () => {
   
   // State for date filtering
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
-  const [selectedDateRange, setSelectedDateRange] = useState<'this-month' | 'last-month' | 'this-year' | 'custom'>('this-month');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
+  const [selectedDateRange, setSelectedDateRange] = useState<'this-month' | 'last-month' | 'this-year' | 'custom'>('custom');
+  const [customStartDate, setCustomStartDate] = useState('2025-03-01');
+  const [customEndDate, setCustomEndDate] = useState('2025-03-31');
   const [tempStartDate, setTempStartDate] = useState('');
   const [tempEndDate, setTempEndDate] = useState('');
 
@@ -211,7 +217,7 @@ const DisputePage: React.FC = () => {
 
   // Column metadata for filter types
   const COLUMN_META = {
-    'Order Item ID': { type: 'string' },
+    'Order ID': { type: 'string' },
     'Order Value': { type: 'number' },
     'Settlement Value': { type: 'number' },
     'Order Date': { type: 'date' },
@@ -220,6 +226,17 @@ const DisputePage: React.FC = () => {
     'Remark': { type: 'enum' },
     'Event Type': { type: 'enum' },
     'Status': { type: 'enum' }
+  };
+
+  // Format backend reason keys like "customer_add_ons" into human-friendly labels like "Customer Add Ons"
+  const formatReasonLabel = (reason?: string): string => {
+    if (!reason || reason.trim() === '') return 'Unknown';
+    const normalized = reason.replace(/[_-]+/g, ' ').trim();
+    return normalized
+      .split(' ')
+      .filter(Boolean)
+      .map(part => (part.charAt(0).toUpperCase() + part.slice(1)))
+      .join(' ');
   };
 
   // Get current date range text for display
@@ -264,14 +281,14 @@ const DisputePage: React.FC = () => {
       const now = new Date();
       const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
       const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
-      params.order_date_from = firstDay.toISOString().split('T')[0];
-      params.order_date_to = lastDay.toISOString().split('T')[0];
+      params.buyer_invoice_date_from = firstDay.toISOString().split('T')[0];
+      params.buyer_invoice_date_to = lastDay.toISOString().split('T')[0];
     } else if (selectedDateRange === 'last-month') {
       const now = new Date();
       const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1));
       const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 0));
-      params.order_date_from = firstDay.toISOString().split('T')[0];
-      params.order_date_to = lastDay.toISOString().split('T')[0];
+      params.buyer_invoice_date_from = firstDay.toISOString().split('T')[0];
+      params.buyer_invoice_date_to = lastDay.toISOString().split('T')[0];
     } else if (selectedDateRange === 'this-year') {
       const now = new Date();
       const currentYear = now.getFullYear();
@@ -281,8 +298,8 @@ const DisputePage: React.FC = () => {
       const lastDay = new Date(Date.UTC(currentYear, 11, 31)); // December 31st (month 11)
       
       // Format dates as YYYY-MM-DD using UTC methods
-      params.order_date_from = firstDay.toISOString().split('T')[0];
-      params.order_date_to = lastDay.toISOString().split('T')[0];
+      params.buyer_invoice_date_from = firstDay.toISOString().split('T')[0];
+      params.buyer_invoice_date_to = lastDay.toISOString().split('T')[0];
       
       // Debug logging for this-year selection
       console.log('This year date calculation:', {
@@ -295,17 +312,17 @@ const DisputePage: React.FC = () => {
         lastDayMonth: lastDay.getUTCMonth()    // Should be 11 (December)
       });
     } else if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
-      params.order_date_from = customStartDate;
-      params.order_date_to = customEndDate;
+      params.buyer_invoice_date_from = customStartDate;
+      params.buyer_invoice_date_to = customEndDate;
     }
     
     // Ensure we always have default dates if none are set
-    if (!params.order_date_from || !params.order_date_to) {
+    if (!params.buyer_invoice_date_from || !params.buyer_invoice_date_to) {
       const now = new Date();
       const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
       const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
-      params.order_date_from = firstDay.toISOString().split('T')[0];
-      params.order_date_to = lastDay.toISOString().split('T')[0];
+      params.buyer_invoice_date_from = firstDay.toISOString().split('T')[0];
+      params.buyer_invoice_date_to = lastDay.toISOString().split('T')[0];
     }
 
     return params;
@@ -321,7 +338,7 @@ const DisputePage: React.FC = () => {
     try {
       const queryParams = buildQueryParams();
       console.log('Fetching unreconciled orders with params:', queryParams);
-      console.log('Date range:', queryParams.order_date_from, 'to', queryParams.order_date_to);
+      console.log('Date range:', queryParams.buyer_invoice_date_from, 'to', queryParams.buyer_invoice_date_to);
       console.log('Selected date range:', selectedDateRange);
       console.log('Full queryParams object:', JSON.stringify(queryParams, null, 2));
       
@@ -460,6 +477,8 @@ const DisputePage: React.FC = () => {
   // Fetch unreconciled orders on component mount
   useEffect(() => {
     if (disputeSubTab === 0) {
+      // On initial load, selectedDateRange is 'custom' with March 2025 defaults,
+      // so buildQueryParams will use buyer_invoice_date_from/to accordingly.
       fetchUnreconciledOrders();
     }
   }, []);
@@ -534,18 +553,21 @@ const DisputePage: React.FC = () => {
       return newSet;
     });
   };
-  
-  // Action handlers for unreconciled transactions
-  const handleMarkReconciled = (id: string) => {
-    // For API data, we can't modify the status directly
-    // This would typically call an API to update the status
-    console.log('Marking as reconciled:', id);
-  };
 
-  const handleRaiseDispute = (id: string) => {
-    // For API data, we can't modify the status directly
-    // This would typically call an API to update the status
-    console.log('Raising dispute:', id);
+  // Raise Dispute dialog state
+  const [raiseDialogOpen, setRaiseDialogOpen] = useState(false);
+  const [selectedRaiseGroup, setSelectedRaiseGroup] = useState<{ reason: string; count: number; orderIds: string[] } | null>(null);
+  const [raiseDescription, setRaiseDescription] = useState<string>('');
+
+  const openRaiseDispute = (group: any) => {
+    setSelectedRaiseGroup({ reason: group?.reason || 'Unknown', count: group?.count || 0, orderIds: group?.orderIds || [] });
+    setRaiseDescription('');
+    setRaiseDialogOpen(true);
+  };
+  const closeRaiseDispute = () => setRaiseDialogOpen(false);
+  const sendRaiseDispute = () => {
+    // TODO: Integrate API to send disputes with selectedRaiseGroup
+    setRaiseDialogOpen(false);
   };
 
   // Column filter handlers
@@ -562,17 +584,66 @@ const DisputePage: React.FC = () => {
   const isFilterActive = (column: string) => {
     const filter = columnFilters[column];
     if (!filter) return false;
-    if (typeof filter === 'string') return filter !== '';
-    if (typeof filter === 'object') {
-      if (filter.min !== undefined && filter.min !== '') return true;
-      if (filter.max !== undefined && filter.max !== '') return true;
-      if (filter.from !== undefined && filter.from !== '') return true;
-      if (filter.to !== undefined && filter.to !== '') return true;
-      if (Array.isArray(filter) && filter.length > 0) return true;
-    }
-    return false;
+    if (typeof filter === 'string') return filter.trim() !== '';
+    if (Array.isArray(filter)) return filter.length > 0;
+    return Object.values(filter).some(v => v !== undefined && v !== '' && v !== null);
   };
 
+  // Persist a manual reconciliation notification for Checklist
+  const pushManualReconNotification = (reason: string, count: number, orderIds: string[]) => {
+    try {
+      const notifKey = 'recon_notifications';
+      const nudgeKey = 'recon_nudge_count';
+      const existing = JSON.parse(localStorage.getItem(notifKey) || '[]');
+      const entry = {
+        id: Date.now(),
+        text: `Orders with ${formatReasonLabel(reason)} manually reconciled`,
+        time: new Date().toISOString(),
+        meta: { reason, count, orderIds },
+      };
+      const updated = [entry, ...existing];
+      localStorage.setItem(notifKey, JSON.stringify(updated));
+      const prevCount = parseInt(localStorage.getItem(nudgeKey) || '0', 10) || 0;
+      localStorage.setItem(nudgeKey, String(prevCount + 1));
+      // Notify other parts of the app (e.g., sidebar) to refresh their nudge count
+      try {
+        window.dispatchEvent(new CustomEvent('recon_nudge_updated'));
+      } catch (_) {
+        // Fallback generic event
+        window.dispatchEvent(new Event('recon_nudge_updated'));
+      }
+    } catch (e) {
+      console.error('Failed to push manual recon notification', e);
+    }
+  };
+
+  // Action handlers for unreconciled transactions
+  const handleMarkReconciled = (id: string) => {
+    // For API data, we can't modify the status directly
+    // This would typically call an API to update the status
+    console.log('Marking as reconciled:', id);
+
+    // Derive metadata from grouped unreconciled data to store a notification for Checklist
+    try {
+      if (disputeSubTab === 0 && Array.isArray(apiRows)) {
+        const groups = apiRows as any[];
+        const matched = groups.find(g => Array.isArray(g?.orderIds) && g.orderIds.includes(id));
+        if (matched) {
+          pushManualReconNotification(matched.reason || 'Unknown', matched.count || 1, matched.orderIds || [id]);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to derive group for manual recon notification', err);
+    }
+  };
+
+  const handleRaiseDispute = (id: string) => {
+    // For API data, we can't modify the status directly
+    // This would typically call an API to update the status
+    console.log('Raising dispute:', id);
+  };
+
+  // Column filter handlers
   const handleStringFilterChange = (column: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setColumnFilters(prev => ({
       ...prev,
@@ -669,11 +740,11 @@ const DisputePage: React.FC = () => {
       let value: any;
       
       // Handle both API data and mock data
-      if ('Order Item ID' in row) {
+      if ('Order ID' in row) {
         // API data (TransactionRow)
         switch (column) {
-          case 'Order Item ID':
-            value = row['Order Item ID'];
+          case 'Order ID':
+            value = row['Order ID'];
             break;
           default:
             continue;
@@ -684,8 +755,8 @@ const DisputePage: React.FC = () => {
       } else {
         // Mock data (old structure)
         switch (column) {
-          case 'Order Item ID':
-            value = (row as any).orderItemId;
+          case 'Order ID':
+            value = (row as any).orderId;
             break;
           case 'Order Value':
             value = Math.abs((row as any).difference) + 1000;
@@ -1035,22 +1106,22 @@ const DisputePage: React.FC = () => {
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                              Order Item ID
+                              Order ID
                             </Typography>
                             <IconButton 
                               size="small" 
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                openFilterPopover('Order Item ID', e.currentTarget);
+                                openFilterPopover('Order ID', e.currentTarget);
                               }}
                               sx={{
                                 ml: 0.5,
-                                color: isFilterActive('Order Item ID') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Order Item ID') ? '#e5e7eb' : 'transparent',
+                                color: isFilterActive('Order ID') ? '#1f2937' : '#6b7280',
+                                background: isFilterActive('Order ID') ? '#e5e7eb' : 'transparent',
                                 '&:hover': { background: '#f3f4f6' },
                               }}
-                              aria-label="Filter Order Item ID"
+                              aria-label="Filter Order ID"
                             >
                               <FilterIcon fontSize="small" />
                             </IconButton>
@@ -1366,7 +1437,16 @@ const DisputePage: React.FC = () => {
                              verticalAlign: 'middle',
                              fontWeight: 500,
                            }}>
-                             {row.reason}
+                             <Chip
+                               label={formatReasonLabel(row.reason)}
+                               size="small"
+                               sx={{
+                                 fontWeight: 600,
+                                 color: '#1f2937',
+                                 backgroundColor: '#e5e7eb',
+                                 '& .MuiChip-label': { px: 1 }
+                               }}
+                             />
                            </TableCell>
                            <TableCell sx={{
                              textAlign: 'center',
@@ -1409,17 +1489,17 @@ const DisputePage: React.FC = () => {
                                <Button
                                  size="small"
                                  variant="outlined"
-                                 onClick={() => handleRaiseDispute(row.orderIds[0])}
+                                 onClick={() => openRaiseDispute(row)}
                                  sx={{
                                    fontSize: '0.75rem',
                                    py: 0.5,
                                    px: 1,
                                    minHeight: 28,
-                                   borderColor: '#f59e0b',
-                                   color: '#f59e0b',
+                                   borderColor: '#6b7280',
+                                   color: '#6b7280',
                                    '&:hover': {
-                                     borderColor: '#d97706',
-                                     backgroundColor: 'rgba(245, 158, 11, 0.04)',
+                                     borderColor: '#4b5563',
+                                     backgroundColor: 'rgba(107, 114, 128, 0.04)',
                                    },
                                  }}
                                >
@@ -1463,7 +1543,7 @@ const DisputePage: React.FC = () => {
                                  fontSize: '0.75rem',
                                  py: 1
                                }}>
-                                 Order Item ID
+                                 Order ID
                                </TableCell>
                                <TableCell sx={{ 
                                  textAlign: 'center', 
@@ -1546,7 +1626,7 @@ const DisputePage: React.FC = () => {
                                    color: '#6b7280',
                                    fontSize: '0.875rem'
                                  }}>
-                                   {transaction.order_item_id}
+                                   {transaction.order_id}
                                  </TableCell>
                                  <TableCell sx={{ 
                                    textAlign: 'center', 
@@ -1586,7 +1666,16 @@ const DisputePage: React.FC = () => {
                                    color: '#6b7280',
                                    fontSize: '0.875rem'
                                  }}>
-                                   {transaction.reason || 'N/A'}
+                                   <Chip
+                                     label={formatReasonLabel(transaction.reason || 'N/A')}
+                                     size="small"
+                                     sx={{
+                                       fontWeight: 600,
+                                       color: '#1f2937',
+                                       backgroundColor: '#e5e7eb',
+                                       '& .MuiChip-label': { px: 1 }
+                                     }}
+                                   />
                                  </TableCell>
                                  <TableCell sx={{ 
                                    textAlign: 'center', 
@@ -1615,6 +1704,29 @@ const DisputePage: React.FC = () => {
           </TableContainer>
         </CardContent>
       </Card>
+
+      {/* Minimal Raise Dispute Dialog */}
+      <Dialog open={raiseDialogOpen} onClose={closeRaiseDispute} PaperProps={{ sx: { borderRadius: 1, minWidth: 420 } }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Raise dispute to Flipkart</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: '#374151', mb: 0.5 }}>Reason: {formatReasonLabel(selectedRaiseGroup?.reason || 'Unknown')}</Typography>
+          <Typography variant="body2" sx={{ color: '#374151', mb: 2 }}>Total orders: {selectedRaiseGroup?.count || 0}</Typography>
+          <TextField
+            label="Description"
+            placeholder="Add a short note for this dispute..."
+            value={raiseDescription}
+            onChange={(e) => setRaiseDescription(e.target.value)}
+            fullWidth
+            multiline
+            minRows={3}
+            size="small"
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button variant="text" onClick={closeRaiseDispute} sx={{ color: '#111827' }}>Cancel</Button>
+          <Button variant="contained" onClick={sendRaiseDispute} sx={{ boxShadow: 'none' }}>Send</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Bulk Action Buttons */}
       {selectedIds.length > 0 && (

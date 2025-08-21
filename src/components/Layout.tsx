@@ -58,6 +58,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // const { user, logout } = useAuth(); // Authentication disabled
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [settingsAnchorEl, setSettingsAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [sidebarNudge, setSidebarNudge] = React.useState<number>(() => {
+    try { return parseInt(localStorage.getItem('recon_nudge_count') || '0', 10) || 0; } catch { return 0; }
+  });
+
+  React.useEffect(() => {
+    const handler = () => {
+      try { setSidebarNudge(parseInt(localStorage.getItem('recon_nudge_count') || '0', 10) || 0); } catch { setSidebarNudge(0); }
+    };
+    window.addEventListener('recon_nudge_updated', handler as EventListener);
+    return () => window.removeEventListener('recon_nudge_updated', handler as EventListener);
+  }, []);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -131,7 +142,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       <Box component="span">Checklist</Box>
                       <Box sx={{ ml: 1 }}>
                         <Badge
-                          badgeContent={5}
+                          badgeContent={sidebarNudge}
                           overlap="rectangular"
                           anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
                           sx={{

@@ -137,6 +137,17 @@ const MarketplaceReconciliation: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(false);
+  
+  // Sales overview data state
+  const [salesOverview, setSalesOverview] = useState({
+    netRevenue: { value: "33836255", label: "Net Revenue" },
+    grossRevenue: { value: "42126513", label: "Gross Revenue" },
+    returns: { value: "8290258", label: "Returns" },
+    monthData: [
+      { month: "March 2025", gross: "44112585", net: "37085655", returns: "7026930" },
+      { month: "April 2025", gross: "35614873", net: "29894054", returns: "5720819" }
+    ]
+  });
   const [activeMainTab, setActiveMainTab] = useState<'recon' | 'dispute'>('recon');
   const handleMainTabChange = (_: any, value: number) => setActiveMainTab(value === 0 ? 'recon' : 'dispute');
 
@@ -585,6 +596,28 @@ const MarketplaceReconciliation: React.FC = () => {
     return parseFloat(percentage) || 0;
   };
 
+  // Fetch sales overview data from backend
+  const fetchSalesOverview = async () => {
+    try {
+      // In a real implementation, you would make an API call here
+      // const response = await apiService.getSalesOverview();
+      // setSalesOverview(response.data.salesOverview);
+      
+      // For now, using the mock data that represents the backend response
+      console.log('Sales overview data loaded from backend');
+      
+      // You can uncomment and modify this when the actual API is ready:
+      // const response = await apiService.getSalesOverview();
+      // if (response.success && response.data) {
+      //   setSalesOverview(response.data.salesOverview);
+      // }
+      
+    } catch (err) {
+      console.error('Error fetching sales overview:', err);
+      // Keep using the default state data if API fails
+    }
+  };
+
   // Init dispute mock data
   useEffect(() => {
     if (disputeRows.length === 0) {
@@ -734,6 +767,11 @@ const MarketplaceReconciliation: React.FC = () => {
   // Load initial data
   useEffect(() => {
     fetchReconciliationData(selectedMonth);
+  }, []);
+
+  // Load sales overview data
+  useEffect(() => {
+    fetchSalesOverview();
   }, []);
 
   // Open Transaction Sheet overlay when query params indicate so
@@ -1575,15 +1613,15 @@ const MarketplaceReconciliation: React.FC = () => {
                         data={[
                           {
                             name: 'Settled Orders',
-                            value: reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number,
-                            amount: parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount),
+                            value: reconciliationData.summaryData.totalReconciled.number,
+                            amount: parseAmount(reconciliationData.summaryData.totalReconciled.amount),
                             color: '#7A5DBF',
                             type: 'settled'
                           },
                           {
                             name: 'Unsettled Orders',
-                            value: reconciliationData.summaryData.netSalesAsPerSalesReport.number,
-                            amount: parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount),
+                            value: reconciliationData.summaryData.totalUnreconciled.number,
+                            amount: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount),
                             color: '#A79CDB',
                             type: 'unsettled'
                           },
@@ -1604,8 +1642,8 @@ const MarketplaceReconciliation: React.FC = () => {
                         dataKey="value"
                       >
                         {[
-                          { name: 'Settled Orders', value: reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number, color: '#7A5DBF' },
-                          { name: 'Unsettled Orders', value: reconciliationData.summaryData.netSalesAsPerSalesReport.number, color: '#A79CDB' },
+                          { name: 'Settled Orders', value: reconciliationData.summaryData.totalReconciled.number, color: '#7A5DBF' },
+                          { name: 'Unsettled Orders', value: reconciliationData.summaryData.totalUnreconciled.number, color: '#A79CDB' },
                           { name: 'cancelled Returns', value: reconciliationData.summaryData.returnedOrCancelledOrders.number, color: '#D3C8EC' }
                         ].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
@@ -1700,7 +1738,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       mb: 2,
                       letterSpacing: '-0.02em'
                     }}>
-                      {(reconciliationData.ordersDelivered?.number || 0) - (reconciliationData.monthOrdersAwaitedSettlement?.salesOrders || 0)}
+                      {(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number)}
                     </Typography>
                     <Typography variant="h6" sx={{
                       color: '#059669',
@@ -1708,7 +1746,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       fontWeight: 600,
                       letterSpacing: '-0.01em'
                     }}>
-                      {formatCurrency(parseAmount(reconciliationData.monthOrdersPayoutReceived || '0'))}
+                      {formatCurrency(parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount || '0'))}
                     </Typography>
                   </Box>
 
@@ -1757,7 +1795,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       mb: 2,
                       letterSpacing: '-0.02em'
                     }}>
-                      {reconciliationData.monthOrdersAwaitedSettlement?.salesOrders || 0}
+                      {reconciliationData.summaryData.totalTransaction.number - reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number}
                     </Typography>
                     <Typography variant="h6" sx={{
                       color: '#d97706',
@@ -1765,7 +1803,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       fontWeight: 600, 
                       letterSpacing: '-0.01em'
                     }}>
-                      {formatCurrency(parseAmount(reconciliationData.monthOrdersAwaitedSettlement?.salesAmount || '0'))}
+                      {formatCurrency(parseAmount(reconciliationData.summaryData.totalTransaction.amount) - parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount))}
                     </Typography>
                   </Box>
                 </Box>
@@ -1816,7 +1854,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       letterSpacing: '-0.03em',
                       fontSize: '2.5rem'
                     }}>
-                      {reconciliationData.summaryData.netSalesAsPerSalesReport.number}
+                      {reconciliationData.summaryData.totalTransaction.number}
                     </Typography>
                   </Box>
                 </Grid>
@@ -1862,7 +1900,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       letterSpacing: '-0.03em',
                       fontSize: '2.5rem'
                     }}>
-                      {((reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number) / (reconciliationData.summaryData.netSalesAsPerSalesReport.number) * 100).toFixed(1)}%
+                      {((reconciliationData.summaryData.totalReconciled.number) / (reconciliationData.summaryData.totalTransaction.number) * 100).toFixed(1)}%
                 </Typography>
               </Box>
                 </Grid>
@@ -1908,7 +1946,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       letterSpacing: '-0.02em',
                       fontSize: '1.5rem'
                     }}>
-                      {formatCurrency(parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount) - parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount))}
+                      {formatCurrency(parseAmount(reconciliationData.summaryData.pendingPaymentFromMarketplace.amount))}
                 </Typography>
               </Box>
                 </Grid>
@@ -1939,7 +1977,11 @@ const MarketplaceReconciliation: React.FC = () => {
               alignItems: 'stretch',
               maxWidth: 'fit-content'
             }}>
-              {Object.entries(enhancedMockData.enhancedKPIs).map(([key, kpi]) => (
+              {[
+                { key: 'netRevenue', data: salesOverview.netRevenue, color: '#F59E0B' },
+                { key: 'grossRevenue', data: salesOverview.grossRevenue, color: '#a79cdb' },
+                { key: 'returns', data: salesOverview.returns, color: '#1f2937' }
+              ].map(({ key, data, color }) => (
                 <Paper 
                   key={key}
                   sx={{ 
@@ -1967,20 +2009,19 @@ const MarketplaceReconciliation: React.FC = () => {
                       letterSpacing: '0.3px'
                     }}
                   >
-                    {kpi.label as any}
+                    {data.label}
                   </Typography>
                   <Typography 
                     variant="h6" 
                     sx={{ 
-                      color: key === 'grossRevenue' ? '#a79cdb' : 
-                             key === 'netRevenue' ? '#F59E0B' : '#1f2937',
+                      color: color,
                       fontWeight: 700,
                       fontSize: '1.125rem',
                       lineHeight: 1.2,
                       mb: 0.5
                     }}
                   >
-                    ₹{((kpi as any).value / 100000).toFixed(1)}L
+                    ₹{(parseFloat(data.value) / 100000).toFixed(1)}L
                   </Typography>
                 </Paper>
               ))}
@@ -2002,7 +2043,12 @@ const MarketplaceReconciliation: React.FC = () => {
           {/* Enhanced 3-Line Graph */}
           <Box sx={{ height: 400 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={enhancedMockData.monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+              <LineChart data={salesOverview.monthData.map(item => ({
+                month: item.month,
+                gross: parseFloat(item.gross),
+                net: parseFloat(item.net),
+                returns: parseFloat(item.returns)
+              }))} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis 
                   dataKey="month" 

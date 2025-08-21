@@ -90,7 +90,7 @@ const overdueTasks = [
 const upcomingTasks = [
   {
     id: 3,
-    title: 'Reconcile Goldman Sachs money market account *100030',
+    title: 'Reconcile March flipkart orders',
     tag: 'LTD',
     due: '3 Feb',
     users: [users[0], users[4]],
@@ -98,7 +98,7 @@ const upcomingTasks = [
   },
   {
     id: 4,
-    title: 'Reconcile Revolut collections bank account *100020',
+    title: 'Reconcile April flipkart orders',
     tag: 'INC.',
     due: '3 Feb',
     users: [users[2], users[3], users[1]],
@@ -106,7 +106,7 @@ const upcomingTasks = [
   },
   {
     id: 5,
-    title: 'Reconcile ING operating bank account *100040',
+    title: 'Reconcile Website orders',
     tag: 'INC.',
     due: '3 Feb',
     users: [users[4], users[0]],
@@ -117,7 +117,7 @@ const upcomingTasks = [
 const completedTasks = [
   {
     id: 6,
-    title: 'Reconcile HSBC operating bank account #100013',
+    title: 'Reconcile February flipkart orders',
     tag: 'INC.',
     completedDate: '1 Feb',
     users: [users[2], users[3]],
@@ -125,18 +125,10 @@ const completedTasks = [
   },
   {
     id: 7,
-    title: 'Post payroll and benefits from payroll system',
+    title: 'Reconcile February website orders',
     tag: 'INC.',
     completedDate: '31 Jan',
     users: [users[1], users[0]],
-    status: 'completed',
-  },
-  {
-    id: 8,
-    title: 'Monthly tax calculations and submissions',
-    tag: 'LTD',
-    completedDate: '30 Jan',
-    users: [users[4], users[2]],
     status: 'completed',
   },
 ];
@@ -234,6 +226,38 @@ const Checklist: React.FC = () => {
   const [fetchingUnreconciled, setFetchingUnreconciled] = useState<boolean>(false);
   const [unreconciledCount, setUnreconciledCount] = useState<number | null>(null);
   const [notifAnchor, setNotifAnchor] = useState<HTMLElement | null>(null);
+
+  // Notifications persisted by Dispute page
+  const [notifications, setNotifications] = useState<Array<{id:number;text:string;time:string;meta?:any}>>([]);
+  const [nudgeCount, setNudgeCount] = useState<number>(0);
+
+  React.useEffect(() => {
+    try {
+      const notifKey = 'recon_notifications';
+      const nudgeKey = 'recon_nudge_count';
+      const stored = JSON.parse(localStorage.getItem(notifKey) || '[]');
+      setNotifications(Array.isArray(stored) ? stored : []);
+      const count = parseInt(localStorage.getItem(nudgeKey) || '0', 10) || 0;
+      setNudgeCount(count);
+    } catch (_) {
+      setNotifications([]);
+      setNudgeCount(0);
+    }
+    const onNudge = () => {
+      try {
+        const notifKey = 'recon_notifications';
+        const nudgeKey = 'recon_nudge_count';
+        const stored = JSON.parse(localStorage.getItem(notifKey) || '[]');
+        setNotifications(Array.isArray(stored) ? stored : []);
+        const count = parseInt(localStorage.getItem(nudgeKey) || '0', 10) || 0;
+        setNudgeCount(count);
+      } catch (_) {
+        // ignore
+      }
+    };
+    window.addEventListener('recon_nudge_updated', onNudge as EventListener);
+    return () => window.removeEventListener('recon_nudge_updated', onNudge as EventListener);
+  }, []);
 
   const navigate = useNavigate();
 
@@ -364,7 +388,7 @@ const Checklist: React.FC = () => {
         </Typography>
         <Box sx={{ flex: 1 }} />
         <IconButton color="inherit" sx={{ mr: 1 }} onClick={(e) => setNotifAnchor(e.currentTarget)}>
-          <Badge color="error" badgeContent={5} overlap="circular">
+          <Badge color="error" badgeContent={nudgeCount} overlap="circular">
             <NotificationsNoneIcon />
           </Badge>
         </IconButton>
@@ -427,25 +451,50 @@ const Checklist: React.FC = () => {
         onClose={() => setNotifAnchor(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        sx={{ '& .MuiPaper-root': { p: 2, borderRadius: 2 } }}
+        sx={{ '& .MuiPaper-root': { p: 2, borderRadius: 2, minWidth: 600 } }}
       >
         <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Notifications</Typography>
-        <List dense sx={{ width: 320 }}>
-          {[
-            'Fetched Flipkart March sales data',
-            'Fetched Flipkart April sales data',
-            'Fetched Flipkart March settlement data',
-            'Fetched Flipkart April sales data',
-            'Reconciliation for March orders done',
-            'Found 1000 unreconciled orders',
-          ].map((text, idx) => (
-            <ListItem key={idx} sx={{ px: 0 }}>
-              <ListItemIcon sx={{ minWidth: 28 }}>
-                <RadioButtonUncheckedIcon fontSize="small" color="disabled" />
-              </ListItemIcon>
-              <ListItemText primary={text} />
+        <List dense sx={{ width: 600 }}>
+          {notifications.length === 0 ? (
+            <ListItem sx={{ px: 0 }}>
+              <ListItemText primary="No notifications" />
             </ListItem>
-          ))}
+          ) : (
+            notifications.map((n) => (
+              <ListItem
+                key={n.id}
+                sx={{ px: 0, cursor: 'pointer' }}
+                onClick={() => { setNotifAnchor(null); navigate('/dispute'); }}
+                secondaryAction={
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="inherit"
+                      sx={{ px: 1, py: 0.25, minHeight: 0, borderColor: '#111', color: '#111' }}
+                      onClick={(e) => { e.stopPropagation(); /* TODO: handle approve */ }}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="inherit"
+                      sx={{ px: 1, py: 0.25, minHeight: 0, borderColor: '#111', color: '#111' }}
+                      onClick={(e) => { e.stopPropagation(); /* TODO: handle reject */ }}
+                    >
+                      Reject
+                    </Button>
+                  </Box>
+                }
+              >
+                <ListItemIcon sx={{ minWidth: 28 }}>
+                  <RadioButtonUncheckedIcon fontSize="small" color="disabled" />
+                </ListItemIcon>
+                <ListItemText primary={n.text} secondary={new Date(n.time).toLocaleString()} sx={{ pr: 10 }} />
+              </ListItem>
+            ))
+          )}
         </List>
       </Popover>
       <Grid container spacing={3}>
@@ -780,11 +829,10 @@ const Checklist: React.FC = () => {
             </Typography>
             <Stack spacing={2}>
               {[
-                { text: 'Task "Reconcile HSBC account" marked as completed', time: '2 hours ago', icon: <CheckCircleIcon sx={{ color: '#10b981', fontSize: 20 }} /> },
-                { text: 'New comment added to "Post payroll" task', time: '4 hours ago', icon: <ErrorOutlineIcon sx={{ color: '#f59e0b', fontSize: 20 }} /> },
-                { text: 'Task "Data validation" assigned to Alice', time: '6 hours ago', icon: <RadioButtonUncheckedIcon sx={{ color: '#3b82f6', fontSize: 20 }} /> },
-                { text: 'Monthly reconciliation report generated', time: '1 day ago', icon: <TableIcon sx={{ color: '#8b5cf6', fontSize: 20 }} /> },
-                { text: 'Task "Exception review" due date updated', time: '2 days ago', icon: <CalendarTodayIcon sx={{ color: '#ef4444', fontSize: 20 }} /> },
+                { text: 'fetch April sales data from flipkart', time: '4 hours ago', icon: <TableIcon sx={{ color: '#8b5cf6', fontSize: 20 }} /> },
+                { text: 'fetch march sales data from flipkart ', time: '6 hours ago', icon: <TableIcon sx={{ color: '#8b5cf6', fontSize: 20 }} />},
+                { text: 'fetch April sales data from flipkart ', time: '1 day ago', icon: <TableIcon sx={{ color: '#8b5cf6', fontSize: 20 }} /> },
+                { text: 'fetch march sales data from flipkart ', time: '2 days ago', icon: <TableIcon sx={{ color: '#8b5cf6', fontSize: 20 }} /> },
               ].map((activity, idx) => (
                 <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
                   <Box sx={{ mt: 0.5 }}>
