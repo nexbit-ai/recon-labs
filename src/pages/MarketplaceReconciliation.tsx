@@ -555,6 +555,32 @@ const MarketplaceReconciliation: React.FC = () => {
     return Math.abs(parseFloat(amount) || 0);
   };
 
+  // Function to get gradient color based on reconciliation percentage
+  const getReconciliationColor = (percentage: number): string => {
+    if (percentage >= 98) {
+      // 98-100%: Green to light green
+      return '#10b981';
+    } else if (percentage >= 90) {
+      // 90-97%: Light green to yellow-green
+      return '#22c55e';
+    } else if (percentage >= 80) {
+      // 80-89%: Yellow-green to yellow
+      return '#84cc16';
+    } else if (percentage >= 70) {
+      // 70-79%: Yellow to orange
+      return '#eab308';
+    } else if (percentage >= 60) {
+      // 60-69%: Orange to dark orange
+      return '#f97316';
+    } else if (percentage >= 50) {
+      // 50-59%: Dark orange to red-orange
+      return '#ea580c';
+    } else {
+      // Below 50%: Red
+      return '#ef4444';
+    }
+  };
+
   const parsePercentage = (percentage: string): number => {
     return parseFloat(percentage) || 0;
   };
@@ -1404,7 +1430,7 @@ const MarketplaceReconciliation: React.FC = () => {
           {/* Reconciliation Status */}
           <Grid item xs={12} md={6}>
                           <Card 
-                onClick={() => navigate('/marketplace-reconciliation?openTs=1&tab=unreconciled')}
+                onClick={() => navigate('/dispute')}
                 sx={{ 
                 background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
                 borderRadius: '16px',
@@ -1447,10 +1473,10 @@ const MarketplaceReconciliation: React.FC = () => {
                       height: 200,
                       borderRadius: '100%',
                       background: `conic-gradient(
-                        ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#10b981' : '#ef4444'} 0deg,
-                        ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#10b981' : '#ef4444'} ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
-                        #f1f5f9 ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
-                        #f1f5f9 360deg
+                        #10b981 0deg,
+                        #10b981 ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
+                        #ef4444 ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
+                        #ef4444 360deg
                       )`,
                       display: 'flex',
                       alignItems: 'center',
@@ -1470,7 +1496,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       }}>
                         <Typography variant="h3" sx={{
                           fontWeight: 500,
-                          color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#059669' : '#dc2626',
+                          color: getReconciliationColor(parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 100 : Math.max(0, 100 - ((parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales)) * 100))),
                           fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                           mb: 0.5,
                           fontSize: '2rem',
@@ -1500,7 +1526,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           Difference Amount
                         </Typography>
                     <Typography variant="h5" sx={{
-                      color: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '#047857' : '#dc2626',
+                      color: getReconciliationColor(parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 100 : Math.max(0, 100 - ((parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales)) * 100))),
                         fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                         fontWeight: 700,
                       letterSpacing: '-0.02em'
