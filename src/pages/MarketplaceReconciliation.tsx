@@ -1278,6 +1278,9 @@ const MarketplaceReconciliation: React.FC = () => {
                             <Typography variant="h3" sx={{ fontWeight: 700, color: '#1f2937', lineHeight: 1.1 }}>
                               {`₹${Math.round(r.amount).toLocaleString('en-IN')}`}
                             </Typography>
+                            <Typography variant="body2" sx={{ mt: 1, color: '#6b7280', fontWeight: 500 }}>
+                              {`${(r.count ?? 0).toLocaleString('en-IN')} Orders`}
+                            </Typography>
                           </Box>
                         ))}
                       </Box>
@@ -1436,7 +1439,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   }}>
                     <Typography variant="h2" sx={{
                       fontWeight: 300,
-                      color: '#0f172a',
+                      color: '#059669',
                       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                       fontSize: '3rem',
                       mb: 2,
