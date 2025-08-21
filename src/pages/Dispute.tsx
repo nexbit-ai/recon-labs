@@ -384,8 +384,8 @@ const DisputePage: React.FC = () => {
             // Group by the actual reason from API response
             const reason = transaction.reason || 'Unknown';
             
-            // Use buyer_invoice_amount from context
-            const amount = parseFloat(transaction.context?.buyer_invoice_amount || '0');
+            // Use diff value from transaction (instead of buyer_invoice_amount)
+            const amount = parseFloat(transaction.diff || '0');
             
             console.log(`Processing transaction ${index + 1}/${transactionData.length}:`, { 
               reason: transaction.reason, 
