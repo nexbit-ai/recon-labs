@@ -1,41 +1,57 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Paper,
-  TextField,
-  Button,
-  Typography,
-  Link,
-} from '@mui/material';
+import React, { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Box, Paper, Typography } from '@mui/material';
+import { StytchB2B, useStytchMemberSession } from '@stytch/react/b2b';
+import { AuthFlowType, B2BProducts } from '@stytch/vanilla-js/b2b';
 // @ts-ignore
 import logo from '../assets/logo.png';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  const location = useLocation();
+  const { session, isInitialized } = useStytchMemberSession();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
+  // Get the intended destination from location state
+  const from = (location.state as any)?.from?.pathname || '/';
+
+  // Monitor session changes and redirect when authenticated
+  useEffect(() => {
+    if (isInitialized && session) {
+      console.log('Session detected in Login component, redirecting to marketplace...');
+      navigate('/marketplace-reconciliation', { replace: true });
+    }
+  }, [session, isInitialized, navigate]);
+
+  const config = {
+    products: [B2BProducts.passwords], // Only passwords, no email magic links
+    sessionOptions: { sessionDurationMinutes: 60 * 24 }, // 24 hours
+    authFlowType: AuthFlowType.Discovery, // Required field, but we'll handle organization selection differently
+    callbacks: {
+      onSuccess: (data: any) => {
+        console.log('Login successful, redirecting to marketplace...', data);
+        // Redirect to marketplace page after successful login
+        navigate('/marketplace-reconciliation', { replace: true });
+      },
+      onError: (error: any) => {
+        console.error('Login error:', error);
+      },
+    },
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Dummy login - just navigate to home
-    navigate('/', { replace: true });
-  };
-
-  const handleResetPassword = () => {
-    // Dummy reset password - just show alert
-    alert('Password reset email sent! (This is a dummy implementation)');
+  // Custom strings to override Stytch default text
+  const customStrings = {
+    'login.title': 'Sign in',
+    'login.subtitle': 'Sign in to your account to continue',
+    'formField.email.label': 'Email',
+    'formField.password.label': 'Password',
+    'formField.password.placeholder': 'Enter your password',
+    'formField.email.placeholder': 'email address',
+    'button.login': 'Sign In',
+    'button.continue': 'Continue',
+    'discovery.title': 'Select Organization',
+    'discovery.subtitle': 'Choose an organization to continue',
+    'discovery.createOrganization': 'Create New Organization',
+    'discovery.joinOrganization': 'Join Organization',
   };
 
   return (
@@ -53,128 +69,26 @@ const Login: React.FC = () => {
         elevation={2}
         sx={{
           width: '100%',
-          maxWidth: 400,
-          padding: 4,
+          maxWidth: 500,
+          padding: 6,
           borderRadius: 2,
           background: '#ffffff',
-          border: '1px solid #e5e7eb',
         }}
       >
         {/* Logo and Header */}
-  <Box sx={{ textAlign: 'left', mb: 4 }}>
+        <Box sx={{ textAlign: 'center', mb: 2 ,marginBottom: 4}}>
           <img
             src={logo}
             alt="Company Logo"
-            style={{ width: 64, height: 64, marginBottom: 16 }}
+            style={{ width: 64, height: 64, marginBottom: 0 }}
           />
           <Typography variant="h4" component="h1" fontWeight={700} gutterBottom sx={{ color: '#111827' }}>
             Welcome back
           </Typography>
-          <Typography variant="body2" sx={{ color: '#6b7280' }}>
-            Sign in to your account to continue
-          </Typography>
         </Box>
 
-        {/* Login Form */}
-        <Box component="form" onSubmit={handleSubmit} sx={{ mb: 3 }}>
-          <TextField
-            fullWidth
-            label="Email address"
-            name="email"
-            type="email"
-            value={formData.email}
-            onChange={handleInputChange}
-            sx={{ 
-              mb: 2,
-              '& .MuiOutlinedInput-root': {
-                height: '40px',
-                '& fieldset': {
-                  borderColor: '#d1d5db',
-                },
-                '&:hover fieldset': {
-                  borderColor: '#9ca3af',
-                },
-                '&.Mui-focused fieldset': {
-            borderColor: '#111111',
-                },
-              },
-              '& .MuiInputLabel-root': {
-                '&.Mui-focused': {
-            color: '#111111',
-                },
-              },
-            }}
-          />
-
-          <TextField
-            fullWidth
-            label="Password"
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleInputChange}
-            sx={{ 
-              mb: 3,
-              '& .MuiOutlinedInput-root': {
-                height: '40px',
-                '& fieldset': {
-                  borderColor: '#d1d5db',
-                },
-                '&:hover fieldset': {
-                  borderColor: '#9ca3af',
-                },
-                '&.Mui-focused fieldset': {
-            borderColor: '#111111',
-                },
-              },
-              '& .MuiInputLabel-root': {
-                '&.Mui-focused': {
-            color: '#111111',
-                },
-              },
-            }}
-          />
-
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            size="large"
-            sx={{
-              py: 1.5,
-              fontSize: '1rem',
-              fontWeight: 600,
-              borderRadius: 2,
-              textTransform: 'none',
-              backgroundColor: '#111827',
-              '&:hover': {
-                backgroundColor: '#374151',
-              },
-            }}
-          >
-            Sign in
-          </Button>
-        </Box>
-
-        {/* Reset Password Link */}
-        <Box sx={{ textAlign: 'center' }}>
-          <Link
-            component="button"
-            variant="body2"
-            onClick={handleResetPassword}
-            sx={{ 
-              textDecoration: 'none',
-              cursor: 'pointer',
-              color: '#6b7280',
-              '&:hover': {
-                textDecoration: 'underline',
-                color: '#374151',
-              }
-            }}
-          >
-            Forgot your password?
-          </Link>
-        </Box>
+        {/* Stytch B2B Authentication Component */}
+        <StytchB2B config={config} strings={customStrings} />
       </Paper>
     </Box>
   );

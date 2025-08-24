@@ -1,5 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useStytchMemberSession } from '@stytch/react/b2b';
+import { StytchB2BUIClient } from '@stytch/vanilla-js/b2b';
 import {
   Box,
   Drawer,
@@ -55,6 +57,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const { session } = useStytchMemberSession();
   // const { user, logout } = useAuth(); // Authentication disabled
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [settingsAnchorEl, setSettingsAnchorEl] = React.useState<null | HTMLElement>(null);
@@ -92,8 +95,34 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     } else if (option === 'Pricing') {
       navigate('/pricing');
     } else if (option === 'Logout') {
-      // Navigate to login page
-      navigate('/login');
+      // Properly logout using Stytch B2B
+      console.log('Logging out user...');
+      
+      try {
+        // Create a new Stytch client instance for logout
+        const stytchClient = new StytchB2BUIClient(
+          import.meta.env.VITE_STYTCH_PUBLIC_TOKEN || ''
+        );
+        
+        // Revoke the current session
+        stytchClient.session.revoke();
+        console.log('Successfully logged out from Stytch B2B');
+        
+        // Clear any local storage
+        try {
+          localStorage.removeItem('stytch_session');
+          sessionStorage.clear();
+        } catch (error) {
+          console.error('Error clearing local data:', error);
+        }
+        
+        // Navigate to login page
+        navigate('/login', { replace: true });
+      } catch (error) {
+        console.error('Error during Stytch logout:', error);
+        // Fallback: navigate to login page
+        navigate('/login', { replace: true });
+      }
     }
   };
 

@@ -16,14 +16,12 @@ import {
   VisibilityOff,
   Lock,
 } from '@mui/icons-material';
-// import { useAuth } from '../contexts/AuthContext';
 // @ts-ignore
 import logo from '../assets/logo.png';
 
 const ResetPassword: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  // const { resetPasswordWithToken } = useAuth();
   
   const [formData, setFormData] = useState({
     password: '',
@@ -77,15 +75,12 @@ const ResetPassword: React.FC = () => {
     setError('');
 
     try {
-      // const success = await resetPasswordWithToken(token, formData.password);
-      // if (success) {
-        setSuccess(true);
-        setTimeout(() => {
-          navigate('/', { replace: true });
-        }, 2000);
-      // } else {
-      //   setError('Failed to reset password. Please try again.');
-      // }
+      // For now, just show success message
+      // In production, this would integrate with Stytch password reset
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/', { replace: true });
+      }, 2000);
     } catch (err) {
       setError('An error occurred. Please try again.');
     } finally {
@@ -101,40 +96,6 @@ const ResetPassword: React.FC = () => {
     setShowConfirmPassword(!showConfirmPassword);
   };
 
-  if (!token && !error) {
-    return (
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          padding: 2,
-        }}
-      >
-        <Paper
-          elevation={24}
-          sx={{
-            width: '100%',
-            maxWidth: 400,
-            padding: 4,
-            borderRadius: 3,
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(10px)',
-          }}
-        >
-          <Box sx={{ textAlign: 'center' }}>
-            <CircularProgress size={40} />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              Loading...
-            </Typography>
-          </Box>
-        </Paper>
-      </Box>
-    );
-  }
-
   return (
     <Box
       sx={{
@@ -142,32 +103,32 @@ const ResetPassword: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: '#f8fafc',
         padding: 2,
       }}
     >
       <Paper
-        elevation={24}
+        elevation={2}
         sx={{
           width: '100%',
           maxWidth: 400,
           padding: 4,
-          borderRadius: 3,
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
+          borderRadius: 2,
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
         }}
       >
         {/* Logo and Header */}
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
+        <Box sx={{ textAlign: 'left', mb: 4 }}>
           <img
             src={logo}
-            alt="Nexbit Logo"
+            alt="Company Logo"
             style={{ width: 64, height: 64, marginBottom: 16 }}
           />
-          <Typography variant="h4" component="h1" fontWeight={800} gutterBottom>
-            Reset password
+          <Typography variant="h4" component="h1" fontWeight={700} gutterBottom sx={{ color: '#111827' }}>
+            Set new password
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: '#6b7280' }}>
             Enter your new password below
           </Typography>
         </Box>
@@ -175,7 +136,7 @@ const ResetPassword: React.FC = () => {
         {/* Success Alert */}
         {success && (
           <Alert severity="success" sx={{ mb: 3 }}>
-            Password reset successfully! Redirecting to dashboard...
+            Password updated successfully! Redirecting to dashboard...
           </Alert>
         )}
 
@@ -186,8 +147,8 @@ const ResetPassword: React.FC = () => {
           </Alert>
         )}
 
-        {/* Reset Form */}
-        {!success && !error.includes('Invalid reset link') && (
+        {/* Reset Password Form */}
+        {!success && (
           <Box component="form" onSubmit={handleSubmit} sx={{ mb: 3 }}>
             <TextField
               fullWidth
@@ -196,6 +157,7 @@ const ResetPassword: React.FC = () => {
               type={showPassword ? 'text' : 'password'}
               value={formData.password}
               onChange={handleInputChange}
+              disabled={isLoading}
               required
               sx={{ mb: 2 }}
               InputProps={{
@@ -225,6 +187,7 @@ const ResetPassword: React.FC = () => {
               type={showConfirmPassword ? 'text' : 'password'}
               value={formData.confirmPassword}
               onChange={handleInputChange}
+              disabled={isLoading}
               required
               sx={{ mb: 3 }}
               InputProps={{
@@ -259,29 +222,20 @@ const ResetPassword: React.FC = () => {
                 fontWeight: 600,
                 borderRadius: 2,
                 textTransform: 'none',
+                backgroundColor: '#111827',
+                '&:hover': {
+                  backgroundColor: '#374151',
+                },
               }}
             >
-              {isLoading ? 'Resetting...' : 'Reset password'}
-            </Button>
-          </Box>
-        )}
-
-        {/* Back to login link */}
-        {error.includes('Invalid reset link') && (
-          <Box sx={{ textAlign: 'center' }}>
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={() => navigate('/login')}
-              sx={{
-                py: 1.5,
-                fontSize: '1rem',
-                fontWeight: 600,
-                borderRadius: 2,
-                textTransform: 'none',
-              }}
-            >
-              Back to login
+              {isLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CircularProgress size={20} color="inherit" />
+                  Updating...
+                </Box>
+              ) : (
+                'Update password'
+              )}
             </Button>
           </Box>
         )}

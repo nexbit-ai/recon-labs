@@ -1,8 +1,16 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { CssBaseline, Box, Paper, Typography, CircularProgress } from '@mui/material';
 import { apiUtils } from './services/api';
-import Layout from './components/Layout';
+
+// Stytch B2B imports
+import { StytchB2BProvider, useStytchMemberSession } from '@stytch/react/b2b';
+import { StytchB2BUIClient } from '@stytch/vanilla-js/b2b';
+import { StytchB2B } from '@stytch/react/b2b';
+import { AuthFlowType, B2BProducts } from '@stytch/vanilla-js/b2b';
+
+// Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -10,16 +18,20 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Checklist from './pages/Checklist';
 import RecentActivities from './pages/RecentActivities';
+import MarketplaceReconciliation from './pages/MarketplaceReconciliation';
+import DisputePage from './pages/Dispute';
 import Reports from './pages/Reports';
+import ConnectDataSources from './pages/ConnectDataSources';
 import AIWorkflows from './pages/AIWorkflows';
+import Assistant from './pages/Assistant';
 import AIReconciliation from './pages/AIReconciliation';
 import Security from './pages/Security';
 import Pricing from './pages/Pricing';
-import ConnectDataSources from './pages/ConnectDataSources';
-import Assistant from './pages/Assistant';
-import MarketplaceReconciliation from './pages/MarketplaceReconciliation';
 import Bookkeeping from './pages/Bookkeeping';
-import DisputePage from './pages/Dispute';
+
+// Components
+import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
 
 const theme = createTheme({
   palette: {
@@ -203,41 +215,256 @@ const theme = createTheme({
   },
 });
 
-function App() {
-  // Initialize API credentials on app startup
+// Initialize Stytch B2B client
+const stytch = new StytchB2BUIClient(
+  import.meta.env.VITE_STYTCH_PUBLIC_TOKEN || ''
+);
+
+// Authenticate component for handling Stytch redirects
+const Authenticate: React.FC = () => {
+  const navigate = useNavigate();
+  const { session, isInitialized } = useStytchMemberSession();
+
   useEffect(() => {
-    apiUtils.initializeApiCredentials();
-  }, []);
+    // Get URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const stytchRedirectType = urlParams.get('stytch_redirect_type');
+    
+    console.log('Authenticate component - URL params:', { token, stytchRedirectType, url: window.location.href });
+    console.log('Session status:', { session, isInitialized });
+    
+    // Handle different redirect types
+    if (stytchRedirectType === 'login' && isInitialized && session) {
+      console.log('Valid session detected, redirecting to marketplace...');
+      navigate('/marketplace-reconciliation', { replace: true });
+    } else if (stytchRedirectType === 'reset_password' && token) {
+      console.log('Password reset flow detected, waiting for user to set new password...');
+      // For password reset, set up a fallback redirect in case onSuccess doesn't trigger
+      const timer = setTimeout(() => {
+        console.log('Password reset fallback: redirecting after 100 seconds...');
+        navigate('/marketplace-reconciliation', { replace: true });
+      }, 100000); // 100 second fallback - gives users plenty of time
+      
+      return () => clearTimeout(timer);
+    } else if (stytchRedirectType === 'signup' && isInitialized && session) {
+      console.log('Signup completed, redirecting to marketplace...');
+      navigate('/marketplace-reconciliation', { replace: true });
+    }
+  }, [navigate, session, isInitialized]);
+
+  // Add a separate effect to watch for session changes during password reset
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stytchRedirectType = urlParams.get('stytch_redirect_type');
+    
+    if (stytchRedirectType === 'reset_password' && isInitialized && session) {
+      console.log('Password reset completed - session detected, redirecting...');
+      navigate('/marketplace-reconciliation', { replace: true });
+    }
+  }, [session, isInitialized, navigate]);
+
+  const config = {
+    products: [B2BProducts.passwords], // Only passwords, no email magic links
+    sessionOptions: { sessionDurationMinutes: 60 * 24 }, // 24 hours
+    authFlowType: AuthFlowType.Discovery,
+    callbacks: {
+      onSuccess: (data: any) => {
+        console.log('Stytch onSuccess callback triggered:', data);
+        // Check if this is a password reset completion
+        const urlParams = new URLSearchParams(window.location.search);
+        const stytchRedirectType = urlParams.get('stytch_redirect_type');
+        
+        if (stytchRedirectType === 'reset_password') {
+          console.log('Password reset completed successfully, redirecting...');
+          // Force redirect immediately for password reset
+          navigate('/marketplace-reconciliation', { replace: true });
+        } else {
+          // For other flows, wait for session update
+          console.log('Success callback completed, waiting for session update...');
+        }
+      },
+      onError: (error: any) => {
+        console.error('Authentication error:', error);
+        // Redirect to login on error
+        navigate('/login', { replace: true });
+      },
+    },
+    // Password-specific configuration
+    passwordOptions: {
+      loginRedirectURL: `${window.location.origin}/authenticate`,
+      signupRedirectURL: `${window.location.origin}/authenticate`,
+    },
+    // Password reset configuration
+    passwordResetOptions: {
+      redirectURL: `${window.location.origin}/authenticate`,
+    },
+    // Hide Stytch branding
+    styles: {
+      hideStytchBranding: true,
+    },
+  };
+
+  return (
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f8fafc',
+        padding: 2,
+      }}
+    >
+      <Paper
+        elevation={2}
+        sx={{
+          width: '100%',
+          maxWidth: 500,
+          padding: 4,
+          borderRadius: 2,
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
+        }}
+      >
+        {/* Header */}
+        <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <CircularProgress size={40} sx={{ mb: 2, color: '#111111' }} />
+          <Typography variant="h4" component="h1" fontWeight={700} gutterBottom sx={{ color: '#111827' }}>
+            {(() => {
+              const urlParams = new URLSearchParams(window.location.search);
+              const stytchRedirectType = urlParams.get('stytch_redirect_type');
+              if (stytchRedirectType === 'reset_password') return 'Reset Your Password';
+              if (stytchRedirectType === 'signup') return 'Complete Signup';
+              return 'Authenticating...';
+            })()}
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#6b7280' }}>
+            {(() => {
+              const urlParams = new URLSearchParams(window.location.search);
+              const stytchRedirectType = urlParams.get('stytch_redirect_type');
+              if (stytchRedirectType === 'reset_password') return 'Enter your new password below';
+              if (stytchRedirectType === 'signup') return 'Complete your account setup';
+              return 'Please wait while we process your authentication';
+            })()}
+          </Typography>
+        </Box>
+
+        {/* Stytch B2B Authentication Component */}
+        <StytchB2B config={config} />
+        
+        {/* Custom CSS to hide Stytch branding */}
+        <style>
+          {`
+            .stytch-branding,
+            [data-testid="stytch-branding"],
+            .stytch-powered-by,
+            [class*="branding"],
+            [class*="powered-by"] {
+              display: none !important;
+            }
+          `}
+        </style>
+      </Paper>
+    </Box>
+  );
+};
+function App() {
+  // Don't initialize API credentials here - let the useOrganization hook handle it dynamically
+  // The organization ID will be set from the Stytch session when user authenticates
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-              <Router>
+      <StytchB2BProvider stytch={stytch}>
+        <Router>
           <Routes>
             {/* Authentication routes (public) */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/authenticate" element={<Authenticate />} />
             
-            {/* Main application routes with Layout */}
-            <Route path="/" element={<Layout><MarketplaceReconciliation /></Layout>} />
-            <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-            <Route path="/checklist" element={<Layout><Checklist /></Layout>} />
-            <Route path="/recent-activities" element={<Layout><RecentActivities /></Layout>} />
-            <Route path="/marketplace-reconciliation" element={<Layout><MarketplaceReconciliation /></Layout>} />
-            <Route path="/dispute" element={<Layout><DisputePage /></Layout>} />
-            <Route path="/reports" element={<Layout><Reports /></Layout>} />
-            <Route path="/finance-dashboard" element={<Layout><MarketplaceReconciliation /></Layout>} />
-            <Route path="/connect-data-sources" element={<Layout><ConnectDataSources /></Layout>} />
-            <Route path="/ai-workflows" element={<Layout><AIWorkflows /></Layout>} />
-            <Route path="/assistant" element={<Layout><Assistant /></Layout>} />
-            <Route path="/ai-reconciliation" element={<Layout><AIReconciliation /></Layout>} />
-            <Route path="/security" element={<Layout><Security /></Layout>} />
-            <Route path="/pricing" element={<Layout><Pricing /></Layout>} />
-            <Route path="/bookkeeping" element={<Layout><Bookkeeping /></Layout>} />
+            {/* Main application routes with Layout and Protection */}
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Layout><MarketplaceReconciliation /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <Layout><Dashboard /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/checklist" element={
+              <ProtectedRoute>
+                <Layout><Checklist /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/recent-activities" element={
+              <ProtectedRoute>
+                <Layout><RecentActivities /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/marketplace-reconciliation" element={
+              <ProtectedRoute>
+                <Layout><MarketplaceReconciliation /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/dispute" element={
+              <ProtectedRoute>
+                <Layout><DisputePage /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/reports" element={
+              <ProtectedRoute>
+                <Layout><Reports /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/finance-dashboard" element={
+              <ProtectedRoute>
+                <Layout><MarketplaceReconciliation /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/connect-data-sources" element={
+              <ProtectedRoute>
+                <Layout><ConnectDataSources /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/ai-workflows" element={
+              <ProtectedRoute>
+                <Layout><AIWorkflows /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/assistant" element={
+              <ProtectedRoute>
+                <Layout><Assistant /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/ai-reconciliation" element={
+              <ProtectedRoute>
+                <Layout><AIReconciliation /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/security" element={
+              <ProtectedRoute>
+                <Layout><Security /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/pricing" element={
+              <ProtectedRoute>
+                <Layout><Pricing /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/bookkeeping" element={
+              <ProtectedRoute>
+                <Layout><Bookkeeping /></Layout>
+              </ProtectedRoute>
+            } />
           </Routes>
         </Router>
+      </StytchB2BProvider>
     </ThemeProvider>
   );
 }
