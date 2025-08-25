@@ -60,6 +60,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { session } = useStytchMemberSession();
   // const { user, logout } = useAuth(); // Authentication disabled
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  
   const [settingsAnchorEl, setSettingsAnchorEl] = React.useState<null | HTMLElement>(null);
   const [sidebarNudge, setSidebarNudge] = React.useState<number>(() => {
     try { return parseInt(localStorage.getItem('recon_nudge_count') || '0', 10) || 0; } catch { return 0; }
@@ -96,7 +97,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       navigate('/pricing');
     } else if (option === 'Logout') {
       // Properly logout using Stytch B2B
-      console.log('Logging out user...');
+      console.log('🚪 ===== LOGOUT PROCESS INITIATED =====');
+      console.log('⏰ Timestamp:', new Date().toISOString());
+      console.log('👤 Current User:', {
+        memberId: session?.member_id,
+        organizationId: session?.organization_id,
+        organizationSlug: session?.organization_slug,
+        roles: session?.roles
+      });
       
       try {
         // Create a new Stytch client instance for logout
@@ -106,20 +114,23 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         
         // Revoke the current session
         stytchClient.session.revoke();
-        console.log('Successfully logged out from Stytch B2B');
+        console.log('✅ Successfully logged out from Stytch B2B');
         
         // Clear any local storage
         try {
           localStorage.removeItem('stytch_session');
           sessionStorage.clear();
+          console.log('🧹 Local storage and session storage cleared');
         } catch (error) {
-          console.error('Error clearing local data:', error);
+          console.error('⚠️ Error clearing local data:', error);
         }
         
+        console.log('🚪 ===== LOGOUT PROCESS COMPLETED =====');
         // Navigate to login page
         navigate('/login', { replace: true });
       } catch (error) {
-        console.error('Error during Stytch logout:', error);
+        console.error('❌ Error during Stytch logout:', error);
+        console.log('🚪 ===== LOGOUT PROCESS FAILED =====');
         // Fallback: navigate to login page
         navigate('/login', { replace: true });
       }

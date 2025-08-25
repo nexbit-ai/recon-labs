@@ -1,189 +1,195 @@
-import { AuthTokens, TokenConfig } from './types';
-import { API_CONFIG } from './config';
+import JWTService, { JWTPayload, StytchSessionData } from '../auth/jwtService';
 
 class TokenManager {
-  private config: TokenConfig;
-  private refreshPromise: Promise<AuthTokens> | null = null;
+  private jwtToken: string | null = null;
+  private apiKey: string | null = null;
+  private orgId: string | null = null;
 
-  constructor(config: TokenConfig) {
-    this.config = {
-      autoRefresh: true,
-      refreshThreshold: 300, // 5 minutes before expiry
-      ...config,
+  /**
+   * Set JWT credentials from Stytch session data
+   */
+  async setJWTCredentials(sessionData: StytchSessionData): Promise<void> {
+    try {
+      // Generate JWT token from session data
+      const token = await JWTService.generateToken(sessionData);
+      
+      // Store the JWT token
+      this.jwtToken = token;
+      
+      // Also store the organization ID for backward compatibility during transition
+      this.orgId = sessionData.organization_id;
+      
+      // Store in localStorage for persistence
+      localStorage.setItem('jwt_token', token);
+      localStorage.setItem('organization_id', sessionData.organization_id);
+      
+      
+    } catch (error) {
+      console.error('❌ Error setting JWT credentials:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Set legacy API credentials (for backward compatibility)
+   */
+  setApiCredentials(apiKey: string, orgId: string): void {
+    console.log('⚠️ Setting legacy API credentials (deprecated - use JWT instead)');
+    this.apiKey = apiKey;
+    this.orgId = orgId;
+    
+    // Store in localStorage for persistence
+    localStorage.setItem('api_key', apiKey);
+    localStorage.setItem('organization_id', orgId);
+  }
+
+  /**
+   * Get JWT token
+   */
+  getJWTToken(): string | null {
+    if (!this.jwtToken) {
+      // Try to load from localStorage
+      this.jwtToken = localStorage.getItem('jwt_token');
+      if (this.jwtToken) {
+        console.log('🔄 JWT token loaded from localStorage');
+      }
+    }
+    return this.jwtToken;
+  }
+
+  /**
+   * Get legacy API key (for backward compatibility)
+   */
+  getApiKey(): string | null {
+    if (!this.apiKey) {
+      // Try to load from localStorage
+      this.apiKey = localStorage.getItem('api_key');
+      if (this.apiKey) {
+        console.log('🔄 API key loaded from localStorage');
+      }
+    }
+    return this.apiKey;
+  }
+
+  /**
+   * Get legacy organization ID (for backward compatibility)
+   */
+  getOrgId(): string | null {
+    if (!this.orgId) {
+      // Try to load from localStorage
+      this.orgId = localStorage.getItem('organization_id');
+      if (this.orgId) {
+        console.log('🔄 Organization ID loaded from localStorage');
+      }
+    }
+    return this.orgId;
+  }
+
+  /**
+   * Get API headers - JWT takes priority, falls back to legacy headers
+   */
+  getApiHeaders(): Record<string, string> {
+    const jwtToken = this.getJWTToken();
+    
+    if (jwtToken && !JWTService.isTokenExpired(jwtToken)) {
+      // Use JWT token
+      return {
+        'Authorization': `Bearer ${jwtToken}`,
+        'Content-Type': 'application/json'
+      };
+    }
+    
+    // No credentials available
+    console.error('❌ No valid JWT credentials available for API requests');
+    return {
+      'Content-Type': 'application/json'
     };
   }
 
-  // Store tokens in localStorage
-  setTokens(tokens: AuthTokens): void {
-    try {
-      localStorage.setItem(this.config.storageKey, JSON.stringify(tokens));
-    } catch (error) {
-      console.error('Failed to store tokens:', error);
-    }
+  /**
+   * Check if JWT token is available and valid
+   */
+  hasValidJWT(): boolean {
+    const token = this.getJWTToken();
+    return token !== null && !JWTService.isTokenExpired(token);
   }
 
-  // Get tokens from localStorage
-  getTokens(): AuthTokens | null {
-    try {
-      const tokens = localStorage.getItem(this.config.storageKey);
-      return tokens ? JSON.parse(tokens) : null;
-    } catch (error) {
-      console.error('Failed to retrieve tokens:', error);
-      return null;
-    }
+  /**
+   * Check if legacy credentials are available
+   */
+  hasLegacyCredentials(): boolean {
+    return false;
   }
 
-  // Get access token
-  getAccessToken(): string | null {
-    const tokens = this.getTokens();
-    return tokens?.accessToken || null;
-  }
-
-  // Get refresh token
-  getRefreshToken(): string | null {
-    const tokens = this.getTokens();
-    return tokens?.refreshToken || null;
-  }
-
-  // Check if token is expired
-  isTokenExpired(): boolean {
-    const tokens = this.getTokens();
-    if (!tokens?.expiresAt) return false;
+  /**
+   * Clear all stored credentials
+   */
+  clearCredentials(): void {
+    console.log('🧹 Clearing all stored credentials');
     
-    const now = Math.floor(Date.now() / 1000);
-    return tokens.expiresAt <= now;
-  }
-
-  // Check if token needs refresh (within threshold)
-  shouldRefreshToken(): boolean {
-    if (!this.config.autoRefresh) return false;
+    this.jwtToken = null;
+    this.apiKey = null;
+    this.orgId = null;
     
-    const tokens = this.getTokens();
-    if (!tokens?.expiresAt) return false;
+    localStorage.removeItem('jwt_token');
+    localStorage.removeItem('api_key');
+    localStorage.removeItem('organization_id');
     
-    const now = Math.floor(Date.now() / 1000);
-    const threshold = this.config.refreshThreshold || 300;
-    
-    return tokens.expiresAt - now <= threshold;
+    console.log('✅ All credentials cleared');
   }
 
-  // Clear tokens
-  clearTokens(): void {
-    try {
-      localStorage.removeItem(this.config.storageKey);
-    } catch (error) {
-      console.error('Failed to clear tokens:', error);
-    }
+  /**
+   * Get current authentication method
+   */
+  getAuthMethod(): 'jwt' | 'legacy' | 'none' {
+    if (this.hasValidJWT()) return 'jwt';
+    return 'none';
   }
 
-  // Update tokens (for refresh scenarios)
-  updateTokens(updates: Partial<AuthTokens>): void {
-    const currentTokens = this.getTokens();
-    if (currentTokens) {
-      const updatedTokens = { ...currentTokens, ...updates };
-      this.setTokens(updatedTokens);
-    }
-  }
-
-  // Get authorization header
-  getAuthHeader(): string | null {
-    const tokens = this.getTokens();
-    if (!tokens?.accessToken) return null;
-    
-    const tokenType = tokens.tokenType || 'Bearer';
-    return `${tokenType} ${tokens.accessToken}`;
-  }
-
-  // Set refresh promise to prevent multiple simultaneous refresh calls
-  setRefreshPromise(promise: Promise<AuthTokens>): void {
-    this.refreshPromise = promise;
-  }
-
-  // Get current refresh promise
-  getRefreshPromise(): Promise<AuthTokens> | null {
-    return this.refreshPromise;
-  }
-
-  // Clear refresh promise
-  clearRefreshPromise(): void {
-    this.refreshPromise = null;
-  }
-
-  // Check if user is authenticated
-  isAuthenticated(): boolean {
-    const tokens = this.getTokens();
-    return !!(tokens?.accessToken && !this.isTokenExpired());
-  }
-
-  // Get token expiry time
-  getTokenExpiry(): number | null {
-    const tokens = this.getTokens();
-    return tokens?.expiresAt || null;
-  }
-
-  // Get time until token expires (in seconds)
-  getTimeUntilExpiry(): number | null {
-    const expiry = this.getTokenExpiry();
-    if (!expiry) return null;
-    
-    const now = Math.floor(Date.now() / 1000);
-    return Math.max(0, expiry - now);
-  }
-
-  // API Key and Organization ID management
-  setApiCredentials(apiKey: string, orgId: string): void {
-    try {
-      localStorage.setItem('recon_labs_api_key', apiKey);
-      localStorage.setItem('recon_labs_org_id', orgId);
-    } catch (error) {
-      console.error('Failed to store API credentials:', error);
-    }
-  }
-
-  getApiKey(): string | null {
-    try {
-      return localStorage.getItem('recon_labs_api_key');
-    } catch (error) {
-      console.error('Failed to retrieve API key:', error);
-      return null;
-    }
-  }
-
-  getOrgId(): string | null {
-    try {
-      return localStorage.getItem('recon_labs_org_id');
-    } catch (error) {
-      console.error('Failed to retrieve organization ID:', error);
-      return null;
-    }
-  }
-
-  clearApiCredentials(): void {
-    try {
-      localStorage.removeItem('recon_labs_api_key');
-      localStorage.removeItem('recon_labs_org_id');
-    } catch (error) {
-      console.error('Failed to clear API credentials:', error);
-    }
-  }
-
-  // Get API headers
-  getApiHeaders(): Record<string, string> {
-    const apiKey = this.getApiKey() || API_CONFIG.API_KEY;
-    const orgId = this.getOrgId() || API_CONFIG.ORG_ID;
+  /**
+   * Get authentication status summary
+   */
+  getAuthStatus(): {
+    method: 'jwt' | 'legacy' | 'none';
+    hasValidCredentials: boolean;
+    jwtExpiration?: Date;
+    organizationId?: string;
+  } {
+    const method = this.getAuthMethod();
+    const jwtToken = this.getJWTToken();
     
     return {
-      'X-API-Key': apiKey,
-      'X-Org-ID': orgId,
+      method,
+      hasValidCredentials: method === 'jwt',
+      jwtExpiration: jwtToken ? JWTService.getTokenExpiration(jwtToken) || undefined : undefined,
+      organizationId: this.getOrgId() || undefined
     };
+  }
+
+  // Backward compatibility methods for existing code
+  getRefreshToken(): string | null {
+    console.log('⚠️ getRefreshToken() called - not implemented in JWT system');
+    return null;
+  }
+
+  setTokens(tokens: any): void {
+    console.log('⚠️ setTokens() called - not implemented in JWT system');
+  }
+
+  clearTokens(): void {
+    console.log('⚠️ clearTokens() called - redirecting to clearCredentials()');
+    this.clearCredentials();
+  }
+
+  isAuthenticated(): boolean {
+    return this.hasValidJWT() || this.hasLegacyCredentials();
+  }
+
+  getAccessToken(): string | null {
+    return this.getJWTToken();
   }
 }
 
-// Create default token manager instance
-export const tokenManager = new TokenManager({
-  storageKey: 'recon_labs_auth_tokens',
-  autoRefresh: true,
-  refreshThreshold: 300, // 5 minutes
-});
-
-export default TokenManager; 
+// Export singleton instance
+export const tokenManager = new TokenManager();
+export default tokenManager; 

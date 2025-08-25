@@ -1,6 +1,7 @@
 import { tokenManager } from './tokenManager';
 import { API_CONFIG, buildApiUrl, buildAuthUrl, replaceUrlParams, DEBUG_CONFIG } from './config';
 import { ApiResponse, ApiError, ApiRequestConfig, RequestConfig } from './types';
+import JWTService from '../auth/jwtService';
 
 class ApiService {
   private baseURL: string;
@@ -138,14 +139,17 @@ class ApiService {
       ...customHeaders,
     };
 
-    // Add API key and organization ID headers
-    const apiHeaders = tokenManager.getApiHeaders();
-    Object.assign(headers, apiHeaders);
+    // Get authentication headers (JWT takes priority, falls back to legacy API key + org ID)
+    const authHeaders = tokenManager.getApiHeaders();
+    Object.assign(headers, authHeaders);
 
-    // Add authorization header if token exists
-    const authHeader = tokenManager.getAuthHeader();
-    if (authHeader) {
-      headers.Authorization = authHeader;
+    // Log the authentication method being used
+    const authMethod = tokenManager.getAuthMethod();
+    if (authMethod === 'jwt') {
+    } else if (authMethod === 'legacy') {
+      console.log('⚠️ Using legacy API key + organization ID authentication for API request');
+    } else {
+      console.warn('⚠️ No authentication credentials available for API request');
     }
 
     return headers;
@@ -158,12 +162,23 @@ class ApiService {
       console.log(`📥 API Response: ${response.status} ${response.statusText}`);
     }
 
-    // Handle token refresh if needed
+    // Handle JWT token refresh if needed
     if (response.status === 401) {
-      const refreshed = await this.handleTokenRefresh();
-      if (refreshed) {
-        // Retry the original request
-        throw new Error('TOKEN_REFRESHED');
+      const authMethod = tokenManager.getAuthMethod();
+      if (authMethod === 'jwt') {
+        console.log('🔐 JWT token expired, attempting to refresh...');
+        try {
+          const jwtToken = tokenManager.getJWTToken();
+          if (jwtToken) {
+            const refreshedToken = await JWTService.refreshToken(jwtToken);
+            // Update the stored JWT token
+            localStorage.setItem('jwt_token', refreshedToken);
+            console.log('✅ JWT token refreshed, retrying request...');
+            throw new Error('TOKEN_REFRESHED');
+          }
+        } catch (error) {
+          console.error('❌ Failed to refresh JWT token:', error);
+        }
       }
     }
 

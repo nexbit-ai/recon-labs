@@ -32,6 +32,7 @@ import Bookkeeping from './pages/Bookkeeping';
 // Components
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import SessionMonitor from './components/SessionMonitor';
 
 const theme = createTheme({
   palette: {
@@ -231,24 +232,18 @@ const Authenticate: React.FC = () => {
     const token = urlParams.get('token');
     const stytchRedirectType = urlParams.get('stytch_redirect_type');
     
-    console.log('Authenticate component - URL params:', { token, stytchRedirectType, url: window.location.href });
-    console.log('Session status:', { session, isInitialized });
     
     // Handle different redirect types
     if (stytchRedirectType === 'login' && isInitialized && session) {
-      console.log('Valid session detected, redirecting to marketplace...');
       navigate('/marketplace-reconciliation', { replace: true });
     } else if (stytchRedirectType === 'reset_password' && token) {
-      console.log('Password reset flow detected, waiting for user to set new password...');
       // For password reset, set up a fallback redirect in case onSuccess doesn't trigger
       const timer = setTimeout(() => {
-        console.log('Password reset fallback: redirecting after 100 seconds...');
         navigate('/marketplace-reconciliation', { replace: true });
       }, 100000); // 100 second fallback - gives users plenty of time
       
       return () => clearTimeout(timer);
     } else if (stytchRedirectType === 'signup' && isInitialized && session) {
-      console.log('Signup completed, redirecting to marketplace...');
       navigate('/marketplace-reconciliation', { replace: true });
     }
   }, [navigate, session, isInitialized]);
@@ -259,7 +254,6 @@ const Authenticate: React.FC = () => {
     const stytchRedirectType = urlParams.get('stytch_redirect_type');
     
     if (stytchRedirectType === 'reset_password' && isInitialized && session) {
-      console.log('Password reset completed - session detected, redirecting...');
       navigate('/marketplace-reconciliation', { replace: true });
     }
   }, [session, isInitialized, navigate]);
@@ -270,22 +264,29 @@ const Authenticate: React.FC = () => {
     authFlowType: AuthFlowType.Discovery,
     callbacks: {
       onSuccess: (data: any) => {
-        console.log('Stytch onSuccess callback triggered:', data);
+        
+        
         // Check if this is a password reset completion
         const urlParams = new URLSearchParams(window.location.search);
         const stytchRedirectType = urlParams.get('stytch_redirect_type');
         
         if (stytchRedirectType === 'reset_password') {
-          console.log('Password reset completed successfully, redirecting...');
+          console.log('✅ Password reset completed successfully, redirecting...');
           // Force redirect immediately for password reset
           navigate('/marketplace-reconciliation', { replace: true });
         } else {
           // For other flows, wait for session update
-          console.log('Success callback completed, waiting for session update...');
+          console.log('⏳ Success callback completed, waiting for session update...');
         }
       },
       onError: (error: any) => {
-        console.error('Authentication error:', error);
+        console.error('❌ Authentication error:', error);
+        console.log('🚨 Error Details:', {
+          type: typeof error,
+          message: error?.message || error?.error_message || 'Unknown error',
+          code: error?.error_type || error?.status_code || 'No code',
+          fullError: error
+        });
         // Redirect to login on error
         navigate('/login', { replace: true });
       },
@@ -377,6 +378,7 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <StytchB2BProvider stytch={stytch}>
+        <SessionMonitor />
         <Router>
           <Routes>
             {/* Authentication routes (public) */}

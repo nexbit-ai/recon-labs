@@ -17,7 +17,19 @@ const Login: React.FC = () => {
   // Monitor session changes and redirect when authenticated
   useEffect(() => {
     if (isInitialized && session) {
-      console.log('Session detected in Login component, redirecting to marketplace...');
+      console.log('🚀 ===== LOGIN COMPONENT SESSION METADATA =====');
+      console.log('🆔 Member Session ID:', session.member_session_id);
+      console.log('👤 Member ID:', session.member_id);
+      console.log('🏢 Organization ID:', session.organization_id);
+      console.log('📅 Started At:', session.started_at);
+      console.log('🔄 Last Accessed:', session.last_accessed_at);
+      console.log('⏳ Expires At:', session.expires_at);
+      console.log('🏢 Organization Slug:', session.organization_slug);
+      console.log('🔑 Roles:', session.roles);
+      console.log('📋 Custom Claims:', session.custom_claims);
+      console.log('🚀 ===== END LOGIN SESSION METADATA =====');
+      
+      console.log('✅ Session detected in Login component, redirecting to marketplace...');
       navigate('/marketplace-reconciliation', { replace: true });
     }
   }, [session, isInitialized, navigate]);
@@ -28,12 +40,23 @@ const Login: React.FC = () => {
     authFlowType: AuthFlowType.Discovery, // Required field, but we'll handle organization selection differently
     callbacks: {
       onSuccess: (data: any) => {
-        console.log('Login successful, redirecting to marketplace...', data);
+        console.log('🎉 Login successful, redirecting to marketplace...', data);
+        console.log('📊 Login Success Data Structure:', {
+          type: typeof data,
+          keys: data ? Object.keys(data) : 'No data',
+          fullData: data
+        });
         // Redirect to marketplace page after successful login
         navigate('/marketplace-reconciliation', { replace: true });
       },
       onError: (error: any) => {
-        console.error('Login error:', error);
+        console.error('❌ Login error:', error);
+        console.log('🚨 Login Error Details:', {
+          type: typeof error,
+          message: error?.message || error?.error_message || 'Unknown error',
+          code: error?.error_type || error?.status_code || 'No code',
+          fullError: error
+        });
       },
     },
   };
