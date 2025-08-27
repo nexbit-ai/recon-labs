@@ -126,6 +126,7 @@ import { apiService } from '../services/api/apiService';
 import { MarketplaceReconciliationResponse } from '../services/api/types';
 import { mockReconciliationData, getSafeReconciliationData, isValidReconciliationData } from '../data/mockReconciliationData';
 import { Platform } from '../data/mockData';
+import { padding } from '@mui/system';
 
 const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
@@ -172,6 +173,9 @@ const MarketplaceReconciliation: React.FC = () => {
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  // Date field filter for transactions-related queries
+  const [dateField, setDateField] = useState<'order' | 'payment' | 'invoice'>('invoice');
+  const [unreconciledReasons, setUnreconciledReasons] = useState<Array<{ reason: string; count: number }>>([]);
 
   // Calendar popup state
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
@@ -225,6 +229,7 @@ const MarketplaceReconciliation: React.FC = () => {
     if (value !== 'custom') {
       // Fetch data based on the selected date range
       fetchReconciliationDataByDateRange(value);
+      fetchUnreconciledReasonsByDateRange(value);
       setDateRangeMenuAnchor(null);
     } else {
       console.log('Setting showCustomDatePicker to true');
@@ -253,6 +258,20 @@ const MarketplaceReconciliation: React.FC = () => {
       }
     }
   }, [showCustomDatePicker, customStartDate, currentCalendarDate]);
+
+  // Fetch unreconciled reasons when dateField changes
+  useEffect(() => {
+    if (selectedDateRange && (customStartDate || selectedDateRange !== 'custom')) {
+      fetchUnreconciledReasonsByDateRange(selectedDateRange);
+    }
+  }, [dateField]);
+
+  // Initial load: fetch unreconciled reasons for current date range
+  useEffect(() => {
+    // Align with initial summary fetch; default is 'this-month'
+    fetchUnreconciledReasonsByDateRange(selectedDateRange);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Handle click outside calendar popup
   useEffect(() => {
@@ -375,6 +394,7 @@ const MarketplaceReconciliation: React.FC = () => {
         
         // Then call API with the current values
         fetchReconciliationDataByDateRangeWithDates(currentStartDate, currentEndDate);
+        fetchUnreconciledReasonsWithDates(currentStartDate, currentEndDate);
         setShowCustomDatePicker(false); // Hide popup
       } else {
         // Normal case: second date is after first date
@@ -393,6 +413,7 @@ const MarketplaceReconciliation: React.FC = () => {
         
         // Then call API with the current values
         fetchReconciliationDataByDateRangeWithDates(currentStartDate, currentEndDate);
+        fetchUnreconciledReasonsWithDates(currentStartDate, currentEndDate);
         setShowCustomDatePicker(false); // Hide popup
       }
     }
@@ -522,6 +543,73 @@ const MarketplaceReconciliation: React.FC = () => {
       setError('Network error, showing sample data');
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // Fetch unreconciled reasons by date range preset
+  const fetchUnreconciledReasonsByDateRange = async (dateRange: string) => {
+    try {
+      let startDate: string;
+      let endDate: string;
+      const today = new Date();
+      if (dateRange === 'custom') {
+        startDate = customStartDate;
+        endDate = customEndDate;
+      } else if (dateRange === 'today') {
+        startDate = today.toISOString().split('T')[0];
+        endDate = today.toISOString().split('T')[0];
+      } else if (dateRange === 'this-week') {
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        startDate = startOfWeek.toISOString().split('T')[0];
+        endDate = endOfWeek.toISOString().split('T')[0];
+      } else if (dateRange === 'this-month') {
+        startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        endDate = endOfMonth.toISOString().split('T')[0];
+      } else if (dateRange === 'this-year') {
+        startDate = `${today.getFullYear()}-01-01`;
+        endDate = `${today.getFullYear()}-12-31`;
+      } else {
+        startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        endDate = endOfMonth.toISOString().split('T')[0];
+      }
+      await fetchUnreconciledReasonsWithDates(startDate, endDate);
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  // Fetch unreconciled reasons with explicit dates
+  const fetchUnreconciledReasonsWithDates = async (startDate: string, endDate: string) => {
+    try {
+      const params: any = { status_in: 'short_received,excess_received', pagination: false };
+      if (dateField === 'invoice') {
+        params.buyer_invoice_date_from = startDate;
+        params.buyer_invoice_date_to = endDate;
+      } else if (dateField === 'order') {
+        params.order_date_from = startDate;
+        params.order_date_to = endDate;
+      } else if (dateField === 'payment') {
+        params.payment_date_from = startDate;
+        params.payment_date_to = endDate;
+      }
+      const resp = await apiService.get('/recon/transactions', params);
+      const rows = (resp as any)?.data?.data || (resp as any)?.data || [];
+      const reasonToCount: Record<string, number> = {};
+      rows.forEach((t: any) => {
+        const r = t.reason || 'Unknown';
+        reasonToCount[r] = (reasonToCount[r] || 0) + 1;
+      });
+      const list = Object.entries(reasonToCount)
+        .map(([reason, count]) => ({ reason, count }))
+        .sort((a, b) => b.count - a.count);
+      setUnreconciledReasons(list);
+    } catch (e) {
+      setUnreconciledReasons([]);
     }
   };
   
@@ -905,6 +993,22 @@ const MarketplaceReconciliation: React.FC = () => {
                     }
                   }}
                 >
+                  <Box sx={{ p: 2, pt: 1.5, padding: '10px 14px' }}>
+                    <Typography variant="caption" sx={{ color: '#6b7280', mb: 0.75, display: 'block' }}>Filter by</Typography>
+                    <FormControl size="small" fullWidth >
+                      <Select
+                        labelId="date-field-label"
+                        value={dateField}
+                        onChange={(e) => { setDateField(e.target.value as any); }}
+                        sx={{padding: '4px 6px',
+                        }}
+                      >
+                        <MenuItem value="order">Order Date</MenuItem>
+                        <MenuItem value="payment">Payment Date</MenuItem>
+                        <MenuItem value="invoice">Invoice Date</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
                   {dateRangeOptions.map((option) => (
                     <MenuItem
                       key={option.value}
@@ -1291,7 +1395,6 @@ const MarketplaceReconciliation: React.FC = () => {
             </Card>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Box sx={{ display: 'grid', gap: 2 }}>
             <Card sx={{ 
               mb: 3, 
               background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
@@ -1305,96 +1408,43 @@ const MarketplaceReconciliation: React.FC = () => {
                 transform: 'translateY(-2px)',
               }
             }}>
-              <CardContent sx={{ p: 5 }}>
-                <Typography variant="h6" sx={{ 
-                  fontWeight: 600, 
-                  mb: 4, 
-                  color: '#1f2937', 
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif', 
-                  textAlign: 'center',
-                  letterSpacing: '-0.025em'
-                }}>
-                 Cancelled Orders
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 1 }}>
-                <Typography variant="h2" sx={{
-                      fontWeight: 300,
-                      color: '#FF7276',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '3rem',
-                      mb: 2,
-                      textAlign: 'center',
-                      lineHeight: 1,
-                      letterSpacing: '-0.02em',
-                    }}>
-                      {formatCurrency(parseAmount(reconciliationData.summaryData?.returnedOrCancelledOrders?.amount || '0'))}
-                    </Typography>
+              <CardContent sx={{ p: 4 }}>
+                {/* AI Insight style header */}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#1f2937', letterSpacing: '-0.02em' }}>
+                    ✨  Unreconciled reasons
+                  </Typography>
                 </Box>
-              </CardContent>
-            </Card>
-
-            {/* Pending payment (new card) */}
-            <Card sx={{ 
-              mb: 3, 
-              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
-              borderRadius: '16px',
-              border: '1px solid #f1f3f4',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
-              overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                transform: 'translateY(-2px)',
-              }
-            }}>
-              <CardContent sx={{ p: 5 }}>
-                <Typography variant="h6" sx={{ 
-                  fontWeight: 600, 
-                  mb: 4, 
-                  color: '#1f2937', 
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif', 
-                  textAlign: 'center',
-                  letterSpacing: '-0.025em'
-                }}>
-                  Pending payment
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 1 }}>
-                  <Box sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': { transform: 'scale(1.02)' }
+                {unreconciledReasons.length === 0 && (
+                  <Box sx={{ 
+                    py: 3, 
+                    px: 2, 
+                    borderRadius: 1, 
+                    background: '#f9fafb', 
+                    border: '1px solid #f1f3f4',
+                    textAlign: 'center'
                   }}>
-                    <Typography variant="h2" sx={{
-                      fontWeight: 300,
-                      color: '#059669',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '3rem',
-                      mb: 2,
-                      textAlign: 'center',
-                      lineHeight: 1,
-                      letterSpacing: '-0.02em',
-                    }}>
-                      {formatCurrency(parseAmount(reconciliationData.summaryData?.pendingPaymentFromMarketplace?.amount || '0'))}
-                    </Typography>
-                    <Typography variant="body1" sx={{
-                      color: '#6b7280',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      textAlign: 'center',
-                      fontWeight: 500,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.1em',
-                      fontSize: '0.875rem',
-                      opacity: 0.9,
-                    }}>
-                      Awaiting settlement
+                    <Typography variant="body2" sx={{ color: '#6b7280', fontStyle: 'italic' }}>
+                      All Good !
                     </Typography>
                   </Box>
+                )}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {unreconciledReasons.map((r, idx) => (
+                    <Grow in key={`${r.reason}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1.25, px: 2, borderRadius: 1, background: '#f9fafb', border: '1px solid #f1f3f4' }}>
+                        <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1rem' }}>
+                          {r.reason}
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.05rem' }}>
+                          {r.count.toLocaleString('en-IN')}
+                        </Typography>
+                      </Box>
+                    </Grow>
+                  ))}
                 </Box>
               </CardContent>
             </Card>
-            </Box>
           </Grid>
 
           {/* Reconciliation Status */}

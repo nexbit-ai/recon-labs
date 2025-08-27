@@ -289,39 +289,26 @@ const ConnectDataSources: React.FC = () => {
           sx={{ 
             p: 4, 
             mb: 4, 
-            borderRadius: 3,
+            borderRadius: 1,
             background: 'rgba(255, 255, 255, 0.8)',
             backdropFilter: 'blur(10px)',
             border: '1px solid rgba(255, 255, 255, 0.2)'
           }}
         >
           <Box display="flex" alignItems="center" mb={3}>
-            <LinkIcon sx={{ color: '#64748b', mr: 2, fontSize: 28 }} />
             <Typography variant="h5" fontWeight={600} color="#1e293b">
               Available Sources
             </Typography>
           </Box>
-          <Grid container spacing={3}>
+          <Grid container spacing={1} sx={{padding: '10px 14px'}}>
             {dataSources.filter(ds => !ds.isConnected).map((ds) => {
               const isSelected = selected.includes(ds.id);
               return (
-                <Grid item xs={12} sm={6} md={4} key={ds.id}>
+                <Grid item xs={12} sm={5} md={2} key={ds.id}>
                   <Card
                     sx={{
-                      height: '100%',
-                      background: isSelected 
-                        ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)'
-                        : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                      border: isSelected ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                      borderRadius: 1.5,
-                      boxShadow: isSelected 
-                        ? '0 8px 25px rgba(59, 130, 246, 0.15)'
-                        : '0 4px 20px rgba(0, 0, 0, 0.08)',
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 8px 25px rgba(0, 0, 0, 0.12)'
-                      }
+                      height: '60%',
+                      width: '60%',
                     }}
                   >
                     <CardActionArea
@@ -331,8 +318,9 @@ const ConnectDataSources: React.FC = () => {
                         flexDirection: 'column',
                         justifyContent: 'center',
                         alignItems: 'center',
-                        p: 4,
+                        p: 6,
                       }}
+                      disableRipple
                       onClick={() => toggleSelect(ds.id)}
                     >
                       <img 
@@ -342,13 +330,10 @@ const ConnectDataSources: React.FC = () => {
                           width: 56, 
                           height: 56, 
                           objectFit: 'contain', 
-                          marginBottom: 16,
                           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
                         }} 
                       />
-                      <Typography variant="h6" fontWeight={600} textAlign="center" color="#1e293b">
-                        {ds.name}
-                      </Typography>
+
                       {isSelected && (
                         <Chip 
                           label="Selected" 

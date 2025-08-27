@@ -23,11 +23,16 @@ import {
   CircularProgress,
   Portal,
   Popover,
+  List,
+  ListItemButton,
+  ListItemText,
+  ListSubheader,
   TextField,
   FormControl,
   InputLabel,
   Select,
   OutlinedInput,
+  TablePagination,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -40,6 +45,7 @@ import {
   FilterList as FilterIcon
 } from '@mui/icons-material';
 import { api } from '../services/api';
+import ColumnFilterControls from '../components/ColumnFilterControls';
 
 // Type definitions for transaction data based on API response
 interface TransactionRow {
@@ -209,6 +215,9 @@ const DisputePage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [apiLoading, setApiLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Pagination for unreconciled tab
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   // Column filter state
   const [columnFilters, setColumnFilters] = useState<Record<string, any>>({});
@@ -219,6 +228,7 @@ const DisputePage: React.FC = () => {
   const COLUMN_META = {
     'Order ID': { type: 'string' },
     'Order Value': { type: 'number' },
+    'Amount': { type: 'number' },
     'Settlement Value': { type: 'number' },
     'Order Date': { type: 'date' },
     'Settlement Date': { type: 'date' },
@@ -358,86 +368,7 @@ const DisputePage: React.FC = () => {
         console.log('Transaction data length:', transactionData.length);
         
         if (Array.isArray(transactionData) && transactionData.length > 0) {
-          // Log first transaction to see structure
-          console.log('First transaction structure:', transactionData[0]);
-          console.log('Total transactions to process:', transactionData.length);
-          
-          // Check if we have the expected fields
-          const sampleTransaction = transactionData[0];
-          console.log('Sample transaction fields:', {
-            reason: sampleTransaction.reason,
-            status: sampleTransaction.status,
-            context: sampleTransaction.context,
-            buyer_invoice_amount: sampleTransaction.context?.buyer_invoice_amount,
-            order_value: sampleTransaction.order_value,
-            order_item_id: sampleTransaction.order_item_id,
-            diff: sampleTransaction.diff,
-            order_date: sampleTransaction.order_date,
-            settlement_date: sampleTransaction.settlement_date
-          });
-          
-          // Log all available keys to see what we can use for grouping
-          console.log('All available transaction keys:', Object.keys(sampleTransaction));
-          
-          // Transform API data to grouped format for unreconciled tab
-          const groupedData = transactionData.reduce((acc: any, transaction: any, index: number) => {
-            // Group by the actual reason from API response
-            const reason = transaction.reason || 'Unknown';
-            
-            // Use diff value from transaction (instead of buyer_invoice_amount)
-            const amount = parseFloat(transaction.diff || '0');
-            
-            console.log(`Processing transaction ${index + 1}/${transactionData.length}:`, { 
-              reason: transaction.reason, 
-              status: transaction.status, 
-              amount, 
-              order_item_id: transaction.order_item_id,
-              buyer_invoice_amount: transaction.context?.buyer_invoice_amount,
-              diff: transaction.diff
-            });
-            
-            if (!acc[reason]) {
-              acc[reason] = {
-                reason: reason, // Use the actual reason from API
-                count: 0,
-                amount: 0,
-                orderIds: [],
-                transactions: [] // Store full transaction data for expansion
-              };
-              console.log(`Created new group for reason: ${reason}`);
-            }
-            
-            acc[reason].count += 1;
-            acc[reason].amount += amount;
-            acc[reason].orderIds.push(transaction.order_item_id);
-            acc[reason].transactions.push(transaction); // Store full transaction
-            
-            console.log(`Updated group ${reason}: count=${acc[reason].count}, amount=${acc[reason].amount}`);
-            
-            return acc;
-          }, {});
-          
-          console.log('Final grouped data object:', groupedData);
-          console.log('Number of groups created:', Object.keys(groupedData).length);
-          
-          console.log('Grouped data before conversion:', groupedData);
-          
-          // Convert grouped data to array format
-          const groupedArray = Object.values(groupedData);
-          console.log('Final grouped array:', groupedArray);
-          
-          // Test: Log each item to verify structure
-          groupedArray.forEach((item: any, index) => {
-            console.log(`Item ${index}:`, {
-              reason: item.reason,
-              count: item.count,
-              amount: item.amount,
-              orderIds: item.orderIds
-            });
-          });
-          
-          setApiRows(groupedArray as GroupedUnreconciledData[]);
-          console.log('setApiRows called with:', groupedArray);
+          setApiRows(transactionData as any);
         } else {
           console.error('No valid transaction data found');
           setError('No transaction data received from API');
@@ -493,8 +424,7 @@ const DisputePage: React.FC = () => {
   // Get current rows based on active tab
   const getCurrentRows = () => {
     if (disputeSubTab === 0) {
-      // For unreconciled tab, return the grouped data directly
-      // The data is already grouped by the API call
+      // For unreconciled tab now return the flat API data directly
       return apiRows;
     }
     return mockRows.filter(r => {
@@ -503,20 +433,20 @@ const DisputePage: React.FC = () => {
     });
   };
 
-  // Calculate total count for unreconciled orders
+  const current = getCurrentRows();
+
+  // Calculate total count for unreconciled orders (flat count)
   const getUnreconciledTotalCount = () => {
-    if (disputeSubTab === 0 && Array.isArray(apiRows)) {
-      return apiRows.reduce((total, item) => {
-        if (item && typeof item === 'object' && 'count' in item) {
-          return total + (item.count || 0);
-        }
-        return total;
-      }, 0);
-    }
+    if (disputeSubTab === 0 && Array.isArray(apiRows)) return apiRows.length;
     return 0;
   };
 
-  const current = getCurrentRows();
+  const paginatedCurrent = (() => {
+    if (disputeSubTab !== 0) return current;
+    const start = page * rowsPerPage;
+    const end = start + rowsPerPage;
+    return current.slice(start, end);
+  })();
   
   // Debug logging for data flow
   useEffect(() => {
@@ -845,41 +775,17 @@ const DisputePage: React.FC = () => {
             </Tabs>
             {/* Right controls: date range + platform + send button */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              {loading && (
-                <CircularProgress size={24} sx={{ color: '#1a1a1a' }} />
-              )}
-              {/* Clear All Filters Button */}
-              {Object.keys(columnFilters).length > 0 && (
-              <Button
-                  size="small"
-                variant="outlined"
-                  onClick={() => setColumnFilters({})}
-                sx={{
-                    fontSize: '0.75rem',
-                    py: 0.5,
-                    px: 1,
-                    minHeight: 28,
-                    borderColor: '#ef4444',
-                    color: '#ef4444',
-                    '&:hover': {
-                      borderColor: '#dc2626',
-                      backgroundColor: 'rgba(239, 68, 68, 0.04)',
-                    },
-                  }}
-                >
-                  Clear Filters
-              </Button>
-              )}
+              
+              {/* New Filter button matching reconciliation behavior */}
               <Button
                 variant="outlined"
-                endIcon={<KeyboardArrowDownIcon />}
-                startIcon={<CalendarTodayIcon />}
-                onClick={(event) => setDateRangeMenuAnchor(event.currentTarget)}
+                startIcon={<FilterIcon />}
+                onClick={(event) => openFilterPopover(activeFilterColumn || 'Order ID', event.currentTarget)}
                 sx={{
                   borderColor: '#6B7280',
                   color: '#6B7280',
                   textTransform: 'none',
-                  minWidth: 200,
+                  minWidth: 120,
                   minHeight: 36,
                   px: 1.5,
                   fontSize: '0.7875rem',
@@ -889,51 +795,9 @@ const DisputePage: React.FC = () => {
                   },
                 }}
               >
-                <Box sx={{ textAlign: 'left' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
-                    {getCurrentDateRangeText()}
-                  </Typography>
-                </Box>
+                Filter
               </Button>
-              
-              <Menu
-                anchorEl={dateRangeMenuAnchor}
-                open={Boolean(dateRangeMenuAnchor)}
-                onClose={() => setDateRangeMenuAnchor(null)}
-                PaperProps={{
-                  sx: {
-                    mt: 1,
-                    minWidth: 250,
-                    borderRadius: 0.5,
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                    border: '1px solid #e5e7eb'
-                  }
-                }}
-              >
-                {dateRangeOptions.map((option) => (
-                  <MenuItem
-                    key={option.value}
-                    onClick={() => handleDateRangeSelect(option.value)}
-                    sx={{
-                      py: 1.5,
-                      px: 2,
-                      '&:hover': {
-                        backgroundColor: '#f9fafb'
-                      }
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
-                        {option.label}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                        {option.dates}
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Menu>
-              
+
               <Button
                 variant="outlined"
                 endIcon={<KeyboardArrowDownIcon />}
@@ -985,83 +849,68 @@ const DisputePage: React.FC = () => {
               <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
                 <TableRow>
                   {disputeSubTab === 0 ? (
-                    // Unreconciled Orders tab - show only 4 columns
+                    // Unreconciled Orders tab - show all detail columns directly
                     <>
-                      <TableCell 
-                        padding="checkbox" 
-                        sx={{
-                          fontWeight: 700,
-                          color: '#111827',
-                          background: '#f9fafb',
-                          textAlign: 'center',
-                          minWidth: 60,
-                          transition: 'all 0.3s ease',
-                          position: 'relative',
-                          py: 1,
-                        }}
-                      >
-                        <Checkbox
-                          checked={false}
-                          disabled
-                          sx={{
-                            color: '#6b7280',
-                          }}
-                        />
+                      <TableCell padding="checkbox" sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 60, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Checkbox checked={false} disabled sx={{ color: '#6b7280' }} />
                       </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 700,
-                        color: '#111827',
-                        background: '#f9fafb',
-                        textAlign: 'center',
-                        minWidth: 200,
-                        transition: 'all 0.3s ease',
-                        position: 'relative',
-                        py: 1,
-                      }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                          Reason
-                        </Typography>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order ID</Typography>
+                          <IconButton size="small" onClick={(e) => openFilterPopover('Order ID', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Order ID') ? '#1f2937' : '#6b7280', background: isFilterActive('Order ID') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Order ID">
+                            <FilterIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
                       </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 700,
-                        color: '#111827',
-                        background: '#f9fafb',
-                        textAlign: 'center',
-                        minWidth: 120,
-                        transition: 'all 0.3s ease',
-                        position: 'relative',
-                        py: 1,
-                      }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                          Count
-                        </Typography>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Amount</Typography>
+                          <IconButton size="small" onClick={(e) => openFilterPopover('Amount', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Amount') ? '#1f2937' : '#6b7280', background: isFilterActive('Amount') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Amount">
+                            <FilterIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
                       </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 700,
-                        color: '#111827',
-                        background: '#f9fafb',
-                        textAlign: 'center',
-                        minWidth: 150,
-                        transition: 'all 0.3s ease',
-                        position: 'relative',
-                        py: 1,
-                      }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                          Amount
-                        </Typography>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Date</Typography>
+                          <IconButton size="small" onClick={(e) => openFilterPopover('Order Date', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Order Date') ? '#1f2937' : '#6b7280', background: isFilterActive('Order Date') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Order Date">
+                            <FilterIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
                       </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 700,
-                        color: '#111827',
-                        background: '#f9fafb',
-                        textAlign: 'center',
-                        minWidth: 200,
-                        transition: 'all 0.3s ease',
-                        position: 'relative',
-                        py: 1,
-                      }}>
-                        Action
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Date</Typography>
+                          <IconButton size="small" onClick={(e) => openFilterPopover('Settlement Date', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Settlement Date') ? '#1f2937' : '#6b7280', background: isFilterActive('Settlement Date') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Settlement Date">
+                            <FilterIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
                       </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 120, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Difference</Typography>
+                          <IconButton size="small" onClick={(e) => openFilterPopover('Difference', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Difference') ? '#1f2937' : '#6b7280', background: isFilterActive('Difference') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Difference">
+                            <FilterIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Reason</Typography>
+                          <IconButton size="small" onClick={(e) => openFilterPopover('Remark', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Remark') ? '#1f2937' : '#6b7280', background: isFilterActive('Remark') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Reason">
+                            <FilterIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 120, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Status</Typography>
+                          <IconButton size="small" onClick={(e) => openFilterPopover('Status', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Status') ? '#1f2937' : '#6b7280', background: isFilterActive('Status') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Status">
+                            <FilterIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 200, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>Action</TableCell>
                     </>
                   ) : (
                     // Other tabs - show original columns with checkbox
@@ -1403,298 +1252,33 @@ const DisputePage: React.FC = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                                 {current.map((row, index) => {
-                   // Check if this is grouped data (unreconciled tab) or mock data (other tabs)
-                   const isGroupedData = 'reason' in row && 'count' in row && 'amount' in row;
-                   
-                                      if (isGroupedData) {
-                     // Render grouped data for unreconciled tab
+                {(disputeSubTab === 0 ? paginatedCurrent : current).map((row: any, index: number) => {
+                  if (disputeSubTab === 0) {
+                    // Flat detailed row for unreconciled orders
                      return (
-                       <Fragment key={`grouped-${index}`}>
-                         <TableRow 
-                           sx={{ 
-                             '&:hover': { background: '#f3f4f6' },
-                             transition: 'all 0.3s ease',
-                           }}
-                         >
-                           <TableCell 
-                             padding="checkbox"
-                             sx={{
-                               textAlign: 'center',
-                               verticalAlign: 'middle',
-                             }}
-                           >
-                             <Checkbox
-                               checked={false}
-                               disabled
-                               sx={{
-                                 color: '#6b7280',
-                               }}
-                             />
+                      <TableRow key={`flat-${index}`} sx={{ '&:hover': { background: '#f3f4f6' }, transition: 'all 0.3s ease' }}>
+                        <TableCell padding="checkbox"><Checkbox checked={false} disabled sx={{ color: '#6b7280' }} /></TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>{row.order_id}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{parseFloat(row.context?.buyer_invoice_amount || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.order_date}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.settlement_date}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>₹{parseFloat(row.diff || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <Chip label={formatReasonLabel(row.reason || 'N/A')} size="small" sx={{ fontWeight: 600, color: '#1f2937', backgroundColor: '#e5e7eb', '& .MuiChip-label': { px: 1 } }} />
                     </TableCell>
-                           <TableCell sx={{
-                             textAlign: 'center',
-                             verticalAlign: 'middle',
-                             fontWeight: 500,
-                           }}>
-                             <Chip
-                               label={formatReasonLabel(row.reason)}
-                               size="small"
-                               sx={{
-                                 fontWeight: 600,
-                                 color: '#1f2937',
-                                 backgroundColor: '#e5e7eb',
-                                 '& .MuiChip-label': { px: 1 }
-                               }}
-                             />
-                           </TableCell>
-                           <TableCell sx={{
-                             textAlign: 'center',
-                             verticalAlign: 'middle',
-                             fontWeight: 500,
-                           }}>
-                             {row.count}
-                           </TableCell>
-                           <TableCell sx={{
-                             textAlign: 'center',
-                             verticalAlign: 'middle',
-                             fontWeight: 500,
-                           }}>
-                             ₹{row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                           </TableCell>
-                           <TableCell sx={{
-                             textAlign: 'center',
-                             verticalAlign: 'middle',
-                           }}>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.status}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                               <Button
-                                 size="small"
-                                 variant="outlined"
-                                 onClick={() => handleMarkReconciled(row.orderIds[0])}
-                                 sx={{
-                                   fontSize: '0.75rem',
-                                   py: 0.5,
-                                   px: 1,
-                                   minHeight: 28,
-                                   borderColor: '#10b981',
-                                   color: '#10b981',
-                                   '&:hover': {
-                                     borderColor: '#059669',
-                                     backgroundColor: 'rgba(16, 185, 129, 0.04)',
-                                   },
-                                 }}
-                               >
-                                 Mark Reconciled
-                               </Button>
-                               <Button
-                                 size="small"
-                                 variant="outlined"
-                                 onClick={() => openRaiseDispute(row)}
-                                 sx={{
-                                   fontSize: '0.75rem',
-                                   py: 0.5,
-                                   px: 1,
-                                   minHeight: 28,
-                                   borderColor: '#6b7280',
-                                   color: '#6b7280',
-                                   '&:hover': {
-                                     borderColor: '#4b5563',
-                                     backgroundColor: 'rgba(107, 114, 128, 0.04)',
-                                   },
-                                 }}
-                               >
-                                 Raise Dispute
-                               </Button>
-                               <Button
-                                 size="small"
-                                 variant="outlined"
-                                 onClick={() => toggleRowExpansion(row.reason)}
-                                 sx={{
-                                   fontSize: '0.75rem',
-                                   py: 0.5,
-                                   px: 1,
-                                   minHeight: 28,
-                                   borderColor: '#6b7280',
-                                   color: '#6b7280',
-                                   '&:hover': {
-                                     borderColor: '#4b5563',
-                                     backgroundColor: 'rgba(107, 114, 128, 0.04)',
-                                   },
-                                 }}
-                               >
-                                 {expandedRows.has(row.reason) ? 'Collapse' : 'Expand'}
-                               </Button>
+                            <Button size="small" variant="outlined" onClick={() => handleMarkReconciled(row.order_id)} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#10b981', color: '#10b981', '&:hover': { borderColor: '#059669', backgroundColor: 'rgba(16, 185, 129, 0.04)' } }}>Mark Reconciled</Button>
+                            <Button size="small" variant="outlined" onClick={() => openRaiseDispute({ reason: row.reason, count: 1, orderIds: [row.order_id] })} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#6b7280', color: '#6b7280', '&:hover': { borderColor: '#4b5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' } }}>Raise Dispute</Button>
                              </Box>
                            </TableCell>
                   </TableRow>
-                         
-                         {/* Expandable rows showing individual transactions */}
-                         {expandedRows.has(row.reason) && row.transactions && (
-                           <>
-                             {/* Column headers for expanded rows */}
-                             <TableRow sx={{ background: '#f1f5f9' }}>
-                               <TableCell sx={{ border: 'none' }} />
-                               <TableCell sx={{ 
-                                 textAlign: 'center', 
-                                 verticalAlign: 'middle',
-                                 pl: 4,
-                                 fontWeight: 600,
-                                 color: '#374151',
-                                 fontSize: '0.75rem',
-                                 py: 1
-                               }}>
-                                 Order ID
-                               </TableCell>
-                               <TableCell sx={{ 
-                                 textAlign: 'center', 
-                                 verticalAlign: 'middle',
-                                 fontWeight: 600,
-                                 color: '#374151',
-                                 fontSize: '0.75rem',
-                                 py: 1
-                               }}>
-                                 Amount
-                               </TableCell>
-                               <TableCell sx={{ 
-                                 textAlign: 'center', 
-                                 verticalAlign: 'middle',
-                                 fontWeight: 600,
-                                 color: '#374151',
-                                 fontSize: '0.75rem',
-                                 py: 1
-                               }}>
-                                 Order Date
-                               </TableCell>
-                               <TableCell sx={{ 
-                                 textAlign: 'center', 
-                                 verticalAlign: 'middle',
-                                 fontWeight: 600,
-                                 color: '#374151',
-                                 fontSize: '0.75rem',
-                                 py: 1
-                               }}>
-                                 Settlement Date
-                               </TableCell>
-                               <TableCell sx={{ 
-                                 textAlign: 'center', 
-                                 verticalAlign: 'middle',
-                                 fontWeight: 600,
-                                 color: '#374151',
-                                 fontSize: '0.75rem',
-                                 py: 1
-                               }}>
-                                 Difference
-                               </TableCell>
-                               <TableCell sx={{ 
-                                 textAlign: 'center', 
-                                 verticalAlign: 'middle',
-                                 fontWeight: 600,
-                                 color: '#374151',
-                                 fontSize: '0.75rem',
-                                 py: 1
-                               }}>
-                                 Reason
-                               </TableCell>
-                               <TableCell sx={{ 
-                                 textAlign: 'center', 
-                                 verticalAlign: 'middle',
-                                 fontWeight: 600,
-                                 color: '#374151',
-                                 fontSize: '0.75rem',
-                                 py: 1
-                               }}>
-                                 Status
-                               </TableCell>
-                               <TableCell sx={{ border: 'none' }} />
-                             </TableRow>
-                             
-                             {/* Individual transaction rows */}
-                             {row.transactions.map((transaction: any, transIndex: number) => (
-                               <TableRow 
-                                 key={`expanded-${row.reason}-${transIndex}`}
-                                 sx={{ 
-                                   background: '#f9fafb',
-                                   '&:hover': { background: '#f3f4f6' },
-                                   transition: 'all 0.3s ease',
-                                 }}
-                               >
-                                 <TableCell sx={{ border: 'none' }} />
-                                 <TableCell sx={{ 
-                                   textAlign: 'center', 
-                                   verticalAlign: 'middle',
-                                   pl: 4,
-                                   color: '#6b7280',
-                                   fontSize: '0.875rem'
-                                 }}>
-                                   {transaction.order_id}
-                                 </TableCell>
-                                 <TableCell sx={{ 
-                                   textAlign: 'center', 
-                                   verticalAlign: 'middle',
-                                   color: '#6b7280',
-                                   fontSize: '0.875rem'
-                                 }}>
-                                   ₹{parseFloat(transaction.context?.buyer_invoice_amount || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                                 </TableCell>
-                                 <TableCell sx={{ 
-                                   textAlign: 'center', 
-                                   verticalAlign: 'middle',
-                                   color: '#6b7280',
-                                   fontSize: '0.875rem'
-                                 }}>
-                                   {transaction.order_date}
-                                 </TableCell>
-                                 <TableCell sx={{ 
-                                   textAlign: 'center', 
-                                   verticalAlign: 'middle',
-                                   color: '#6b7280',
-                                   fontSize: '0.875rem'
-                                 }}>
-                                   {transaction.settlement_date}
-                                 </TableCell>
-                                 <TableCell sx={{ 
-                                   textAlign: 'center', 
-                                   verticalAlign: 'middle',
-                                   color: '#6b7280',
-                                   fontSize: '0.875rem'
-                                 }}>
-                                   ₹{parseFloat(transaction.diff || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                                 </TableCell>
-                                 <TableCell sx={{ 
-                                   textAlign: 'center', 
-                                   verticalAlign: 'middle',
-                                   color: '#6b7280',
-                                   fontSize: '0.875rem'
-                                 }}>
-                                   <Chip
-                                     label={formatReasonLabel(transaction.reason || 'N/A')}
-                                     size="small"
-                                     sx={{
-                                       fontWeight: 600,
-                                       color: '#1f2937',
-                                       backgroundColor: '#e5e7eb',
-                                       '& .MuiChip-label': { px: 1 }
-                                     }}
-                                   />
-                                 </TableCell>
-                                 <TableCell sx={{ 
-                                   textAlign: 'center', 
-                                   verticalAlign: 'middle',
-                                   color: '#6b7280',
-                                   fontSize: '0.875rem'
-                                 }}>
-                                   {transaction.status}
-                                 </TableCell>
-                                 <TableCell sx={{ border: 'none' }} />
-                  </TableRow>
-                ))}
-                           </>
-                         )}
-                       </Fragment>
-                     );
-                   }
+                    );
+                  }
+                  return null;
                  })}
-                {current.length === 0 && (
+                {(disputeSubTab === 0 ? paginatedCurrent : current).length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
                   </TableRow>
@@ -1702,6 +1286,19 @@ const DisputePage: React.FC = () => {
               </TableBody>
             </Table>
           </TableContainer>
+          {disputeSubTab === 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 2 }}>
+              <TablePagination
+                component="div"
+                count={getUnreconciledTotalCount()}
+                page={page}
+                onPageChange={(_, newPage) => setPage(newPage)}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+                rowsPerPageOptions={[10, 25, 50, 100]}
+              />
+            </Box>
+          )}
         </CardContent>
       </Card>
 
@@ -1813,110 +1410,47 @@ const DisputePage: React.FC = () => {
           paper: {
             sx: {
               p: 2,
-              minWidth: 280,
+              minWidth: 480,
+              maxWidth: 560,
               zIndex: (theme) => theme.zIndex.modal + 1,
             },
           },
         }}
       >
-        {(() => {
-          const meta = (COLUMN_META as any)[activeFilterColumn]?.type || 'string';
-          if (meta === 'string') {
-            const val = (columnFilters[activeFilterColumn] || '') as string;
-            return (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Typography variant="caption" sx={{ color: '#6b7280' }}>Contains</Typography>
-                <TextField 
-                  size="small" 
-                  value={val} 
-                  onChange={handleStringFilterChange(activeFilterColumn)} 
-                  placeholder={`Filter ${activeFilterColumn}`} 
-                />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                  <Button size="small" onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
-                  <Button size="small" variant="contained" onClick={applyFilters}>Apply</Button>
-                </Box>
-              </Box>
-            );
-          }
-          if (meta === 'number') {
-            const minVal = (columnFilters[activeFilterColumn]?.min ?? '') as string;
-            const maxVal = (columnFilters[activeFilterColumn]?.max ?? '') as string;
-            return (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Typography variant="caption" sx={{ color: '#6b7280' }}>Between</Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <TextField size="small" type="number" placeholder="Min" value={minVal} onChange={handleNumberRangeChange(activeFilterColumn, 'min')} />
-                  <TextField size="small" type="number" placeholder="Max" value={maxVal} onChange={handleNumberRangeChange(activeFilterColumn, 'max')} />
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                  <Button size="small" onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
-                  <Button size="small" variant="contained" onClick={applyFilters}>Apply</Button>
-                </Box>
-              </Box>
-            );
-          }
-          if (meta === 'date') {
-            const fromVal = (columnFilters[activeFilterColumn]?.from ?? '') as string;
-            const toVal = (columnFilters[activeFilterColumn]?.to ?? '') as string;
-            return (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Typography variant="caption" sx={{ color: '#6b7280' }}>Between dates</Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <TextField 
-                    size="small" 
-                    type="date" 
-                    value={fromVal} 
-                    onChange={handleDateRangeFilterChange(activeFilterColumn, 'from')}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                  <TextField 
-                    size="small" 
-                    type="date" 
-                    value={toVal} 
-                    onChange={handleDateRangeFilterChange(activeFilterColumn, 'to')}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                  <Button size="small" onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
-                  <Button size="small" variant="contained" onClick={applyFilters}>Apply</Button>
-                </Box>
-              </Box>
-            );
-          }
-          if (meta === 'enum') {
-            const options = getUniqueValuesForColumn(activeFilterColumn);
-            const value: string[] = Array.isArray(columnFilters[activeFilterColumn]) ? columnFilters[activeFilterColumn] : [];
-            return (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Typography variant="caption" sx={{ color: '#6b7280' }}>Select values</Typography>
-                <FormControl size="small">
-                  <Select
-                    multiple
-                    value={value}
-                    onChange={handleEnumFilterChange(activeFilterColumn)}
-                    input={<OutlinedInput />}
-                    renderValue={(selected) => (selected as string[]).join(', ')}
-                    MenuProps={{ PaperProps: { style: { maxHeight: 240 } } }}
-                  >
-                    {options.map((opt) => (
-                      <MenuItem key={opt} value={opt}>
-                        <Checkbox checked={value.indexOf(opt) > -1} />
-                        <Typography variant="caption">{opt}</Typography>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                  <Button size="small" onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
-                  <Button size="small" variant="contained" onClick={applyFilters}>Apply</Button>
-                </Box>
-              </Box>
-            );
-          }
-          return null;
-        })()}
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          {/* Left: Full column list */}
+          <Box sx={{ width: 240, maxHeight: 320, overflowY: 'auto', borderRight: '1px solid #eee', pr: 1.5, pl: 0.5 }}>
+            <List dense subheader={<ListSubheader disableSticky sx={{ bgcolor: 'transparent', px: 0, fontSize: '0.75rem', color: '#6b7280' }}></ListSubheader>}>
+              {Object.keys(COLUMN_META).map((col) => (
+                <ListItemButton
+                  key={col}
+                  selected={activeFilterColumn === col}
+                  onClick={() => setActiveFilterColumn(col)}
+                  sx={{ borderRadius: 0.75, py: 0.75, px: 1 }}
+                >
+                  <ListItemText primary={col} primaryTypographyProps={{ fontSize: '0.82rem' }} />
+                </ListItemButton>
+              ))}
+            </List>
+          </Box>
+          {/* Right: Reusable controls */}
+          <ColumnFilterControls
+            columnMeta={COLUMN_META as any}
+            activeColumn={activeFilterColumn}
+            setActiveColumn={(c) => setActiveFilterColumn(c)}
+            pendingFilters={columnFilters}
+            handleStringChange={handleStringFilterChange}
+            handleNumberRangeChange={handleNumberRangeChange}
+            handleDateRangeChange={handleDateRangeFilterChange}
+            handleEnumChange={handleEnumFilterChange}
+            getEnumOptions={getUniqueValuesForColumn}
+            onClear={clearColumnFilter}
+            onApply={() => {
+              closeFilterPopover();
+              // Optionally trigger a refetch here if needed
+            }}
+          />
+        </Box>
       </Popover>
 
       {/* Custom Date Picker Popup */}

@@ -2,7 +2,6 @@ import React from 'react';
 import { Box, Typography, Paper, Grid, Button, Chip, Container, Card, CardContent, Stack, Divider } from '@mui/material';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SpeedIcon from '@mui/icons-material/Speed';
 import SecurityIcon from '@mui/icons-material/Security';
 import VisibilityIcon from '@mui/icons-material/Visibility';

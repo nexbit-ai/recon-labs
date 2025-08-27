@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useStytchMemberSession } from '@stytch/react/b2b';
 import { StytchB2BUIClient } from '@stytch/vanilla-js/b2b';
+import { tokenManager } from '../services/api/tokenManager';
 import {
   Box,
   Drawer,
@@ -60,6 +61,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { session } = useStytchMemberSession();
   // const { user, logout } = useAuth(); // Authentication disabled
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   
   const [settingsAnchorEl, setSettingsAnchorEl] = React.useState<null | HTMLElement>(null);
   const [sidebarNudge, setSidebarNudge] = React.useState<number>(() => {
@@ -96,44 +98,29 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     } else if (option === 'Pricing') {
       navigate('/pricing');
     } else if (option === 'Logout') {
-      // Properly logout using Stytch B2B
-      console.log('🚪 ===== LOGOUT PROCESS INITIATED =====');
-      console.log('⏰ Timestamp:', new Date().toISOString());
-      console.log('👤 Current User:', {
-        memberId: session?.member_id,
-        organizationId: session?.organization_id,
-        organizationSlug: session?.organization_slug,
-        roles: session?.roles
-      });
+      // Start smooth logout with blur overlay
+      setIsLoggingOut(true);
       
-      try {
-        // Create a new Stytch client instance for logout
-        const stytchClient = new StytchB2BUIClient(
-          import.meta.env.VITE_STYTCH_PUBLIC_TOKEN || ''
-        );
-        
-        // Revoke the current session
-        stytchClient.session.revoke();
-        console.log('✅ Successfully logged out from Stytch B2B');
-        
-        // Clear any local storage
-        try {
-          localStorage.removeItem('stytch_session');
-          sessionStorage.clear();
-          console.log('🧹 Local storage and session storage cleared');
-        } catch (error) {
-          console.error('⚠️ Error clearing local data:', error);
-        }
-        
-        console.log('🚪 ===== LOGOUT PROCESS COMPLETED =====');
-        // Navigate to login page
+      // Wait for blur animation, then navigate
+      setTimeout(() => {
         navigate('/login', { replace: true });
-      } catch (error) {
-        console.error('❌ Error during Stytch logout:', error);
-        console.log('🚪 ===== LOGOUT PROCESS FAILED =====');
-        // Fallback: navigate to login page
-        navigate('/login', { replace: true });
-      }
+        
+        // Clean up after navigation
+        queueMicrotask(() => {
+          try {
+            const stytchClient = new StytchB2BUIClient(
+              import.meta.env.VITE_STYTCH_PUBLIC_TOKEN || ''
+            );
+            stytchClient.session.revoke();
+          } catch {}
+          try {
+            tokenManager.clearCredentials();
+            localStorage.removeItem('stytch_session');
+            sessionStorage.clear();
+          } catch {}
+          setIsLoggingOut(false);
+        });
+      }, 300); // Match CSS transition duration
     }
   };
 
@@ -285,7 +272,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         >
           <MenuItem onClick={() => handleMenuOption('Settings')}>Settings</MenuItem>
           <MenuItem onClick={() => handleMenuOption('Security')}>Security</MenuItem>
-          <MenuItem onClick={() => handleMenuOption('Pricing')}>Pricing</MenuItem>
           <MenuItem onClick={() => handleMenuOption('Logout')}>
             <LogoutIcon sx={{ mr: 1 }} />
             Logout
@@ -297,6 +283,40 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <Box sx={{ display: 'flex' }}>
+      {/* Logout overlay with blur effect */}
+      {isLoggingOut && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.3s ease-in-out',
+          }}
+        >
+          <Box
+            sx={{
+              textAlign: 'center',
+              color: 'text.primary',
+            }}
+          >
+            <Typography variant="h6" sx={{ mb: 1 }}>
+              Logging out...
+            </Typography>
+            <Typography variant="body2" sx={{ opacity: 0.7 }}>
+              Please wait
+            </Typography>
+          </Box>
+        </Box>
+      )}
+      
       <Box
         component="nav"
         sx={{ 

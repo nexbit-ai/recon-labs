@@ -43,6 +43,7 @@ import {
   ListItemText,
   ListSubheader,
 } from '@mui/material';
+import ColumnFilterControls from '../components/ColumnFilterControls';
 import { api } from '../services/api';
 import { OrdersResponse, OrderItem, MarketplaceReconciliationResponse } from '../services/api/types';
 import {
@@ -2831,7 +2832,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               <Box sx={{ display: 'flex', gap: 1.5 }}>
                 {/* Left: Full column list */}
                 <Box sx={{ width: 240, maxHeight: 320, overflowY: 'auto', borderRight: '1px solid #eee', pr: 1.5, pl: 0.5 }}>
-                  <List dense subheader={<ListSubheader disableSticky sx={{ bgcolor: 'transparent', px: 0, fontSize: '0.75rem', color: '#6b7280' }}>Columns</ListSubheader>}>
+                  <List dense subheader={<ListSubheader disableSticky sx={{ bgcolor: 'transparent', px: 0, fontSize: '0.75rem', color: '#6b7280' }}></ListSubheader>}>
                     {Object.keys(COLUMN_META).map((col) => (
                       <ListItemButton
                         key={col}
@@ -2844,263 +2845,30 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     ))}
                   </List>
                 </Box>
-                {/* Right: Controls for selected column */}
-                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.25, pr: 0.5 }}>
-                {/* Column selector */}
-                <FormControl size="small" sx={{ mb: 1 }}>
-                  <InputLabel id="filter-column-select">Column</InputLabel>
-                  <Select
-                    labelId="filter-column-select"
-                    label="Column"
-                    value={activeFilterColumn || ''}
-                    onChange={(e) => setActiveFilterColumn(String(e.target.value))}
-                    input={<OutlinedInput />}
-                    sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.85rem', height: 38, marginTop: 1 } }}
-                  >
-                    {Object.keys(COLUMN_META).map((col) => (
-                      <MenuItem key={col} value={col}>{col}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                {(() => {
-                  if (!activeFilterColumn) return null;
-                  const meta = (COLUMN_META as any)[activeFilterColumn]?.type || 'string';
-                  
-                  if (meta === 'string') {
-                                            const val = (pendingColumnFilters[activeFilterColumn] || '') as string;
-                    return (
-                      <>
-                        <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Contains</Typography>
-                        <TextField 
-                          size="small" 
-                          value={val} 
-                          onChange={handleStringFilterChange(activeFilterColumn)} 
-                          placeholder={`Filter ${activeFilterColumn}`}
-                          sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 } }}
-                        />
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, gap: 1 }}>
-                          <Button size="small" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, color: '#666', '&:hover': { backgroundColor: '#f5f5f5' } }} onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
-                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={applyFilters}>Apply</Button>
-                        </Box>
-                      </>
-                    );
-                  }
-                  
-                  if (meta === 'number') {
-                                            const minVal = (pendingColumnFilters[activeFilterColumn]?.min ?? '') as string;
-                        const maxVal = (pendingColumnFilters[activeFilterColumn]?.max ?? '') as string;
-                    return (
-                      <>
-                        <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Between</Typography>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <TextField 
-                            size="small" 
-                            type="number" 
-                            placeholder="Min" 
-                            value={minVal} 
-                            onChange={handleNumberRangeChange(activeFilterColumn, 'min')}
-                            sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 } }}
-                          />
-                          <TextField 
-                            size="small" 
-                            type="number" 
-                            placeholder="Max" 
-                            value={maxVal} 
-                            onChange={handleNumberRangeChange(activeFilterColumn, 'max')}
-                            sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 } }}
-                          />
-                        </Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, gap: 1 }}>
-                          <Button size="small" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, color: '#666', '&:hover': { backgroundColor: '#f5f5f5' } }} onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
-                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={applyFilters}>Apply</Button>
-                        </Box>
-                      </>
-                    );
-                  }
-                  
-                  if (meta === 'date') {
-                                            const fromVal = (pendingColumnFilters[activeFilterColumn]?.from ?? '') as string;
-                        const toVal = (pendingColumnFilters[activeFilterColumn]?.to ?? '') as string;
-                    return (
-                      <>
-                        <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Between dates</Typography>
-                        <Box sx={{ display: 'flex', gap: 0.5, flexDirection: 'column' }}>
-                          <TextField 
-                            size="small" 
-                            type="date" 
-                            label=""
-                            value={fromVal} 
-                            onChange={handleDateRangeFilterChange(activeFilterColumn, 'from')}
-                            sx={{ 
-                              '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 },
-                              '& input[type="date"]::-webkit-datetime-edit-text': {
-                                color: 'transparent',
-                              },
-                              '& input[type="date"]::-webkit-datetime-edit-month-field': {
-                                color: 'transparent',
-                              },
-                              '& input[type="date"]::-webkit-datetime-edit-day-field': {
-                                color: 'transparent',
-                              },
-                              '& input[type="date"]::-webkit-datetime-edit-year-field': {
-                                color: 'transparent',
-                              },
-                              '& input[type="date"]:valid': {
-                                '&::-webkit-datetime-edit-text, &::-webkit-datetime-edit-month-field, &::-webkit-datetime-edit-day-field, &::-webkit-datetime-edit-year-field': {
-                                  color: 'inherit',
-                                }
-                              },
-                              '& input[type="date"]::-webkit-input-placeholder': {
-                                color: 'transparent',
-                              },
-                              '& input[type="date"]::-moz-placeholder': {
-                                color: 'transparent',
-                              }
-                            }}
-                          />
-                          <TextField 
-                            size="small" 
-                            type="date" 
-                            label=""
-                            value={toVal} 
-                            onChange={handleDateRangeFilterChange(activeFilterColumn, 'to')}
-                            sx={{ 
-                              '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 },
-                              '& input[type="date"]::-webkit-datetime-edit-text': {
-                                color: 'transparent',
-                              },
-                              '& input[type="date"]::-webkit-datetime-edit-month-field': {
-                                color: 'transparent',
-                              },
-                              '& input[type="date"]::-webkit-datetime-edit-day-field': {
-                                color: 'transparent',
-                              },
-                              '& input[type="date"]::-webkit-datetime-edit-year-field': {
-                                color: 'transparent',
-                              },
-                              '& input[type="date"]:valid': {
-                                '&::-webkit-datetime-edit-text, &::-webkit-datetime-edit-month-field, &::-webkit-datetime-edit-day-field, &::-webkit-datetime-edit-year-field': {
-                                  color: 'inherit',
-                                }
-                              },
-                              '& input[type="date"]::-webkit-input-placeholder': {
-                                color: 'transparent',
-                              },
-                              '& input[type="date"]::-moz-placeholder': {
-                                color: 'transparent',
-                              }
-                            }}
-                          />
-                        </Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, gap: 1 }}>
-                          <Button size="small" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, color: '#666', '&:hover': { backgroundColor: '#f5f5f5' } }} onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
-                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={applyFilters}>Apply</Button>
-                        </Box>
-                      </>
-                    );
-                  }
-                  
-                  if (meta === 'enum') {
-                    const rawOptions = getUniqueValuesForColumn(activeFilterColumn);
-                                            const value: string[] = Array.isArray(pendingColumnFilters[activeFilterColumn]) ? pendingColumnFilters[activeFilterColumn] : [];
-                    // For Status, we show both Remark and Event Type distincts, grouped with badges
-                    const isStatus = activeFilterColumn === 'Status';
-                    const options = isStatus
-                      ? rawOptions
-                      : rawOptions;
-                    return (
-                      <>
-                        <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Select values</Typography>
-                        <Box sx={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 1, p: 0.5 }}>
-                          {options.map((opt) => (
-                            <Box
-                              key={opt}
-                              onClick={() => {
-                                const newValue = value.includes(opt)
-                                  ? value.filter(v => v !== opt)
-                                  : [...value, opt];
-                                setColumnFilters(prev => ({
-                                  ...prev,
-                                  [activeFilterColumn]: newValue
-                                }));
-                              }}
-                              sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                p: 0.5,
-                                cursor: 'pointer',
-                                borderRadius: 0.5,
-                                '&:hover': { backgroundColor: '#f5f5f5' },
-                                backgroundColor: value.includes(opt) ? '#1f2937' : 'transparent',
-                                color: value.includes(opt) ? 'white' : '#333',
-                                transition: 'all 0.15s ease',
-                              }}
-                            >
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                                {isStatus ? (
-                                  (() => {
-                                    const [group, raw] = opt.split(':', 2);
-                                    if (group === 'remark') {
-                                      const { background, color } = getRemarkChipColors(raw);
-                                      return (
-                                        <Chip
-                                          label={raw}
-                                          size="small"
-                                          sx={{
-                                            background,
-                                            color,
-                                            fontWeight: 600,
-                                            fontSize: '0.7rem',
-                                            height: 22,
-                                            '& .MuiChip-label': { px: 0.75 },
-                                          }}
-                                        />
-                                      );
-                                    } else {
-                                      const { background, color } = getEventTypeChipColors(raw);
-                                      return (
-                                        <Chip
-                                          label={raw}
-                                          size="small"
-                                          sx={{
-                                            background,
-                                            color,
-                                            fontWeight: 600,
-                                            fontSize: '0.7rem',
-                                            height: 22,
-                                            '& .MuiChip-label': { px: 0.75 },
-                                          }}
-                                        />
-                                      );
-                                    }
-                                  })()
-                                ) : (
-                                  <Typography variant="caption" sx={{ fontSize: '0.75rem', fontWeight: value.includes(opt) ? 600 : 400 }}>
-                                    {opt}
-                                  </Typography>
-                                )}
-                              </Box>
-                              {value.includes(opt) && (
-                                <Typography variant="caption" sx={{ fontSize: '0.7rem', opacity: 0.8 }}>
-                                  ✓
-                                </Typography>
-                              )}
-                            </Box>
-                          ))}
-                        </Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5, gap: 1 }}>
-                          <Button size="small" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, color: '#666', '&:hover': { backgroundColor: '#f5f5f5' } }} onClick={() => clearColumnFilter(activeFilterColumn)}>Clear</Button>
-                          <Button size="small" variant="contained" sx={{ fontSize: '0.7rem', minWidth: 'auto', px: 1, backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' } }} onClick={applyFilters}>Apply</Button>
-                        </Box>
-                      </>
-                    );
-                  }
-                  
-                  return null;
-                })()}
+                {/* Right: Reusable controls */}
+                <ColumnFilterControls
+                  columnMeta={COLUMN_META as any}
+                  activeColumn={activeFilterColumn || ''}
+                  setActiveColumn={(c) => setActiveFilterColumn(c)}
+                  pendingFilters={pendingColumnFilters}
+                  handleStringChange={handleStringFilterChange}
+                  handleNumberRangeChange={handleNumberRangeChange}
+                  handleDateRangeChange={handleDateRangeFilterChange}
+                  handleEnumChange={handleEnumFilterChange}
+                  getEnumOptions={getUniqueValuesForColumn}
+                  onClear={(col) => clearColumnFilter(col)}
+                  onApply={() => {
+                    // Apply pending column/date filters
+                    setColumnFilters(pendingColumnFilters);
+                    setDateRange(pendingDateRange);
+                    closeFilterPopover();
+                    // Refresh data with applied filters
+                    fetchOrdersWithFilters();
+                    fetchTabCountWithFilters('settlement_matched', pendingColumnFilters, pendingDateRange);
+                    fetchTabCountWithFilters('unsettled', pendingColumnFilters, pendingDateRange);
+                  }}
+                />
               </Box>
-            </Box>
             </Box>
           </Portal>
         )}
