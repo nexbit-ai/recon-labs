@@ -120,6 +120,7 @@ import {
   KeyboardArrowDown as KeyboardArrowDownIcon,
   CalendarToday as CalendarTodayIcon,
   ArrowRight,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
 import { apiService } from '../services/api/apiService';
@@ -171,7 +172,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [selectedDateRange, setSelectedDateRange] = useState('custom');
   const [dateRangeMenuAnchor, setDateRangeMenuAnchor] = useState<null | HTMLElement>(null);
   const [customStartDate, setCustomStartDate] = useState<string>('2025-03-01');
-  const [customEndDate, setCustomEndDate] = useState<string>('2025-03-30');
+  const [customEndDate, setCustomEndDate] = useState<string>('2025-03-31');
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   // Date field filter for transactions-related queries
   const [dateField, setDateField] = useState<'order' | 'payment' | 'invoice'>('invoice');
@@ -191,6 +192,99 @@ const MarketplaceReconciliation: React.FC = () => {
     { value: 'this-year', label: 'This year', dates: 'This year' },
     { value: 'custom', label: 'Custom date range', dates: 'Custom' }
   ];
+
+  const handleDownloadCSV = () => {
+    try {
+      const dateRangeText = getCurrentDateRangeText();
+      const startDateText = customStartDate || '';
+      const endDateText = customEndDate || '';
+
+      const safeNum = (n: any) => (typeof n === 'number' && isFinite(n) ? n : parseFloat(n || '0') || 0);
+      const amt = (s: any) => safeNum(parseAmount(String(s || '0')));
+
+      const grossSales = amt(reconciliationData.grossSales);
+      const totalTxnAmount = amt(reconciliationData.summaryData?.totalTransaction?.amount);
+      const totalTxnCount = safeNum(reconciliationData.summaryData?.totalTransaction?.number);
+      const netSalesCount = safeNum(reconciliationData.summaryData?.netSalesAsPerSalesReport?.number);
+      const netSalesAmount = amt(reconciliationData.summaryData?.netSalesAsPerSalesReport?.amount);
+      const paymentRecCount = safeNum(reconciliationData.summaryData?.paymentReceivedAsPerSettlementReport?.number);
+      const paymentRecAmount = amt(reconciliationData.summaryData?.paymentReceivedAsPerSettlementReport?.amount);
+      const pendingPaymentCount = safeNum(reconciliationData.summaryData?.pendingPaymentFromMarketplace?.number);
+      const pendingPaymentAmount = amt(reconciliationData.summaryData?.pendingPaymentFromMarketplace?.amount);
+      const reconciledCount = safeNum(reconciliationData.summaryData?.totalReconciled?.number);
+      const reconciledAmount = amt(reconciliationData.summaryData?.totalReconciled?.amount);
+      const unrecCount = safeNum(reconciliationData.summaryData?.totalUnreconciled?.number);
+      const unrecAmount = amt(reconciliationData.summaryData?.totalUnreconciled?.amount);
+      const lessPayCount = safeNum(reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.number);
+      const lessPayAmount = amt(reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.amount);
+      const morePayCount = safeNum(reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.number);
+      const morePayAmount = amt(reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.amount);
+      const cancelledCount = safeNum(reconciliationData.summaryData?.returnedOrCancelledOrders?.number);
+      const cancelledAmount = amt(reconciliationData.summaryData?.returnedOrCancelledOrders?.amount);
+      const totalTDA = amt(reconciliationData.totalTDA);
+      const totalTDS = amt(reconciliationData.totalTDS);
+
+      const reconPercent = totalTxnAmount === 0 ? 100 : Math.max(0, 100 - ((unrecAmount / (grossSales || totalTxnAmount || 1)) * 100));
+
+      const headerLines: string[] = [
+        'Section,Key,Value'
+      ];
+
+      const infoRows: string[] = [
+        `Date Range,Selected,${dateRangeText}`,
+        `Date Range,Start Date,${startDateText}`,
+        `Date Range,End Date,${endDateText}`,
+        `Summary,Gross Sales,${grossSales}`,
+        `Summary,Total Transactions (count),${totalTxnCount}`,
+        `Summary,Total Transactions (amount),${totalTxnAmount}`,
+        `Summary,Net Sales As Per Sales Report (count),${netSalesCount}`,
+        `Summary,Net Sales As Per Sales Report (amount),${netSalesAmount}`,
+        `Summary,Payment Received As Per Settlement (count),${paymentRecCount}`,
+        `Summary,Payment Received As Per Settlement (amount),${paymentRecAmount}`,
+        `Summary,Pending Payment From Marketplace (count),${pendingPaymentCount}`,
+        `Summary,Pending Payment From Marketplace (amount),${pendingPaymentAmount}`,
+        `Summary,Reconciled Orders (count),${reconciledCount}`,
+        `Summary,Reconciled Orders (amount),${reconciledAmount}`,
+        `Summary,Unreconciled (count),${unrecCount}`,
+        `Summary,Unreconciled (amount),${unrecAmount}`,
+        `Summary,Less Payment Received (count),${lessPayCount}`,
+        `Summary,Less Payment Received (amount),${lessPayAmount}`,
+        `Summary,More Payment Received (count),${morePayCount}`,
+        `Summary,More Payment Received (amount),${morePayAmount}`,
+        `Summary,Cancelled/Returned Orders (count),${cancelledCount}`,
+        `Summary,Cancelled/Returned Orders (amount),${cancelledAmount}`,
+        `Deductions,TDA,${totalTDA}`,
+        `Deductions,TDS,${totalTDS}`,
+        `Status,Reconciliation %,${reconPercent.toFixed(1)}%`
+      ];
+
+      const reasonsHeader = 'Unreconciled Reasons,Reason,Count';
+      const reasonRows = (unreconciledReasons && unreconciledReasons.length > 0)
+        ? unreconciledReasons.map((r) => `Unreconciled Reasons,${String(r.reason).replace(/,/g, ';')},${safeNum(r.count)}`)
+        : ['Unreconciled Reasons,None,0'];
+
+      const csv = [
+        ...headerLines,
+        ...infoRows,
+        reasonsHeader,
+        ...reasonRows,
+      ].join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const filename = `reconciliation_report_${(startDateText || 'start')}_${(endDateText || 'end')}.csv`;
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export CSV:', err);
+    }
+  };
 
   // Get current date range display text
   const getCurrentDateRangeText = () => {
@@ -1034,6 +1128,24 @@ const MarketplaceReconciliation: React.FC = () => {
                     </Typography>
                   </Box>
                 </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleDownloadCSV}
+                  sx={{
+                    borderColor: '#6B7280',
+                    color: '#6B7280',
+                    textTransform: 'none',
+                    minHeight: 36,
+                    fontSize: '0.7875rem',
+                    '&:hover': {
+                      borderColor: '#4B5563',
+                      backgroundColor: 'rgba(107, 114, 128, 0.04)',
+                    },
+                  }}
+                >
+                  Download CSV
+                </Button>
                 <Menu
                   anchorEl={dateRangeMenuAnchor}
                   open={Boolean(dateRangeMenuAnchor)}
@@ -1383,8 +1495,8 @@ const MarketplaceReconciliation: React.FC = () => {
           </Box>
         </Fade>
 
-        <Grid container spacing={3} sx={{ mb: 6 }}>
-          <Grid item xs={12}>
+        <Grid container spacing={3} alignItems="stretch" sx={{ mb: 6 }}>
+          <Grid item xs={12} md={7}>
             <Card sx={{ 
               background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
               borderRadius: '16px',
@@ -1410,7 +1522,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     fontWeight: 600,
                     color: '#1f2937',
                     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                    letterSpacing: '-0.025em'
+                    letterSpacing: '-0.025em', 
                   }}>
                     Reconciliation Summary
                   </Typography>
@@ -1441,9 +1553,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       { label: 'Total Transactions', count: totalTransactionsCount, amount: totalTransactionsAmount },
                       { label: 'Net Sales as per Sales Reports', count: netSalesSalesReportsCount, amount: netSalesSalesReportsAmount },
                       { label: 'Payment Received as per Payment Report', count: netPaymentReceivedAsPerPaymentCount, amount: netPaymentReceivedAsPerPaymentAmount },
-                      { label: 'Total Unreconciled Amount', count: totalUnrecCount, amount: totalUnrecAmount },
                       { label: 'Reconciled Orders', count: reconciledOrdersCount, amount: reconciledOrdersAmount },
-                      { label: 'Less Payment Received', count: lessPaymentCount, amount: lessPaymentAmount },
                       // Removed: More Payment Received
                       { label: 'Pending Payment', count: pendingPaymentCount, amount: pendingPaymentAmount },
                       { label: 'Cancelled Orders', count: cancelledOrdersCount, amount: cancelledOrdersAmount },
@@ -1455,7 +1565,7 @@ const MarketplaceReconciliation: React.FC = () => {
                         gridTemplateColumns: {
                           xs: 'repeat(1, minmax(220px, 1fr))',
                           sm: 'repeat(2, minmax(220px, 1fr))',
-                          md: 'repeat(4, minmax(220px, 1fr))',
+                          md: 'repeat(3, minmax(220px, 1fr))',
                         },
                       }}>
                         {cards.map((r, idx) => (
@@ -1486,6 +1596,81 @@ const MarketplaceReconciliation: React.FC = () => {
                     );
                   })()}
                 </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          {/* Unreconciled Card (Total + Breakdown) */}
+          <Grid item xs={12} md={5}>
+            <Card sx={{ 
+              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+              borderRadius: '16px',
+              border: '1px solid #f1f3f4',
+              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              overflow: 'hidden',
+              height: '100%',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+                transform: 'translateY(-2px)',
+              }
+            }}>
+              <CardContent sx={{ p: 4 }}>
+                {(() => {
+                  const totalUnrecAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.amount || '0');
+                  const totalUnrecCount = reconciliationData.summaryData?.totalUnreconciled?.number || 0;
+                  const lessPaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.amount || '0');
+                  const lessPaymentCount = reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.number || 0;
+                  const morePaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.amount || '0');
+                  const morePaymentCount = reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.number || 0;
+                  return (
+                    <Box>
+                      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="h6" sx={{ 
+                          fontWeight: 600, 
+                          color: '#1f2937',
+                          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                          letterSpacing: '-0.025em'
+                        }}>
+                          <span style={{ fontSize: '1.5rem' }}>Total Unreconciled</span>
+                        </Typography>
+                        <Typography variant="h4" sx={{ fontWeight: 800, color: '#1f2937', letterSpacing: '-0.02em', fontSize: '1.5rem', textAlign: 'right', ml: 2 }}>
+                          {formatCurrency(totalUnrecAmount)}
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" sx={{ mt: 0.5, color: '#6b7280', fontWeight: 500, fontSize: '1.00rem' }}>
+                        {(totalUnrecCount).toLocaleString('en-IN')} Orders
+                      </Typography>
+                      <Divider sx={{ my: 2 }} />
+                      <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>
+                        Unreconciled = Less Payment Received − More Payment Received from Marketplace
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Typography variant="body1" sx={{ color: '#b91c1c', fontWeight: 600, fontSize: '1.15rem' }}>
+                            Less Payment Received
+                          </Typography>
+                          <Typography variant="h5" sx={{ color: '#ef4444', fontWeight: 700, fontSize: '1.25rem' }}>
+                            {formatCurrency(lessPaymentAmount)}
+                          </Typography>
+                        </Box>
+                        <Typography variant="caption" sx={{ color: '#6b7280', mt: 0, mb: 0.125 }}>
+                          {lessPaymentCount.toLocaleString('en-IN')} Orders
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.125 }}>
+                          <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.15rem' }}>
+                            More Payment Received
+                          </Typography>
+                          <Typography variant="h5" sx={{ color: '#10b981', fontWeight: 700, fontSize: '1.25rem' }}>
+                            {formatCurrency(morePaymentAmount)}
+                          </Typography>
+                        </Box>
+                        <Typography variant="caption" sx={{ color: '#6b7280', mt: 0 }}>
+                          {morePaymentCount.toLocaleString('en-IN')} Orders
+                        </Typography>
+                      </Box>
+                    </Box>
+                  );
+                })()}
               </CardContent>
             </Card>
           </Grid>
@@ -1689,21 +1874,21 @@ const MarketplaceReconciliation: React.FC = () => {
                       <Pie
                         data={[
                           {
-                            name: 'Settled Orders',
-                            value: reconciliationData.summaryData.totalReconciled.number,
-                            amount: parseAmount(reconciliationData.summaryData.totalReconciled.amount),
+                            name: 'Total Sales Orders',
+                            value: reconciliationData.summaryData.netSalesAsPerSalesReport.number,
+                            amount: parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount),
                             color: '#7A5DBF',
                             type: 'settled'
                           },
                           {
-                            name: 'Unsettled Orders',
-                            value: reconciliationData.summaryData.totalUnreconciled.number,
-                            amount: parseAmount(reconciliationData.summaryData.totalUnreconciled.amount),
+                            name: 'Unsettled Sales Orders',
+                            value: reconciliationData.summaryData.pendingPaymentFromMarketplace.number,
+                            amount: parseAmount(reconciliationData.summaryData.pendingPaymentFromMarketplace.amount),
                             color: '#A79CDB',
                             type: 'unsettled'
                           },
                           {
-                            name: 'cancelled Orders',
+                            name: 'Cancelled Orders',
                             value: reconciliationData.summaryData.returnedOrCancelledOrders.number,
                             amount: parseAmount(reconciliationData.summaryData.returnedOrCancelledOrders.amount),
                             color: '#D3C8EC',
@@ -1720,7 +1905,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       >
                         {[
                           { name: 'Settled Orders', value: reconciliationData.summaryData.totalReconciled.number, color: '#7A5DBF' },
-                          { name: 'Unsettled Orders', value: reconciliationData.summaryData.totalUnreconciled.number, color: '#A79CDB' },
+                          { name: 'Unsettled Orders', value: reconciliationData.summaryData.pendingPaymentFromMarketplace.number, color: '#A79CDB' },
                           { name: 'cancelled Returns', value: reconciliationData.summaryData.returnedOrCancelledOrders.number, color: '#D3C8EC' }
                         ].map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
@@ -1815,7 +2000,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       mb: 2,
                       letterSpacing: '-0.02em'
                     }}>
-                      {(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number)}
+                      {(reconciliationData.summaryData.totalTransaction.number - reconciliationData.summaryData.pendingPaymentFromMarketplace.number)}
                     </Typography>
                     <Typography variant="h6" sx={{
                       color: '#059669',
@@ -1823,7 +2008,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       fontWeight: 600,
                       letterSpacing: '-0.01em'
                     }}>
-                      {formatCurrency(parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount || '0'))}
+                      {formatCurrency(parseAmount(reconciliationData.summaryData.totalTransaction.amount) - parseAmount(reconciliationData.summaryData.pendingPaymentFromMarketplace.amount || '0'))}
                     </Typography>
                   </Box>
 
@@ -1872,7 +2057,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       mb: 2,
                       letterSpacing: '-0.02em'
                     }}>
-                      {reconciliationData.summaryData.totalTransaction.number - reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number}
+                      {reconciliationData.summaryData.pendingPaymentFromMarketplace.number}
                     </Typography>
                     <Typography variant="h6" sx={{
                       color: '#d97706',
@@ -1880,7 +2065,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       fontWeight: 600, 
                       letterSpacing: '-0.01em'
                     }}>
-                      {formatCurrency(parseAmount(reconciliationData.summaryData.totalTransaction.amount) - parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount))}
+                      {formatCurrency(parseAmount(reconciliationData.summaryData.pendingPaymentFromMarketplace.amount || '0'))}
                     </Typography>
                   </Box>
                 </Box>
