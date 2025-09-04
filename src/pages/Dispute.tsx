@@ -284,8 +284,9 @@ const DisputePage: React.FC = () => {
   };
 
   // Build query parameters for API calls
-  const buildQueryParams = (): TransactionQueryParams => {
+  const buildQueryParams = (filtersOverride?: Record<string, any>): TransactionQueryParams => {
     const params: TransactionQueryParams = {};
+    const f = filtersOverride || columnFilters;
     // Set status for unreconciled orders (short_received, excess_received)
     if (disputeSubTab === 0) {
       params.status_in = 'short_received,excess_received';
@@ -293,18 +294,18 @@ const DisputePage: React.FC = () => {
     }
 
     // Map applied column filters to API params (server-side filtering)
-    const statusFilter = columnFilters['Status'];
+    const statusFilter = f['Status'];
     if (statusFilter && Array.isArray(statusFilter) && statusFilter.length > 0) {
       params.status_in = statusFilter.join(',');
     }
 
-    const orderIdFilter = columnFilters['Order ID'];
+    const orderIdFilter = f['Order ID'];
     if (orderIdFilter && typeof orderIdFilter === 'string' && orderIdFilter.trim() !== '') {
       // Backend expects order_id here (not order_item_id)
       (params as any).order_id = orderIdFilter.trim();
     }
 
-    const diffFilter = columnFilters['Difference'];
+    const diffFilter = f['Difference'];
     if (diffFilter && typeof diffFilter === 'object') {
       if (diffFilter.min !== undefined && diffFilter.min !== '') {
         const v = parseFloat(diffFilter.min);
@@ -316,27 +317,27 @@ const DisputePage: React.FC = () => {
       }
     }
 
-    const orderDateFilter = columnFilters['Order Date'];
+    const orderDateFilter = f['Order Date'];
     if (orderDateFilter && typeof orderDateFilter === 'object') {
       if (orderDateFilter.from) params.order_date_from = orderDateFilter.from;
       if (orderDateFilter.to) params.order_date_to = orderDateFilter.to;
     }
 
     // Settlement Date range
-    const settlementDateFilter = columnFilters['Settlement Date'];
+    const settlementDateFilter = f['Settlement Date'];
     if (settlementDateFilter && typeof settlementDateFilter === 'object') {
       if (settlementDateFilter.from) (params as any).settlement_date_from = settlementDateFilter.from;
       if (settlementDateFilter.to) (params as any).settlement_date_to = settlementDateFilter.to;
     }
 
     // Reason enum → reason_in
-    const reasonFilter = columnFilters['Reason'];
+    const reasonFilter = f['Reason'];
     if (reasonFilter && Array.isArray(reasonFilter) && reasonFilter.length > 0) {
       (params as any).reason_in = reasonFilter.join(',');
     }
 
     // Remark (string or enums). Prefer remark_in for arrays, else remark
-    const remarkFilter = columnFilters['Remark'];
+    const remarkFilter = f['Remark'];
     if (remarkFilter) {
       if (Array.isArray(remarkFilter) && remarkFilter.length > 0) {
         (params as any).remark_in = remarkFilter.join(',');
@@ -346,7 +347,7 @@ const DisputePage: React.FC = () => {
     }
 
     // Event Type enum → event_type_in
-    const eventTypeFilter = columnFilters['Event Type'];
+    const eventTypeFilter = f['Event Type'];
     if (eventTypeFilter && Array.isArray(eventTypeFilter) && eventTypeFilter.length > 0) {
       (params as any).event_type_in = eventTypeFilter.join(',');
     }
@@ -394,14 +395,14 @@ const DisputePage: React.FC = () => {
   };
 
   // Fetch unreconciled orders from API
-  const fetchUnreconciledOrders = async () => {
+  const fetchUnreconciledOrders = async (filtersOverride?: Record<string, any>) => {
     if (disputeSubTab !== 0) return; // Only fetch for unreconciled tab
     
     setApiLoading(true);
     setError(null);
     
     try {
-      const queryParams = buildQueryParams();
+      const queryParams = buildQueryParams(filtersOverride);
       console.log('Fetching unreconciled orders with params:', queryParams);
       console.log('Date range:', queryParams.buyer_invoice_date_from, 'to', queryParams.buyer_invoice_date_to);
       console.log('Selected date range:', selectedDateRange);
@@ -878,7 +879,18 @@ const DisputePage: React.FC = () => {
                   return (
                     <Box key={`${col}-${label}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, border: '1px solid #e5e7eb', borderRadius: '9999px', fontSize: '0.75rem', color: '#111827', background: '#f3f4f6' }}>
                       <span>{label}</span>
-                      <IconButton size="small" onClick={() => clearColumnFilter(col)} sx={{ p: 0.25, color: '#6b7280', '&:hover': { color: '#111827' } }} aria-label={`Clear ${col} filter`}>
+                      <IconButton
+                  size="small"
+                        onClick={() => {
+                          const next = { ...columnFilters } as Record<string, any>;
+                          delete next[col];
+                          setColumnFilters(next);
+                          setPage(0);
+                          fetchUnreconciledOrders(next);
+                        }}
+                        sx={{ p: 0.25, color: '#6b7280', '&:hover': { color: '#111827' } }}
+                        aria-label={`Clear ${col} filter`}
+                      >
                         <CloseIcon sx={{ fontSize: 14 }} />
                       </IconButton>
                     </Box>
@@ -907,7 +919,7 @@ const DisputePage: React.FC = () => {
               >
                 Filter
               </Button>
-
+              
               <Button
                 variant="outlined"
                 endIcon={<KeyboardArrowDownIcon />}
@@ -936,7 +948,7 @@ const DisputePage: React.FC = () => {
                   }
                 }}
               >
-                <MenuItem
+                  <MenuItem
                   selected={selectedPlatforms.length === 2}
                   onClick={() => {
                     const newSel: Array<'flipkart'|'amazon'> = ['flipkart','amazon'];
@@ -945,7 +957,7 @@ const DisputePage: React.FC = () => {
                     // With All selected, prefer backend flow
                     fetchUnreconciledOrders();
                   }}
-                  sx={{
+                    sx={{
                     mb: 0.5,
                     borderRadius: '8px',
                     '&.Mui-selected': { outline: '2px solid #111', outlineOffset: '-2px', backgroundColor: '#fff' },
@@ -955,7 +967,7 @@ const DisputePage: React.FC = () => {
                   }}
                 >
                   All
-                </MenuItem>
+                  </MenuItem>
                 <MenuItem
                   selected={selectedPlatforms.includes('flipkart')}
                   onClick={() => {
@@ -992,16 +1004,16 @@ const DisputePage: React.FC = () => {
                       setPage(0);
                     }
                   }}
-                  sx={{
+                sx={{
                     mb: 0.5,
                     borderRadius: '8px',
                     '&.Mui-selected': { outline: '2px solid #111', outlineOffset: '-2px', backgroundColor: '#fff' },
                     '&:hover': { backgroundColor: '#f3f4f6' },
                     px: 1.25,
                     py: 1
-                  }}
-                >
-                  Flipkart
+                }}
+              >
+                Flipkart
                 </MenuItem>
                 <MenuItem
                   selected={selectedPlatforms.includes('amazon')}
@@ -1507,15 +1519,15 @@ const DisputePage: React.FC = () => {
                      return (
                       <TableRow key={`flat-${index}`} sx={{ '&:hover': { background: '#f3f4f6' }, transition: 'all 0.3s ease' }}>
                         <TableCell padding="checkbox">
-                          <Checkbox
+                             <Checkbox
                             checked={selectedIds.includes(row.order_id)}
                             onChange={() => toggleRow(row.order_id)}
-                            sx={{
-                              color: '#6b7280',
+                               sx={{
+                                 color: '#6b7280',
                               '&.Mui-checked': { color: '#1f2937' },
-                            }}
-                          />
-                        </TableCell>
+                               }}
+                             />
+                    </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>{row.order_id}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{parseFloat(row.context?.buyer_invoice_amount || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.order_date}</TableCell>
@@ -1523,7 +1535,7 @@ const DisputePage: React.FC = () => {
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>₹{parseFloat(row.diff || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           <Chip label={formatReasonLabel(row.reason || 'N/A')} size="small" sx={{ fontWeight: 600, color: '#1f2937', backgroundColor: '#e5e7eb', '& .MuiChip-label': { px: 1 } }} />
-                    </TableCell>
+                           </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.status}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
@@ -1690,7 +1702,7 @@ const DisputePage: React.FC = () => {
                 </ListItemButton>
               ))}
             </List>
-          </Box>
+                </Box>
           {/* Right: Reusable controls */}
           <ColumnFilterControls
             columnMeta={COLUMN_META as any}
@@ -1707,7 +1719,7 @@ const DisputePage: React.FC = () => {
               applyFilters();
             }}
           />
-        </Box>
+              </Box>
       </Popover>
 
       {/* Custom Date Picker Popup */}

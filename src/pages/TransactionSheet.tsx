@@ -224,7 +224,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   if (!orderItemId || String(orderItemId).trim() === '') {
     orderItemId = undefined;
   }
-
+  
   return {
     "Order ID": backendOrderId || orderItemId || `ORD_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
     "Order Item ID": orderItemId,
@@ -234,7 +234,8 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
     "Settlement Date": settlementDate,
     "Difference": difference,
     "Remark": remark,
-    "Event Type": orderItem.event_type || "Sale", // Default to "Sale" if not provided
+    // Derive event type from order value: > 0 => Sale, else Return
+    "Event Type": orderValue > 0 ? "Sale" : "Return",
     // Preserve the original API response data for popup access
     originalData: orderItem as TransactionApiResponse,
   };
@@ -1432,20 +1433,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Helpers to get enum options from current data
   const getUniqueValuesForColumn = (columnName: string): string[] => {
-    // Special handling for computed columns
+    // For Status, show unique backend statuses plus Sale/Return (event types)
     if (columnName === 'Status') {
-      const remarks = new Set<string>();
-      const events = new Set<string>();
-      allTransactionData.forEach(row => {
-        const remark = (row as any)['Remark'];
-        const eventType = (row as any)['Event Type'];
-        if (typeof remark === 'string' && remark) remarks.add(`remark:${remark}`);
-        if (typeof eventType === 'string' && eventType) events.add(`event:${eventType}`);
-      });
-      return [
-        ...Array.from(remarks).sort((a,b) => a.localeCompare(b)),
-        ...Array.from(events).sort((a,b) => a.localeCompare(b)),
-      ];
+      // Hardcoded per request
+      return ['excess_received', 'short_received', 'settlement_matched'];
     }
 
     const values = new Set<string>();
@@ -1557,6 +1548,20 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               if (filterValue.max !== undefined && filterValue.max !== '') {
                 params.diff_max = parseFloat(filterValue.max);
               }
+            }
+            break;
+
+          case 'Status':
+            // Status filter can include backend statuses and event types (Sale/Return)
+            if (Array.isArray(filterValue)) {
+              const statuses: string[] = [];
+              const eventTypes: string[] = [];
+              filterValue.forEach((val: string) => {
+                if (val === 'Sale' || val === 'Return') eventTypes.push(val.toLowerCase());
+                else statuses.push(val);
+              });
+              if (statuses.length > 0) params.status_in = statuses.join(',');
+              if (eventTypes.length > 0) (params as any).event_type_in = eventTypes.join(',');
             }
             break;
         }
@@ -2397,7 +2402,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     <Button
                       variant="outlined"
                       startIcon={<FilterIcon />}
-                      onClick={(e) => openFilterPopover('Order ID', e.currentTarget as any)}
+                      onClick={(e) => openFilterPopover('Status', e.currentTarget as any)}
                       sx={{ textTransform: 'none', borderColor: '#1f2937', color: '#1f2937' }}
                     >
                       Filters
@@ -2658,27 +2663,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {column === 'Status' ? (
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    {/* Remark chip */}
+                                    {/* Backend Status chip (exact value from API) */}
+                                    {((row as any)?.originalData?.status) && (
                                     <Chip
-                                      label={(row as any)['Remark']}
+                                        label={(row as any).originalData.status}
                                       size="small"
                                       sx={{
-                                        background: (row as any)['Remark'] === 'Matched' ? '#dcfce7' : 
-                                                   (row as any)['Remark'] === 'Excess Amount Received' ? '#fef3c7' : 
-                                                   (row as any)['Remark'] === 'Short Amount Received' ? '#fee2e2' :
-                                                   (row as any)['Remark'] === 'Pending Settlement' ? '#dbeafe' :
-                                                   (row as any)['Remark'] === 'Return Initiated' ? '#f3e8ff' : '#f3f4f6',
-                                        color: (row as any)['Remark'] === 'Matched' ? '#059669' : 
-                                               (row as any)['Remark'] === 'Excess Amount Received' ? '#d97706' : 
-                                               (row as any)['Remark'] === 'Short Amount Received' ? '#dc2626' :
-                                               (row as any)['Remark'] === 'Pending Settlement' ? '#111111' :
-                                               (row as any)['Remark'] === 'Return Initiated' ? '#7c3aed' : '#374151',
+                                          background: '#f3f4f6',
+                                          color: '#111827',
                                         fontWeight: 600,
                                         fontSize: '0.75rem',
                                         height: 24,
                                         '& .MuiChip-label': { px: 1 },
                                       }}
                                     />
+                                    )}
                                     {/* Event Type chip */}
                                     <Chip
                                       label={(row as any)['Event Type']}
@@ -2777,6 +2776,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           <Portal>
             <Box
               data-filter-popup="true"
+              aria-hidden={false}
+              tabIndex={-1}
               sx={{
                 position: 'fixed',
                 top: (() => {
@@ -2852,7 +2853,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 {/* Right: Reusable controls */}
                 <ColumnFilterControls
                   columnMeta={COLUMN_META as any}
-                  activeColumn={activeFilterColumn || ''}
+                  activeColumn={activeFilterColumn || 'Status'}
                   setActiveColumn={(c) => setActiveFilterColumn(c)}
                   pendingFilters={pendingColumnFilters}
                   handleStringChange={handleStringFilterChange}
@@ -2872,7 +2873,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     fetchTabCountWithFilters('unsettled', pendingColumnFilters, pendingDateRange);
                   }}
                 />
-              </Box>
+            </Box>
             </Box>
           </Portal>
         )}

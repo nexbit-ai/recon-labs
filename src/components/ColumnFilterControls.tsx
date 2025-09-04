@@ -33,7 +33,15 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
   onApply,
 }) => {
   const metaType = (columnMeta as any)[activeColumn]?.type || 'string';
-  const enumOptions = activeColumn && getEnumOptions ? getEnumOptions(activeColumn) : [];
+  let enumOptions = activeColumn && getEnumOptions ? getEnumOptions(activeColumn) : [];
+  // For Transaction Sheet Status specifically, hardcode the three values
+  if (activeColumn === 'Status') {
+    enumOptions = ['excess_received', 'short_received', 'settlement_matched'];
+  }
+  if (activeColumn === 'Status') {
+    try { console.log('[ColumnFilterControls] Status options:', enumOptions); } catch {}
+  }
+  const [enumOpen, setEnumOpen] = React.useState(false);
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, pr: 0 }}>
@@ -118,11 +126,29 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
           <FormControl size="small">
             <Select
               multiple
+              open={enumOpen}
+              onOpen={() => {
+                try {
+                  (document.activeElement as HTMLElement | null)?.blur?.();
+                } catch {}
+                setEnumOpen(true);
+              }}
+              onClose={() => setEnumOpen(false)}
               value={Array.isArray(pendingFilters[activeColumn]) ? pendingFilters[activeColumn] : []}
               onChange={handleEnumChange(activeColumn)}
               input={<OutlinedInput />}
               renderValue={(selected) => (selected as string[]).join(', ')}
-              MenuProps={{ PaperProps: { style: { maxHeight: 280 } } }}
+              displayEmpty
+              MenuProps={{
+                disablePortal: false,
+                container: typeof document !== 'undefined' ? document.body : undefined,
+                PaperProps: { sx: { maxHeight: 320, zIndex: 20000 } },
+                keepMounted: true,
+                disableEnforceFocus: true,
+                disableRestoreFocus: true,
+                anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
+                transformOrigin: { vertical: 'top', horizontal: 'left' },
+              }}
               sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 38 } }}
             >
               {(getEnumOptions ? enumOptions : []).map((opt) => (
