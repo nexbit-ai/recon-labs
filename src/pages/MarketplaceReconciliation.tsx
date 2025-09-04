@@ -617,9 +617,10 @@ const MarketplaceReconciliation: React.FC = () => {
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['flipkart']);
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
   
-  // Available platforms (only Flipkart for now)
+  // Available platforms
   const availablePlatforms = [
-    { value: 'flipkart' as Platform, label: 'Flipkart' }
+    { value: 'flipkart' as Platform, label: 'Flipkart' },
+    { value: 'amazon' as Platform, label: 'Amazon' }
   ];
 
   // Generate available months (last 12 months)
@@ -1159,9 +1160,11 @@ const MarketplaceReconciliation: React.FC = () => {
                     },
                   }}
                 >
-                  {selectedPlatforms.length > 0 
-                    ? availablePlatforms.find(p => p.value === selectedPlatforms[0])?.label || 'Flipkart'
-                    : 'Select Platforms'
+                  {selectedPlatforms.length === availablePlatforms.length
+                    ? 'All'
+                    : (selectedPlatforms.length > 0 
+                        ? (availablePlatforms.find(p => p.value === selectedPlatforms[0])?.label || 'Select Platforms')
+                        : 'Select Platforms')
                   }
                 </Button>
                 <Menu
@@ -1178,6 +1181,34 @@ const MarketplaceReconciliation: React.FC = () => {
                     }
                   }}
                 >
+                  <MenuItem
+                    onClick={() => {
+                      setSelectedPlatforms(availablePlatforms.map(p => p.value) as Platform[]);
+                      setPlatformMenuAnchorEl(null);
+                    }}
+                    sx={{
+                      py: 1.5,
+                      px: 2,
+                      '&:hover': {
+                        backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                      },
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                      <StorefrontIcon sx={{ mr: 2, fontSize: 20, color: '#6B7280' }} />
+                      <Typography variant="body2" sx={{ flex: 1 }}>
+                        All
+                      </Typography>
+                      {selectedPlatforms.length === availablePlatforms.length && (
+                        <Chip 
+                          label="Selected" 
+                          size="small" 
+                          color="primary" 
+                          sx={{ ml: 1 }}
+                        />
+                      )}
+                    </Box>
+                  </MenuItem>
                   {availablePlatforms.map((platform) => (
                     <MenuItem
                       key={platform.value}
