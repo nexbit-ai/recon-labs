@@ -42,7 +42,8 @@ import {
   CalendarToday as CalendarTodayIcon, 
   KeyboardArrowDown as KeyboardArrowDownIcon, 
   StorefrontOutlined as StorefrontIcon,
-  FilterList as FilterIcon
+  FilterList as FilterIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import { api } from '../services/api';
 import ColumnFilterControls from '../components/ColumnFilterControls';
@@ -291,6 +292,65 @@ const DisputePage: React.FC = () => {
       params.pagination = false; // Disable pagination to get all unreconciled orders
     }
 
+    // Map applied column filters to API params (server-side filtering)
+    const statusFilter = columnFilters['Status'];
+    if (statusFilter && Array.isArray(statusFilter) && statusFilter.length > 0) {
+      params.status_in = statusFilter.join(',');
+    }
+
+    const orderIdFilter = columnFilters['Order ID'];
+    if (orderIdFilter && typeof orderIdFilter === 'string' && orderIdFilter.trim() !== '') {
+      // Backend expects order_id here (not order_item_id)
+      (params as any).order_id = orderIdFilter.trim();
+    }
+
+    const diffFilter = columnFilters['Difference'];
+    if (diffFilter && typeof diffFilter === 'object') {
+      if (diffFilter.min !== undefined && diffFilter.min !== '') {
+        const v = parseFloat(diffFilter.min);
+        if (!Number.isNaN(v)) params.diff_min = v;
+      }
+      if (diffFilter.max !== undefined && diffFilter.max !== '') {
+        const v = parseFloat(diffFilter.max);
+        if (!Number.isNaN(v)) params.diff_max = v;
+      }
+    }
+
+    const orderDateFilter = columnFilters['Order Date'];
+    if (orderDateFilter && typeof orderDateFilter === 'object') {
+      if (orderDateFilter.from) params.order_date_from = orderDateFilter.from;
+      if (orderDateFilter.to) params.order_date_to = orderDateFilter.to;
+    }
+
+    // Settlement Date range
+    const settlementDateFilter = columnFilters['Settlement Date'];
+    if (settlementDateFilter && typeof settlementDateFilter === 'object') {
+      if (settlementDateFilter.from) (params as any).settlement_date_from = settlementDateFilter.from;
+      if (settlementDateFilter.to) (params as any).settlement_date_to = settlementDateFilter.to;
+    }
+
+    // Reason enum → reason_in
+    const reasonFilter = columnFilters['Reason'];
+    if (reasonFilter && Array.isArray(reasonFilter) && reasonFilter.length > 0) {
+      (params as any).reason_in = reasonFilter.join(',');
+    }
+
+    // Remark (string or enums). Prefer remark_in for arrays, else remark
+    const remarkFilter = columnFilters['Remark'];
+    if (remarkFilter) {
+      if (Array.isArray(remarkFilter) && remarkFilter.length > 0) {
+        (params as any).remark_in = remarkFilter.join(',');
+      } else if (typeof remarkFilter === 'string' && remarkFilter.trim() !== '') {
+        params.remark = remarkFilter.trim();
+      }
+    }
+
+    // Event Type enum → event_type_in
+    const eventTypeFilter = columnFilters['Event Type'];
+    if (eventTypeFilter && Array.isArray(eventTypeFilter) && eventTypeFilter.length > 0) {
+      (params as any).event_type_in = eventTypeFilter.join(',');
+    }
+
     // Set date range based on selected date range
     if (selectedDateRange === 'this-month') {
       const now = new Date();
@@ -316,16 +376,6 @@ const DisputePage: React.FC = () => {
       params.buyer_invoice_date_from = firstDay.toISOString().split('T')[0];
       params.buyer_invoice_date_to = lastDay.toISOString().split('T')[0];
       
-      // Debug logging for this-year selection
-      console.log('This year date calculation:', {
-        currentYear: currentYear,
-        firstDay: firstDay.toISOString().split('T')[0],
-        lastDay: lastDay.toISOString().split('T')[0],
-        firstDayDate: firstDay,
-        lastDayDate: lastDay,
-        firstDayMonth: firstDay.getUTCMonth(), // Should be 0 (January)
-        lastDayMonth: lastDay.getUTCMonth()    // Should be 11 (December)
-      });
     } else if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
       params.buyer_invoice_date_from = customStartDate;
       params.buyer_invoice_date_to = customEndDate;
@@ -727,9 +777,10 @@ const DisputePage: React.FC = () => {
   };
 
   const applyFilters = () => {
-    // Reset to first page when filters change for a better UX
+    // Reset to first page and refetch from backend with server-side filters
     setPage(0);
     closeFilterPopover();
+    fetchUnreconciledOrders();
   };
 
   const getUniqueValuesForColumn = (column: string) => {
@@ -815,7 +866,7 @@ const DisputePage: React.FC = () => {
             {/* Right controls: applied filter chips + filter + platform + send button */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               {/* Applied filter summary (left of Filter button) */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', maxWidth: 420 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', maxWidth: 520 }}>
                 {Object.entries(columnFilters).map(([col, val]) => {
                   if (!val || (typeof val === 'string' && !val.trim()) || (Array.isArray(val) && val.length === 0)) return null;
                   let label = '';
@@ -825,8 +876,11 @@ const DisputePage: React.FC = () => {
                   else if (val && (val.from || val.to)) label = `${col}: ${val.from ?? ''} → ${val.to ?? ''}`;
                   else return null;
                   return (
-                    <Box key={`${col}-${label}`} sx={{ px: 1, py: 0.25, border: '1px solid #e5e7eb', borderRadius: '20px', fontSize: '0.75rem', color: '#111827', background: '#fff' }}>
-                      {label}
+                    <Box key={`${col}-${label}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, border: '1px solid #e5e7eb', borderRadius: '9999px', fontSize: '0.75rem', color: '#111827', background: '#f3f4f6' }}>
+                      <span>{label}</span>
+                      <IconButton size="small" onClick={() => clearColumnFilter(col)} sx={{ p: 0.25, color: '#6b7280', '&:hover': { color: '#111827' } }} aria-label={`Clear ${col} filter`}>
+                        <CloseIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
                     </Box>
                   );
                 })}
@@ -1650,8 +1704,7 @@ const DisputePage: React.FC = () => {
             getEnumOptions={getUniqueValuesForColumn}
             onClear={clearColumnFilter}
             onApply={() => {
-              closeFilterPopover();
-              // Optionally trigger a refetch here if needed
+              applyFilters();
             }}
           />
         </Box>

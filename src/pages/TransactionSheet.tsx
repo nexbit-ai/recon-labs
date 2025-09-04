@@ -67,7 +67,8 @@ import {
 
 // Type definitions for transaction data based on actual API response
 interface TransactionRow {
-  "Order Item ID": string;
+  "Order ID"?: string;
+  "Order Item ID"?: string;
   "Order Value": number;
   "Settlement Value": number;
   "Order Date": string;
@@ -150,7 +151,7 @@ interface TransactionQueryParams {
   diff_max?: number;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
-  order_item_id?: string;
+  order_id?: string;
   remark?: string;
 }
 
@@ -191,12 +192,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   
   console.log('Parsed values - orderValue:', orderValue, 'settlementValue:', settlementValue, 'difference:', difference);
   
-  // Handle missing or empty order_item_id
-  let orderItemId = orderItem.order_item_id;
-  if (!orderItemId || orderItemId.trim() === '') {
-    orderItemId = `ITEM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    console.warn('No order item ID found, using fallback:', orderItemId);
-  }
+  // (Deprecated) legacy path removed; order item id handled below
   
   // Determine remark based on API response
   let remark = "unsettled";
@@ -222,7 +218,15 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
     settlementDate = "Pending";
   }
   
+  // Determine IDs from API response
+  const backendOrderId: string | undefined = (orderItem as any).order_id || (orderItem as any).orderId;
+  let orderItemId: string | undefined = (orderItem as any).order_item_id || (orderItem as any).orderItemId;
+  if (!orderItemId || String(orderItemId).trim() === '') {
+    orderItemId = undefined;
+  }
+
   return {
+    "Order ID": backendOrderId || orderItemId || `ORD_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
     "Order Item ID": orderItemId,
     "Order Value": orderValue,
     "Settlement Value": settlementValue,
@@ -1040,7 +1044,7 @@ const TransactionDetailsPopup: React.FC<{
             Transaction Details
           </Typography>
           <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.75rem' }}>
-            Order ID: {transaction["Order Item ID"]}
+            Order ID: {transaction["Order ID"] || transaction["Order Item ID"]}
           </Typography>
         </Box>
         <IconButton
@@ -1368,7 +1372,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Column metadata for rendering filter UIs
   const COLUMN_META: Record<string, { type: 'string' | 'number' | 'date' | 'enum' }> = {
-    'Order Item ID': { type: 'string' },
+    'Order ID': { type: 'string' },
     'Order Value': { type: 'number' },
     'Settlement Value': { type: 'number' },
     'Order Date': { type: 'date' },
@@ -1532,9 +1536,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         if (!filterValue) return;
 
         switch (columnKey) {
-          case 'Order Item ID':
+          case 'Order ID':
             if (typeof filterValue === 'string' && filterValue.trim()) {
-              params.order_item_id = filterValue.trim();
+              params.order_id = filterValue.trim();
             }
             break;
           
@@ -2278,7 +2282,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Get visible columns
   const getVisibleColumns = () => {
     const base = [
-      "Order Item ID",
+      "Order ID",
       "Order Value",
       "Settlement Value",
       "Order Date",
@@ -2393,7 +2397,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     <Button
                       variant="outlined"
                       startIcon={<FilterIcon />}
-                      onClick={(e) => openFilterPopover('Order Item ID', e.currentTarget as any)}
+                      onClick={(e) => openFilterPopover('Order ID', e.currentTarget as any)}
                       sx={{ textTransform: 'none', borderColor: '#1f2937', color: '#1f2937' }}
                     >
                       Filters
@@ -2606,7 +2610,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     ) : (
                       filteredData
                         .map((row, rowIndex) => {
-                        const isSelected = selectedTransaction?.["Order Item ID"] === row["Order Item ID"];
+                        const isSelected = (selectedTransaction?.["Order ID"] || selectedTransaction?.["Order Item ID"]) === (row["Order ID"] || row["Order Item ID"]);
                         return (
                           <React.Fragment key={rowIndex}>
                                                           <TableRow 
@@ -2636,7 +2640,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           
                           return (
                             <TableCell
-                              key={`${row["Order Item ID"]}-${column}-${colIndex}`}
+                              key={`${(row["Order ID"] || row["Order Item ID"])}-${column}-${colIndex}`}
                               sx={{
                                 background: '#ffffff',
                                 textAlign: 'center',
