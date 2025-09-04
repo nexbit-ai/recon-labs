@@ -440,17 +440,108 @@ const DisputePage: React.FC = () => {
 
   const current = getCurrentRows();
 
+  // Apply column filters to current data (must be defined before usage below)
+  const filteredCurrent = current.filter(row => {
+    // Apply column filters
+    for (const [column, filter] of Object.entries(columnFilters)) {
+      if (!filter) continue;
+      
+      let value: any;
+      
+      // Handle both API data and mock data
+      if ('Order ID' in row) {
+        // API data (TransactionRow)
+        switch (column) {
+          case 'Order ID':
+            value = (row as any)['Order ID'];
+            break;
+          default:
+            continue;
+        }
+      } else if ('reason' in row) {
+        // Grouped data (unreconciled tab) - skip filtering for now
+        continue;
+      } else {
+        // Mock data (old structure)
+        switch (column) {
+          case 'Order ID':
+            value = (row as any).orderId;
+            break;
+          case 'Order Value':
+            value = Math.abs((row as any).difference) + 1000;
+            break;
+          case 'Settlement Value':
+            value = Math.abs((row as any).difference) + 900;
+            break;
+          case 'Order Date':
+            value = (row as any).orderDate;
+            break;
+          case 'Settlement Date':
+            value = '-';
+            break;
+          case 'Difference':
+            value = Math.abs((row as any).difference);
+            break;
+          case 'Remark':
+            value = (row as any).remark;
+            break;
+          case 'Event Type':
+            value = (row as any).eventType;
+            break;
+          default:
+            continue;
+        }
+      }
+
+      if (typeof filter === 'string') {
+        // String filter
+        if (!value.toString().toLowerCase().includes(filter.toLowerCase())) {
+          return false;
+        }
+      } else if (typeof filter === 'object') {
+        if (filter.min !== undefined && filter.min !== '') {
+          if (typeof value === 'number' && value < parseFloat(filter.min)) {
+            return false;
+          }
+        }
+        if (filter.max !== undefined && filter.max !== '') {
+          if (typeof value === 'number' && value > parseFloat(filter.max)) {
+            return false;
+          }
+        }
+        if (filter.from !== undefined && filter.from !== '') {
+          if (new Date(value) < new Date(filter.from)) {
+            return false;
+          }
+        }
+        if (filter.to !== undefined && filter.to !== '') {
+          if (new Date(value) > new Date(filter.to)) {
+            return false;
+          }
+        }
+        if (Array.isArray(filter) && filter.length > 0) {
+          if (!filter.includes(value)) {
+            return false;
+          }
+        }
+      }
+    }
+    
+    return true;
+  });
+
   // Calculate total count for unreconciled orders (flat count)
   const getUnreconciledTotalCount = () => {
-    if (disputeSubTab === 0 && Array.isArray(apiRows)) return apiRows.length;
+    if (disputeSubTab === 0 && Array.isArray(apiRows)) return filteredCurrent.length;
     return 0;
   };
 
   const paginatedCurrent = (() => {
-    if (disputeSubTab !== 0) return current;
+    const base = filteredCurrent;
+    if (disputeSubTab !== 0) return base;
     const start = page * rowsPerPage;
     const end = start + rowsPerPage;
-    return current.slice(start, end);
+    return base.slice(start, end);
   })();
 
   // Selection helpers for visible rows in Unreconciled tab
@@ -636,8 +727,9 @@ const DisputePage: React.FC = () => {
   };
 
   const applyFilters = () => {
+    // Reset to first page when filters change for a better UX
+    setPage(0);
     closeFilterPopover();
-    // Filter logic will be applied in the current variable
   };
 
   const getUniqueValuesForColumn = (column: string) => {
@@ -696,95 +788,7 @@ const DisputePage: React.FC = () => {
     };
   }, [showCustomDatePicker]);
 
-  // Apply column filters to current data
-  const filteredCurrent = current.filter(row => {
-    // Apply column filters
-    for (const [column, filter] of Object.entries(columnFilters)) {
-      if (!filter) continue;
-      
-      let value: any;
-      
-      // Handle both API data and mock data
-      if ('Order ID' in row) {
-        // API data (TransactionRow)
-        switch (column) {
-          case 'Order ID':
-            value = row['Order ID'];
-            break;
-          default:
-            continue;
-        }
-      } else if ('reason' in row) {
-        // Grouped data (unreconciled tab) - skip filtering for now
-        continue;
-      } else {
-        // Mock data (old structure)
-        switch (column) {
-          case 'Order ID':
-            value = (row as any).orderId;
-            break;
-          case 'Order Value':
-            value = Math.abs((row as any).difference) + 1000;
-            break;
-          case 'Settlement Value':
-            value = Math.abs((row as any).difference) + 900;
-            break;
-          case 'Order Date':
-            value = (row as any).orderDate;
-            break;
-          case 'Settlement Date':
-            value = '-';
-            break;
-          case 'Difference':
-            value = Math.abs((row as any).difference);
-            break;
-          case 'Remark':
-            value = (row as any).remark;
-            break;
-          case 'Event Type':
-            value = (row as any).eventType;
-            break;
-          default:
-            continue;
-        }
-      }
-
-      if (typeof filter === 'string') {
-        // String filter
-        if (!value.toString().toLowerCase().includes(filter.toLowerCase())) {
-          return false;
-        }
-      } else if (typeof filter === 'object') {
-        if (filter.min !== undefined && filter.min !== '') {
-          if (typeof value === 'number' && value < parseFloat(filter.min)) {
-            return false;
-          }
-        }
-        if (filter.max !== undefined && filter.max !== '') {
-          if (typeof value === 'number' && value > parseFloat(filter.max)) {
-            return false;
-          }
-        }
-        if (filter.from !== undefined && filter.from !== '') {
-          if (new Date(value) < new Date(filter.from)) {
-            return false;
-          }
-        }
-        if (filter.to !== undefined && filter.to !== '') {
-          if (new Date(value) > new Date(filter.to)) {
-            return false;
-          }
-        }
-        if (Array.isArray(filter) && filter.length > 0) {
-          if (!filter.includes(value)) {
-            return false;
-          }
-        }
-      }
-    }
-    
-    return true;
-  });
+  // (moved filteredCurrent above for initialization order)
 
  
   
@@ -808,8 +812,25 @@ const DisputePage: React.FC = () => {
               <Tab label={`Unreconciled Orders (${getUnreconciledTotalCount()})`} />
               <Tab label="Dispute Raised" />
             </Tabs>
-            {/* Right controls: date range + platform + send button */}
+            {/* Right controls: applied filter chips + filter + platform + send button */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              {/* Applied filter summary (left of Filter button) */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', maxWidth: 420 }}>
+                {Object.entries(columnFilters).map(([col, val]) => {
+                  if (!val || (typeof val === 'string' && !val.trim()) || (Array.isArray(val) && val.length === 0)) return null;
+                  let label = '';
+                  if (typeof val === 'string') label = `${col}: ${val}`;
+                  else if (Array.isArray(val)) label = `${col}: ${val.join(', ')}`;
+                  else if (val && (val.min || val.max)) label = `${col}: ${val.min ?? ''} - ${val.max ?? ''}`;
+                  else if (val && (val.from || val.to)) label = `${col}: ${val.from ?? ''} → ${val.to ?? ''}`;
+                  else return null;
+                  return (
+                    <Box key={`${col}-${label}`} sx={{ px: 1, py: 0.25, border: '1px solid #e5e7eb', borderRadius: '20px', fontSize: '0.75rem', color: '#111827', background: '#fff' }}>
+                      {label}
+                    </Box>
+                  );
+                })}
+              </Box>
               
               {/* New Filter button matching reconciliation behavior */}
               <Button
@@ -1071,7 +1092,7 @@ const DisputePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Reason</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Remark', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Remark') ? '#1f2937' : '#6b7280', background: isFilterActive('Remark') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Reason">
+                          <IconButton size="small" onClick={(e) => openFilterPopover('Reason', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Reason') ? '#1f2937' : '#6b7280', background: isFilterActive('Reason') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Reason">
                             <FilterIcon fontSize="small" />
                           </IconButton>
                         </Box>

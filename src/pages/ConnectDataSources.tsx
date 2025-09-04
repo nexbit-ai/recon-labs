@@ -202,10 +202,10 @@ const ConnectDataSources: React.FC = () => {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Box maxWidth="1200px" mx="auto">
+      <Box sx={{ maxWidth: '100%', mx: 0 }}>
         {/* Page Title aligned left like other screens */}
         <Box mb={3}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: 'primary.main' }}>
             Connect Your Data Sources
           </Typography>
         </Box>

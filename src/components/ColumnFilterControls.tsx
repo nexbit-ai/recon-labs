@@ -93,7 +93,7 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
               onChange={handleDateRangeChange(activeColumn, 'from')}
               onClick={(e: any) => e.target?.showPicker && e.target.showPicker()}
               InputLabelProps={{ shrink: true }}
-              sx={{ width: '60%', padding: '2px', '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 38, padding: '2px' } }}
+              sx={{ width: '60%', padding: '2px', '& .MuiOutlinedInput-root fieldset': { borderColor: '#111' }, '& .MuiOutlinedInput-root:hover fieldset': { borderColor: '#111' }, '& .MuiOutlinedInput-root.Mui-focused fieldset': { borderColor: '#111' }, '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 38, padding: '2px' } }}
             />
             <TextField
               size="small"
@@ -102,7 +102,7 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
               onChange={handleDateRangeChange(activeColumn, 'to')}
               onClick={(e: any) => e.target?.showPicker && e.target.showPicker()}
               InputLabelProps={{ shrink: true }}
-              sx={{ width: '60%', '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 38, borderRadius: '40px', padding: '2px' } }}
+              sx={{ width: '60%', '& .MuiOutlinedInput-root fieldset': { borderColor: '#111' }, '& .MuiOutlinedInput-root:hover fieldset': { borderColor: '#111' }, '& .MuiOutlinedInput-root.Mui-focused fieldset': { borderColor: '#111' }, '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 38, borderRadius: '40px', padding: '2px' } }}
             />
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
@@ -122,7 +122,7 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
               onChange={handleEnumChange(activeColumn)}
               input={<OutlinedInput />}
               renderValue={(selected) => (selected as string[]).join(', ')}
-              MenuProps={{ PaperProps: { style: { maxHeight: 40   } } }}
+              MenuProps={{ PaperProps: { style: { maxHeight: 280 } } }}
               sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 38 } }}
             >
               {(getEnumOptions ? enumOptions : []).map((opt) => (
