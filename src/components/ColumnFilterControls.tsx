@@ -86,22 +86,24 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
         <>
           <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Between dates</Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <TextField size="small" type="date" value={(pendingFilters[activeColumn]?.from ?? '') as string} onChange={handleDateRangeChange(activeColumn, 'from')} InputLabelProps={{ shrink: true }} sx={{ width: '60%',padding: '2px', '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 38, padding: '2px',// hide calendar picker icon
-      '& input::-webkit-calendar-picker-indicator': {
-        display: 'none',
-        WebkitAppearance: 'none',
-      },
-      '& input::-webkit-clear-button': {
-        display: 'none',
-      }, } }}/>
-            <TextField size="small" type="date" value={(pendingFilters[activeColumn]?.to ?? '') as string} onChange={handleDateRangeChange(activeColumn, 'to')} InputLabelProps={{ shrink: true }} sx={{ width: '60%', '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 38, borderRadius: '40px', padding: '2px',// hide calendar picker icon
-      '& input::-webkit-calendar-picker-indicator': {
-        display: 'none',
-        WebkitAppearance: 'none',
-      },
-      '& input::-webkit-clear-button': {
-        display: 'none',
-      }, } }}/>
+            <TextField
+              size="small"
+              type="date"
+              value={(pendingFilters[activeColumn]?.from ?? '') as string}
+              onChange={handleDateRangeChange(activeColumn, 'from')}
+              onClick={(e: any) => e.target?.showPicker && e.target.showPicker()}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: '60%', padding: '2px', '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 38, padding: '2px' } }}
+            />
+            <TextField
+              size="small"
+              type="date"
+              value={(pendingFilters[activeColumn]?.to ?? '') as string}
+              onChange={handleDateRangeChange(activeColumn, 'to')}
+              onClick={(e: any) => e.target?.showPicker && e.target.showPicker()}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: '60%', '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 38, borderRadius: '40px', padding: '2px' } }}
+            />
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
             <Button size="small" onClick={() => onClear(activeColumn)}>Clear</Button>

@@ -219,6 +219,10 @@ const DisputePage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
 
+  // Platform selector state for dropdown (multi-select)
+  const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Array<'flipkart' | 'amazon'>>(['flipkart']);
+
   // Column filter state
   const [columnFilters, setColumnFilters] = useState<Record<string, any>>({});
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HTMLElement | null>(null);
@@ -234,6 +238,7 @@ const DisputePage: React.FC = () => {
     'Settlement Date': { type: 'date' },
     'Difference': { type: 'number' },
     'Remark': { type: 'enum' },
+    'Reason': { type: 'enum' },
     'Event Type': { type: 'enum' },
     'Status': { type: 'enum' }
   };
@@ -447,6 +452,20 @@ const DisputePage: React.FC = () => {
     const end = start + rowsPerPage;
     return current.slice(start, end);
   })();
+
+  // Selection helpers for visible rows in Unreconciled tab
+  const visibleIds: string[] = disputeSubTab === 0
+    ? (paginatedCurrent as any[]).map((r) => r.order_id)
+    : [];
+  const allSelectedInView = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
+  const someSelectedInView = visibleIds.some(id => selectedIds.includes(id)) && !allSelectedInView;
+  const toggleSelectAllInView = () => {
+    if (allSelectedInView) {
+      setSelectedIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
   
   // Debug logging for data flow
   useEffect(() => {
@@ -623,8 +642,21 @@ const DisputePage: React.FC = () => {
 
   const getUniqueValuesForColumn = (column: string) => {
     const values = new Set<string>();
+    // Include values from API rows when in Unreconciled tab
+    if (disputeSubTab === 0 && Array.isArray(apiRows)) {
+      (apiRows as any[]).forEach(row => {
+        if (column === 'Reason') {
+          const v = row.reason || row.Remark;
+          if (v) values.add(formatReasonLabel(String(v)));
+        } else if (column === 'Status') {
+          const v = row.status;
+          if (v) values.add(String(v));
+        }
+      });
+    }
+    // Also include mock rows to support the other tab
     mockRows.forEach(row => {
-      let value: string;
+      let value: string | undefined;
       switch (column) {
         case 'Remark':
           value = row.remark;
@@ -635,8 +667,11 @@ const DisputePage: React.FC = () => {
         case 'Status':
           value = row.status;
           break;
+        case 'Reason':
+          value = undefined; // mock rows do not have reason
+          break;
         default:
-          return;
+          value = undefined;
       }
       if (value) values.add(value);
     });
@@ -802,13 +837,143 @@ const DisputePage: React.FC = () => {
                 variant="outlined"
                 endIcon={<KeyboardArrowDownIcon />}
                 startIcon={<StorefrontIcon />}
+                onClick={(e) => setPlatformMenuAnchorEl(e.currentTarget)}
                 sx={{
                   borderColor: '#6B7280', color: '#6B7280', textTransform: 'none',
                   minWidth: 'auto', minHeight: 36, px: 1.5, fontSize: '0.7875rem', '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107,114,128,0.04)' }
                 }}
               >
-                Flipkart
+                {selectedPlatforms.length === 2 ? 'All' : (selectedPlatforms[0] === 'amazon' ? 'Amazon' : 'Flipkart')}
               </Button>
+              <Menu
+                anchorEl={platformMenuAnchorEl}
+                open={Boolean(platformMenuAnchorEl)}
+                onClose={() => setPlatformMenuAnchorEl(null)}
+                PaperProps={{
+                  sx: {
+                    mt: 1,
+                    minWidth: 220,
+                    borderRadius: '10px',
+                    border: '1px solid #e5e7eb',
+                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)',
+                    p: 0.75,
+                    backgroundColor: '#ffffff'
+                  }
+                }}
+              >
+                <MenuItem
+                  selected={selectedPlatforms.length === 2}
+                  onClick={() => {
+                    const newSel: Array<'flipkart'|'amazon'> = ['flipkart','amazon'];
+                    setSelectedPlatforms(newSel);
+                    setPlatformMenuAnchorEl(null);
+                    // With All selected, prefer backend flow
+                    fetchUnreconciledOrders();
+                  }}
+                  sx={{
+                    mb: 0.5,
+                    borderRadius: '8px',
+                    '&.Mui-selected': { outline: '2px solid #111', outlineOffset: '-2px', backgroundColor: '#fff' },
+                    '&:hover': { backgroundColor: '#f3f4f6' },
+                    px: 1.25,
+                    py: 1
+                  }}
+                >
+                  All
+                </MenuItem>
+                <MenuItem
+                  selected={selectedPlatforms.includes('flipkart')}
+                  onClick={() => {
+                    const has = selectedPlatforms.includes('flipkart');
+                    const next = has ? selectedPlatforms.filter(p => p !== 'flipkart') : [...selectedPlatforms, 'flipkart'];
+                    setSelectedPlatforms(next);
+                    // Close menu after toggle
+                    setPlatformMenuAnchorEl(null);
+                    // If flipkart is present (either alone or with amazon), use backend
+                    if (next.includes('flipkart')) {
+                      fetchUnreconciledOrders();
+                    } else {
+                      // Only Amazon left
+                      const demoRows = Array.from({ length: 25 }).map((_, i) => {
+                        const id = `AMZ${100000 + i}`;
+                        const orderValue = (1500 + (i % 7) * 125).toFixed(2);
+                        const diffVal = ((i % 2 === 0 ? 1 : -1) * (50 + (i % 5) * 20)).toFixed(2);
+                        const orderDate = new Date(Date.now() - (i + 1) * 86400000).toISOString().slice(0, 10);
+                        const settlementDate = new Date(Date.now() - (i - 1) * 86400000).toISOString().slice(0, 10);
+                        const reasons = ['commission_mismatch', 'weight_discrepancy_fee', 'return_window_elapsed', 'shipping_overcharge', 'promo_fee_variance'];
+                        const reason = reasons[i % reasons.length];
+                        const status = 'short_received';
+                        return {
+                          order_id: id,
+                          order_date: orderDate,
+                          settlement_date: settlementDate,
+                          diff: diffVal,
+                          context: { buyer_invoice_amount: orderValue },
+                          reason,
+                          status,
+                        } as any;
+                      });
+                      setApiRows(demoRows);
+                      setPage(0);
+                    }
+                  }}
+                  sx={{
+                    mb: 0.5,
+                    borderRadius: '8px',
+                    '&.Mui-selected': { outline: '2px solid #111', outlineOffset: '-2px', backgroundColor: '#fff' },
+                    '&:hover': { backgroundColor: '#f3f4f6' },
+                    px: 1.25,
+                    py: 1
+                  }}
+                >
+                  Flipkart
+                </MenuItem>
+                <MenuItem
+                  selected={selectedPlatforms.includes('amazon')}
+                  onClick={() => {
+                    const has = selectedPlatforms.includes('amazon');
+                    const next = has ? selectedPlatforms.filter(p => p !== 'amazon') : [...selectedPlatforms, 'amazon'];
+                    setSelectedPlatforms(next);
+                    setPlatformMenuAnchorEl(null);
+                    // If amazon is selected alone, show demo; if combined with flipkart, backend
+                    if (next.length === 1 && next.includes('amazon')) {
+                      const demoRows = Array.from({ length: 25 }).map((_, i) => {
+                        const id = `AMZ${100000 + i}`;
+                        const orderValue = (1500 + (i % 7) * 125).toFixed(2);
+                        const diffVal = ((i % 2 === 0 ? 1 : -1) * (50 + (i % 5) * 20)).toFixed(2);
+                        const orderDate = new Date(Date.now() - (i + 1) * 86400000).toISOString().slice(0, 10);
+                        const settlementDate = new Date(Date.now() - (i - 1) * 86400000).toISOString().slice(0, 10);
+                        const reasons = ['commission_mismatch', 'weight_discrepancy_fee', 'return_window_elapsed', 'shipping_overcharge', 'promo_fee_variance'];
+                        const reason = reasons[i % reasons.length];
+                        const status = 'short_received';
+                        return {
+                          order_id: id,
+                          order_date: orderDate,
+                          settlement_date: settlementDate,
+                          diff: diffVal,
+                          context: { buyer_invoice_amount: orderValue },
+                          reason,
+                          status,
+                        } as any;
+                      });
+                      setApiRows(demoRows);
+                      setPage(0);
+                    } else {
+                      fetchUnreconciledOrders();
+                    }
+                  }}
+                  sx={{
+                    mb: 0.25,
+                    borderRadius: '8px',
+                    '&.Mui-selected': { outline: '2px solid #111', outlineOffset: '-2px', backgroundColor: '#fff' },
+                    '&:hover': { backgroundColor: '#f3f4f6' },
+                    px: 1.25,
+                    py: 1
+                  }}
+                >
+                  Amazon
+                </MenuItem>
+              </Menu>
               <Button variant="contained" onClick={sendToFlipkart} disabled={selectedIds.length === 0} sx={{ backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' }, textTransform: 'none', fontWeight: 600 }}>
                 Send to Flipkart ({selectedIds.length})
               </Button>
@@ -852,7 +1017,16 @@ const DisputePage: React.FC = () => {
                     // Unreconciled Orders tab - show all detail columns directly
                     <>
                       <TableCell padding="checkbox" sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 60, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Checkbox checked={false} disabled sx={{ color: '#6b7280' }} />
+                        <Checkbox
+                          checked={allSelectedInView}
+                          indeterminate={someSelectedInView}
+                          onChange={toggleSelectAllInView}
+                          sx={{
+                            color: '#6b7280',
+                            '&.Mui-checked': { color: '#1f2937' },
+                            '&.MuiCheckbox-indeterminate': { color: '#1f2937' },
+                          }}
+                        />
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
@@ -1257,7 +1431,16 @@ const DisputePage: React.FC = () => {
                     // Flat detailed row for unreconciled orders
                      return (
                       <TableRow key={`flat-${index}`} sx={{ '&:hover': { background: '#f3f4f6' }, transition: 'all 0.3s ease' }}>
-                        <TableCell padding="checkbox"><Checkbox checked={false} disabled sx={{ color: '#6b7280' }} /></TableCell>
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={selectedIds.includes(row.order_id)}
+                            onChange={() => toggleRow(row.order_id)}
+                            sx={{
+                              color: '#6b7280',
+                              '&.Mui-checked': { color: '#1f2937' },
+                            }}
+                          />
+                        </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>{row.order_id}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{parseFloat(row.context?.buyer_invoice_amount || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.order_date}</TableCell>

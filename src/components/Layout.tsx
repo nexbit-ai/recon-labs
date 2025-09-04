@@ -256,7 +256,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   color: 'text.primary',
                   fontSize: '14px'
                 }}>
-                  Hi, Krishna
+                  Hi, User
                   <KeyboardArrowUpIcon sx={{ fontSize: '16px', color: 'text.primary', fontWeight: 'bold' }} />
                 </Typography>
               } 

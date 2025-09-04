@@ -168,10 +168,10 @@ const MarketplaceReconciliation: React.FC = () => {
   const [monthMenuAnchorEl, setMonthMenuAnchorEl] = useState<null | HTMLElement>(null);
   
   // Date range filter state
-  const [selectedDateRange, setSelectedDateRange] = useState('this-month');
+  const [selectedDateRange, setSelectedDateRange] = useState('custom');
   const [dateRangeMenuAnchor, setDateRangeMenuAnchor] = useState<null | HTMLElement>(null);
-  const [customStartDate, setCustomStartDate] = useState<string>('');
-  const [customEndDate, setCustomEndDate] = useState<string>('');
+  const [customStartDate, setCustomStartDate] = useState<string>('2025-03-01');
+  const [customEndDate, setCustomEndDate] = useState<string>('2025-03-30');
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   // Date field filter for transactions-related queries
   const [dateField, setDateField] = useState<'order' | 'payment' | 'invoice'>('invoice');
@@ -685,6 +685,60 @@ const MarketplaceReconciliation: React.FC = () => {
     return parseFloat(percentage) || 0;
   };
 
+  // Apply demo data for Amazon selection
+  const applyAmazonDemoData = () => {
+    try {
+      const demo: MarketplaceReconciliationResponse = JSON.parse(JSON.stringify(reconciliationData));
+
+      // High-level sales numbers
+      (demo as any).grossSales = '28500000';
+      (demo as any).totalTDA = '450000';
+      (demo as any).totalTDS = '320000';
+
+      // Summary data
+      demo.summaryData.totalTransaction = { number: 18425, amount: '31250000' } as any;
+      demo.summaryData.netSalesAsPerSalesReport = { number: 16230, amount: '28500000' } as any;
+      demo.summaryData.paymentReceivedAsPerSettlementReport = { number: 15080, amount: '26200000' } as any;
+      demo.summaryData.pendingPaymentFromMarketplace = { number: 1150, amount: '2300000' } as any;
+      demo.summaryData.totalReconciled = { number: 15080, amount: '26200000' } as any;
+      demo.summaryData.totalUnreconciled = {
+        number: 3345,
+        amount: '2300000',
+        lessPaymentReceivedFromFlipkart: { number: 2100, amount: '1450000' },
+        excessPaymentReceivedFromFlipkart: { number: 1245, amount: '850000' },
+      } as any;
+      demo.summaryData.returnedOrCancelledOrders = { number: 720, amount: '980000' } as any;
+
+      // Orders delivered/returned (if present on the shape)
+      (demo as any).ordersDelivered = { number: 15180, amount: '26800000' };
+      (demo as any).ordersReturned = { number: 520, amount: '700000' };
+
+      setReconciliationData(demo);
+
+      // Demo unreconciled reasons (AI insight)
+      setUnreconciledReasons([
+        { reason: 'Commission mismatch', count: 132 },
+        { reason: 'Weight discrepancy fee', count: 97 },
+        { reason: 'Return not received in time', count: 74 },
+        { reason: 'Shipping overcharge', count: 58 },
+        { reason: 'Promotional fee variance', count: 41 },
+      ]);
+
+      // Demo sales overview
+      setSalesOverview({
+        netRevenue: { value: '26200000', label: 'Net Revenue' },
+        grossRevenue: { value: '28500000', label: 'Gross Revenue' },
+        returns: { value: '980000', label: 'Returns' },
+        monthData: [
+          { month: 'February 2025', gross: '25500000', net: '23200000', returns: '600000' },
+          { month: 'March 2025', gross: '28500000', net: '26200000', returns: '980000' },
+        ],
+      });
+    } catch (e) {
+      // no-op
+    }
+  };
+
   // Fetch sales overview data from backend
   const fetchSalesOverview = async () => {
     try {
@@ -853,9 +907,9 @@ const MarketplaceReconciliation: React.FC = () => {
     fetchReconciliationData(newMonth);
   };
 
-  // Load initial data
+  // Load initial data with explicit default date range
   useEffect(() => {
-    fetchReconciliationData(selectedMonth);
+    fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
   }, []);
 
   // Load sales overview data
@@ -1214,6 +1268,16 @@ const MarketplaceReconciliation: React.FC = () => {
                       key={platform.value}
                       onClick={() => {
                         setSelectedPlatforms([platform.value]);
+                        if (platform.value === 'amazon') {
+                          applyAmazonDemoData();
+                        } else {
+                          // revert to current date-range data on non-Amazon selection
+                          if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
+                            fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
+                          } else {
+                            fetchReconciliationDataByDateRange(selectedDateRange);
+                          }
+                        }
                         setPlatformMenuAnchorEl(null);
                       }}
                       sx={{

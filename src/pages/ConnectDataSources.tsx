@@ -71,7 +71,8 @@ const dataSources: DataSource[] = [
   { id: 'flipkart', name: 'Flipkart', logo: 'https://cdn.worldvectorlogo.com/logos/flipkart.svg', isConnected: true },
   { id: 'myntra', name: 'Myntra', logo: 'https://cdn.worldvectorlogo.com/logos/myntra-1.svg' },
   { id: 'nykaa', name: 'Nykaa', logo: 'https://cdn.worldvectorlogo.com/logos/nykaa-1.svg' },
-  { id: 'zoho', name: 'Zoho', logo: 'https://cdn.worldvectorlogo.com/logos/zoho-1.svg', isConnected: true },
+  { id: 'zoho', name: 'Zoho', logo: 'https://cdn.worldvectorlogo.com/logos/zoho-1.svg'},
+  { id: 'payu', name: 'PayU', logo: 'https://cdn.worldvectorlogo.com/logos/payu-1.svg' },
   { id: 'razorpay', name: 'Razorpay', logo: 'https://cdn.worldvectorlogo.com/logos/razorpay.svg' },
   { id: 'tally', name: 'Tally', logo: 'https://cdn.worldvectorlogo.com/logos/tally-solutions.svg' },
   { id: 'xero', name: 'Xero', logo: 'https://cdn.worldvectorlogo.com/logos/xero-1.svg' },
@@ -200,16 +201,11 @@ const ConnectDataSources: React.FC = () => {
   const isSubmitDisabled = selected.length === 0 || !settlementReport || !salesReport;
 
   return (
-    <Box sx={{ 
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      py: 6,
-      px: { xs: 2, md: 4 }
-    }}>
+    <Box sx={{ p: { xs: 2, md: 3 } }}>
       <Box maxWidth="1200px" mx="auto">
         {/* Page Title aligned left like other screens */}
         <Box mb={3}>
-          <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
             Connect Your Data Sources
           </Typography>
         </Box>
@@ -218,13 +214,15 @@ const ConnectDataSources: React.FC = () => {
         <Paper 
           elevation={0} 
           sx={{ 
-            p: 4, 
-            mb: 4, 
-            border: '1px solid rgba(255, 255, 255, 0.2)'
+            p: 3, 
+            mb: 3, 
+            background: '#ffffff',
+            borderRadius: '12px',
+            border: '1px solid #e5e7eb'
           }}
         >
           <Box display="flex" alignItems="center" mb={3}>
-            <Typography variant="h5" fontWeight={600} color="#1e293b">
+            <Typography variant="h6" fontWeight={700} color="#1e293b">
               Connected Sources
             </Typography>
           </Box>
@@ -247,7 +245,7 @@ const ConnectDataSources: React.FC = () => {
                       flexDirection: 'column',
                       justifyContent: 'center',
                       alignItems: 'center',
-                      p: 4,
+                      p: 3,
                       cursor: 'pointer'
                     }}
                     onClick={() => setReportsOpen(true)}
@@ -259,18 +257,18 @@ const ConnectDataSources: React.FC = () => {
                         width: 56, 
                         height: 56, 
                         objectFit: 'contain', 
-                        marginBottom: 16,
+                        marginBottom: 12,
                         filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
                       }} 
                     />
-                    <Typography variant="h6" fontWeight={600} textAlign="center" color="#1e293b">
+                    <Typography variant="subtitle1" fontWeight={700} textAlign="center" color="#1e293b">
                       {ds.name}
                     </Typography>
                     <Chip 
                       label="Connected" 
                       size="small" 
                       sx={{ 
-                        mt: 1,
+                        mt: 0.5,
                         background: '#10b981',
                         color: 'white',
                         fontWeight: 500
@@ -287,28 +285,28 @@ const ConnectDataSources: React.FC = () => {
         <Paper 
           elevation={0} 
           sx={{ 
-            p: 4, 
-            mb: 4, 
-            borderRadius: 1,
-            background: 'rgba(255, 255, 255, 0.8)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.2)'
+            p: 3, 
+            mb: 3, 
+            background: '#ffffff',
+            borderRadius: '12px',
+            border: '1px solid #e5e7eb'
           }}
         >
           <Box display="flex" alignItems="center" mb={3}>
-            <Typography variant="h5" fontWeight={600} color="#1e293b">
+            <Typography variant="h6" fontWeight={700} color="#1e293b">
               Available Sources
             </Typography>
           </Box>
-          <Grid container spacing={1} sx={{padding: '10px 14px'}}>
+          <Grid container spacing={2}>
             {dataSources.filter(ds => !ds.isConnected).map((ds) => {
               const isSelected = selected.includes(ds.id);
               return (
-                <Grid item xs={12} sm={5} md={2} key={ds.id}>
+                <Grid item xs={6} sm={4} md={2} key={ds.id}>
                   <Card
                     sx={{
-                      height: '60%',
-                      width: '60%',
+                      height: '100%',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 1.5,
                     }}
                   >
                     <CardActionArea
@@ -318,7 +316,7 @@ const ConnectDataSources: React.FC = () => {
                         flexDirection: 'column',
                         justifyContent: 'center',
                         alignItems: 'center',
-                        p: 6,
+                        p: 3,
                       }}
                       disableRipple
                       onClick={() => toggleSelect(ds.id)}
@@ -333,13 +331,16 @@ const ConnectDataSources: React.FC = () => {
                           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
                         }} 
                       />
+                      <Typography variant="subtitle2" fontWeight={700} textAlign="center" color="#1e293b" style={{ marginTop: 8 }}>
+                        {ds.name}
+                      </Typography>
 
                       {isSelected && (
                         <Chip 
                           label="Selected" 
                           size="small" 
                           sx={{ 
-                            mt: 1,
+                            mt: 0.5,
                             background: '#3b82f6',
                             color: 'white',
                             fontWeight: 500
@@ -359,16 +360,15 @@ const ConnectDataSources: React.FC = () => {
           <Paper 
             elevation={0} 
             sx={{ 
-              p: 4, 
-              borderRadius: 3,
-              background: 'rgba(255, 255, 255, 0.8)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)'
+              p: 3, 
+              borderRadius: '12px',
+              background: '#ffffff',
+              border: '1px solid #e5e7eb'
             }}
           >
             <Box display="flex" alignItems="center" mb={4}>
               <CloudUploadIcon sx={{ color: '#64748b', mr: 2, fontSize: 28 }} />
-              <Typography variant="h5" fontWeight={600} color="#1e293b">
+              <Typography variant="h6" fontWeight={700} color="#1e293b">
                 Upload Required Reports
               </Typography>
             </Box>
@@ -377,7 +377,7 @@ const ConnectDataSources: React.FC = () => {
               {/* Settlement Report Upload */}
               <Grid item xs={12} md={6}>
                 <Box>
-                  <Typography variant="h6" mb={2} color="#1e293b" fontWeight={600}>
+                  <Typography variant="subtitle1" mb={2} color="#1e293b" fontWeight={700}>
                     Settlement Report
                   </Typography>
                   <Typography variant="body2" mb={3} color="text.secondary">
@@ -421,7 +421,7 @@ const ConnectDataSources: React.FC = () => {
               {/* Sales Report Upload */}
               <Grid item xs={12} md={6}>
                 <Box>
-                  <Typography variant="h6" mb={2} color="#1e293b" fontWeight={600}>
+                  <Typography variant="subtitle1" mb={2} color="#1e293b" fontWeight={700}>
                     Sales Report
                   </Typography>
                   <Typography variant="body2" mb={3} color="text.secondary">
@@ -480,23 +480,23 @@ const ConnectDataSources: React.FC = () => {
               </Alert>
             )}
 
-            <Box mt={4} textAlign="center">
+            <Box mt={3} textAlign="center">
               <Button
                 variant="contained"
                 onClick={handleSubmit}
                 disabled={isSubmitDisabled}
                 size="large"
                 sx={{ 
-                  px: 4, 
-                  py: 1.25,
-                  background: 'linear-gradient(135deg, #1e293b 0%, #475569 100%)',
+                  px: 3.5, 
+                  py: 1.1,
+                  background: '#1f2937',
                   borderRadius: 1.5,
-                  fontWeight: 600,
-                  fontSize: '1rem',
+                  fontWeight: 700,
+                  fontSize: '0.95rem',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)',
+                    background: '#374151',
                     transform: 'translateY(-1px)',
-                    boxShadow: '0 8px 25px rgba(30, 41, 59, 0.3)'
+                    boxShadow: '0 8px 25px rgba(30, 41, 59, 0.15)'
                   },
                   '&:disabled': {
                     background: '#e2e8f0',
