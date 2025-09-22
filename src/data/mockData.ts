@@ -71,7 +71,7 @@ export interface FinanceMockData {
   returns_table: SalesRow[];
 }
 
-export type Platform = 'shopify' | 'amazon' | 'flipkart' | 'myntra';
+export type Platform = 'shopify' | 'amazon' | 'flipkart' | 'myntra' | 'd2c';
 
 export interface PlatformData {
   [key: string]: FinanceMockData;
@@ -83,6 +83,7 @@ const PLATFORM_WEIGHTS: Record<Platform, number> = {
   amazon: 0.28,     // 28% - second highest  
   flipkart: 0.22,   // 22% - third
   myntra: 0.15,     // 15% - lowest
+  d2c: 0.25,        // 25% - D2C platform
 };
 
 // Helper function to get number of days from date range string

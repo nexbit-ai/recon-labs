@@ -159,6 +159,10 @@ const MarketplaceReconciliation: React.FC = () => {
   const [disputeRows, setDisputeRows] = useState<Array<{ id: string; orderItemId: string; orderDate: string; difference: number; remark: string; eventType: string; status: 'open' | 'raised'; }>>([]);
   const [selectedDisputeIds, setSelectedDisputeIds] = useState<string[]>([]);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  
+  // Unreconciled tab state
+  const [unreconciledTab, setUnreconciledTab] = useState<number>(0); // 0: by reasons, 1: by providers
+  const handleUnreconciledTabChange = (_: any, value: number) => setUnreconciledTab(value);
 
   // Sync data sources state
   const [showSyncModal, setShowSyncModal] = useState(false);
@@ -175,7 +179,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [customEndDate, setCustomEndDate] = useState<string>('2025-03-31');
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   // Date field filter for transactions-related queries
-  const [dateField, setDateField] = useState<'order' | 'payment' | 'invoice'>('invoice');
+  const [dateField, setDateField] = useState<'settlement' | 'invoice'>('invoice');
   const [unreconciledReasons, setUnreconciledReasons] = useState<Array<{ reason: string; count: number }>>([]);
 
   // Calendar popup state
@@ -353,10 +357,16 @@ const MarketplaceReconciliation: React.FC = () => {
     }
   }, [showCustomDatePicker, customStartDate, currentCalendarDate]);
 
-  // Fetch unreconciled reasons when dateField changes
+  // Fetch unreconciled reasons and stats when dateField changes
   useEffect(() => {
     if (selectedDateRange && (customStartDate || selectedDateRange !== 'custom')) {
       fetchUnreconciledReasonsByDateRange(selectedDateRange);
+      // Also fetch stats with the new date field
+      if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
+        fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
+      } else {
+        fetchReconciliationDataByDateRange(selectedDateRange);
+      }
     }
   }, [dateField]);
 
@@ -583,10 +593,13 @@ const MarketplaceReconciliation: React.FC = () => {
       
       // Call the backend API with date range
       console.log('API call with dates:', { start_date: startDate, end_date: endDate });
-      const response = await apiService.get('/recon/fetchStats', {
+      const params: any = {
         start_date: startDate,
-        end_date: endDate
-      });
+        end_date: endDate,
+        date_field: dateField === 'invoice' ? 'buyer_invoice_date' : 'settlement_date'
+      };
+      
+      const response = await apiService.get('/recon/fetchStats', params);
       
       if (response.success && response.data) {
         setReconciliationData(response.data);
@@ -615,10 +628,13 @@ const MarketplaceReconciliation: React.FC = () => {
     
     try {
       console.log('API call with specific dates:', { start_date: startDate, end_date: endDate });
-      const response = await apiService.get('/recon/fetchStats', {
+      const params: any = {
         start_date: startDate,
-        end_date: endDate
-      });
+        end_date: endDate,
+        date_field: dateField === 'invoice' ? 'buyer_invoice_date' : 'settlement_date'
+      };
+      
+      const response = await apiService.get('/recon/fetchStats', params);
       
       if (response.success && response.data) {
         setReconciliationData(response.data);
@@ -684,10 +700,7 @@ const MarketplaceReconciliation: React.FC = () => {
       if (dateField === 'invoice') {
         params.buyer_invoice_date_from = startDate;
         params.buyer_invoice_date_to = endDate;
-      } else if (dateField === 'order') {
-        params.order_date_from = startDate;
-        params.order_date_to = endDate;
-      } else if (dateField === 'payment') {
+      } else if (dateField === 'settlement') {
         params.payment_date_from = startDate;
         params.payment_date_to = endDate;
       }
@@ -714,8 +727,91 @@ const MarketplaceReconciliation: React.FC = () => {
   // Available platforms
   const availablePlatforms = [
     { value: 'flipkart' as Platform, label: 'Flipkart' },
-    { value: 'amazon' as Platform, label: 'Amazon' }
+    { value: 'amazon' as Platform, label: 'Amazon' },
+    { value: 'd2c' as Platform, label: 'D2C' }
   ];
+
+  // Generate D2C dummy data
+  const buildD2CDemoData = (): MarketplaceReconciliationResponse => {
+    return {
+      grossSales: "850000",
+      ordersDelivered: {
+        amount: "850000",
+        number: 1250
+      },
+      ordersReturned: {
+        amount: "15000",
+        number: 25
+      },
+      commission: {
+        totalCommission: "0",
+        commissionRate: "0.00"
+      },
+      settledSales: "850000",
+      summaryData: {
+        totalTransaction: {
+          amount: "850000",
+          number: 1250
+        },
+        netSalesAsPerSalesReport: {
+          amount: "835000",
+          number: 1225
+        },
+        paymentReceivedAsPerSettlementReport: {
+          amount: "820000",
+          number: 1200
+        },
+        totalUnreconciled: {
+          amount: "15000",
+          number: 25,
+          lessPaymentReceivedFromFlipkart: {
+            amount: "5000",
+            number: 10
+          },
+          excessPaymentReceivedFromFlipkart: {
+            amount: "10000",
+            number: 15
+          }
+        },
+        totalReconciled: {
+          amount: "820000",
+          number: 1200
+        },
+        pendingPaymentFromMarketplace: {
+          amount: "0",
+          number: 0
+        },
+        pendingDeductions: {
+          amount: "0",
+          number: 0
+        },
+        returnedOrCancelledOrders: {
+          amount: "15000",
+          number: 25
+        }
+      },
+      totalTDS: "0",
+      totalTDA: "0",
+      monthOrdersPayoutReceived: "820000",
+      monthOrdersAwaitedSettlement: {
+        salesAmount: "0",
+        salesOrders: 0
+      },
+      unsettledReturns: {
+        returnAmount: "5000",
+        returnsOrders: 5
+      },
+      difference: "15000",
+      returnRate: "1.8",
+      commissionRate: "0.00"
+    };
+  };
+
+  // Apply D2C demo data
+  const applyD2CDemoData = () => {
+    const d2cData = buildD2CDemoData();
+    setReconciliationData(d2cData);
+  };
 
   // Generate available months (last 12 months)
   const generateAvailableMonths = () => {
@@ -779,6 +875,186 @@ const MarketplaceReconciliation: React.FC = () => {
     return parseFloat(percentage) || 0;
   };
 
+  // Fetch Flipkart data (from API) for the currently selected date range
+  const fetchFlipkartDataForCurrentRange = async (): Promise<MarketplaceReconciliationResponse> => {
+    let startDate = customStartDate;
+    let endDate = customEndDate;
+    const today = new Date();
+    const format = (d: Date) => d.toISOString().split('T')[0];
+    if (selectedDateRange !== 'custom') {
+      if (selectedDateRange === 'today') {
+        startDate = format(today);
+        endDate = format(today);
+      } else if (selectedDateRange === 'this-week') {
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        startDate = format(startOfWeek);
+        endDate = format(endOfWeek);
+      } else if (selectedDateRange === 'this-month') {
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+        endDate = format(endOfMonth);
+      } else if (selectedDateRange === 'this-year') {
+        startDate = `${today.getFullYear()}-01-01`;
+        endDate = `${today.getFullYear()}-12-31`;
+      }
+    }
+
+    try {
+      const params: any = {
+        start_date: startDate,
+        end_date: endDate,
+        date_field: dateField === 'invoice' ? 'buyer_invoice_date' : 'settlement_date'
+      };
+      
+      const response = await apiService.get<MarketplaceReconciliationResponse>(
+        '/recon/fetchStats',
+        params
+      );
+      if (response.success && response.data) {
+        return getSafeReconciliationData(response.data);
+      }
+    } catch (e) {
+      // no-op, will fallback to mock
+    }
+    return mockReconciliationData;
+  };
+
+  // Build Amazon demo data (for Amazon-only and All aggregation)
+  const buildAmazonDemoData = (): MarketplaceReconciliationResponse => {
+    return {
+      grossSales: '28500000',
+      ordersDelivered: { number: 15180, amount: '26800000' } as any,
+      ordersReturned: { number: 520, amount: '700000' } as any,
+      commission: { totalCommission: '0', commissionRate: '0' } as any,
+      settledSales: '0',
+      summaryData: {
+        totalTransaction: { number: 18425, amount: '31250000' } as any,
+        netSalesAsPerSalesReport: { number: 16230, amount: '28500000' } as any,
+        paymentReceivedAsPerSettlementReport: { number: 15080, amount: '26200000' } as any,
+        pendingPaymentFromMarketplace: { number: 1150, amount: '600000' } as any,
+        totalReconciled: { number: 15080, amount: '26200000' } as any,
+        totalUnreconciled: {
+          number: 3345,
+          amount: '600000',
+          lessPaymentReceivedFromFlipkart: { number: 2100, amount: '1450000' } as any,
+          excessPaymentReceivedFromFlipkart: { number: 1245, amount: '850000' } as any,
+        } as any,
+        pendingDeductions: { number: 0, amount: '0' } as any,
+        returnedOrCancelledOrders: { number: 720, amount: '980000' } as any,
+      } as any,
+      totalTDS: '320000',
+      totalTDA: '450000',
+      monthOrdersPayoutReceived: '26200000',
+      monthOrdersAwaitedSettlement: { salesOrders: 0, salesAmount: '0' } as any,
+      unsettledReturns: { returnsOrders: 0, returnAmount: '0' } as any,
+      difference: '0',
+      returnRate: '0',
+      commissionRate: '0',
+    } as any;
+  };
+
+  // Helper to convert numeric to API string amount
+  const toAmountString = (value: number): string => {
+    return String(Math.round(value || 0));
+  };
+
+  // Merge two reconciliation datasets by summing relevant numeric fields
+  const mergeReconciliationData = (
+    a: MarketplaceReconciliationResponse,
+    b: MarketplaceReconciliationResponse
+  ): MarketplaceReconciliationResponse => {
+    const sumAmount = (x?: string, y?: string) => toAmountString(parseAmount(x || '0') + parseAmount(y || '0'));
+    const sumNum = (x?: number, y?: number) => (x || 0) + (y || 0);
+
+    return {
+      grossSales: sumAmount(a.grossSales, b.grossSales),
+      ordersDelivered: {
+        number: sumNum(a.ordersDelivered?.number, b.ordersDelivered?.number),
+        amount: sumAmount(a.ordersDelivered?.amount, b.ordersDelivered?.amount),
+      } as any,
+      ordersReturned: {
+        number: sumNum(a.ordersReturned?.number, b.ordersReturned?.number),
+        amount: sumAmount(a.ordersReturned?.amount, b.ordersReturned?.amount),
+      } as any,
+      commission: {
+        totalCommission: sumAmount(a.commission?.totalCommission as any, b.commission?.totalCommission as any),
+        commissionRate: a.commission?.commissionRate || '0',
+      } as any,
+      settledSales: sumAmount(a.settledSales as any, b.settledSales as any),
+      summaryData: {
+        totalTransaction: {
+          number: sumNum(a.summaryData?.totalTransaction?.number, b.summaryData?.totalTransaction?.number),
+          amount: sumAmount(a.summaryData?.totalTransaction?.amount, b.summaryData?.totalTransaction?.amount),
+        } as any,
+        netSalesAsPerSalesReport: {
+          number: sumNum(a.summaryData?.netSalesAsPerSalesReport?.number, b.summaryData?.netSalesAsPerSalesReport?.number),
+          amount: sumAmount(a.summaryData?.netSalesAsPerSalesReport?.amount, b.summaryData?.netSalesAsPerSalesReport?.amount),
+        } as any,
+        paymentReceivedAsPerSettlementReport: {
+          number: sumNum(a.summaryData?.paymentReceivedAsPerSettlementReport?.number, b.summaryData?.paymentReceivedAsPerSettlementReport?.number),
+          amount: sumAmount(a.summaryData?.paymentReceivedAsPerSettlementReport?.amount, b.summaryData?.paymentReceivedAsPerSettlementReport?.amount),
+        } as any,
+        pendingPaymentFromMarketplace: {
+          number: sumNum(a.summaryData?.pendingPaymentFromMarketplace?.number, b.summaryData?.pendingPaymentFromMarketplace?.number),
+          amount: sumAmount(a.summaryData?.pendingPaymentFromMarketplace?.amount, b.summaryData?.pendingPaymentFromMarketplace?.amount),
+        } as any,
+        totalReconciled: {
+          number: sumNum(a.summaryData?.totalReconciled?.number, b.summaryData?.totalReconciled?.number),
+          amount: sumAmount(a.summaryData?.totalReconciled?.amount, b.summaryData?.totalReconciled?.amount),
+        } as any,
+        totalUnreconciled: {
+          number: sumNum(a.summaryData?.totalUnreconciled?.number, b.summaryData?.totalUnreconciled?.number),
+          amount: sumAmount(a.summaryData?.totalUnreconciled?.amount, b.summaryData?.totalUnreconciled?.amount),
+          lessPaymentReceivedFromFlipkart: {
+            number: sumNum(
+              a.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.number,
+              b.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.number
+            ),
+            amount: sumAmount(
+              a.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.amount,
+              b.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.amount
+            ),
+          } as any,
+          excessPaymentReceivedFromFlipkart: {
+            number: sumNum(
+              a.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.number,
+              b.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.number
+            ),
+            amount: sumAmount(
+              a.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.amount,
+              b.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.amount
+            ),
+          } as any,
+        } as any,
+        pendingDeductions: {
+          number: sumNum(a.summaryData?.pendingDeductions?.number, b.summaryData?.pendingDeductions?.number),
+          amount: sumAmount(a.summaryData?.pendingDeductions?.amount, b.summaryData?.pendingDeductions?.amount),
+        } as any,
+        returnedOrCancelledOrders: {
+          number: sumNum(a.summaryData?.returnedOrCancelledOrders?.number, b.summaryData?.returnedOrCancelledOrders?.number),
+          amount: sumAmount(a.summaryData?.returnedOrCancelledOrders?.amount, b.summaryData?.returnedOrCancelledOrders?.amount),
+        } as any,
+      } as any,
+      totalTDS: sumAmount(a.totalTDS as any, b.totalTDS as any),
+      totalTDA: sumAmount(a.totalTDA as any, b.totalTDA as any),
+      monthOrdersPayoutReceived: sumAmount(a.monthOrdersPayoutReceived as any, b.monthOrdersPayoutReceived as any),
+      monthOrdersAwaitedSettlement: {
+        salesOrders: sumNum(a.monthOrdersAwaitedSettlement?.salesOrders, b.monthOrdersAwaitedSettlement?.salesOrders),
+        salesAmount: sumAmount(a.monthOrdersAwaitedSettlement?.salesAmount, b.monthOrdersAwaitedSettlement?.salesAmount),
+      } as any,
+      unsettledReturns: {
+        returnsOrders: sumNum(a.unsettledReturns?.returnsOrders, b.unsettledReturns?.returnsOrders),
+        returnAmount: sumAmount(a.unsettledReturns?.returnAmount, b.unsettledReturns?.returnAmount),
+      } as any,
+      difference: sumAmount(a.difference as any, b.difference as any),
+      returnRate: a.returnRate || '0',
+      commissionRate: a.commissionRate || '0',
+    } as any;
+  };
+
   // Apply demo data for Amazon selection
   const applyAmazonDemoData = () => {
     try {
@@ -793,11 +1069,11 @@ const MarketplaceReconciliation: React.FC = () => {
       demo.summaryData.totalTransaction = { number: 18425, amount: '31250000' } as any;
       demo.summaryData.netSalesAsPerSalesReport = { number: 16230, amount: '28500000' } as any;
       demo.summaryData.paymentReceivedAsPerSettlementReport = { number: 15080, amount: '26200000' } as any;
-      demo.summaryData.pendingPaymentFromMarketplace = { number: 1150, amount: '2300000' } as any;
+      demo.summaryData.pendingPaymentFromMarketplace = { number: 1150, amount: '600000' } as any;
       demo.summaryData.totalReconciled = { number: 15080, amount: '26200000' } as any;
       demo.summaryData.totalUnreconciled = {
         number: 3345,
-        amount: '2300000',
+        amount: '600000',
         lessPaymentReceivedFromFlipkart: { number: 2100, amount: '1450000' },
         excessPaymentReceivedFromFlipkart: { number: 1245, amount: '850000' },
       } as any;
@@ -963,10 +1239,13 @@ const MarketplaceReconciliation: React.FC = () => {
     const { startDate, endDate } = getMonthDateRange(month);
     
     try {
-      const response = await apiService.get<MarketplaceReconciliationResponse>(
-        '/recon/fetchStats',
-        { start_date: startDate, end_date: endDate }
-      );
+      const params: any = {
+        start_date: startDate,
+        end_date: endDate,
+        date_field: dateField === 'invoice' ? 'buyer_invoice_date' : 'settlement_date'
+      };
+      
+      const response = await apiService.get('/recon/fetchStats', params);
       
       if (response.success && response.data) {
         // Validate the response data and use mock data if invalid
@@ -1170,8 +1449,7 @@ const MarketplaceReconciliation: React.FC = () => {
                         sx={{padding: '4px 6px',
                         }}
                       >
-                        <MenuItem value="order">Order Date</MenuItem>
-                        <MenuItem value="payment">Payment Date</MenuItem>
+                        <MenuItem value="settlement">Settlement Date</MenuItem>
                         <MenuItem value="invoice">Invoice Date</MenuItem>
                       </Select>
                     </FormControl>
@@ -1348,8 +1626,15 @@ const MarketplaceReconciliation: React.FC = () => {
                   }}
                 >
                   <MenuItem
-                    onClick={() => {
+                    onClick={async () => {
+                      // All: sum Flipkart API data with Amazon demo data and D2C demo data
                       setSelectedPlatforms(availablePlatforms.map(p => p.value) as Platform[]);
+                      const flipkartData = await fetchFlipkartDataForCurrentRange();
+                      const amazonDemo = buildAmazonDemoData();
+                      const d2cDemo = buildD2CDemoData();
+                      const merged = mergeReconciliationData(flipkartData, amazonDemo);
+                      const finalMerged = mergeReconciliationData(merged, d2cDemo);
+                      setReconciliationData(finalMerged);
                       setPlatformMenuAnchorEl(null);
                     }}
                     sx={{
@@ -1378,17 +1663,18 @@ const MarketplaceReconciliation: React.FC = () => {
                   {availablePlatforms.map((platform) => (
                     <MenuItem
                       key={platform.value}
-                      onClick={() => {
+                      onClick={async () => {
                         setSelectedPlatforms([platform.value]);
                         if (platform.value === 'amazon') {
+                          // Amazon: show only Amazon demo data
                           applyAmazonDemoData();
+                        } else if (platform.value === 'd2c') {
+                          // D2C: show only D2C demo data
+                          applyD2CDemoData();
                         } else {
-                          // revert to current date-range data on non-Amazon selection
-                          if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
-                            fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
-                          } else {
-                            fetchReconciliationDataByDateRange(selectedDateRange);
-                          }
+                          // Flipkart: show only API-fetched data for current range
+                          const flipkartOnly = await fetchFlipkartDataForCurrentRange();
+                          setReconciliationData(flipkartOnly);
                         }
                         setPlatformMenuAnchorEl(null);
                       }}
@@ -1513,8 +1799,8 @@ const MarketplaceReconciliation: React.FC = () => {
               <CardContent sx={{ p: 0 }}>
                 {/* Title */}
                 <Box sx={{ 
-                  px: 4, 
-                  py: 3,
+                  px: 3, 
+                  py: 2,
                   background: 'transparent',
                   borderBottom: 'none'
                 }}>
@@ -1527,69 +1813,96 @@ const MarketplaceReconciliation: React.FC = () => {
                     Reconciliation Summary
                   </Typography>
                 </Box>
-                <Box sx={{ px: 4, pb: 2 }}>
+                <Box sx={{ px: 3, pb: 2, mt: 6 }}>
                   {(() => {
-                    const totalTransactions = (reconciliationData.ordersDelivered?.number || 0) + (reconciliationData.ordersReturned?.number || 0);
-                    const totalTransactionsAmount = parseAmount(reconciliationData.summaryData.totalTransaction.amount);
-                    const totalTransactionsCount = reconciliationData.summaryData.totalTransaction.number;
-                    const netSalesSalesReports = parseAmount(reconciliationData.grossSales);
-                    const netSalesSalesReportsCount = reconciliationData.summaryData.netSalesAsPerSalesReport.number;
-                    const netSalesSalesReportsAmount = parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount);
-                    const netPaymentReceivedAsPerPaymentAmount = parseAmount(reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.amount);
-                    const netPaymentReceivedAsPerPaymentCount = reconciliationData.summaryData.paymentReceivedAsPerSettlementReport.number;
-                    const pendingPaymentCount = reconciliationData.summaryData?.pendingPaymentFromMarketplace?.number || 0;
+                    // Calculate values for the simplified formula: Total Sales = Net Sales - Returns - Cancellations + Pending Payment
+                    const netSalesAmount = parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount);
+                    const netSalesCount = reconciliationData.summaryData.netSalesAsPerSalesReport.number;
+                    
+                    const returnsAmount = parseAmount(reconciliationData.ordersReturned?.amount || '0');
+                    const returnsCount = reconciliationData.ordersReturned?.number || 0;
+                    
+                    const cancellationsAmount = parseAmount(reconciliationData.summaryData?.returnedOrCancelledOrders?.amount || '0');
+                    const cancellationsCount = reconciliationData.summaryData?.returnedOrCancelledOrders?.number || 0;
+                    
                     const pendingPaymentAmount = parseAmount(reconciliationData.summaryData?.pendingPaymentFromMarketplace?.amount || '0');
-                    const reconciledOrdersAmount = parseAmount(reconciliationData.summaryData?.totalReconciled?.amount || '0');
-                    const reconciledOrdersCount = reconciliationData.summaryData?.totalReconciled?.number || 0;
-                    const lessPaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.amount || '0');
-                    const lessPaymentCount = reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.number || 0;
-                    const morePaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.amount || '0');
-                    const pendingDeductions = reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.number || 0;
-                    const totalUnrecAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.amount || '0');
-                    const totalUnrecCount = reconciliationData.summaryData?.totalUnreconciled?.number || 0;
-                    const cancelledOrdersCount = reconciliationData.summaryData.returnedOrCancelledOrders.number;
-                    const cancelledOrdersAmount = parseAmount(reconciliationData.summaryData?.returnedOrCancelledOrders?.amount || '0');
-                    const cards = [
-                      { label: 'Total Transactions', count: totalTransactionsCount, amount: totalTransactionsAmount },
-                      { label: 'Net Sales as per Sales Reports', count: netSalesSalesReportsCount, amount: netSalesSalesReportsAmount },
-                      { label: 'Payment Received as per Payment Report', count: netPaymentReceivedAsPerPaymentCount, amount: netPaymentReceivedAsPerPaymentAmount },
-                      { label: 'Reconciled Orders', count: reconciledOrdersCount, amount: reconciledOrdersAmount },
-                      // Removed: More Payment Received
-                      { label: 'Pending Payment', count: pendingPaymentCount, amount: pendingPaymentAmount },
-                      { label: 'Cancelled Orders', count: cancelledOrdersCount, amount: cancelledOrdersAmount },
+                    const pendingPaymentCount = reconciliationData.summaryData?.pendingPaymentFromMarketplace?.number || 0;
+                    
+                    // Calculate total sales using the formula
+                    const totalSalesAmount = netSalesAmount - returnsAmount - cancellationsAmount + pendingPaymentAmount;
+                    const totalSalesCount = netSalesCount - returnsCount - cancellationsCount + pendingPaymentCount;
+                    
+                    const sections = [
+                      { type: 'metric', label: 'Total Sales', amount: totalSalesAmount, count: totalSalesCount },
+                      { type: 'operator', symbol: '=' },
+                      { type: 'metric', label: 'Net Sales', amount: netSalesAmount, count: netSalesCount },
+                      { type: 'operator', symbol: '-' },
+                      { type: 'metric', label: 'Returns', amount: returnsAmount, count: returnsCount },
+                      { type: 'operator', symbol: '-' },
+                      { type: 'metric', label: 'Cancellations', amount: cancellationsAmount, count: cancellationsCount },
+                      { type: 'operator', symbol: '+' },
+                      { type: 'metric', label: 'Pending Payment', amount: pendingPaymentAmount, count: pendingPaymentCount }
                     ];
+                    
                     return (
-                      <Box sx={{
-                        display: 'grid',
-                        gap: 2,
-                        gridTemplateColumns: {
-                          xs: 'repeat(1, minmax(220px, 1fr))',
-                          sm: 'repeat(2, minmax(220px, 1fr))',
-                          md: 'repeat(3, minmax(220px, 1fr))',
-                        },
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        flexWrap: 'wrap',
+                        gap: 0.5,
+                        p: 3
                       }}>
-                        {cards.map((r, idx) => (
-                          <Box key={idx} sx={{
-                            p: 1.5,
-                            borderRadius: 0,
-                            background: 'transparent',
-                            border: 'none',
-                            boxShadow: 'none',
+                        {sections.map((section, idx) => (
+                          <Box key={idx} sx={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            alignItems: 'center',
+                            textAlign: 'center',
+                            minWidth: section.type === 'operator' ? '30px' : '120px'
                           }}>
-                            <Box sx={{ mb: 0.5 }}>
-                              <Typography 
-                                variant="caption" 
-                                sx={{ fontWeight: 600, color: '#9ca3af', letterSpacing: '0.02em' }}
-                              >
-                                {r.label}
+                            {section.type === 'metric' ? (
+                              <>
+                                <Typography sx={{ 
+                                  fontSize: '0.75rem', 
+                                  fontWeight: 500, 
+                                  color: '#6b7280',
+                                  letterSpacing: '0.05em',
+                                  textTransform: 'uppercase',
+                                  mb: 0.5
+                                }}>
+                                  {section.label}
+                                </Typography>
+                                <Typography sx={{ 
+                                  fontSize: '1.5rem', 
+                                  fontWeight: 300, 
+                                  color: '#111827',
+                                  fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
+                                  letterSpacing: '-0.02em',
+                                  mb: 0.25
+                                }}>
+                                  ₹{Math.round(section.amount).toLocaleString('en-IN')}
+                                </Typography>
+                                <Typography sx={{ 
+                                  fontSize: '0.75rem', 
+                                  fontWeight: 300, 
+                                  color: '#9ca3af',
+                                  letterSpacing: '0.025em'
+                                }}>
+                                  {section.count.toLocaleString('en-IN')} orders
+                                </Typography>
+                              </>
+                            ) : (
+                              <Typography sx={{ 
+                                fontSize: '1.75rem', 
+                                fontWeight: 300, 
+                                color: '#6b7280',
+                                fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
+                                lineHeight: 1
+                              }}>
+                                {section.symbol}
                               </Typography>
-                            </Box>
-                            <Typography variant="h3" sx={{ fontWeight: 700, color: '#1f2937', lineHeight: 1.1 }}>
-                              {`₹${Math.round(r.amount).toLocaleString('en-IN')}`}
-                            </Typography>
-                            <Typography variant="body2" sx={{ mt: 1, color: '#6b7280', fontWeight: 500 }}>
-                              {`${(r.count ?? 0).toLocaleString('en-IN')} Orders`}
-                            </Typography>
+                            )}
                           </Box>
                         ))}
                       </Box>
@@ -1599,136 +1912,8 @@ const MarketplaceReconciliation: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
-          {/* Unreconciled Card (Total + Breakdown) */}
-          <Grid item xs={12} md={5}>
-            <Card sx={{ 
-              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
-              borderRadius: '16px',
-              border: '1px solid #f1f3f4',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
-              overflow: 'hidden',
-              height: '100%',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                transform: 'translateY(-2px)',
-              }
-            }}>
-              <CardContent sx={{ p: 4 }}>
-                {(() => {
-                  const totalUnrecAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.amount || '0');
-                  const totalUnrecCount = reconciliationData.summaryData?.totalUnreconciled?.number || 0;
-                  const lessPaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.amount || '0');
-                  const lessPaymentCount = reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.number || 0;
-                  const morePaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.amount || '0');
-                  const morePaymentCount = reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.number || 0;
-                  return (
-                    <Box>
-                      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="h6" sx={{ 
-                          fontWeight: 600, 
-                          color: '#1f2937',
-                          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                          letterSpacing: '-0.025em'
-                        }}>
-                          <span style={{ fontSize: '1.5rem' }}>Total Unreconciled</span>
-                        </Typography>
-                        <Typography variant="h4" sx={{ fontWeight: 800, color: '#1f2937', letterSpacing: '-0.02em', fontSize: '1.5rem', textAlign: 'right', ml: 2 }}>
-                          {formatCurrency(totalUnrecAmount)}
-                        </Typography>
-                      </Box>
-                      <Typography variant="body2" sx={{ mt: 0.5, color: '#6b7280', fontWeight: 500, fontSize: '1.00rem' }}>
-                        {(totalUnrecCount).toLocaleString('en-IN')} Orders
-                      </Typography>
-                      <Divider sx={{ my: 2 }} />
-                      <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>
-                        Unreconciled = Less Payment Received − More Payment Received from Marketplace
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Typography variant="body1" sx={{ color: '#b91c1c', fontWeight: 600, fontSize: '1.15rem' }}>
-                            Less Payment Received
-                          </Typography>
-                          <Typography variant="h5" sx={{ color: '#ef4444', fontWeight: 700, fontSize: '1.25rem' }}>
-                            {formatCurrency(lessPaymentAmount)}
-                          </Typography>
-                        </Box>
-                        <Typography variant="caption" sx={{ color: '#6b7280', mt: 0, mb: 0.125 }}>
-                          {lessPaymentCount.toLocaleString('en-IN')} Orders
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.125 }}>
-                          <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.15rem' }}>
-                            More Payment Received
-                          </Typography>
-                          <Typography variant="h5" sx={{ color: '#10b981', fontWeight: 700, fontSize: '1.25rem' }}>
-                            {formatCurrency(morePaymentAmount)}
-                          </Typography>
-                        </Box>
-                        <Typography variant="caption" sx={{ color: '#6b7280', mt: 0 }}>
-                          {morePaymentCount.toLocaleString('en-IN')} Orders
-                        </Typography>
-                      </Box>
-                    </Box>
-                  );
-                })()}
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Card sx={{ 
-              mb: 3, 
-              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
-              borderRadius: '16px',
-              border: '1px solid #f1f3f4',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
-              overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                transform: 'translateY(-2px)',
-              }
-            }}>
-              <CardContent sx={{ p: 4 }}>
-                {/* AI Insight style header */}
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#1f2937', letterSpacing: '-0.02em' }}>
-                    ✨  Unreconciled reasons
-                  </Typography>
-                </Box>
-                {unreconciledReasons.length === 0 && (
-                  <Box sx={{ 
-                    py: 3, 
-                    px: 2, 
-                    borderRadius: 1, 
-                    background: '#f9fafb', 
-                    border: '1px solid #f1f3f4',
-                    textAlign: 'center'
-                  }}>
-                    <Typography variant="body2" sx={{ color: '#6b7280', fontStyle: 'italic' }}>
-                      All Good !
-                    </Typography>
-                  </Box>
-                )}
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {unreconciledReasons.map((r, idx) => (
-                    <Grow in key={`${r.reason}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1.25, px: 2, borderRadius: 1, background: '#f9fafb', border: '1px solid #f1f3f4' }}>
-                        <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1rem' }}>
-                          {r.reason}
-                        </Typography>
-                        <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.05rem' }}>
-                          {r.count.toLocaleString('en-IN')}
-                        </Typography>
-                      </Box>
-                    </Grow>
-                  ))}
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
           {/* Reconciliation Status */}
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={5}>
                           <Card 
                 onClick={() => navigate('/dispute')}
                 sx={{ 
@@ -1747,10 +1932,10 @@ const MarketplaceReconciliation: React.FC = () => {
                 }
               }}
             >
-              <CardContent sx={{ p: 4 }}>
+              <CardContent sx={{ p: 3 }}>
                 <Typography variant="h6" sx={{ 
                   fontWeight: 600, 
-                  mb: 3, 
+                  mb: 2, 
                   color: '#1f2937',
                   fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                   letterSpacing: '-0.025em',
@@ -1764,13 +1949,13 @@ const MarketplaceReconciliation: React.FC = () => {
                   flexDirection: 'column', 
                   alignItems: 'center',
                   justifyContent: 'flex-start',
-                  gap: 3,
+                  gap: 2,
                 }}>
                   {/* Gauge Chart */}
                   <Box sx={{ position: 'relative' }}>
                     <Box sx={{
-                      width: 200,
-                      height: 200,
+                      width: 140,
+                      height: 140,
                       borderRadius: '100%',
                       background: `conic-gradient(
                         #10b981 0deg,
@@ -1784,8 +1969,8 @@ const MarketplaceReconciliation: React.FC = () => {
                       position: 'relative',
                     }}>
                       <Box sx={{
-                        width: 180,
-                        height: 180,
+                        width: 120,
+                        height: 120,
                         borderRadius: '50%',
                         background: 'white',
                         display: 'flex',
@@ -1794,12 +1979,12 @@ const MarketplaceReconciliation: React.FC = () => {
                         justifyContent: 'center',
                         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
                       }}>
-                        <Typography variant="h3" sx={{
+                        <Typography variant="h4" sx={{
                           fontWeight: 500,
                           color: getReconciliationColor(parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 100 : Math.max(0, 100 - ((parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales)) * 100))),
                           fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                           mb: 0.5,
-                          fontSize: '2rem',
+                          fontSize: '1.5rem',
                           letterSpacing: '-0.02em'
                         }}>
                           {parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '100%' : `${Math.max(0, 100 - ((parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales)) * 100)).toFixed(1)}%`}
@@ -1811,7 +1996,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   {/* Difference Amount Card */}
                     <Box sx={{
                     width: '100%',
-                    p: 3,
+                    p: 2,
                     textAlign: 'center',
                     }}>
                                               <Typography variant="body2" sx={{
@@ -1835,6 +2020,342 @@ const MarketplaceReconciliation: React.FC = () => {
                       </Typography>
                   </Box>
                 </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          {/* Comprehensive Unreconciled Section */}
+          <Grid item xs={12} md={12}>
+            <Card sx={{ 
+              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+              borderRadius: '16px',
+              border: '1px solid #f1f3f4',
+              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+                transform: 'translateY(-2px)',
+              }
+            }}>
+              <CardContent sx={{ p: 4 }}>
+                {(() => {
+                  const totalUnrecAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.amount || '0');
+                  const totalUnrecCount = reconciliationData.summaryData?.totalUnreconciled?.number || 0;
+                  const lessPaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.amount || '0');
+                  const lessPaymentCount = reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.number || 0;
+                  const morePaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.amount || '0');
+                  const morePaymentCount = reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.number || 0;
+                  
+                  // Mock data for providers
+                  const providerData = [
+                    { name: 'PayU', amount: 15000, count: 45, type: 'payment' },
+                    { name: 'Paytm', amount: 12000, count: 38, type: 'payment' },
+                    { name: 'Delhivery', amount: 8500, count: 25, type: 'logistics' },
+                    { name: 'Blue Dart', amount: 6200, count: 18, type: 'logistics' },
+                    { name: 'DTDC', amount: 4800, count: 15, type: 'logistics' },
+                    { name: 'Shadowfax', amount: 3200, count: 12, type: 'logistics' },
+                    { name: 'BlitzNow', amount: 2100, count: 8, type: 'logistics' }
+                  ];
+
+                  return (
+                    <Box>
+                      {/* Header with Total Unreconciled */}
+                      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 3 }}>
+                        <Typography variant="h5" sx={{ 
+                          fontWeight: 700, 
+                          color: '#1f2937',
+                          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                          letterSpacing: '-0.025em'
+                        }}>
+                          Unreconciled Transactions Summary
+                        </Typography>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => navigate('/dispute')}
+                          sx={{
+                            borderColor: '#6366f1',
+                            color: '#6366f1',
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            '&:hover': {
+                              borderColor: '#4f46e5',
+                              backgroundColor: 'rgba(99, 102, 241, 0.04)',
+                            }
+                          }}
+                        >
+                          View Full Report
+                        </Button>
+                      </Box>
+
+                      {/* Total Unreconciled Summary */}
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between', 
+                        mb: 1,
+                        p: 3,
+                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                        borderRadius: '12px',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        <Box>
+                          <Typography variant="h4" sx={{ 
+                            fontWeight: 800, 
+                            color: '#1f2937', 
+                            letterSpacing: '-0.02em',
+                            fontSize: '2rem'
+                          }}>
+                            {formatCurrency(totalUnrecAmount)}
+                          </Typography>
+                          <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
+                            {(totalUnrecCount).toLocaleString('en-IN')} Orders
+                          </Typography>
+                        </Box>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>
+                            Unreconciled = Less Payment Received − More Payment Received from Marketplace
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                              <Typography variant="body1" sx={{ color: '#b91c1c', fontWeight: 600, fontSize: '1.1rem' }}>
+                                Less Payment Received
+                              </Typography>
+                              <Typography variant="h6" sx={{ color: '#ef4444', fontWeight: 700, fontSize: '1.2rem' }}>
+                                {formatCurrency(lessPaymentAmount)}
+                              </Typography>
+                            </Box>
+                            <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
+                              {lessPaymentCount.toLocaleString('en-IN')} Orders
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                              <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
+                                More Payment Received
+                              </Typography>
+                              <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 700, fontSize: '1.2rem' }}>
+                                {formatCurrency(morePaymentAmount)}
+                              </Typography>
+                            </Box>
+                            <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
+                              {morePaymentCount.toLocaleString('en-IN')} Orders
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Box>
+
+                      {/* Conditional Content based on selected platform */}
+                      {selectedPlatforms.includes('d2c') ? (
+                        <>
+                          {/* Tabs for By Reasons and By Providers - Only for D2C */}
+                          <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
+                            <Tabs
+                              value={unreconciledTab}
+                              onChange={handleUnreconciledTabChange}
+                              sx={{
+                                borderBottom: 1,
+                                borderColor: 'divider',
+                                mb: 3,
+                                '& .MuiTab-root': {
+                                  textTransform: 'none',
+                                  fontWeight: 600,
+                                  fontSize: '1rem',
+                                  minHeight: 48,
+                                }
+                              }}
+                            >
+                              <Tab label="By Reasons" />
+                              <Tab label="By Providers" />
+                            </Tabs>
+                          </Box>
+
+                          {/* Tab Content for D2C */}
+                          {unreconciledTab === 0 && (
+                            <Box>
+                              <Typography variant="h6" sx={{ 
+                                fontWeight: 600, 
+                                color: '#1f2937', 
+                                mb: 2,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1
+                              }}>
+                                ✨ Unreconciled by Reasons
+                              </Typography>
+                              {unreconciledReasons.length === 0 ? (
+                                <Box sx={{ 
+                                  py: 4, 
+                                  px: 2, 
+                                  borderRadius: 1, 
+                                  background: '#f9fafb', 
+                                  border: '1px solid #f1f3f4',
+                                  textAlign: 'center'
+                                }}>
+                                  <Typography variant="body2" sx={{ color: '#6b7280', fontStyle: 'italic' }}>
+                                    All Good! No unreconciled transactions by reasons.
+                                  </Typography>
+                                </Box>
+                              ) : (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                  {unreconciledReasons.map((r, idx) => (
+                                    <Grow in key={`${r.reason}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
+                                      <Box sx={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'space-between', 
+                                        py: 2, 
+                                        px: 3, 
+                                        borderRadius: 2, 
+                                        background: '#f9fafb', 
+                                        border: '1px solid #f1f3f4',
+                                        transition: 'all 0.2s ease',
+                                        '&:hover': {
+                                          background: '#f3f4f6',
+                                          borderColor: '#e5e7eb'
+                                        }
+                                      }}>
+                                        <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
+                                          {r.reason}
+                                        </Typography>
+                                        <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
+                                          {r.count.toLocaleString('en-IN')}
+                                        </Typography>
+                                      </Box>
+                                    </Grow>
+                                  ))}
+                                </Box>
+                              )}
+                            </Box>
+                          )}
+
+                          {unreconciledTab === 1 && (
+                            <Box>
+                              <Typography variant="h6" sx={{ 
+                                fontWeight: 600, 
+                                color: '#1f2937', 
+                                mb: 2,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1
+                              }}>
+                                🏢 Unreconciled by Providers
+                              </Typography>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                {providerData.map((provider, idx) => (
+                                  <Grow in key={`${provider.name}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
+                                    <Box sx={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'space-between', 
+                                      py: 2, 
+                                      px: 3, 
+                                      borderRadius: 2, 
+                                      background: '#f9fafb', 
+                                      border: '1px solid #f1f3f4',
+                                      transition: 'all 0.2s ease',
+                                      '&:hover': {
+                                        background: '#f3f4f6',
+                                        borderColor: '#e5e7eb'
+                                      }
+                                    }}>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Box sx={{
+                                          width: 8,
+                                          height: 8,
+                                          borderRadius: '50%',
+                                          backgroundColor: provider.type === 'payment' ? '#3b82f6' : '#10b981'
+                                        }} />
+                                        <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
+                                          {provider.name}
+                                        </Typography>
+                                        <Chip 
+                                          label={provider.type === 'payment' ? 'Payment' : 'Logistics'} 
+                                          size="small" 
+                                          sx={{ 
+                                            fontSize: '0.75rem',
+                                            height: 20,
+                                            backgroundColor: provider.type === 'payment' ? '#dbeafe' : '#d1fae5',
+                                            color: provider.type === 'payment' ? '#1e40af' : '#065f46'
+                                          }} 
+                                        />
+                                      </Box>
+                                      <Box sx={{ textAlign: 'right' }}>
+                                        <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
+                                          {formatCurrency(provider.amount)}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                                          {provider.count} orders
+                                        </Typography>
+                                      </Box>
+                                    </Box>
+                                  </Grow>
+                                ))}
+                              </Box>
+                            </Box>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {/* Direct Reasons Display for Flipkart/Amazon */}
+                          <Box sx={{ mt: 4 }}>
+                            <Typography variant="h6" sx={{ 
+                              fontWeight: 600, 
+                              color: '#1f2937', 
+                              mb: 2,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1
+                            }}>
+                              ✨ Unreconciled by Reasons
+                            </Typography>
+                            {unreconciledReasons.length === 0 ? (
+                              <Box sx={{ 
+                                py: 4, 
+                                px: 2, 
+                                borderRadius: 1, 
+                                background: '#f9fafb', 
+                                border: '1px solid #f1f3f4',
+                                textAlign: 'center'
+                              }}>
+                                <Typography variant="body2" sx={{ color: '#6b7280', fontStyle: 'italic' }}>
+                                  All Good! No unreconciled transactions by reasons.
+                                </Typography>
+                              </Box>
+                            ) : (
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                {unreconciledReasons.map((r, idx) => (
+                                  <Grow in key={`${r.reason}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
+                                    <Box sx={{ 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'space-between', 
+                                      py: 2, 
+                                      px: 3, 
+                                      borderRadius: 2, 
+                                      background: '#f9fafb', 
+                                      border: '1px solid #f1f3f4',
+                                      transition: 'all 0.2s ease',
+                                      '&:hover': {
+                                        background: '#f3f4f6',
+                                        borderColor: '#e5e7eb'
+                                      }
+                                    }}>
+                                      <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
+                                        {r.reason}
+                                      </Typography>
+                                      <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
+                                        {r.count.toLocaleString('en-IN')}
+                                      </Typography>
+                                    </Box>
+                                  </Grow>
+                                ))}
+                              </Box>
+                            )}
+                          </Box>
+                        </>
+                      )}
+                    </Box>
+                  );
+                })()}
               </CardContent>
             </Card>
           </Grid>
@@ -2162,7 +2683,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       letterSpacing: '-0.03em',
                       fontSize: '2.5rem'
                     }}>
-                      {((reconciliationData.summaryData.totalReconciled.number) / (reconciliationData.summaryData.totalTransaction.number) * 100).toFixed(1)}%
+                      {((reconciliationData.summaryData.totalTransaction.number - reconciliationData.summaryData.pendingPaymentFromMarketplace.number) / (reconciliationData.summaryData.totalTransaction.number) * 100).toFixed(3)}%
                 </Typography>
               </Box>
                 </Grid>
