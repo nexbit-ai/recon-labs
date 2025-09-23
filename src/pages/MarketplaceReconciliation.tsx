@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -181,6 +182,8 @@ const MarketplaceReconciliation: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(false);
+  const [isCodExpanded, setIsCodExpanded] = useState(false);
+  const [expandedProviderKey, setExpandedProviderKey] = useState<string | null>(null);
   
   // Sales overview data state
   const [salesOverview, setSalesOverview] = useState({
@@ -772,7 +775,7 @@ const MarketplaceReconciliation: React.FC = () => {
   };
   
   // Platform selector state
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['flipkart']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['d2c']);
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
   
   // Available platforms
@@ -1866,7 +1869,7 @@ const MarketplaceReconciliation: React.FC = () => {
                 </Box>
                 <Box sx={{ px: 3, pb: 2, mt: 6 }}>
                   {(() => {
-                    // Calculate values for the simplified formula: Total Sales = Net Sales - Returns - Cancellations + Pending Payment
+                    // Calculate values for the simplified formula: Total Sales = Net Sales - Returns - Cancellations
                     const netSalesAmount = parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount);
                     const netSalesCount = reconciliationData.summaryData.netSalesAsPerSalesReport.number;
                     
@@ -1876,12 +1879,9 @@ const MarketplaceReconciliation: React.FC = () => {
                     const cancellationsAmount = parseAmount(reconciliationData.summaryData?.returnedOrCancelledOrders?.amount || '0');
                     const cancellationsCount = reconciliationData.summaryData?.returnedOrCancelledOrders?.number || 0;
                     
-                    const pendingPaymentAmount = parseAmount(reconciliationData.summaryData?.pendingPaymentFromMarketplace?.amount || '0');
-                    const pendingPaymentCount = reconciliationData.summaryData?.pendingPaymentFromMarketplace?.number || 0;
-                    
                     // Calculate total sales using the formula
-                    const totalSalesAmount = netSalesAmount - returnsAmount - cancellationsAmount + pendingPaymentAmount;
-                    const totalSalesCount = netSalesCount - returnsCount - cancellationsCount + pendingPaymentCount;
+                    const totalSalesAmount = netSalesAmount - returnsAmount - cancellationsAmount;
+                    const totalSalesCount = netSalesCount - returnsCount - cancellationsCount;
                     
                     const sections = [
                       { type: 'metric', label: 'Total Sales', amount: totalSalesAmount, count: totalSalesCount },
@@ -1890,9 +1890,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       { type: 'operator', symbol: '-' },
                       { type: 'metric', label: 'Returns', amount: returnsAmount, count: returnsCount },
                       { type: 'operator', symbol: '-' },
-                      { type: 'metric', label: 'Cancellations', amount: cancellationsAmount, count: cancellationsCount },
-                      { type: 'operator', symbol: '+' },
-                      { type: 'metric', label: 'Pending Payment', amount: pendingPaymentAmount, count: pendingPaymentCount }
+                      { type: 'metric', label: 'Cancellations', amount: cancellationsAmount, count: cancellationsCount }
                     ];
                     
                     return (
@@ -2176,15 +2174,21 @@ const MarketplaceReconciliation: React.FC = () => {
 
                             // Mock provider split for settled transactions (kept local, visual only)
                             const providerSplits = [
-                              { name: 'Paytm', key: 'paytm', share: 0.38, color: '#1e40af', type: 'payment' },
-                              { name: 'PayU', key: 'payu', share: 0.34, color: '#2563eb', type: 'payment' },
-                              { name: 'Razorpay', key: 'razorpay', share: 0.28, color: '#0ea5e9', type: 'payment' },
+                              { name: 'Paytm', key: 'paytm', share: 0.35, color: '#1e40af', type: 'payment' },
+                              { name: 'PayU', key: 'payu', share: 0.40, color: '#2563eb', type: 'payment' },
+                              { name: 'Cash on Delivery', key: 'cod', share: 0.25, color: '#10b981', type: 'cod' },
                             ];
                             const providers = providerSplits.map((p) => ({
                               ...p,
                               amount: Math.round(settledAmount * p.share),
                               count: Math.round((settledCount || 0) * p.share),
-                              percentOfSettled: (expectedSalesAmount === 0 || settledAmount === 0) ? 0 : ((settledAmount * p.share) / expectedSalesAmount) * 100,
+                              // Percent of this partner's expected amount that has been received
+                              percentOfSettled: (() => {
+                                const expectedForPartner = expectedSalesAmount * p.share;
+                                const receivedForPartner = settledAmount * p.share;
+                                if (expectedForPartner === 0) return 0;
+                                return (receivedForPartner / expectedForPartner) * 100;
+                              })(),
                             }));
 
                             return (
@@ -2209,7 +2213,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                       {formatCurrency(settledAmount)}
                                     </Typography>
                                     <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
-                                      {(settledCount).toLocaleString('en-IN')} Orders Settled
+                                      {(settledCount).toLocaleString('en-IN')} Orders Matched
                                     </Typography>
                                   </Box>
                                   <Box sx={{ textAlign: 'right' }}>
@@ -2219,7 +2223,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                                         <Typography variant="body1" sx={{ color: '#374151', fontWeight: 600, fontSize: '1.1rem' }}>
-                                          Expected Sales
+                                          Total Sales
                                         </Typography>
                                         <Typography variant="h6" sx={{ color: '#111827', fontWeight: 700, fontSize: '1.2rem' }}>
                                           {formatCurrency(expectedSalesAmount)}
@@ -2230,14 +2234,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                       </Typography>
                                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                                         <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
-                                          Settled
+                                          Matched
                                         </Typography>
                                         <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 700, fontSize: '1.2rem' }}>
                                           {percentSettled.toFixed(1)}%
                                         </Typography>
                                       </Box>
                                       <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
-                                        of Expected Sales
+                                        of Total Sales
                                       </Typography>
                                     </Box>
                                   </Box>
@@ -2256,60 +2260,277 @@ const MarketplaceReconciliation: React.FC = () => {
                                     }}>
                                       Settlements by Providers
                                     </Typography>
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                      {providers.map((provider, idx) => (
+                                    <Grid container spacing={2}>
+                                      <Grid item xs={12} md={6}>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                          {providers.map((provider, idx) => (
                                         <Grow in key={`${provider.key}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
-                                          <Box sx={{ 
-                                            display: 'flex', 
-                                            alignItems: 'center', 
-                                            justifyContent: 'space-between', 
-                                            py: 2, 
-                                            px: 3, 
-                                            borderRadius: 2, 
-                                            background: '#f9fafb', 
-                                            border: '1px solid #f1f3f4',
-                                            transition: 'all 0.2s ease',
-                                            '&:hover': {
-                                              background: '#f3f4f6',
-                                              borderColor: '#e5e7eb'
-                                            }
-                                          }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                              <Box sx={{
-                                                width: 8,
-                                                height: 8,
-                                                borderRadius: '50%',
-                                                backgroundColor: provider.color
-                                              }} />
-                                              <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
-                                                {provider.name}
-                                              </Typography>
-                                              <Chip 
-                                                label={'Payment'} 
-                                                size="small" 
-                                                sx={{ 
-                                                  fontSize: '0.75rem',
-                                                  height: 20,
-                                                  backgroundColor: '#dbeafe',
-                                                  color: '#1e40af'
-                                                }} 
-                                              />
+                                          <Box>
+                                            <Box sx={{ 
+                                              display: 'flex', 
+                                              alignItems: 'center', 
+                                              justifyContent: 'space-between', 
+                                                  py: 1.25, 
+                                              px: 3, 
+                                              borderRadius: 2, 
+                                              background: '#f9fafb', 
+                                              border: '1px solid #f1f3f4',
+                                              transition: 'all 0.2s ease',
+                                              cursor: 'pointer',
+                                              '&:hover': {
+                                                background: '#f3f4f6',
+                                                borderColor: '#e5e7eb'
+                                              }
+                                            }}
+                                              onClick={() => {
+                                                if (provider.key === 'cod') {
+                                                  setIsCodExpanded((v) => !v);
+                                                  setExpandedProviderKey(null);
+                                                } else {
+                                                  setExpandedProviderKey((prev) => (prev === provider.key ? null : provider.key));
+                                                  setIsCodExpanded(false);
+                                                }
+                                              }}
+                                              role={'button'}
+                                              aria-expanded={provider.key === 'cod' ? isCodExpanded : expandedProviderKey === provider.key}
+                                            >
+                                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                <Box sx={{
+                                                  width: 8,
+                                                  height: 8,
+                                                  borderRadius: '50%',
+                                                  backgroundColor: provider.color
+                                                }} />
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
+                                                    {provider.name}
+                                                  </Typography>
+                                                  <ExpandMoreIcon 
+                                                    sx={{ 
+                                                      fontSize: 22,
+                                                      color: '#6b7280',
+                                                      transition: 'transform 0.2s',
+                                                      transform: (provider.key === 'cod' ? (isCodExpanded ? 'rotate(180deg)' : 'rotate(0deg)') : (expandedProviderKey === provider.key ? 'rotate(180deg)' : 'rotate(0deg)'))
+                                                    }}
+                                                  />
+                                                </Box>
+                                                <Chip 
+                                                  label={provider.key === 'cod' ? 'COD' : 'Payment'} 
+                                                  size="small" 
+                                                  sx={{ 
+                                                    fontSize: '0.75rem',
+                                                    height: 20,
+                                                    backgroundColor: provider.key === 'cod' ? '#d1fae5' : '#dbeafe',
+                                                    color: provider.key === 'cod' ? '#065f46' : '#1e40af'
+                                                  }} 
+                                                />
+                                              </Box>
+                                              <Box sx={{ textAlign: 'right' }}>
+                                                <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1rem' }}>
+                                                  {formatCurrency(provider.amount)}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                                                  {provider.count.toLocaleString('en-IN')} orders
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700 }}>
+                                                  {provider.percentOfSettled.toFixed(1)}% matched
+                                                </Typography>
+                                              </Box>
                                             </Box>
-                                            <Box sx={{ textAlign: 'right' }}>
-                                              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
-                                                {formatCurrency(provider.amount)}
-                                              </Typography>
-                                              <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
-                                                {provider.count.toLocaleString('en-IN')} orders
-                                              </Typography>
-                                              <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700 }}>
-                                                {provider.percentOfSettled.toFixed(1)}% of expected
-                                              </Typography>
-                                            </Box>
+                                            {/* COD logistics partners expandable details */}
+                                            {provider.key === 'cod' && (
+                                              <MuiCollapse in={isCodExpanded} timeout="auto" unmountOnExit>
+                                                <Box sx={{ mt: 1.5, ml: { xs: 0, md: 4 } }}>
+                                                  <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1 }}>
+                                                    Logistics partners who settled
+                                                  </Typography>
+                                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                    {[
+                                                      {
+                                                        name: 'Delhivery',
+                                                        settledAmount: Math.round(provider.amount * 0.36),
+                                                        orders: Math.round(provider.count * 0.36),
+                                                        percentOfExpected: (() => {
+                                                          const expectedForLp = expectedSalesAmount * provider.share * 0.36;
+                                                          if (expectedForLp === 0) return 0;
+                                                          const receivedForLp = settledAmount * provider.share * 0.36;
+                                                          return (receivedForLp / expectedForLp) * 100;
+                                                        })(),
+                                                      },
+                                                      {
+                                                        name: 'Blue Dart',
+                                                        settledAmount: Math.round(provider.amount * 0.28),
+                                                        orders: Math.round(provider.count * 0.28),
+                                                        percentOfExpected: (() => {
+                                                          const expectedForLp = expectedSalesAmount * provider.share * 0.28;
+                                                          if (expectedForLp === 0) return 0;
+                                                          const receivedForLp = settledAmount * provider.share * 0.28;
+                                                          return (receivedForLp / expectedForLp) * 100;
+                                                        })(),
+                                                      },
+                                                      {
+                                                        name: 'DTDC',
+                                                        settledAmount: Math.round(provider.amount * 0.22),
+                                                        orders: Math.round(provider.count * 0.22),
+                                                        percentOfExpected: (() => {
+                                                          const expectedForLp = expectedSalesAmount * provider.share * 0.22;
+                                                          if (expectedForLp === 0) return 0;
+                                                          const receivedForLp = settledAmount * provider.share * 0.22;
+                                                          return (receivedForLp / expectedForLp) * 100;
+                                                        })(),
+                                                      },
+                                                      {
+                                                        name: 'Ecom Express',
+                                                        settledAmount: Math.round(provider.amount * 0.14),
+                                                        orders: Math.round(provider.count * 0.14),
+                                                        percentOfExpected: (() => {
+                                                          const expectedForLp = expectedSalesAmount * provider.share * 0.14;
+                                                          if (expectedForLp === 0) return 0;
+                                                          const receivedForLp = settledAmount * provider.share * 0.14;
+                                                          return (receivedForLp / expectedForLp) * 100;
+                                                        })(),
+                                                      },
+                                                    ].map((lp) => (
+                                                      <Box key={lp.name} sx={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                          py: 1,
+                                                        px: 2,
+                                                        borderRadius: 1.5,
+                                                        background: '#ffffff',
+                                                        border: '1px solid #e5e7eb'
+                                                      }}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                          <DeliveryIcon fontSize="small" sx={{ color: '#059669' }} />
+                                                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{lp.name}</Typography>
+                                                          <Chip label="Logistics" size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: '#ecfeff', color: '#164e63' }} />
+                                                        </Box>
+                                                        <Box sx={{ textAlign: 'right' }}>
+                                                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(lp.settledAmount)}</Typography>
+                                                          <Typography variant="caption" sx={{ color: '#6b7280' }}>{lp.orders.toLocaleString('en-IN')} orders • </Typography>
+                                                          <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700 }}>
+                                                            {lp.percentOfExpected.toFixed(1)}% matched
+                                                          </Typography>
+                                                        </Box>
+                                                      </Box>
+                                                    ))}
+                                                  </Box>
+                                                </Box>
+                                              </MuiCollapse>
+                                            )}
+                                            {/* Gateway provider charges breakdown expandable details */}
+                                            {provider.key !== 'cod' && (
+                                              <MuiCollapse in={expandedProviderKey === provider.key} timeout="auto" unmountOnExit>
+                                                <Box sx={{ mt: 1.5, ml: { xs: 0, md: 4 } }}>
+                                                  <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1 }}>
+                                                    Charges & Settlement details
+                                                  </Typography>
+                                                  {(() => {
+                                                    const grossSales = provider.amount; // amount displayed above
+                                                    const assumedCommissionRate = 0.018; // 1.8%
+                                                    const fixedFee = 3000; // assumed fixed monthly/operational fee (demo)
+                                                    const commissionAmount = Math.round(grossSales * assumedCommissionRate);
+                                                    const gstRate = 0.18; // 18% GST on commission
+                                                    const gstOnCommission = Math.round(commissionAmount * gstRate);
+                                                    const otherCharges = Math.round(grossSales * 0.001); // 0.1% misc charges (demo)
+                                                    const totalCharges = commissionAmount + gstOnCommission + otherCharges + fixedFee;
+                                                    const paymentReceived = Math.max(0, grossSales - totalCharges);
+                                                    return (
+                                                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1, border: '1px solid #e5e7eb', borderRadius: 1.5, bgcolor: '#fff' }}>
+                                                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>Gross sales via {provider.name}</Typography>
+                                                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(grossSales)}</Typography>
+                                                        </Box>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1, border: '1px solid #e5e7eb', borderRadius: 1.5, bgcolor: '#ffffff' }}>
+                                                          <Typography variant="body2" sx={{ color: '#374151' }}>Commission ({(assumedCommissionRate*100).toFixed(2)}%)</Typography>
+                                                          <Typography variant="body2" sx={{ color: '#374151' }}>-{formatCurrency(commissionAmount)}</Typography>
+                                                        </Box>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1, border: '1px solid #e5e7eb', borderRadius: 1.5, bgcolor: '#ffffff' }}>
+                                                          <Typography variant="body2" sx={{ color: '#374151' }}>GST on commission (18%)</Typography>
+                                                          <Typography variant="body2" sx={{ color: '#374151' }}>-{formatCurrency(gstOnCommission)}</Typography>
+                                                        </Box>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1, border: '1px solid #e5e7eb', borderRadius: 1.5, bgcolor: '#ffffff' }}>
+                                                          <Typography variant="body2" sx={{ color: '#374151' }}>Other charges</Typography>
+                                                          <Typography variant="body2" sx={{ color: '#374151' }}>-{formatCurrency(otherCharges)}</Typography>
+                                                        </Box>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1, border: '1px solid #e5e7eb', borderRadius: 1.5, bgcolor: '#ffffff' }}>
+                                                          <Typography variant="body2" sx={{ color: '#374151' }}>Fixed / operational fees</Typography>
+                                                          <Typography variant="body2" sx={{ color: '#374151' }}>-{formatCurrency(fixedFee)}</Typography>
+                                                        </Box>
+                                                        <Divider sx={{ my: 0.5 }} />
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1, border: '1px solid #e5e7eb', borderRadius: 1.5, bgcolor: '#f9fafb' }}>
+                                                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#111827' }}>Payment received</Typography>
+                                                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#059669' }}>{formatCurrency(paymentReceived)}</Typography>
+                                                        </Box>
+                                                      </Box>
+                                                    );
+                                                  })()}
+                                                </Box>
+                                              </MuiCollapse>
+                                            )}
+                                            
                                           </Box>
                                         </Grow>
-                                      ))}
-                                    </Box>
+                                          ))}
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} md={6}>
+                                        <Box sx={{ p: 2, border: '1px solid #f1f3f4', borderRadius: 2, background: '#fff', height: '100%' }}>
+                                          <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1 }}>
+                                            Provider Breakdown (Gateways + COD partners)
+                                          </Typography>
+                                          {(() => {
+                                            const cod = providers.find(p => p.key === 'cod');
+                                            const gateways = providers.filter(p => p.key !== 'cod');
+                                            const codAmount = cod ? cod.amount : 0;
+                                            const codPartners = [
+                                              { name: 'Delhivery', value: Math.round(codAmount * 0.36), color: '#0ea5e9' },
+                                              { name: 'Blue Dart', value: Math.round(codAmount * 0.28), color: '#10b981' },
+                                              { name: 'DTDC', value: Math.round(codAmount * 0.22), color: '#6366f1' },
+                                              { name: 'Ecom Express', value: Math.round(codAmount * 0.14), color: '#f59e0b' },
+                                            ];
+                                            const pieData = [
+                                              ...gateways.map(g => ({ name: g.name, value: g.amount, color: g.color })),
+                                              ...codPartners,
+                                            ];
+                                            return (
+                                              <>
+                                                <Box sx={{ width: '100%', height: 240 }}>
+                                                  <ResponsiveContainer>
+                                                    <PieChart>
+                                                      <Pie
+                                                        data={pieData}
+                                                        dataKey="value"
+                                                        nameKey="name"
+                                                        cx="50%"
+                                                        cy="50%"
+                                                        innerRadius={50}
+                                                        outerRadius={80}
+                                                        paddingAngle={2}
+                                                      >
+                                                        {pieData.map((item, i) => (
+                                                          <Cell key={`cell-${i}`} fill={item.color} />
+                                                        ))}
+                                                      </Pie>
+                                                      <RechartsTooltip formatter={(value) => formatCurrency(Number(value))} />
+                                                    </PieChart>
+                                                  </ResponsiveContainer>
+                                                </Box>
+                                                <Box sx={{ mt: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75 }}>
+                                                  {pieData.map((item) => (
+                                                    <Box key={`legend-${item.name}`} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: item.color }} />
+                                                      <Typography variant="caption" sx={{ color: '#374151' }}>{item.name}: {formatCurrency(item.value)}</Typography>
+                                                    </Box>
+                                                  ))}
+                                                </Box>
+                                              </>
+                                            );
+                                          })()}
+                                        </Box>
+                                      </Grid>
+                                    </Grid>
                                   </Box>
                                 )}
                               </>
@@ -2616,9 +2837,8 @@ const MarketplaceReconciliation: React.FC = () => {
               const totalCommissionAmount = Math.round(baseAmount * overallCommissionRate);
               // provider splits (dummy)
               const providerSplits = [
-                { name: 'Paytm', key: 'paytm', share: 0.4, color: '#7A5DBF' },
-                { name: 'PayU', key: 'payu', share: 0.35, color: '#A79CDB' },
-                { name: 'Razorpay', key: 'razorpay', share: 0.25, color: '#D3C8EC' },
+                { name: 'Paytm', key: 'paytm', share: 0.55, color: '#7A5DBF' },
+                { name: 'PayU', key: 'payu', share: 0.45, color: '#A79CDB' },
               ];
               const providerData = providerSplits.map(p => ({
                 ...p,
