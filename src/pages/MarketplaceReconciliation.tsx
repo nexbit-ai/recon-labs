@@ -63,6 +63,8 @@ import {
   CartesianGrid,
   XAxis,
   YAxis,
+  BarChart,
+  Bar,
 } from 'recharts';
 
 // Enhanced mock data for the new sales dashboard
@@ -87,6 +89,46 @@ const enhancedMockData = {
     { month: 'Sep 2024', gross: 4500000, net: 3000000, returns: 200000 }
   ]
 };
+
+// Payment Ageing Analysis (providers and distributions)
+type ProviderType = 'Logistics (COD)' | 'Payment Gateway';
+type AgeBucketKey = '<=1d' | '2-3d' | '4-7d' | '8-14d' | '15-30d' | '>30d';
+
+interface ProviderAgeing {
+  provider: string;
+  type: ProviderType;
+  averageDaysToSettle: number;
+  distribution: Record<AgeBucketKey, number>;
+}
+
+const AGE_BUCKETS: AgeBucketKey[] = ['<=1d', '2-3d', '4-7d', '8-14d', '15-30d', '>30d'];
+
+// Minimal, desaturated palette (single green accent + neutral grays)
+const BUCKET_COLORS: Record<AgeBucketKey, string> = {
+  '<=1d': '#2e7d32',   // accent for fastest
+  '2-3d': '#cbd5e1',   // slate-200
+  '4-7d': '#94a3b8',   // slate-400
+  '8-14d': '#64748b',  // slate-500
+  '15-30d': '#475569', // slate-600
+  '>30d': '#1f2937',   // slate-800
+};
+
+const PROVIDER_AGEING_DATA: ProviderAgeing[] = [
+  { provider: 'Blue Dart', type: 'Logistics (COD)', averageDaysToSettle: 6.2, distribution: { '<=1d': 5, '2-3d': 18, '4-7d': 42, '8-14d': 25, '15-30d': 8, '>30d': 2 } },
+  { provider: 'DTDC', type: 'Logistics (COD)', averageDaysToSettle: 7.9, distribution: { '<=1d': 4, '2-3d': 15, '4-7d': 38, '8-14d': 28, '15-30d': 12, '>30d': 3 } },
+  { provider: 'Delhivery', type: 'Logistics (COD)', averageDaysToSettle: 5.6, distribution: { '<=1d': 7, '2-3d': 22, '4-7d': 45, '8-14d': 20, '15-30d': 5, '>30d': 1 } },
+  { provider: 'Ecom Express', type: 'Logistics (COD)', averageDaysToSettle: 6.8, distribution: { '<=1d': 6, '2-3d': 20, '4-7d': 40, '8-14d': 24, '15-30d': 8, '>30d': 2 } },
+  { provider: 'PayU', type: 'Payment Gateway', averageDaysToSettle: 2.3, distribution: { '<=1d': 35, '2-3d': 45, '4-7d': 15, '8-14d': 4, '15-30d': 1, '>30d': 0 } },
+  { provider: 'Paytm', type: 'Payment Gateway', averageDaysToSettle: 2.0, distribution: { '<=1d': 40, '2-3d': 42, '4-7d': 12, '8-14d': 4, '15-30d': 2, '>30d': 0 } },
+  { provider: 'Razorpay', type: 'Payment Gateway', averageDaysToSettle: 1.8, distribution: { '<=1d': 48, '2-3d': 40, '4-7d': 9, '8-14d': 2, '15-30d': 1, '>30d': 0 } },
+  { provider: 'Cashfree', type: 'Payment Gateway', averageDaysToSettle: 2.5, distribution: { '<=1d': 32, '2-3d': 46, '4-7d': 17, '8-14d': 4, '15-30d': 1, '>30d': 0 } },
+];
+
+const AGEING_CHART_DATA = PROVIDER_AGEING_DATA.map((p) => {
+  const row: any = { provider: p.provider };
+  AGE_BUCKETS.forEach((b) => { row[b] = p.distribution[b]; });
+  return row;
+});
 import {
   StorefrontOutlined as StorefrontIcon,
   TrendingUp as TrendingUpIcon,
@@ -160,6 +202,10 @@ const MarketplaceReconciliation: React.FC = () => {
   const [selectedDisputeIds, setSelectedDisputeIds] = useState<string[]>([]);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   
+  // Main transactions tab state
+  const [transactionsTab, setTransactionsTab] = useState<number>(0); // 0: reconciled, 1: unreconciled
+  const handleTransactionsTabChange = (_: any, value: number) => setTransactionsTab(value);
+  
   // Unreconciled tab state
   const [unreconciledTab, setUnreconciledTab] = useState<number>(0); // 0: by reasons, 1: by providers
   const handleUnreconciledTabChange = (_: any, value: number) => setUnreconciledTab(value);
@@ -181,6 +227,11 @@ const MarketplaceReconciliation: React.FC = () => {
   // Date field filter for transactions-related queries
   const [dateField, setDateField] = useState<'settlement' | 'invoice'>('invoice');
   const [unreconciledReasons, setUnreconciledReasons] = useState<Array<{ reason: string; count: number }>>([]);
+  
+  // Ageing summary (Avg TAT across providers)
+  const overallAvgTAT = (
+    PROVIDER_AGEING_DATA.reduce((sum, p) => sum + p.averageDaysToSettle, 0) / PROVIDER_AGEING_DATA.length
+  ).toFixed(1);
 
   // Calendar popup state
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
@@ -1881,7 +1932,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                   letterSpacing: '-0.02em',
                                   mb: 0.25
                                 }}>
-                                  ₹{Math.round(section.amount).toLocaleString('en-IN')}
+                                  ₹{Math.round(Number(section.amount || 0)).toLocaleString('en-IN')}
                                 </Typography>
                                 <Typography sx={{ 
                                   fontSize: '0.75rem', 
@@ -1889,7 +1940,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                   color: '#9ca3af',
                                   letterSpacing: '0.025em'
                                 }}>
-                                  {section.count.toLocaleString('en-IN')} orders
+                                  {Number(section.count || 0).toLocaleString('en-IN')} orders
                                 </Typography>
                               </>
                             ) : (
@@ -2067,38 +2118,219 @@ const MarketplaceReconciliation: React.FC = () => {
                           fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                           letterSpacing: '-0.025em'
                         }}>
-                          Unreconciled Transactions Summary
+                          Transactions Summary
                         </Typography>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => navigate('/dispute')}
+                        {transactionsTab === 1 && (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => navigate('/dispute')}
+                            sx={{
+                              borderColor: '#6366f1',
+                              color: '#6366f1',
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              '&:hover': {
+                                borderColor: '#4f46e5',
+                                backgroundColor: 'rgba(99, 102, 241, 0.04)',
+                              }
+                            }}
+                          >
+                            View Full Report
+                          </Button>
+                        )}
+                      </Box>
+
+                      {/* Main Tabs for Reconciled and Unreconciled Transactions */}
+                      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                        <Tabs
+                          value={transactionsTab}
+                          onChange={handleTransactionsTabChange}
                           sx={{
-                            borderColor: '#6366f1',
-                            color: '#6366f1',
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            '&:hover': {
-                              borderColor: '#4f46e5',
-                              backgroundColor: 'rgba(99, 102, 241, 0.04)',
+                            borderBottom: 1,
+                            borderColor: 'divider',
+                            mb: 3,
+                            '& .MuiTab-root': {
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              fontSize: '1rem',
+                              minHeight: 48,
                             }
                           }}
                         >
-                          View Full Report
-                        </Button>
+                          <Tab label="Reconciled Transactions" />
+                          <Tab label="Unreconciled Transactions" />
+                        </Tabs>
                       </Box>
 
-                      {/* Total Unreconciled Summary */}
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'space-between', 
-                        mb: 1,
-                        p: 3,
-                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                        borderRadius: '12px',
-                        border: '1px solid #e2e8f0'
-                      }}>
+                      {/* Tab Content */}
+                      {transactionsTab === 0 && (
+                        <Box>
+                          {/* Reconciled Transactions Summary */}
+                          {(() => {
+                            const expectedSalesAmount = parseAmount(reconciliationData.summaryData?.netSalesAsPerSalesReport?.amount || reconciliationData.summaryData?.totalTransaction?.amount || '0');
+                            const expectedSalesCount = Number(reconciliationData.summaryData?.netSalesAsPerSalesReport?.number || reconciliationData.summaryData?.totalTransaction?.number || 0);
+                            const settledAmount = parseAmount(reconciliationData.summaryData?.paymentReceivedAsPerSettlementReport?.amount || reconciliationData.summaryData?.totalReconciled?.amount || '0');
+                            const settledCount = Number(reconciliationData.summaryData?.paymentReceivedAsPerSettlementReport?.number || reconciliationData.summaryData?.totalReconciled?.number || 0);
+                            const percentSettled = expectedSalesAmount === 0 ? 0 : Math.min(100, (settledAmount / expectedSalesAmount) * 100);
+
+                            // Mock provider split for settled transactions (kept local, visual only)
+                            const providerSplits = [
+                              { name: 'Paytm', key: 'paytm', share: 0.38, color: '#1e40af', type: 'payment' },
+                              { name: 'PayU', key: 'payu', share: 0.34, color: '#2563eb', type: 'payment' },
+                              { name: 'Razorpay', key: 'razorpay', share: 0.28, color: '#0ea5e9', type: 'payment' },
+                            ];
+                            const providers = providerSplits.map((p) => ({
+                              ...p,
+                              amount: Math.round(settledAmount * p.share),
+                              count: Math.round((settledCount || 0) * p.share),
+                              percentOfSettled: (expectedSalesAmount === 0 || settledAmount === 0) ? 0 : ((settledAmount * p.share) / expectedSalesAmount) * 100,
+                            }));
+
+                            return (
+                              <>
+                                <Box sx={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'space-between', 
+                                  mb: 1,
+                                  p: 3,
+                                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                                  borderRadius: '12px',
+                                  border: '1px solid #e2e8f0'
+                                }}>
+                                  <Box>
+                                    <Typography variant="h4" sx={{ 
+                                      fontWeight: 800, 
+                                      color: '#1f2937', 
+                                      letterSpacing: '-0.02em',
+                                      fontSize: '2rem'
+                                    }}>
+                                      {formatCurrency(settledAmount)}
+                                    </Typography>
+                                    <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
+                                      {(settledCount).toLocaleString('en-IN')} Orders Settled
+                                    </Typography>
+                                  </Box>
+                                  <Box sx={{ textAlign: 'right' }}>
+                                    <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>
+                                      Expected vs Settled
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                                        <Typography variant="body1" sx={{ color: '#374151', fontWeight: 600, fontSize: '1.1rem' }}>
+                                          Expected Sales
+                                        </Typography>
+                                        <Typography variant="h6" sx={{ color: '#111827', fontWeight: 700, fontSize: '1.2rem' }}>
+                                          {formatCurrency(expectedSalesAmount)}
+                                        </Typography>
+                                      </Box>
+                                      <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
+                                        {(expectedSalesCount).toLocaleString('en-IN')} Orders
+                                      </Typography>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                                        <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
+                                          Settled
+                                        </Typography>
+                                        <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 700, fontSize: '1.2rem' }}>
+                                          {percentSettled.toFixed(1)}%
+                                        </Typography>
+                                      </Box>
+                                      <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
+                                        of Expected Sales
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                </Box>
+
+                                {/* Settlements by Providers - only for D2C */}
+                                {selectedPlatforms.includes('d2c') && (
+                                  <Box sx={{ mt: 4 }}>
+                                    <Typography variant="h6" sx={{ 
+                                      fontWeight: 600, 
+                                      color: '#1f2937', 
+                                      mb: 2,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 1
+                                    }}>
+                                      Settlements by Providers
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                      {providers.map((provider, idx) => (
+                                        <Grow in key={`${provider.key}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
+                                          <Box sx={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'space-between', 
+                                            py: 2, 
+                                            px: 3, 
+                                            borderRadius: 2, 
+                                            background: '#f9fafb', 
+                                            border: '1px solid #f1f3f4',
+                                            transition: 'all 0.2s ease',
+                                            '&:hover': {
+                                              background: '#f3f4f6',
+                                              borderColor: '#e5e7eb'
+                                            }
+                                          }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                              <Box sx={{
+                                                width: 8,
+                                                height: 8,
+                                                borderRadius: '50%',
+                                                backgroundColor: provider.color
+                                              }} />
+                                              <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
+                                                {provider.name}
+                                              </Typography>
+                                              <Chip 
+                                                label={'Payment'} 
+                                                size="small" 
+                                                sx={{ 
+                                                  fontSize: '0.75rem',
+                                                  height: 20,
+                                                  backgroundColor: '#dbeafe',
+                                                  color: '#1e40af'
+                                                }} 
+                                              />
+                                            </Box>
+                                            <Box sx={{ textAlign: 'right' }}>
+                                              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
+                                                {formatCurrency(provider.amount)}
+                                              </Typography>
+                                              <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                                                {provider.count.toLocaleString('en-IN')} orders
+                                              </Typography>
+                                              <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700 }}>
+                                                {provider.percentOfSettled.toFixed(1)}% of expected
+                                              </Typography>
+                                            </Box>
+                                          </Box>
+                                        </Grow>
+                                      ))}
+                                    </Box>
+                                  </Box>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </Box>
+                      )}
+
+                      {transactionsTab === 1 && (
+                        <Box>
+                          {/* Total Unreconciled Summary */}
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between', 
+                            mb: 1,
+                            p: 3,
+                            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                            borderRadius: '12px',
+                            border: '1px solid #e2e8f0'
+                          }}>
                         <Box>
                           <Typography variant="h4" sx={{ 
                             fontWeight: 800, 
@@ -2353,6 +2585,8 @@ const MarketplaceReconciliation: React.FC = () => {
                           </Box>
                         </>
                       )}
+                        </Box>
+                      )}
                     </Box>
                   );
                 })()}
@@ -2361,7 +2595,7 @@ const MarketplaceReconciliation: React.FC = () => {
           </Grid>
         </Grid>
 
-        {/* Settlement Status Visualization */}
+        {/* Commission & Charges Summary (replaces Settlement/Unsettled section) */}
         <Card sx={{ 
           mb: 6,
           background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
@@ -2376,369 +2610,157 @@ const MarketplaceReconciliation: React.FC = () => {
           }
         }}>
           <CardContent sx={{ p: 5 }}>
-            <Typography variant="h6" sx={{ 
-              fontWeight: 600, 
-              mb: 4, 
-              color: '#1f2937',
-              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-              letterSpacing: '-0.025em'
-            }}>
-              Settlement and Unsettled Summary
-            </Typography>
-            
-            <Grid container spacing={3}>
-              {/* Settlement Status Chart */}
-              <Grid item xs={12} md={8}>
-                <Box sx={{ height: 400 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          {
-                            name: 'Total Sales Orders',
-                            value: reconciliationData.summaryData.netSalesAsPerSalesReport.number,
-                            amount: parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount),
-                            color: '#7A5DBF',
-                            type: 'settled'
-                          },
-                          {
-                            name: 'Unsettled Sales Orders',
-                            value: reconciliationData.summaryData.pendingPaymentFromMarketplace.number,
-                            amount: parseAmount(reconciliationData.summaryData.pendingPaymentFromMarketplace.amount),
-                            color: '#A79CDB',
-                            type: 'unsettled'
-                          },
-                          {
-                            name: 'Cancelled Orders',
-                            value: reconciliationData.summaryData.returnedOrCancelledOrders.number,
-                            amount: parseAmount(reconciliationData.summaryData.returnedOrCancelledOrders.amount),
-                            color: '#D3C8EC',
-                            type: 'returns'
-                          }
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={125}
-                        outerRadius={140}
-                        paddingAngle={1}
-                        cornerRadius={1}
-                        dataKey="value"
-                      >
-                        {[
-                          { name: 'Settled Orders', value: reconciliationData.summaryData.totalReconciled.number, color: '#7A5DBF' },
-                          { name: 'Unsettled Orders', value: reconciliationData.summaryData.pendingPaymentFromMarketplace.number, color: '#A79CDB' },
-                          { name: 'cancelled Returns', value: reconciliationData.summaryData.returnedOrCancelledOrders.number, color: '#D3C8EC' }
-                        ].map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
+            {(() => {
+              const baseAmount = parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport?.amount || reconciliationData.summaryData.totalTransaction?.amount || '0');
+              const overallCommissionRate = 2.1 / 100; // dummy overall rate 2.1%
+              const totalCommissionAmount = Math.round(baseAmount * overallCommissionRate);
+              // provider splits (dummy)
+              const providerSplits = [
+                { name: 'Paytm', key: 'paytm', share: 0.4, color: '#7A5DBF' },
+                { name: 'PayU', key: 'payu', share: 0.35, color: '#A79CDB' },
+                { name: 'Razorpay', key: 'razorpay', share: 0.25, color: '#D3C8EC' },
+              ];
+              const providerData = providerSplits.map(p => ({
+                ...p,
+                amount: Math.round(totalCommissionAmount * p.share),
+                percentOfSales: ((totalCommissionAmount * p.share) / baseAmount) * 100
+              }));
+              // charge types breakdown (dummy distribution across all providers)
+              const chargeTypes = [
+                { label: 'MDR / Commission', key: 'mdr', pct: 0.68, color: '#7A5DBF' },
+                { label: 'Platform Fee', key: 'platform', pct: 0.12, color: '#6EE7B7' },
+                { label: 'PG / Gateway Charges', key: 'pg', pct: 0.10, color: '#F59E0B' },
+                { label: 'Refund / Failure Charges', key: 'refund', pct: 0.05, color: '#EF4444' },
+                { label: 'Dispute / Chargeback', key: 'dispute', pct: 0.02, color: '#0EA5E9' },
+                { label: 'GST on Charges', key: 'gst', pct: 0.03, color: '#10B981' },
+              ];
+              const chargesBreakdown = chargeTypes.map(c => ({
+                ...c,
+                amount: Math.round(totalCommissionAmount * c.pct)
+              }));
+              return (
+                <>
+                  <Typography variant="h6" sx={{ 
+                    fontWeight: 600, 
+                    mb: 4, 
+                    color: '#1f2937',
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                    letterSpacing: '-0.025em'
+                  }}>
+                    Commission & Charges Summary
+                  </Typography>
+
+                  <Grid container spacing={3}>
+                    {/* Provider split donut */}
+                    <Grid item xs={12} md={8}>
+                      <Box sx={{ height: 400 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={providerData.map(p => ({ name: p.name, value: p.amount, color: p.color }))}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={110}
+                              outerRadius={140}
+                              paddingAngle={1}
+                              cornerRadius={1}
+                              dataKey="value"
+                            >
+                              {providerData.map((p, idx) => (
+                                <Cell key={`prov-${idx}`} fill={p.color} />
+                              ))}
+                            </Pie>
+                            <RechartsTooltip
+                              formatter={(value: any, name: string) => [formatCurrency(Number(value)), name]}
+                            />
+                            <Legend
+                              verticalAlign="bottom"
+                              height={36}
+                              formatter={(value, entry) => (
+                                <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                                  {value}
+                                </span>
+                              )}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </Box>
+                    </Grid>
+
+                    {/* KPI cards */}
+                    <Grid item xs={12} md={4}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <Box sx={{
+                          p: 4,
+                          borderRadius: '16px',
+                          background: 'rgba(255, 255, 255, 0.9)',
+                          border: '1px solid rgba(229, 231, 235, 0.6)',
+                          textAlign: 'center'
+                        }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
+                            Total Commission
+                          </Typography>
+                          <Typography variant="h5" sx={{ mt: 1, color: '#1f2937', fontWeight: 600 }}>
+                            {formatCurrency(totalCommissionAmount)}
+                          </Typography>
+                          <Typography variant="body2" sx={{ mt: 0.5, color: '#059669', fontWeight: 600 }}>
+                            {(overallCommissionRate * 100).toFixed(2)}% of Net Sales
+                          </Typography>
+                        </Box>
+                        {providerData.map(p => (
+                          <Box key={p.key} sx={{
+                            p: 3,
+                            borderRadius: '14px',
+                            background: 'rgba(255,255,255,0.9)',
+                            border: '1px solid rgba(229,231,235,0.6)'
+                          }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                              <Typography variant="body2" sx={{ color: '#374151', fontWeight: 600 }}>{p.name}</Typography>
+                              <Typography variant="caption" sx={{ color: '#6b7280' }}>{p.percentOfSales.toFixed(2)}% of sales</Typography>
+                            </Box>
+                            <Typography variant="subtitle2" sx={{ color: p.color, fontWeight: 700 }}>
+                              {formatCurrency(p.amount)}
+                            </Typography>
+                          </Box>
                         ))}
-                      </Pie>
-                      <RechartsTooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <Box sx={{
-                                background: 'white',
-                                border: '1px solid #e0e0e0',
-                                borderRadius: '6px',
-                                p: 2,
-                                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                              }}>
-                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a1a1a', mb: 1 }}>
-                                  {data.name}
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: '#666666', mb: 0.5 }}>
-                                  Orders: {data.value}
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: '#666666' }}>
-                                  Amount: {formatCurrency(data.amount)}
-                                </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+
+                  {/* Charges breakdown */}
+                  <Box sx={{ mt: 4 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 2, color: '#374151', fontWeight: 700 }}>
+                      Charges Breakdown (All Providers)
+                    </Typography>
+                    <Grid container spacing={2}>
+                      {chargesBreakdown.map(c => {
+                        const pct = (c.amount / totalCommissionAmount) * 100;
+                        return (
+                          <Grid item xs={12} sm={6} md={4} key={c.key}>
+                            <Box sx={{ p: 2.5, border: '1px solid #e5e7eb', borderRadius: '12px', background: '#ffffff' }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                <Typography variant="body2" sx={{ color: '#111827', fontWeight: 600 }}>{c.label}</Typography>
+                                <Typography variant="caption" sx={{ color: '#6b7280' }}>{pct.toFixed(1)}%</Typography>
                               </Box>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Legend
-                        verticalAlign="bottom"
-                        height={36}
-                        formatter={(value, entry) => (
-                          <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                            {value} ({entry.payload && entry.payload.value})
-                          </span>
-                        )}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </Box>
-              </Grid>
-
-              {/* Settlement Details */}
-              <Grid item xs={12} md={4}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {/* Settled Orders */}
-                  <Box sx={{
-                    position: 'relative',
-                    p: 5,
-                    borderRadius: '20px',
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.06)',
-                    textAlign: 'center',
-                    overflow: 'hidden',
-                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                    '&:hover': {
-                      transform: 'translateY(-4px) scale(1.02)',
-                      boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
-                      background: 'rgba(255, 255, 255, 0.95)',
-                    },
-                    '&:before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: '4px',
-                      borderRadius: '20px 20px 0 0',
-                    }
-                  }}>
-                    <Typography variant="body2" sx={{
-                      fontWeight: 500,
-                      color: '#6b7280',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      mb: 1,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.1em',
-                      fontSize: '0.75rem'
-                    }}>
-                      Settled Orders
-                    </Typography>
-                    <Typography variant="h3" sx={{
-                      fontWeight: 300,
-                      color: '#1f2937',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      mb: 2,
-                      letterSpacing: '-0.02em'
-                    }}>
-                      {(reconciliationData.summaryData.totalTransaction.number - reconciliationData.summaryData.pendingPaymentFromMarketplace.number)}
-                    </Typography>
-                    <Typography variant="h6" sx={{
-                      color: '#059669',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontWeight: 600,
-                      letterSpacing: '-0.01em'
-                    }}>
-                      {formatCurrency(parseAmount(reconciliationData.summaryData.totalTransaction.amount) - parseAmount(reconciliationData.summaryData.pendingPaymentFromMarketplace.amount || '0'))}
-                    </Typography>
+                              <Box sx={{ height: 8, bgcolor: '#f3f4f6', borderRadius: '9999px', overflow: 'hidden' }}>
+                                <Box sx={{ width: `${pct}%`, height: '100%', backgroundColor: c.color }} />
+                              </Box>
+                              <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#374151', fontWeight: 600 }}>
+                                {formatCurrency(c.amount)}
+                              </Typography>
+                            </Box>
+                          </Grid>
+                        );
+                      })}
+                    </Grid>
                   </Box>
-
-                  {/* Unsettled Orders */}
-                  <Box sx={{
-                    position: 'relative',
-                    p: 5,
-                    borderRadius: '20px',
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.06)',
-                    textAlign: 'center',
-                    overflow: 'hidden',
-                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                    '&:hover': {
-                      transform: 'translateY(-4px) scale(1.02)',
-                      boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
-                      background: 'rgba(255, 255, 255, 0.95)',
-                    },
-                    '&:before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: '4px',
-                      borderRadius: '20px 20px 0 0',
-                    }
-                  }}>
-                    <Typography variant="body2" sx={{
-                      fontWeight: 500,
-                      color: '#6b7280',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      mb: 1,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.1em',
-                      fontSize: '0.75rem'
-                    }}>
-                      Unsettled Orders
-                    </Typography>
-                    <Typography variant="h3" sx={{
-                      fontWeight: 300,
-                      color: '#1f2937',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      mb: 2,
-                      letterSpacing: '-0.02em'
-                    }}>
-                      {reconciliationData.summaryData.pendingPaymentFromMarketplace.number}
-                    </Typography>
-                    <Typography variant="h6" sx={{
-                      color: '#d97706',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontWeight: 600, 
-                      letterSpacing: '-0.01em'
-                    }}>
-                      {formatCurrency(parseAmount(reconciliationData.summaryData.pendingPaymentFromMarketplace.amount || '0'))}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Grid>
-            </Grid>
-
-            {/* Settlement Summary */}
-            <Box sx={{ mt: 4 }}>
-              <Grid container spacing={4}>
-                {/* Total Orders */}
-                <Grid item xs={12} md={4}>
-                  <Box sx={{
-                    position: 'relative',
-                    p: 4,
-                    borderRadius: '18px',
-                    background: 'rgba(255, 255, 255, 0.8)',
-                    backdropFilter: 'blur(12px)',
-                    border: '1px solid rgba(229, 231, 235, 0.4)',
-                    textAlign: 'center',
-                    overflow: 'hidden',
-                    '&:before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: '60px',
-                      height: '3px',
-                      borderRadius: '0 0 20px 20px',
-                    }
-                  }}>
-                    <Typography variant="caption" sx={{ 
-                      color: '#9ca3af', 
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '0.75rem',
-                      fontWeight: 500,
-                      mb: 2,
-                      display: 'block',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.1em'
-                    }}>
-                      Total Orders
-                    </Typography>
-                    <Typography variant="h2" sx={{
-                      fontWeight: 200,
-                      color: '#1f2937', 
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      letterSpacing: '-0.03em',
-                      fontSize: '2.5rem'
-                    }}>
-                      {reconciliationData.summaryData.totalTransaction.number}
-                    </Typography>
-                  </Box>
-                </Grid>
-
-                {/* Settlement Rate */}
-                <Grid item xs={12} md={4}>
-            <Box sx={{
-                    position: 'relative',
-                    p: 4,
-                    borderRadius: '18px',
-                    background: 'rgba(255, 255, 255, 0.8)',
-                    backdropFilter: 'blur(12px)',
-                    border: '1px solid rgba(187, 247, 208, 0.4)',
-                    textAlign: 'center',
-                    overflow: 'hidden',
-                    '&:before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: '60px',
-                      height: '3px',
-                      borderRadius: '0 0 20px 20px',
-                    }
-                  }}>
-                    <Typography variant="caption" sx={{ 
-                      color: '#065f46', 
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '0.75rem',
-                      fontWeight: 500,
-                  mb: 2,
-                      display: 'block',
-                  textTransform: 'uppercase',
-                      letterSpacing: '0.1em'
-                }}>
-                      Settlement Rate
-                </Typography>
-                    <Typography variant="h2" sx={{
-                      fontWeight: 200,
-                      color: '#1f2937', 
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      letterSpacing: '-0.03em',
-                      fontSize: '2.5rem'
-                    }}>
-                      {((reconciliationData.summaryData.totalTransaction.number - reconciliationData.summaryData.pendingPaymentFromMarketplace.number) / (reconciliationData.summaryData.totalTransaction.number) * 100).toFixed(3)}%
-                </Typography>
-              </Box>
-                </Grid>
-
-                {/* Net Pending Amount */}
-                <Grid item xs={12} md={4}>
-              <Box sx={{
-                    position: 'relative',
-                    p: 4,
-                    borderRadius: '18px',
-                    background: 'rgba(255, 255, 255, 0.8)',
-                    backdropFilter: 'blur(12px)',
-                    border: '1px solid rgba(253, 230, 138, 0.4)',
-                    textAlign: 'center',
-                    overflow: 'hidden',
-                    '&:before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: '60px',
-                      height: '3px',
-                      borderRadius: '0 0 20px 20px',
-                    }
-                  }}>
-                    <Typography variant="caption" sx={{ 
-                      color: '#92400e', 
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontSize: '0.75rem',
-                      fontWeight: 500,
-                  mb: 2,
-                      display: 'block',
-                  textTransform: 'uppercase',
-                      letterSpacing: '0.1em'
-                }}>
-                      Net Pending Amount
-                </Typography>
-                    <Typography variant="h5" sx={{
-                      fontWeight: 300,
-                      color: '#1f2937', 
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      letterSpacing: '-0.02em',
-                      fontSize: '1.5rem'
-                    }}>
-                      {formatCurrency(parseAmount(reconciliationData.summaryData.pendingPaymentFromMarketplace.amount))}
-                </Typography>
-              </Box>
-                </Grid>
-              </Grid>
-            </Box>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
 
-        {/* Enhanced Sales Dashboard with 3-Line Graph and KPI Cards */}
+        {/* Payment Ageing Analysis (replaces Sales Dashboard) */}
         <Paper sx={{ 
           p: 3, 
           mb: 6, 
@@ -2747,152 +2769,89 @@ const MarketplaceReconciliation: React.FC = () => {
           borderRadius: '16px',
           boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
         }}>
-          <Typography variant="h6" mb={3} sx={{ color: '#1f2937', fontWeight: 600 }}>
-            Sales Dashboard
-          </Typography>
-
-          {/* Enhanced KPI Cards */}
-          <Box sx={{ mb: 4 }}>
-            <Box sx={{ 
-              display: 'flex', 
-              gap: 1.5, 
-              justifyContent: 'flex-start',
-              alignItems: 'stretch',
-              maxWidth: 'fit-content'
-            }}>
-              {[
-                { key: 'netRevenue', data: salesOverview.netRevenue, color: '#F59E0B' },
-                { key: 'grossRevenue', data: salesOverview.grossRevenue, color: '#a79cdb' },
-                { key: 'returns', data: salesOverview.returns, color: '#1f2937' }
-              ].map(({ key, data, color }) => (
-                <Paper 
-                  key={key}
-                  sx={{ 
-                    flex: '0 0 auto',
-                    width: 140,
-                    p: 2, 
-                    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                    borderRadius: '14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    textAlign: 'center',
-                    minHeight: 70
-                  }}
-                >
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      color: '#6b7280', 
-                      fontWeight: 500, 
-                      mb: 0.5,
-                      fontSize: '0.75rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.3px'
-                    }}
-                  >
-                    {data.label}
-                  </Typography>
-                  <Typography 
-                    variant="h6" 
-                    sx={{ 
-                      color: color,
-                      fontWeight: 700,
-                      fontSize: '1.125rem',
-                      lineHeight: 1.2,
-                      mb: 0.5
-                    }}
-                  >
-                    ₹{(parseFloat(data.value) / 100000).toFixed(1)}L
-                  </Typography>
-                </Paper>
-              ))}
-            </Box>
-            <Typography 
-              variant="caption" 
-              sx={{ 
-                color: '#6b7280', 
-                fontStyle: 'italic',
-                mt: 1.5,
-                display: 'block',
-                fontSize: '0.625rem'
-              }}
-            >
-              * Amount represented are exclusive of taxes
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6" sx={{ color: '#1f2937', fontWeight: 600 }}>
+              Payment Ageing Analysis
             </Typography>
+            <Chip label={`Avg TAT: ${overallAvgTAT} days`} sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 700 }} />
           </Box>
-
-          {/* Enhanced 3-Line Graph */}
-          <Box sx={{ height: 400 }}>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+            {AGE_BUCKETS.map((b) => (
+              <Chip 
+                key={b} 
+                size="small" 
+                label={b} 
+                variant="outlined"
+                sx={{ 
+                  borderColor: BUCKET_COLORS[b], 
+                  color: BUCKET_COLORS[b], 
+                  fontWeight: 700 
+                }} 
+              />
+            ))}
+          </Box>
+          <Box sx={{ width: '100%', height: 380 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={salesOverview.monthData.map(item => ({
-                month: item.month,
-                gross: parseFloat(item.gross),
-                net: parseFloat(item.net),
-                returns: parseFloat(item.returns)
-              }))} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis 
-                  dataKey="month" 
-                  tick={{ fontSize: 12, fill: '#6b7280' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis 
-                  tick={{ fontSize: 12, fill: '#6b7280' }}
-                  axisLine={false}
-                  tickLine={false}
-                  label={{ 
-                    value: 'In Lakhs', 
-                    angle: -90, 
-                    position: 'insideLeft',
-                    style: { textAnchor: 'middle', fill: '#6b7280' } as any
-                  }}
-                  tickFormatter={(value: number) => `${(value / 100000).toFixed(0)}L`}
-                />
-                <RechartsTooltip 
-                  formatter={(value: any, name: string) => [
-                    `₹${(Number(value) / 100000).toFixed(1)}L`, 
-                    name === 'gross' ? 'Gross Revenue' : 
-                    name === 'net' ? 'Net Revenue' : 'Returns'
-                  ]}
-                  contentStyle={{ 
-                    borderRadius: 8, 
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                    border: '1px solid #e5e7eb'
-                  }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="gross" 
-                  stroke="#a79cdb" 
-                  strokeWidth={3} 
-                  dot={false}
-                  activeDot={{ r: 6, stroke: '#a79cdb', strokeWidth: 2, fill: '#a79cdb' }}
-                  name="gross"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="net" 
-                  stroke="#F59E0B" 
-                  strokeWidth={3} 
-                  dot={false}
-                  activeDot={{ r: 6, stroke: '#F59E0B', strokeWidth: 2, fill: '#F59E0B' }}
-                  name="net"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="returns" 
-                  stroke="#1f2937" 
-                  strokeWidth={3} 
-                  dot={false}
-                  activeDot={{ r: 6, stroke: '#1f2937', strokeWidth: 2, fill: '#1f2937' }}
-                  name="returns"
-                />
-              </LineChart>
+              <BarChart data={AGEING_CHART_DATA} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barCategoryGap={"35%"} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="provider" tick={{ fontSize: 12 }} interval={0} height={60} angle={-15} textAnchor="end" />
+                <YAxis unit="%" tick={{ fontSize: 12 }} domain={[0, 100]} />
+                <RechartsTooltip formatter={(v: any) => [`${v}%`, 'Share']} />
+                {AGE_BUCKETS.map((b) => (
+                  <Bar key={b} dataKey={b} stackId="a" fill={BUCKET_COLORS[b]} radius={0} barSize={18} />
+                ))}
+              </BarChart>
             </ResponsiveContainer>
           </Box>
+        </Paper>
+
+        <Paper sx={{ 
+          p: 3, 
+          mb: 6, 
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '16px',
+          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+        }}>
+          <Typography variant="h6" sx={{ color: '#1f2937', fontWeight: 600, mb: 2 }}>
+            Provider TAT Summary
+          </Typography>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 700 }}>Provider</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }} align="right">Avg TAT (days)</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }} align="right">≤3d %</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }} align="right">4–7d %</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }} align="right">8–14d %</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }} align="right">{'>'}14d %</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {PROVIDER_AGEING_DATA.map((p) => {
+                  const le3 = p.distribution['<=1d'] + p.distribution['2-3d'];
+                  const d4_7 = p.distribution['4-7d'];
+                  const d8_14 = p.distribution['8-14d'];
+                  const gt14 = p.distribution['15-30d'] + p.distribution['>30d'];
+                  return (
+                    <TableRow key={p.provider} hover>
+                      <TableCell>{p.provider}</TableCell>
+                      <TableCell>
+                        <Chip size="small" label={p.type} sx={{ bgcolor: p.type === 'Payment Gateway' ? '#e3f2fd' : '#fff7e6', fontWeight: 700 }} />
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700 }}>{p.averageDaysToSettle.toFixed(1)}</TableCell>
+                      <TableCell align="right">{le3}%</TableCell>
+                      <TableCell align="right">{d4_7}%</TableCell>
+                      <TableCell align="right">{d8_14}%</TableCell>
+                      <TableCell align="right">{gt14}%</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Paper>
 
         {/* Tax Breakdown */}
