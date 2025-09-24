@@ -110,6 +110,14 @@ interface TransactionApiResponse {
   settlement_date: string | null;
   settlement_value: string;
   status: string;
+  breakups?: {
+    settlement_value: number;
+    shipping_courier: string;
+    settlement_provider: string;
+    recon_status: string;
+    sale_order_status: string;
+    shipping_package_status_code: string;
+  };
 }
 
 interface TransactionData {
@@ -1288,6 +1296,290 @@ const TransactionDetailsPopup: React.FC<{
   );
 };
 
+// Breakups Modal Component
+const BreakupsModal: React.FC<{ 
+  open: boolean;
+  onClose: () => void;
+  breakups: any;
+  orderId: string;
+  anchorEl: HTMLElement | null;
+}> = ({ open, onClose, breakups, orderId, anchorEl }) => {
+  if (!open || !breakups || !anchorEl) return null;
+
+  const formatValue = (value: any) => {
+    if (typeof value === 'number') {
+      return value.toLocaleString('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      });
+    }
+    return value || 'N/A';
+  };
+
+  const getStatusColor = (status: any) => {
+    const statusStr = String(status || '').toLowerCase();
+    switch (statusStr) {
+      case 'delivered':
+      case 'complete':
+      case 'settlement_matched':
+        return '#059669';
+      case 'pending':
+      case 'processing':
+        return '#d97706';
+      case 'cancelled':
+      case 'failed':
+        return '#dc2626';
+      default:
+        return '#6b7280';
+    }
+  };
+
+  // Dynamically create breakups data from whatever fields are available
+  const breakupsData = Object.entries(breakups).map(([key, value]) => {
+    // Convert snake_case to Title Case for display
+    const label = key
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+    
+    // Determine if it's a currency field
+    const isCurrency = key.includes('value') || key.includes('amount') || key.includes('price');
+    
+    // Determine if it's a status field
+    const isStatus = key.includes('status') || key.includes('state');
+    
+    return {
+      label,
+      value,
+      isCurrency,
+      isStatus
+    };
+  });
+
+  // Calculate smart positioning similar to TransactionDetailsPopup
+  const getPopupPosition = () => {
+    const rect = anchorEl.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const popupHeight = 400; // Height for breakups popup
+    const popupWidth = 400;
+    const offset = 12;
+
+    // Calculate vertical position with better viewport awareness
+    let top: number;
+    let animationDirection: 'up' | 'down' = 'down';
+    let maxHeight: number | undefined;
+    
+    // Check available space above and below
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    
+    if (spaceBelow >= popupHeight + offset) {
+      // Enough space below - show below
+      top = rect.bottom + offset;
+      animationDirection = 'down';
+    } else if (spaceAbove >= popupHeight + offset) {
+      // Enough space above - show above
+      top = rect.top - popupHeight - offset;
+      animationDirection = 'up';
+    } else {
+      // Not enough space either way - find optimal position
+      if (spaceBelow > spaceAbove) {
+        // More space below - position at bottom with scroll
+        top = Math.max(offset, viewportHeight - popupHeight - offset);
+        maxHeight = popupHeight;
+        animationDirection = 'down';
+      } else {
+        // More space above - position at top with scroll
+        top = offset;
+        maxHeight = popupHeight;
+        animationDirection = 'up';
+      }
+    }
+
+    // Ensure minimum height for scrollable content
+    if (maxHeight && maxHeight < 300) {
+      maxHeight = 300;
+    }
+
+    // Calculate horizontal position
+    let left: number;
+    if (rect.left + popupWidth <= viewportWidth) {
+      // Enough space to the right - align with left edge
+      left = rect.left;
+    } else {
+      // Not enough space - align with right edge
+      left = Math.max(offset, viewportWidth - popupWidth - offset);
+    }
+
+    // Final validation: ensure popup is always within viewport bounds
+    if (top < offset) {
+      top = offset;
+      maxHeight = Math.min(popupHeight, viewportHeight - offset * 2);
+    }
+    if (top + (maxHeight || popupHeight) > viewportHeight - offset) {
+      top = Math.max(offset, viewportHeight - (maxHeight || popupHeight) - offset);
+    }
+
+    // Ensure horizontal position is also within viewport
+    if (left < offset) {
+      left = offset;
+    }
+    if (left + popupWidth > viewportWidth - offset) {
+      left = viewportWidth - popupWidth - offset;
+    }
+
+    return { top, left, animationDirection, maxHeight };
+  };
+
+  const position = getPopupPosition();
+
+  return (
+    <>
+      {/* Backdrop */}
+      <Box
+        onClick={onClose}
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.3)',
+          zIndex: 1399,
+          animation: 'fadeIn 0.2s ease-out',
+          '@keyframes fadeIn': {
+            '0%': {
+              opacity: 0,
+            },
+            '100%': {
+              opacity: 1,
+            },
+          },
+        }}
+      />
+      
+      {/* Popup */}
+      <Box
+        onClick={(e) => e.stopPropagation()}
+        sx={{
+          position: 'fixed',
+          top: position.top,
+          left: position.left,
+          width: '400px',
+          maxHeight: position.maxHeight ? `${position.maxHeight}px` : 'auto',
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '12px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          zIndex: 1400,
+          animation: position.animationDirection === 'down' 
+            ? 'fadeInScaleDown 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+            : 'fadeInScaleUp 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          '@keyframes fadeInScaleDown': {
+            '0%': {
+              opacity: 0,
+              transform: 'scale(0.95) translateY(-10px)',
+            },
+            '100%': {
+              opacity: 1,
+              transform: 'scale(1) translateY(0)',
+            },
+          },
+          '@keyframes fadeInScaleUp': {
+            '0%': {
+              opacity: 0,
+              transform: 'scale(0.95) translateY(10px)',
+            },
+            '100%': {
+              opacity: 1,
+              transform: 'scale(1) translateY(0)',
+            },
+          },
+        }}
+      >
+        {/* Header */}
+        <Box
+          sx={{
+            p: 2,
+            borderBottom: '1px solid #e5e7eb',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#111827' }}>
+              Transaction Breakups
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+              Order ID: {orderId}
+            </Typography>
+          </Box>
+          <IconButton
+            onClick={onClose}
+            size="small"
+            sx={{
+              p: 0.5,
+              '&:hover': {
+                background: '#f3f4f6',
+              },
+            }}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Box>
+
+        {/* Content */}
+        <Box sx={{ p: 2, maxHeight: position.maxHeight ? `${position.maxHeight - 80}px` : '300px', overflowY: 'auto' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            {breakupsData.map((item, index) => (
+              <Box
+                key={index}
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  p: 1.5,
+                  background: '#f9fafb',
+                  borderRadius: '6px',
+                  border: '1px solid #e5e7eb',
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 500,
+                    color: '#374151',
+                    minWidth: '120px',
+                    fontSize: '0.75rem',
+                  }}
+                >
+                  {item.label}:
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 600,
+                    color: item.isStatus ? getStatusColor(item.value) : '#111827',
+                    textAlign: 'right',
+                    flex: 1,
+                    fontSize: '0.75rem',
+                  }}
+                >
+                  {item.isCurrency ? formatValue(item.value) : item.value || 'N/A'}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      </Box>
+    </>
+  );
+};
+
 interface TransactionSheetProps {
   onBack: () => void;
   open?: boolean;
@@ -1324,6 +1616,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [activeTab, setActiveTab] = useState(getInitialTab() === 0 ? 0 : getInitialTab() === 1 ? 1 : 0);
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionRow | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [breakupsModalOpen, setBreakupsModalOpen] = useState(false);
+  const [selectedBreakups, setSelectedBreakups] = useState<any>(null);
+  const [breakupsAnchorEl, setBreakupsAnchorEl] = useState<HTMLElement | null>(null);
+  const [breakupsOrderId, setBreakupsOrderId] = useState<string>('');
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HTMLElement | null>(null);
@@ -1334,12 +1630,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   
   // New state for total transactions API
   const [totalTransactionsData, setTotalTransactionsData] = useState<TotalTransactionsResponse | null>(null);
-  const [useNewAPI, setUseNewAPI] = useState(true); // Flag to switch between old and new API
+  const [useNewAPI, setUseNewAPI] = useState(true); // Always use new API
 
   // Get current data based on which API is being used
   const getCurrentData = (): any[] => {
     if (useNewAPI && totalTransactionsData) {
-      return totalTransactionsData.data;
+      // Handle null data case (0 results)
+      return totalTransactionsData.data || [];
     }
     return allTransactionData;
   };
@@ -1347,7 +1644,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Get current columns based on which API is being used
   const getCurrentColumns = () => {
     if (useNewAPI && totalTransactionsData) {
-      return totalTransactionsData.columns.map(col => col.title);
+      // Handle null columns case
+      return totalTransactionsData.columns?.map(col => col.title) || [];
     }
     return visibleColumns;
   };
@@ -1872,19 +2170,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Fetch data on component mount
   useEffect(() => {
-    if (useNewAPI) {
-      // Use new total transactions API
-      fetchTotalTransactions(1);
-    } else {
-      // Use old API
-      setLoading(true);
-      // Start with settled transactions (activeTab = 0)
-      fetchOrders(1, 'settlement_matched');
-      // Prefetch counts for all tabs
-      fetchTabCount('settlement_matched');
-      fetchTabCount('unsettled');
-    }
-  }, [useNewAPI]);
+    // Always use new total transactions API
+    fetchTotalTransactions(1);
+  }, []);
 
   // Apply filters function - called when Apply button is clicked
   const applyFilters = () => {
@@ -2034,14 +2322,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       
       if (response.success && response.data) {
         setTotalTransactionsData(response.data);
-        setTotalCount(response.data.pagination.total_count);
-        setCurrentPage(response.data.pagination.page);
+        setTotalCount(response.data.pagination?.total_count || 0);
+        setCurrentPage(response.data.pagination?.page || 1);
+        
+        // Handle null data case (0 results)
+        const dataArray = response.data.data || [];
         
         // Update tab counts based on the data
-        const settledCount = response.data.data.filter(row => 
+        const settledCount = dataArray.filter(row => 
           row.status === 'settlement_matched' || row.status === 'payment_received'
         ).length;
-        const unsettledCount = response.data.data.filter(row => 
+        const unsettledCount = dataArray.filter(row => 
           row.status === 'unsettled' || row.status === 'short_received' || row.status === 'excess_received'
         ).length;
         
@@ -2178,6 +2469,65 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setAnchorEl(event.currentTarget);
   };
 
+  // Breakups modal handler
+  const handleBreakupsOpen = (event: React.MouseEvent<HTMLElement>, row: any) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    console.log('Row data for breakups:', row);
+    console.log('Row keys:', Object.keys(row));
+    console.log('Row has breakups property:', 'breakups' in row);
+    console.log('Row breakups value:', row.breakups);
+    
+    // Check multiple possible locations for breakups data
+    let breakups = null;
+    
+    // First, check if breakups is directly in the row (most likely for TOTAL_TRANSACTIONS API)
+    if (row.breakups) {
+      breakups = row.breakups;
+      console.log('Found breakups in row.breakups:', breakups);
+    }
+    // Check if breakups is in originalData (for other APIs)
+    else if ((row as any)?.originalData?.breakups) {
+      breakups = (row as any).originalData.breakups;
+      console.log('Found breakups in originalData.breakups:', breakups);
+    }
+    // Check if breakups is in the raw data
+    else if ((row as any)?.rawData?.breakups) {
+      breakups = (row as any).rawData.breakups;
+      console.log('Found breakups in rawData.breakups:', breakups);
+    }
+    // Check if the entire row is the breakups data (flexible approach)
+    else if (row && typeof row === 'object' && !row.order_id && !row['Order ID']) {
+      // If it doesn't have order_id or Order ID, it might be breakups data itself
+      breakups = row;
+      console.log('Using entire row as breakups data:', breakups);
+    }
+    
+    // Extract order ID from the row data
+    const orderId = row.order_id || row['Order ID'] || row['Order Item ID'] || row.order_item_id || 'Unknown';
+    
+    if (breakups && Object.keys(breakups).length > 0) {
+      console.log('Opening breakups modal with data:', breakups);
+      setSelectedBreakups(breakups);
+      setBreakupsOrderId(orderId);
+      setBreakupsAnchorEl(event.currentTarget);
+      setBreakupsModalOpen(true);
+    } else {
+      console.log('No breakups data available for this transaction');
+      console.log('Available data:', row);
+      console.log('Row structure:', JSON.stringify(row, null, 2));
+      
+      // As a fallback, show all available data in the modal
+      // This helps debug what data is actually available
+      console.log('Showing all available data as fallback');
+      setSelectedBreakups(row);
+      setBreakupsOrderId(orderId);
+      setBreakupsAnchorEl(event.currentTarget);
+      setBreakupsModalOpen(true);
+    }
+  };
+
   // Filter data based on search, date range, and column filters
   useEffect(() => {
     if (getCurrentData().length > 0) {
@@ -2267,12 +2617,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     const newPageNumber = newPage + 1; // Convert from 0-based to 1-based
     setPage(newPage);
     
-    if (useNewAPI) {
-      fetchTotalTransactions(newPageNumber);
-    } else {
-      const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-      fetchOrders(newPageNumber, remark);
-    }
+    // Always use new total transactions API
+    fetchTotalTransactions(newPageNumber);
   };
 
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2353,15 +2699,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setPage(0); // Reset to first page when changing tabs
     setCurrentPage(1); // Reset current page
     
-    if (useNewAPI) {
-      // Use new API - status filtering is handled in fetchTotalTransactions
-      fetchTotalTransactions(1);
-    } else {
-      // Use old API
-      const remark = newValue === 0 ? 'settlement_matched' : 'unsettled';
-      console.log(`Fetching data for tab ${newValue} with remark: ${remark}`);
-      fetchOrders(1, remark); // Fetch first page data with correct remark
-    }
+    // Always use new total transactions API
+    fetchTotalTransactions(1);
   };
 
   // Handle transaction row click
@@ -2697,7 +3036,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       <TableRow>
                         <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
                           <Typography variant="body2" sx={{ color: '#6b7280' }}>
-                            No transactions found matching your criteria.
+                            {totalTransactionsData ? 'No transactions found.' : 'No data available.'}
                           </Typography>
                         </TableCell>
                       </TableRow>
@@ -2763,6 +3102,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             }
                           }
                           
+                          // Capitalize platform column
+                          if (column === 'Platform' || column === 'platform') {
+                            displayValue = String(displayValue || '').toUpperCase();
+                          }
+                          
                           return (
                             <TableCell
                               key={`${(row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"])}-${column}-${colIndex}`}
@@ -2783,38 +3127,100 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {column === 'Status' ? (
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    {/* Backend Status chip (exact value from API) */}
-                                    {((row as any)?.originalData?.status) && (
-                                    <Chip
-                                        label={(row as any).originalData.status}
-                                      size="small"
-                                      sx={{
-                                          background: '#f3f4f6',
-                                          color: '#111827',
-                                        fontWeight: 600,
-                                        fontSize: '0.75rem',
-                                        height: 24,
-                                        '& .MuiChip-label': { px: 1 },
-                                      }}
-                                    />
-                                    )}
-                                    {/* Event Type chip */}
-                                    <Chip
-                                      label={(row as any)['Event Type']}
-                                      size="small"
-                                      sx={{
-                                        background: (row as any)['Event Type'] === 'Sale' ? '#dcfce7' : '#fee2e2',
-                                        color: (row as any)['Event Type'] === 'Sale' ? '#059669' : '#dc2626',
-                                        fontWeight: 600,
-                                        fontSize: '0.75rem',
-                                        height: 24,
-                                        '& .MuiChip-label': { px: 1 },
-                                      }}
-                                    />
-                                    {/* Transaction details button */}
+                                    {/* Recon Status from breakups */}
+                                    {(() => {
+                                      const breakups = row.breakups || (row as any)?.originalData?.breakups;
+                                      const reconStatus = breakups?.recon_status;
+                                      
+                                      if (reconStatus) {
+                                        let displayText = '';
+                                        let backgroundColor = '';
+                                        let textColor = '';
+                                        
+                                        switch (reconStatus) {
+                                          case 'settlement_matched':
+                                            displayText = 'Matched';
+                                            backgroundColor = '#dcfce7';
+                                            textColor = '#059669';
+                                            break;
+                                          case 'less_payment_received':
+                                            displayText = 'Less Payment Received';
+                                            backgroundColor = '#fef3c7';
+                                            textColor = '#d97706';
+                                            break;
+                                          case 'more_payment_received':
+                                            displayText = 'More Payment Received';
+                                            backgroundColor = '#fef3c7';
+                                            textColor = '#d97706';
+                                            break;
+                                          default:
+                                            displayText = 'Unsettled';
+                                            backgroundColor = '#fee2e2';
+                                            textColor = '#dc2626';
+                                        }
+                                        
+                                        return (
+                                          <Chip
+                                            label={displayText}
+                                            size="small"
+                                            sx={{
+                                              background: backgroundColor,
+                                              color: textColor,
+                                              fontWeight: 600,
+                                              fontSize: '0.75rem',
+                                              height: 24,
+                                              '& .MuiChip-label': { px: 1 },
+                                            }}
+                                          />
+                                        );
+                                      } else {
+                                        // Fallback to showing "Unsettled" if no recon_status
+                                        return (
+                                          <Chip
+                                            label="Unsettled"
+                                            size="small"
+                                            sx={{
+                                              background: '#fee2e2',
+                                              color: '#dc2626',
+                                              fontWeight: 600,
+                                              fontSize: '0.75rem',
+                                              height: 24,
+                                              '& .MuiChip-label': { px: 1 },
+                                            }}
+                                          />
+                                        );
+                                      }
+                                    })()}
+                                    
+                                    {/* Event Type chip based on shipping_package_status_code */}
+                                    {(() => {
+                                      const breakups = row.breakups || (row as any)?.originalData?.breakups;
+                                      const shippingStatus = breakups?.shipping_package_status_code;
+                                      
+                                      // Determine if it's Sale or Return based on shipping status
+                                      const isSale = shippingStatus?.toLowerCase() === 'delivered';
+                                      const eventType = isSale ? 'Sale' : 'Return';
+                                      
+                                      return (
+                                        <Chip
+                                          label={eventType}
+                                          size="small"
+                                          sx={{
+                                            background: isSale ? '#dcfce7' : '#fee2e2',
+                                            color: isSale ? '#059669' : '#dc2626',
+                                            fontWeight: 600,
+                                            fontSize: '0.75rem',
+                                            height: 24,
+                                            '& .MuiChip-label': { px: 1 },
+                                          }}
+                                        />
+                                      );
+                                    })()}
+                                    
+                                    {/* Breakups details button */}
                                     <IconButton
                                       size="small"
-                                      onClick={(e) => handleTransactionDetailsOpen(e, row)}
+                                      onClick={(e) => handleBreakupsOpen(e, row)}
                                       sx={{
                                         p: 0.5,
                                         minWidth: 20,
@@ -2881,6 +3287,20 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           formatCurrency={formatCurrency}
           formatDate={formatDate}
           anchorEl={anchorEl}
+        />
+
+        {/* Breakups Modal */}
+        <BreakupsModal
+          open={breakupsModalOpen}
+          onClose={() => {
+            setBreakupsModalOpen(false);
+            setSelectedBreakups(null);
+            setBreakupsAnchorEl(null);
+            setBreakupsOrderId('');
+          }}
+          breakups={selectedBreakups}
+          orderId={breakupsOrderId}
+          anchorEl={breakupsAnchorEl}
         />
 
         {/* Filter Menu Portal - Rendered outside table container */}
