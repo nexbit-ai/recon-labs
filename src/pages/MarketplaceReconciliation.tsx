@@ -2126,9 +2126,10 @@ const MarketplaceReconciliation: React.FC = () => {
                       borderRadius: '100%',
                       background: (() => {
                         const s = mainSummary?.summary as any;
-                        const unreconciledAmount = Number(s?.total_unreconciled_amount || 0);
-                        const baseAmount = Number(s?.net_sales_amount || 0);
-                        const matchedPct = baseAmount === 0 ? 100 : Math.max(0, Math.min(100, 100 - ((unreconciledAmount / baseAmount) * 100)));
+                        const reconciledCount = Number(s?.total_reconciled_count || 0);
+                        const unreconciledCount = Number(s?.total_unreconciled_count || 0);
+                        const totalCount = reconciledCount + unreconciledCount;
+                        const matchedPct = totalCount === 0 ? 100 : Math.max(0, Math.min(100, (reconciledCount / totalCount) * 100));
                         const matchedDeg = (matchedPct / 100) * 360;
                         return `conic-gradient(#10b981 0deg, #10b981 ${matchedDeg}deg, #ef4444 ${matchedDeg}deg, #ef4444 360deg)`;
                       })(),
@@ -2152,9 +2153,10 @@ const MarketplaceReconciliation: React.FC = () => {
                           fontWeight: 500,
                           color: (() => {
                             const s = mainSummary?.summary as any;
-                            const unreconciledAmount = Number(s?.total_unreconciled_amount || 0);
-                            const baseAmount = Number(s?.net_sales_amount || 0);
-                            const pct = baseAmount === 0 ? 100 : Math.max(0, 100 - ((unreconciledAmount / baseAmount) * 100));
+                            const reconciledCount = Number(s?.total_reconciled_count || 0);
+                            const unreconciledCount = Number(s?.total_unreconciled_count || 0);
+                            const totalCount = reconciledCount + unreconciledCount;
+                            const pct = totalCount === 0 ? 100 : Math.max(0, (reconciledCount / totalCount) * 100);
                             return getReconciliationColor(pct);
                           })(),
                           fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -2164,9 +2166,10 @@ const MarketplaceReconciliation: React.FC = () => {
                         }}>
                           {(() => {
                             const s = mainSummary?.summary as any;
-                            const unreconciledAmount = Number(s?.total_unreconciled_amount || 0);
-                            const baseAmount = Number(s?.net_sales_amount || 0);
-                            const pct = baseAmount === 0 ? 100 : Math.max(0, 100 - ((unreconciledAmount / baseAmount) * 100));
+                            const reconciledCount = Number(s?.total_reconciled_count || 0);
+                            const unreconciledCount = Number(s?.total_unreconciled_count || 0);
+                            const totalCount = reconciledCount + unreconciledCount;
+                            const pct = totalCount === 0 ? 100 : Math.max(0, (reconciledCount / totalCount) * 100);
                             return `${pct.toFixed(1)}%`;
                           })()}
                         </Typography>
@@ -2174,7 +2177,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     </Box>
                   </Box>
 
-                  {/* Difference Amount Card */}
+                  {/* Total Unreconciled Transactions Card */}
                     <Box sx={{
                     width: '100%',
                     p: 2,
@@ -2189,21 +2192,15 @@ const MarketplaceReconciliation: React.FC = () => {
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
                         }}>
-                          Difference Amount
+                          Total Unreconciled Transactions
                         </Typography>
                     <Typography variant="h5" sx={{
-                      color: (() => {
-                        const diff = Number(mainSummary?.UnReconcile?.summary?.total_difference_amount || 0);
-                        const s = mainSummary?.summary as any;
-                        const baseAmount = Number(s?.net_sales_amount || 0);
-                        const pct = baseAmount === 0 ? 100 : Math.max(0, 100 - (Math.abs(diff) / baseAmount) * 100);
-                        return getReconciliationColor(pct);
-                      })(),
+                      color: '#1f2937',
                         fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                         fontWeight: 700,
                       letterSpacing: '-0.02em'
                       }}>
-                      {formatCurrency(Number(mainSummary?.UnReconcile?.summary?.total_difference_amount || 0))}
+                      {Number(mainSummary?.summary?.total_unreconciled_count || 0).toLocaleString()}
                       </Typography>
                   </Box>
                 </Box>
@@ -2226,12 +2223,15 @@ const MarketplaceReconciliation: React.FC = () => {
             }}>
               <CardContent sx={{ p: 4 }}>
                 {(() => {
-                  const totalUnrecAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.amount || '0');
-                  const totalUnrecCount = reconciliationData.summaryData?.totalUnreconciled?.number || 0;
-                  const lessPaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.amount || '0');
-                  const lessPaymentCount = reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.number || 0;
-                  const morePaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.amount || '0');
-                  const morePaymentCount = reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.number || 0;
+                  // Use UnReconcile.summary strictly for mismatched transactions hero
+                  const unrecSummary = (mainSummary as any)?.UnReconcile?.summary || {};
+                  const totalUnrecAmount = Number(unrecSummary.total_difference_amount || 0);
+                  const totalUnrecCount = Number(unrecSummary.total_orders_count || 0);
+                  const lessPaymentAmount = Number(unrecSummary.total_less_payment_received_amount || 0);
+                  const lessPaymentCount = Number(unrecSummary.total_less_payment_received_orders || 0);
+                  const morePaymentAmount = Number(unrecSummary.total_more_payment_received_amount || 0);
+                  const morePaymentCount = Number(unrecSummary.total_more_payment_received_orders || 0);
+                  const amountColor = (v: number) => (v > 0 ? '#10b981' : v < 0 ? '#ef4444' : '#1f2937');
                   
                   // Providers for mismatched transactions from main-summary API (fallback to mock if unavailable)
                   const providerData = mainSummary
@@ -2279,7 +2279,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               }
                             }}
                           >
-                            View Full Report
+                            View Mismatched Transactions
                           </Button>
                         )}
                       </Box>
@@ -2312,12 +2312,19 @@ const MarketplaceReconciliation: React.FC = () => {
                         <Box>
                           {/* Reconciled Transactions Summary */}
                           {(() => {
-                            // Expected sales from mainSummary.summary
+                            // Revenue calculation: total_transactions_amount - total_unreconciled_amount
                             const s = mainSummary?.summary as any;
-                            const expectedSalesAmount = Number(s?.net_sales_amount || 0);
+                            const totalTransactionsAmount = Number(s?.total_transactions_amount || 0);
+                            const totalUnsettledAmount = Number(s?.total_unsettled_amount || 0);
+                            const expectedSalesAmount = totalTransactionsAmount - totalUnsettledAmount;
                             const expectedSalesCount = Number(s?.net_sales_orders || 0);
 
-                            // Compute matched totals from mainSummary.Reconcile providers
+                            // Matched totals from API response
+                            const matchedAmount = Number(s?.total_reconciled_amount || 0);
+                            const matchedCount = Number(s?.total_reconciled_count || 0);
+                            const percentSettled = expectedSalesAmount === 0 ? 0 : Math.min(100, (matchedAmount / expectedSalesAmount) * 100);
+
+                            // Keep the existing provider calculation for display purposes
                             const { gateways, cod } = splitGatewaysAndCod(mainSummary?.Reconcile);
                             const sumAmount = (arr: any[]) => arr.reduce((acc, x) => acc + Number(x?.totalSaleAmount || 0), 0);
                             const sumCount = (arr: any[]) => arr.reduce((acc, x) => acc + Number(x?.totalCount || 0), 0);
@@ -2325,9 +2332,8 @@ const MarketplaceReconciliation: React.FC = () => {
                             const gatewaysCount = sumCount(gateways);
                             const codAmount = sumAmount(cod);
                             const codCount = sumCount(cod);
-                            const settledAmount = gatewaysAmount + codAmount;
-                            const settledCount = gatewaysCount + codCount;
-                            const percentSettled = expectedSalesAmount === 0 ? 0 : Math.min(100, (settledAmount / expectedSalesAmount) * 100);
+                            const settledAmount = matchedAmount;
+                            const settledCount = matchedCount;
 
                             // Providers list using raw Reconcile values
                             const totalSettledAmount = settledAmount || 0;
@@ -2412,7 +2418,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                                         <Typography variant="body1" sx={{ color: '#374151', fontWeight: 600, fontSize: '1.1rem' }}>
-                                          Total Sales
+                                          Revenue
                                         </Typography>
                                         <Typography variant="h6" sx={{ color: '#111827', fontWeight: 700, fontSize: '1.2rem' }}>
                                           {formatCurrency(expectedSalesAmount)}
@@ -2423,15 +2429,15 @@ const MarketplaceReconciliation: React.FC = () => {
                                       </Typography>
                                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                                         <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
-                                          Matched
+                                          Matched&nbsp;<span style={{ marginLeft: 130 }}>{percentSettled.toFixed(1)}%</span>
                                         </Typography>
-                                        <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 700, fontSize: '1.2rem' }}>
-                                          {percentSettled.toFixed(1)}%
-                                        </Typography>
+                                        {/* <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 700, fontSize: '1.2rem' }}>
+                                          {formatCurrency(matchedAmount)}
+                                        </Typography> */}
                                       </Box>
-                                      <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
-                                        of Total Sales
-                                      </Typography>
+                                      {/* <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
+                                        {(matchedCount).toLocaleString('en-IN')} Orders ({percentSettled.toFixed(1)}%)
+                                      </Typography> */}
                                     </Box>
                                   </Box>
                                 </Box>
@@ -2544,31 +2550,59 @@ const MarketplaceReconciliation: React.FC = () => {
                                                       const percentMatched = denom === 0 ? 0 : (settledAmountForLp / denom) * 100;
                                                       const lp = { name: lpRaw.displayName, settledAmount: settledAmountForLp, orders: ordersForLp, percentMatched };
                                                       return (
-                                                      <Box key={lp.name} sx={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'space-between',
-                                                          py: 1,
-                                                        px: 2,
-                                                        borderRadius: 1.5,
-                                                        background: '#ffffff',
-                                                        border: '1px solid #e5e7eb'
-                                                      }}>
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                          <DeliveryIcon fontSize="small" sx={{ color: '#059669' }} />
-                                                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{lp.name}</Typography>
-                                                          <Chip label="Logistics" size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: '#ecfeff', color: '#164e63' }} />
+                                                        <Box key={lp.name}>
+                                                          <Box sx={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'space-between',
+                                                            py: 1,
+                                                            px: 2,
+                                                            borderRadius: 1.5,
+                                                            background: '#ffffff',
+                                                            border: '1px solid #e5e7eb'
+                                                          }}>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                              <DeliveryIcon fontSize="small" sx={{ color: '#059669' }} />
+                                                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{lp.name}</Typography>
+                                                              <Chip label="Logistics" size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: '#ecfeff', color: '#164e63' }} />
+                                                            </Box>
+                                                            <Box sx={{ textAlign: 'right' }}>
+                                                              <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(lp.settledAmount)}</Typography>
+                                                              <Typography variant="caption" sx={{ color: '#6b7280' }}>{lp.orders.toLocaleString('en-IN')} orders • </Typography>
+                                                              <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700 }}>
+                                                                {Number(lp.percentMatched || 0).toFixed(1)}% matched
+                                                              </Typography>
+                                                            </Box>
+                                                          </Box>
                                                         </Box>
-                                                        <Box sx={{ textAlign: 'right' }}>
-                                                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(lp.settledAmount)}</Typography>
-                                                          <Typography variant="caption" sx={{ color: '#6b7280' }}>{lp.orders.toLocaleString('en-IN')} orders • </Typography>
-                                                          <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700 }}>
-                                                            {Number(lp.percentMatched || 0).toFixed(1)}% matched
-                                                          </Typography>
-                                                        </Box>
-                                                      </Box>
-                                                    );
+                                                      );
                                                     })}
+                                                  </Box>
+                                                  {/* Minimal View Transactions Button for COD */}
+                                                  <Box sx={{ mt: 2, textAlign: 'right' }}>
+                                                    <Button
+                                                      variant="text"
+                                                      size="small"
+                                                      endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                      sx={{
+                                                        textTransform: 'none',
+                                                        fontSize: '0.8rem',
+                                                        fontWeight: 500,
+                                                        color: '#2563eb',
+                                                        p: 0,
+                                                        minWidth: 'auto',
+                                                        '&:hover': {
+                                                          backgroundColor: 'transparent',
+                                                          color: '#1d4ed8',
+                                                        }
+                                                      }}
+                                                      onClick={() => {
+                                                        // TODO: Replace with actual link when provided
+                                                        console.log('View Cash on Delivery transactions');
+                                                      }}
+                                                    >
+                                                      View Cash on Delivery transactions
+                                                    </Button>
                                                   </Box>
                                                 </Box>
                                               </MuiCollapse>
@@ -2583,12 +2617,10 @@ const MarketplaceReconciliation: React.FC = () => {
                                                   {(() => {
                                                     const grossSales = provider.amount; // amount displayed above
                                                     const assumedCommissionRate = 0.018; // 1.8%
-                                                    const fixedFee = 3000; // assumed fixed monthly/operational fee (demo)
                                                     const commissionAmount = Math.round(grossSales * assumedCommissionRate);
                                                     const gstRate = 0.18; // 18% GST on commission
                                                     const gstOnCommission = Math.round(commissionAmount * gstRate);
-                                                    const otherCharges = Math.round(grossSales * 0.001); // 0.1% misc charges (demo)
-                                                    const totalCharges = commissionAmount + gstOnCommission + otherCharges + fixedFee;
+                                                    const totalCharges = commissionAmount + gstOnCommission;
                                                     const paymentReceived = Math.max(0, grossSales - totalCharges);
                                                     return (
                                                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -2604,14 +2636,6 @@ const MarketplaceReconciliation: React.FC = () => {
                                                           <Typography variant="body2" sx={{ color: '#374151' }}>GST on commission (18%)</Typography>
                                                           <Typography variant="body2" sx={{ color: '#374151' }}>-{formatCurrency(gstOnCommission)}</Typography>
                                                         </Box>
-                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1, border: '1px solid #e5e7eb', borderRadius: 1.5, bgcolor: '#ffffff' }}>
-                                                          <Typography variant="body2" sx={{ color: '#374151' }}>Other charges</Typography>
-                                                          <Typography variant="body2" sx={{ color: '#374151' }}>-{formatCurrency(otherCharges)}</Typography>
-                                                        </Box>
-                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1, border: '1px solid #e5e7eb', borderRadius: 1.5, bgcolor: '#ffffff' }}>
-                                                          <Typography variant="body2" sx={{ color: '#374151' }}>Fixed / operational fees</Typography>
-                                                          <Typography variant="body2" sx={{ color: '#374151' }}>-{formatCurrency(fixedFee)}</Typography>
-                                                        </Box>
                                                         <Divider sx={{ my: 0.5 }} />
                                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1, border: '1px solid #e5e7eb', borderRadius: 1.5, bgcolor: '#f9fafb' }}>
                                                           <Typography variant="body2" sx={{ fontWeight: 700, color: '#111827' }}>Payment received</Typography>
@@ -2620,6 +2644,32 @@ const MarketplaceReconciliation: React.FC = () => {
                                                       </Box>
                                                     );
                                                   })()}
+                                                  {/* Minimal View Transactions Button */}
+                                                  <Box sx={{ mt: 2, textAlign: 'right' }}>
+                                                    <Button
+                                                      variant="text"
+                                                      size="small"
+                                                      endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                      sx={{
+                                                        textTransform: 'none',
+                                                        fontSize: '0.8rem',
+                                                        fontWeight: 500,
+                                                        color: '#2563eb',
+                                                        p: 0,
+                                                        minWidth: 'auto',
+                                                        '&:hover': {
+                                                          backgroundColor: 'transparent',
+                                                          color: '#1d4ed8',
+                                                        }
+                                                      }}
+                                                      onClick={() => {
+                                                        // TODO: Replace with actual link when provided
+                                                        console.log(`View ${provider.name} transactions`);
+                                                      }}
+                                                    >
+                                                      View {provider.name} transactions
+                                                    </Button>
+                                                  </Box>
                                                 </Box>
                                               </MuiCollapse>
                                             )}
@@ -2728,12 +2778,28 @@ const MarketplaceReconciliation: React.FC = () => {
                               type: 'cod' as const,
                             });
 
+                            // Aggregate COD providers into a single expandable item
+                            const codTotalAmount = cod.reduce((sum, c) => sum + Number(c.totalSaleAmount || 0), 0);
+                            const codTotalCount = cod.reduce((sum, c) => sum + Number(c.totalCount || 0), 0);
                             const pendingPaymentProviders = [
                               ...gateways.map(mapGateway),
-                              ...cod.map(mapCod),
+                              ...(cod.length > 0
+                                ? [{
+                                    name: 'Cash on Delivery',
+                                    key: 'cod',
+                                    amount: codTotalAmount,
+                                    count: codTotalCount,
+                                    color: '#10b981',
+                                    type: 'cod' as const,
+                                  }]
+                                : []),
                             ];
 
-                            const pendingPaymentPieData = pendingPaymentProviders.map(p => ({
+                            // Pie should reflect all providers including individual COD partners
+                            const pendingPaymentPieData = [
+                              ...gateways.map(mapGateway),
+                              ...cod.map(mapCod),
+                            ].map((p) => ({
                               name: p.name,
                               value: p.amount,
                               color: p.color,
@@ -2744,18 +2810,16 @@ const MarketplaceReconciliation: React.FC = () => {
                               <>
                                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                                   <Box>
-                                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(totalUnsettledAmount)}</Typography>
-                                    <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>Unsettled Amount</Typography>
+                                    <Typography sx={{ fontWeight: 800, color: '#1f2937', letterSpacing: '-0.02em', fontSize: { xs: '1.75rem', md: '2.25rem' }, lineHeight: 1 }}>
+                                      {formatCurrency(pendingPaymentAmount)}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: '#6b7280' }}>Pending Payment Amount</Typography>
                                   </Box>
                                   <Box sx={{ textAlign: 'right' }}>
-                                    <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>Pending payment</Typography>
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-                                        <Typography variant="body2" sx={{ color: '#b45309', fontWeight: 600 }}>Pending Payment</Typography>
-                                        <Typography variant="subtitle2" sx={{ color: '#d97706', fontWeight: 700 }}>{formatCurrency(pendingPaymentAmount)}</Typography>
-                                      </Box>
-                                      <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>{pendingPaymentCount.toLocaleString('en-IN')} Orders</Typography>
-                                    </Box>
+                                    <Typography sx={{ fontWeight: 800, color: '#1f2937', letterSpacing: '-0.02em', fontSize: { xs: '1.75rem', md: '2.25rem' }, lineHeight: 1 }}>
+                                      {pendingPaymentCount.toLocaleString('en-IN')}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: '#6b7280' }}>Orders</Typography>
                                   </Box>
                                 </Box>
 
@@ -2764,16 +2828,118 @@ const MarketplaceReconciliation: React.FC = () => {
                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                                       <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1f2937' }}>Pending Payment by Providers</Typography>
                                       {pendingPaymentProviders.map((provider, idx) => (
-                                        <Box key={`up-${provider.key}-${idx}`} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, px: 2, borderRadius: 1.5, background: '#f9fafb', border: '1px solid #f1f3f4' }}>
-                                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                            <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: provider.color }} />
-                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{provider.name}</Typography>
-                                            <Chip label={provider.type === 'cod' ? 'COD' : 'Payment'} size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: provider.type === 'cod' ? '#d1fae5' : '#dbeafe', color: provider.type === 'cod' ? '#065f46' : '#1e40af' }} />
+                                        <Box key={`up-${provider.key}-${idx}`}>
+                                          <Box
+                                            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, px: 2, borderRadius: 1.5, background: '#f9fafb', border: '1px solid #f1f3f4', cursor: provider.key === 'cod' ? 'pointer' : 'default', transition: 'background 0.2s', '&:hover': { background: provider.key === 'cod' ? '#f3f4f6' : '#f9fafb' } }}
+                                            onClick={() => {
+                                              if (provider.key === 'cod') {
+                                                setIsCodExpanded((v) => !v);
+                                              }
+                                            }}
+                                            role={provider.key === 'cod' ? 'button' : undefined}
+                                            aria-expanded={provider.key === 'cod' ? isCodExpanded : undefined}
+                                          >
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                              <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: provider.color }} />
+                                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{provider.name}</Typography>
+                                                {provider.key === 'cod' && (
+                                                  <ExpandMoreIcon 
+                                                    sx={{ 
+                                                      fontSize: 20,
+                                                      color: '#6b7280', 
+                                                      transition: 'transform 0.2s', 
+                                                      transform: isCodExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+                                                    }} 
+                                                  />
+                                                )}
+                                              </Box>
+                                              <Chip label={provider.type === 'cod' ? 'COD' : 'Payment'} size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: provider.type === 'cod' ? '#d1fae5' : '#dbeafe', color: provider.type === 'cod' ? '#065f46' : '#1e40af' }} />
+                                            </Box>
+                                            <Box sx={{ textAlign: 'right' }}>
+                                              <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(provider.amount)}</Typography>
+                                              <Typography variant="caption" sx={{ color: '#6b7280' }}>{provider.count.toLocaleString('en-IN')} orders</Typography>
+                                            </Box>
                                           </Box>
-                                          <Box sx={{ textAlign: 'right' }}>
-                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(provider.amount)}</Typography>
-                                            <Typography variant="caption" sx={{ color: '#6b7280' }}>{provider.count.toLocaleString('en-IN')} orders</Typography>
-                                          </Box>
+                                          {/* Minimal View Transactions Button for Payment Gateways in Unsettled */}
+                                          {provider.key !== 'cod' && (
+                                            <Box sx={{ mt: 1, textAlign: 'right' }}>
+                                              <Button
+                                                variant="text"
+                                                size="small"
+                                                endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                sx={{
+                                                  textTransform: 'none',
+                                                  fontSize: '0.8rem',
+                                                  fontWeight: 500,
+                                                  color: '#2563eb',
+                                                  p: 0,
+                                                  minWidth: 'auto',
+                                                  '&:hover': {
+                                                    backgroundColor: 'transparent',
+                                                    color: '#1d4ed8',
+                                                  }
+                                                }}
+                                                onClick={() => {
+                                                  // TODO: Replace with actual link when provided
+                                                  console.log(`View ${provider.name} unsettled transactions`);
+                                                }}
+                                              >
+                                                View {provider.name} transactions
+                                              </Button>
+                                            </Box>
+                                          )}
+                                          {/* Expandable list of COD partners for unsettled pending payment */}
+                                          {provider.key === 'cod' && (
+                                            <MuiCollapse in={isCodExpanded} timeout="auto" unmountOnExit>
+                                              <Box sx={{ mt: 1, ml: { xs: 0, md: 4 } }}>
+                                                <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1 }}>
+                                                  Logistics partners with pending payment
+                                                </Typography>
+                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                  {cod.map((lp) => (
+                                                    <Box key={lp.code} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, px: 2, borderRadius: 1.5, background: '#ffffff', border: '1px solid #e5e7eb' }}>
+                                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                        <DeliveryIcon fontSize="small" sx={{ color: '#059669' }} />
+                                                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{lp.displayName}</Typography>
+                                                        <Chip label="Logistics" size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: '#ecfeff', color: '#164e63' }} />
+                                                      </Box>
+                                                      <Box sx={{ textAlign: 'right' }}>
+                                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(Number(lp.totalSaleAmount || 0))}</Typography>
+                                                        <Typography variant="caption" sx={{ color: '#6b7280' }}>{Number(lp.totalCount || 0).toLocaleString('en-IN')} orders</Typography>
+                                                      </Box>
+                                                    </Box>
+                                                  ))}
+                                                </Box>
+                                                {/* Minimal View Transactions Button for COD in Unsettled */}
+                                                <Box sx={{ mt: 2, textAlign: 'right' }}>
+                                                  <Button
+                                                    variant="text"
+                                                    size="small"
+                                                    endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                    sx={{
+                                                      textTransform: 'none',
+                                                      fontSize: '0.8rem',
+                                                      fontWeight: 500,
+                                                      color: '#2563eb',
+                                                      p: 0,
+                                                      minWidth: 'auto',
+                                                      '&:hover': {
+                                                        backgroundColor: 'transparent',
+                                                        color: '#1d4ed8',
+                                                      }
+                                                    }}
+                                                    onClick={() => {
+                                                      // TODO: Replace with actual link when provided
+                                                      console.log('View Cash on Delivery unsettled transactions');
+                                                    }}
+                                                  >
+                                                    View Cash on Delivery transactions
+                                                  </Button>
+                                                </Box>
+                                              </Box>
+                                            </MuiCollapse>
+                                          )}
                                         </Box>
                                       ))}
                                     </Box>
@@ -2785,12 +2951,18 @@ const MarketplaceReconciliation: React.FC = () => {
                                         <ResponsiveContainer>
                                           <PieChart>
                                             <Pie data={pendingPaymentPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={70} paddingAngle={2}>
-                                              {pendingPaymentPieData.map((item, i) => (<Cell key={`upp-${i}`} fill={item.color} />))}
+                                              {(() => {
+                                                const PIE_COLORS = ['#2563eb','#1e40af','#0ea5e9','#38bdf8','#10b981','#6366f1','#f59e0b','#14b8a6','#ef4444','#9333ea','#c2410c','#059669','#0f766e','#84cc16','#64748b'];
+                                                return pendingPaymentPieData.map((_, i) => (
+                                                  <Cell key={`upp-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                                                ));
+                                              })()}
                                             </Pie>
                                             <RechartsTooltip formatter={(value) => formatCurrency(Number(value))} />
                                           </PieChart>
                                         </ResponsiveContainer>
                                       </Box>
+                                      {/* legend removed as per request */}
                                     </Box>
                                   </Grid>
                                 </Grid>
@@ -2819,7 +2991,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             letterSpacing: '-0.02em',
                             fontSize: '2rem'
                           }}>
-                            {formatCurrency(totalUnrecAmount)}
+                            {formatCurrency(Math.abs(totalUnrecAmount))}
                           </Typography>
                           <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
                             {(totalUnrecCount).toLocaleString('en-IN')} Orders
@@ -2834,8 +3006,8 @@ const MarketplaceReconciliation: React.FC = () => {
                               <Typography variant="body1" sx={{ color: '#b91c1c', fontWeight: 600, fontSize: '1.1rem' }}>
                                 Less Payment Received
                               </Typography>
-                              <Typography variant="h6" sx={{ color: '#ef4444', fontWeight: 700, fontSize: '1.2rem' }}>
-                                {formatCurrency(lessPaymentAmount)}
+                              <Typography variant="h6" sx={{ color: amountColor(lessPaymentAmount), fontWeight: 700, fontSize: '1.2rem' }}>
+                                {formatCurrency(Math.abs(lessPaymentAmount))}
                               </Typography>
                             </Box>
                             <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
@@ -2845,7 +3017,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
                                 More Payment Received
                               </Typography>
-                              <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 700, fontSize: '1.2rem' }}>
+                              <Typography variant="h6" sx={{ color: amountColor(morePaymentAmount), fontWeight: 700, fontSize: '1.2rem' }}>
                                 {formatCurrency(morePaymentAmount)}
                               </Typography>
                             </Box>
@@ -2942,67 +3114,351 @@ const MarketplaceReconciliation: React.FC = () => {
 
                           {unreconciledTab === 1 && (
                             <Box>
-                              <Typography variant="h6" sx={{ 
-                                fontWeight: 600, 
-                                color: '#1f2937', 
-                                mb: 2,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 1
-                              }}>
-                                🏢 Unreconciled by Providers
-                              </Typography>
-                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                {providerData.map((provider, idx) => (
-                                  <Grow in key={`${provider.name}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
-                                    <Box sx={{ 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'space-between', 
-                                      py: 2, 
-                                      px: 3, 
-                                      borderRadius: 2, 
-                                      background: '#f9fafb', 
-                                      border: '1px solid #f1f3f4',
-                                      transition: 'all 0.2s ease',
-                                      '&:hover': {
-                                        background: '#f3f4f6',
-                                        borderColor: '#e5e7eb'
-                                      }
+                              {(() => {
+                                // Build providers UI identical to matched section, but source numbers from UnReconcile
+                                const splitUnrec = splitGatewaysAndCod(mainSummary?.UnReconcile);
+                                const gatewaysUnrec = splitUnrec.gateways;
+                                const codUnrec = splitUnrec.cod;
+
+                                const gatewaysAmount = gatewaysUnrec.reduce((sum, g) => sum + Number(g.totalSaleAmount || 0), 0);
+                                const gatewaysCount = gatewaysUnrec.reduce((sum, g) => sum + Number(g.totalCount || 0), 0);
+                                const codAmount = codUnrec.reduce((sum, c) => sum + Number(c.totalSaleAmount || 0), 0);
+                                const codCount = codUnrec.reduce((sum, c) => sum + Number(c.totalCount || 0), 0);
+
+                                const providersBase = [
+                                  ...gatewaysUnrec.map(g => ({
+                                    name: g.displayName,
+                                    key: g.code,
+                                    type: 'payment' as const,
+                                    color: '#2563eb',
+                                    amount: Number(g.totalSaleAmount || 0),
+                                    count: Number(g.totalCount || 0),
+                                    commission: Number(g.totalCommission || 0),
+                                    gstOnCommission: Number(g.totalGstOnCommission || 0),
+                                  })),
+                                  ...(codUnrec.length > 0 ? [{
+                                    name: 'Cash on Delivery',
+                                    key: 'cod',
+                                    type: 'cod' as const,
+                                    color: '#10b981',
+                                    amount: codAmount,
+                                    count: codCount,
+                                  }] : []),
+                                ];
+
+                                // Compute percent matched using Reconcile vs UnReconcile split (same logic as matched section)
+                                const splitRec = splitGatewaysAndCod(mainSummary?.Reconcile);
+                                const codRecAmount = splitRec.cod.reduce((sum, c) => sum + Number(c.totalSaleAmount || 0), 0);
+
+                                const providers = providersBase.map((p) => {
+                                  if (p.key === 'cod') {
+                                    const matchedAmount = Number(codRecAmount || 0);
+                                    const unmatchedAmount = Number(codAmount || 0);
+                                    const denom = matchedAmount + unmatchedAmount;
+                                    const percentMismatched = denom === 0 ? 0 : (unmatchedAmount / denom) * 100;
+                                    return {
+                                      ...p,
+                                      share: (gatewaysAmount + codAmount) === 0 ? 0 : (Number(p.amount) / (gatewaysAmount + codAmount)),
+                                      percentMismatched,
+                                    };
+                                  }
+                                  const matchedForProvider = Number((splitRec.gateways.find(g => g.code === p.key))?.totalSaleAmount || 0);
+                                  const unmatchedForProvider = Number(p.amount || 0);
+                                  const denom = matchedForProvider + unmatchedForProvider;
+                                  const percentMismatched = denom === 0 ? 0 : (unmatchedForProvider / denom) * 100;
+                                  return {
+                                    ...p,
+                                    share: (gatewaysAmount + codAmount) === 0 ? 0 : (Number(p.amount) / (gatewaysAmount + codAmount)),
+                                    percentMismatched,
+                                  };
+                                });
+
+                                return (
+                                  <>
+                                    <Typography variant="h6" sx={{ 
+                                      fontWeight: 600, 
+                                      color: '#1f2937', 
+                                      mb: 2,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 1
                                     }}>
-                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                        <Box sx={{
-                                          width: 8,
-                                          height: 8,
-                                          borderRadius: '50%',
-                                          backgroundColor: provider.type === 'payment' ? '#3b82f6' : '#10b981'
-                                        }} />
-                                        <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
-                                          {provider.name}
-                                        </Typography>
-                                        <Chip 
-                                          label={provider.type === 'payment' ? 'Payment' : 'Logistics'} 
-                                          size="small" 
-                                          sx={{ 
-                                            fontSize: '0.75rem',
-                                            height: 20,
-                                            backgroundColor: provider.type === 'payment' ? '#dbeafe' : '#d1fae5',
-                                            color: provider.type === 'payment' ? '#1e40af' : '#065f46'
-                                          }} 
-                                        />
-                                      </Box>
-                                      <Box sx={{ textAlign: 'right' }}>
-                                        <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
-                                          {formatCurrency(provider.amount)}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                                          {provider.count} orders
-                                        </Typography>
-                                      </Box>
-                                    </Box>
-                                  </Grow>
-                                ))}
-                              </Box>
+                                      🏢 Unreconciled by Providers
+                                    </Typography>
+                                    <Grid container spacing={2}>
+                                      <Grid item xs={12} md={6}>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                          {providers.map((provider, idx) => (
+                                            <Grow in key={`${provider.key}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
+                                              <Box>
+                                                <Box sx={{ 
+                                                  display: 'flex', 
+                                                  alignItems: 'center', 
+                                                  justifyContent: 'space-between', 
+                                                  py: 1.25, 
+                                                  px: 3, 
+                                                  borderRadius: 2, 
+                                                  background: '#f9fafb', 
+                                                  border: '1px solid #f1f3f4',
+                                                  transition: 'all 0.2s ease',
+                                                  cursor: 'pointer',
+                                                  '&:hover': {
+                                                    background: '#f3f4f6',
+                                                    borderColor: '#e5e7eb'
+                                                  }
+                                                }}
+                                                  onClick={() => {
+                                                    if (provider.key === 'cod') {
+                                                      setIsCodExpanded((v) => !v);
+                                                      setExpandedProviderKey(null);
+                                                    } else {
+                                                      setExpandedProviderKey((prev) => (prev === provider.key ? null : provider.key));
+                                                      setIsCodExpanded(false);
+                                                    }
+                                                  }}
+                                                  role={'button'}
+                                                  aria-expanded={provider.key === 'cod' ? isCodExpanded : expandedProviderKey === provider.key}
+                                                >
+                                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                    <Box sx={{
+                                                      width: 8,
+                                                      height: 8,
+                                                      borderRadius: '50%',
+                                                      backgroundColor: provider.color
+                                                    }} />
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                      <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
+                                                        {provider.name}
+                                                      </Typography>
+                                                      <ExpandMoreIcon 
+                                                        sx={{ 
+                                                          fontSize: 22,
+                                                          color: '#6b7280',
+                                                          transition: 'transform 0.2s',
+                                                          transform: (provider.key === 'cod' ? (isCodExpanded ? 'rotate(180deg)' : 'rotate(0deg)') : (expandedProviderKey === provider.key ? 'rotate(180deg)' : 'rotate(0deg)'))
+                                                        }}
+                                                      />
+                                                    </Box>
+                                                    <Chip 
+                                                      label={provider.key === 'cod' ? 'COD' : 'Payment'} 
+                                                      size="small" 
+                                                      sx={{ 
+                                                        fontSize: '0.75rem',
+                                                        height: 20,
+                                                        backgroundColor: provider.key === 'cod' ? '#d1fae5' : '#dbeafe',
+                                                        color: provider.key === 'cod' ? '#065f46' : '#1e40af'
+                                                      }} 
+                                                    />
+                                                  </Box>
+                                                  <Box sx={{ textAlign: 'right' }}>
+                                                    <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1rem' }}>
+                                                      {formatCurrency(provider.amount)}
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                                                      {provider.count.toLocaleString('en-IN')} orders
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ color: '#ef4444', fontWeight: 700 }}>
+                                                      {Number(provider.percentMismatched || 0).toFixed(1)}% mismatched
+                                                    </Typography>
+                                                  </Box>
+                                                </Box>
+                                                {/* COD logistics partners expandable details (sourced from UnReconcile for amounts/counts) */}
+                                                {provider.key === 'cod' && (
+                                                  <MuiCollapse in={isCodExpanded} timeout="auto" unmountOnExit>
+                                                    <Box sx={{ mt: 1.5, ml: { xs: 0, md: 4 } }}>
+                                                      <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1 }}>
+                                                        Logistics partners who settled
+                                                      </Typography>
+                                                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                        {codUnrec.map((lpRaw) => {
+                                                          const unrecAmountForLp = Number(lpRaw.totalSaleAmount || 0);
+                                                          const ordersForLp = Number(lpRaw.totalCount || 0);
+                                                          // matched for this LP from Reconcile.cod
+                                                          const recCodArray = splitRec.cod;
+                                                          const matchedForLp = Number((recCodArray.find(c => c.code === lpRaw.code))?.totalSaleAmount || 0);
+                                                          const denom = matchedForLp + unrecAmountForLp;
+                                                          const percentMismatched = denom === 0 ? 0 : (unrecAmountForLp / denom) * 100;
+                                                          const lp = { name: lpRaw.displayName, amount: unrecAmountForLp, orders: ordersForLp, percentMismatched };
+                                                          return (
+                                                            <Box key={lp.name} sx={{
+                                                              display: 'flex',
+                                                              alignItems: 'center',
+                                                              justifyContent: 'space-between',
+                                                              py: 1,
+                                                              px: 2,
+                                                              borderRadius: 1.5,
+                                                              background: '#ffffff',
+                                                              border: '1px solid #e5e7eb'
+                                                            }}>
+                                                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                                <DeliveryIcon fontSize="small" sx={{ color: '#059669' }} />
+                                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{lp.name}</Typography>
+                                                                <Chip label="Logistics" size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: '#ecfeff', color: '#164e63' }} />
+                                                              </Box>
+                                                              <Box sx={{ textAlign: 'right' }}>
+                                                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(lp.amount)}</Typography>
+                                                                <Typography variant="caption" sx={{ color: '#6b7280' }}>{lp.orders.toLocaleString('en-IN')} orders • </Typography>
+                                                                <Typography variant="caption" sx={{ color: '#ef4444', fontWeight: 700 }}>
+                                                                  {Number(lp.percentMismatched || 0).toFixed(1)}% mismatched
+                                                                </Typography>
+                                                              </Box>
+                                                            </Box>
+                                                          );
+                                                        })}
+                                                      </Box>
+                                                      {/* Minimal View Transactions Button for COD in Mismatched */}
+                                                      <Box sx={{ mt: 2, textAlign: 'right' }}>
+                                                        <Button
+                                                          variant="text"
+                                                          size="small"
+                                                          endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                          sx={{
+                                                            textTransform: 'none',
+                                                            fontSize: '0.8rem',
+                                                            fontWeight: 500,
+                                                            color: '#2563eb',
+                                                            p: 0,
+                                                            minWidth: 'auto',
+                                                            '&:hover': {
+                                                              backgroundColor: 'transparent',
+                                                              color: '#1d4ed8',
+                                                            }
+                                                          }}
+                                                          onClick={() => {
+                                                            // TODO: Replace with actual link when provided
+                                                            console.log('View Cash on Delivery mismatched transactions');
+                                                          }}
+                                                        >
+                                                          View Cash on Delivery transactions
+                                                        </Button>
+                                                      </Box>
+                                                    </Box>
+                                                  </MuiCollapse>
+                                                )}
+                                                {/* Gateway provider details area (kept placeholder for parity) */}
+                                                {provider.key !== 'cod' && (
+                                                  <MuiCollapse in={expandedProviderKey === provider.key} timeout="auto" unmountOnExit>
+                                                    <Box sx={{ mt: 1.5, ml: { xs: 0, md: 4 } }}>
+                                                      <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1 }}>
+                                                        Charges & Settlement details
+                                                      </Typography>
+                                                      {(() => {
+                                                        const grossSales = Number(provider.amount || 0);
+                                                        const gateway = gatewaysUnrec.find(g => g.code === provider.key);
+                                                        const commissionAmount = Number(gateway?.totalCommission || 0);
+                                                        const gstOnCommission = Number(gateway?.totalGstOnCommission || 0);
+                                                        const totalCharges = commissionAmount + gstOnCommission;
+                                                        const settlementReceivable = Math.max(0, grossSales - totalCharges);
+                                                        return (
+                                                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1, border: '1px solid #e5e7eb', borderRadius: 1.5, bgcolor: '#fff' }}>
+                                                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>Gross sales via {provider.name}</Typography>
+                                                              <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(grossSales)}</Typography>
+                                                            </Box>
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1, border: '1px solid #e5e7eb', borderRadius: 1.5, bgcolor: '#ffffff' }}>
+                                                              <Typography variant="body2" sx={{ color: '#374151' }}>Total commission</Typography>
+                                                              <Typography variant="body2" sx={{ color: '#374151' }}>-{formatCurrency(commissionAmount)}</Typography>
+                                                            </Box>
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1, border: '1px solid #e5e7eb', borderRadius: 1.5, bgcolor: '#ffffff' }}>
+                                                              <Typography variant="body2" sx={{ color: '#374151' }}>GST on commission</Typography>
+                                                              <Typography variant="body2" sx={{ color: '#374151' }}>-{formatCurrency(gstOnCommission)}</Typography>
+                                                            </Box>
+                                                            <Divider sx={{ my: 0.5 }} />
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 2, py: 1, border: '1px solid #e5e7eb', borderRadius: 1.5, bgcolor: '#ffffff' }}>
+                                                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>Settlement receivable</Typography>
+                                                              <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(settlementReceivable)}</Typography>
+                                                            </Box>
+                                                            <Typography variant="caption" sx={{ color: '#6b7280', px: 1 }}>
+                                                              Orders: {provider.count?.toLocaleString('en-IN')}
+                                                            </Typography>
+                                                          </Box>
+                                                        );
+                                                      })()}
+                                                      {/* Minimal View Transactions Button for Gateway in Mismatched */}
+                                                      <Box sx={{ mt: 2, textAlign: 'right' }}>
+                                                        <Button
+                                                          variant="text"
+                                                          size="small"
+                                                          endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                          sx={{
+                                                            textTransform: 'none',
+                                                            fontSize: '0.8rem',
+                                                            fontWeight: 500,
+                                                            color: '#2563eb',
+                                                            p: 0,
+                                                            minWidth: 'auto',
+                                                            '&:hover': {
+                                                              backgroundColor: 'transparent',
+                                                              color: '#1d4ed8',
+                                                            }
+                                                          }}
+                                                          onClick={() => {
+                                                            // TODO: Replace with actual link when provided
+                                                            console.log(`View ${provider.name} mismatched transactions`);
+                                                          }}
+                                                        >
+                                                          View {provider.name} transactions
+                                                        </Button>
+                                                      </Box>
+                                                    </Box>
+                                                  </MuiCollapse>
+                                                )}
+                                              </Box>
+                                            </Grow>
+                                          ))}
+                                        </Box>
+                                      </Grid>
+                                      <Grid item xs={12} md={6}>
+                                        <Box sx={{ p: 2, border: '1px solid #f1f3f4', borderRadius: 2, background: '#fff', height: '100%' }}>
+                                          <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1 }}>
+                                            Provider Breakdown (Gateways + COD partners)
+                                          </Typography>
+                                          {(() => {
+                                            const split = splitGatewaysAndCod(mainSummary?.UnReconcile);
+                                            const palette = ['#2563eb', '#1e40af', '#0ea5e9', '#10b981', '#6366f1', '#f59e0b', '#7c3aed'];
+                                            const gatewaysPie = split.gateways.map((g, i) => ({ name: g.displayName, value: Number(g.totalSaleAmount || 0), color: palette[i % palette.length] }));
+                                            const codPie = split.cod.map((c, i) => ({ name: c.displayName, value: Number(c.totalSaleAmount || 0), color: palette[(i + gatewaysPie.length) % palette.length] }));
+                                            const pieData = [...gatewaysPie, ...codPie];
+                                            return (
+                                              <>
+                                                <Box sx={{ width: '100%', height: 240 }}>
+                                                  <ResponsiveContainer>
+                                                    <PieChart>
+                                                      <Pie
+                                                        data={pieData}
+                                                        dataKey="value"
+                                                        nameKey="name"
+                                                        cx="50%"
+                                                        cy="50%"
+                                                        innerRadius={66}
+                                                        outerRadius={80}
+                                                        paddingAngle={2}
+                                                      >
+                                                        {pieData.map((item, i) => (
+                                                          <Cell key={`unrec-cell-${i}`} fill={item.color} />
+                                                        ))}
+                                                      </Pie>
+                                                      <RechartsTooltip formatter={(value) => formatCurrency(Number(value))} />
+                                                    </PieChart>
+                                                  </ResponsiveContainer>
+                                                </Box>
+                                                <Box sx={{ mt: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75 }}>
+                                                  {pieData.map((item) => (
+                                                    <Box key={`unrec-legend-${item.name}`} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: item.color }} />
+                                                      <Typography variant="caption" sx={{ color: '#374151' }}>{item.name}: {formatCurrency(item.value)}</Typography>
+                                                    </Box>
+                                                  ))}
+                                                </Box>
+                                              </>
+                                            );
+                                          })()}
+                                        </Box>
+                                      </Grid>
+                                    </Grid>
+                                  </>
+                                );
+                              })()}
                             </Box>
                           )}
                         </>
@@ -3092,35 +3548,41 @@ const MarketplaceReconciliation: React.FC = () => {
         }}>
           <CardContent sx={{ p: 5 }}>
             {(() => {
-              const baseAmount = parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport?.amount || reconciliationData.summaryData.totalTransaction?.amount || '0');
-              // Build dynamic provider commission amounts from mainSummary.Reconcile providers
-              const allProviders = normalizeProvidersBlock(mainSummary?.Reconcile);
-              // Only payment gateways (Paytm, PayU) have commission & charges summary
-              const gatewayProviders = allProviders.filter(p => p.code === 'paytm' || p.code === 'payU');
-              if (gatewayProviders.length === 0) return null;
-              const totalSalesAcrossProviders = gatewayProviders.reduce((s, p) => s + p.totalSaleAmount, 0) || 1;
-              const totalCommissionAmount = gatewayProviders.reduce((s, p) => s + p.totalCommission + p.totalGstOnCommission, 0);
+              const commissionArray = (mainSummary as any)?.commission as Array<{
+                platform: string;
+                total_amount_settled: number;
+                total_commission: number;
+                total_gst_on_commission: number;
+              }> | undefined;
+              if (!commissionArray || commissionArray.length === 0) return null;
+
+              const byPlatform = (name: string) => commissionArray.find(c => c.platform?.toLowerCase() === name);
+              const paytm = byPlatform('paytm');
+              const payu = byPlatform('payu');
+
+              const totalCommissionCharges = (paytm?.total_commission || 0) + (payu?.total_commission || 0);
+              const totalGstOnCommission = (paytm?.total_gst_on_commission || 0) + (payu?.total_gst_on_commission || 0);
+
+              const fmtPct = (commissionPlusGst: number, base: number) => {
+                if (!base || base === 0) return '0.00%';
+                return `${((commissionPlusGst / base) * 100).toFixed(2)}%`;
+              };
+
+              // Prepare donut data (same colors as before)
               const palette2 = ['#7A5DBF', '#A79CDB', '#10B981', '#F59E0B', '#0EA5E9', '#6366F1', '#EF4444'];
-              const providerData = gatewayProviders.map((p, idx) => ({
-                name: p.displayName,
-                key: p.code,
-                color: palette2[idx % palette2.length],
-                amount: Math.round(p.totalCommission + p.totalGstOnCommission),
-                percentOfSales: ((p.totalCommission + p.totalGstOnCommission) / Math.max(1, baseAmount)) * 100,
-              }));
-              // charge types breakdown (dummy distribution across all providers)
-              const chargeTypes = [
-                { label: 'MDR / Commission', key: 'mdr', pct: 0.68, color: '#7A5DBF' },
-                { label: 'Platform Fee', key: 'platform', pct: 0.12, color: '#6EE7B7' },
-                { label: 'PG / Gateway Charges', key: 'pg', pct: 0.10, color: '#F59E0B' },
-                { label: 'Refund / Failure Charges', key: 'refund', pct: 0.05, color: '#EF4444' },
-                { label: 'Dispute / Chargeback', key: 'dispute', pct: 0.02, color: '#0EA5E9' },
-                { label: 'GST on Charges', key: 'gst', pct: 0.03, color: '#10B981' },
+              const providerOrder: Array<{ key: string; label: string; color: string }> = [
+                { key: 'paytm', label: 'Paytm', color: palette2[0] },
+                { key: 'payu', label: 'PayU', color: palette2[1] },
               ];
-              const chargesBreakdown = chargeTypes.map(c => ({
-                ...c,
-                amount: Math.round(totalCommissionAmount * c.pct)
-              }));
+              const providerData = providerOrder
+                .map(p => {
+                  const row = byPlatform(p.key);
+                  if (!row) return null;
+                  const amount = Math.round((row.total_commission || 0) + (row.total_gst_on_commission || 0));
+                  return { name: p.label, value: amount, color: p.color };
+                })
+                .filter(Boolean) as Array<{ name: string; value: number; color: string }>;
+
               return (
                 <>
                   <Typography variant="h3" sx={{ 
@@ -3134,13 +3596,13 @@ const MarketplaceReconciliation: React.FC = () => {
                   </Typography>
 
                   <Grid container spacing={3}>
-                    {/* Provider split donut */}
+                    {/* Donut chart (restored) */}
                     <Grid item xs={12} md={8}>
-                      <Box sx={{ height: 400 }}>
+                      <Box sx={{ height: 360 }}>
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
-                              data={providerData.map(p => ({ name: p.name, value: p.amount, color: p.color }))}
+                              data={providerData}
                               cx="50%"
                               cy="50%"
                               innerRadius={122}
@@ -3153,88 +3615,67 @@ const MarketplaceReconciliation: React.FC = () => {
                                 <Cell key={`prov-${idx}`} fill={p.color} />
                               ))}
                             </Pie>
-                            <RechartsTooltip
-                              formatter={(value: any, name: string) => [formatCurrency(Number(value)), name]}
-                            />
-                            <Legend
-                              verticalAlign="bottom"
-                              height={36}
-                              formatter={(value, entry) => (
-                                <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                                  {value}
-                                </span>
-                              )}
-                            />
+                            <RechartsTooltip formatter={(value: any, name: string) => [formatCurrency(Number(value)), name]} />
+                            <Legend verticalAlign="bottom" height={36} formatter={(value, entry) => (
+                              <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>{value}</span>
+                            )} />
                           </PieChart>
                         </ResponsiveContainer>
                       </Box>
                     </Grid>
-
-                    {/* KPI cards */}
+                    {/* KPI cards (totals) */}
                     <Grid item xs={12} md={4}>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        <Box sx={{
-                          p: 4,
-                          borderRadius: '16px',
-                          background: 'rgba(255, 255, 255, 0.9)',
-                          border: '1px solid rgba(229, 231, 235, 0.6)',
-                          textAlign: 'center'
-                        }}>
-                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>
-                            Total Commission
-                          </Typography>
-                          <Typography variant="h5" sx={{ mt: 1, color: '#1f2937', fontWeight: 600 }}>
-                            {formatCurrency(totalCommissionAmount)}
-                          </Typography>
-                          <Typography variant="body2" sx={{ mt: 0.5, color: '#059669', fontWeight: 600 }}>
-                            {baseAmount > 0 ? ((totalCommissionAmount / baseAmount) * 100).toFixed(2) : '0.00'}% of Net Sales
-                          </Typography>
+                        <Box sx={{ p: 4, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center' }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Commission Charges</Typography>
+                          <Typography variant="h5" sx={{ mt: 1, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
                         </Box>
-                        {providerData.map(p => (
-                          <Box key={p.key} sx={{
-                            p: 3,
-                            borderRadius: '14px',
-                            background: 'rgba(255,255,255,0.9)',
-                            border: '1px solid rgba(229,231,235,0.6)'
-                          }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                              <Typography variant="body2" sx={{ color: '#374151', fontWeight: 600 }}>{p.name}</Typography>
-                              <Typography variant="caption" sx={{ color: '#6b7280' }}>{p.percentOfSales.toFixed(2)}% of sales</Typography>
-                            </Box>
-                            <Typography variant="subtitle2" sx={{ color: p.color, fontWeight: 700 }}>
-                              {formatCurrency(p.amount)}
-                            </Typography>
-                          </Box>
-                        ))}
+                        <Box sx={{ p: 4, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center' }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total GST on Commission</Typography>
+                          <Typography variant="h5" sx={{ mt: 1, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalGstOnCommission)}</Typography>
+                        </Box>
                       </Box>
                     </Grid>
                   </Grid>
 
-                  {/* Charges breakdown */}
                   <Box sx={{ mt: 4 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 2, color: '#374151', fontWeight: 700 }}>
-                      Charges Breakdown (All Providers)
-                    </Typography>
                     <Grid container spacing={2}>
-                      {chargesBreakdown.map(c => {
-                        const pct = (c.amount / totalCommissionAmount) * 100;
-                        return (
-                          <Grid item xs={12} sm={6} md={4} key={c.key}>
-                            <Box sx={{ p: 2.5, border: '1px solid #e5e7eb', borderRadius: '12px', background: '#ffffff' }}>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                                <Typography variant="body2" sx={{ color: '#111827', fontWeight: 600 }}>{c.label}</Typography>
-                                <Typography variant="caption" sx={{ color: '#6b7280' }}>{pct.toFixed(1)}%</Typography>
-                              </Box>
-                              <Box sx={{ height: 8, bgcolor: '#f3f4f6', borderRadius: '9999px', overflow: 'hidden' }}>
-                                <Box sx={{ width: `${pct}%`, height: '100%', backgroundColor: c.color }} />
-                              </Box>
-                              <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#374151', fontWeight: 600 }}>
-                                {formatCurrency(c.amount)}
-                              </Typography>
+                      {paytm && (
+                        <Grid item xs={12} md={6}>
+                          <Box sx={{ p: 3, borderRadius: '14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(229,231,235,0.6)' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                              <Typography variant="body2" sx={{ color: '#374151', fontWeight: 700 }}>Paytm</Typography>
+                              <Typography variant="caption" sx={{ color: '#6b7280' }}>{fmtPct((paytm.total_commission + paytm.total_gst_on_commission), (paytm.total_amount_settled || 0))} of settled</Typography>
                             </Box>
-                          </Grid>
-                        );
-                      })}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
+                              <Typography variant="body2" sx={{ color: '#374151' }}>Commission</Typography>
+                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>{formatCurrency(paytm.total_commission)}</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                              <Typography variant="body2" sx={{ color: '#374151' }}>GST</Typography>
+                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>{formatCurrency(paytm.total_gst_on_commission)}</Typography>
+                            </Box>
+                          </Box>
+                        </Grid>
+                      )}
+                      {payu && (
+                        <Grid item xs={12} md={6}>
+                          <Box sx={{ p: 3, borderRadius: '14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(229,231,235,0.6)' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                              <Typography variant="body2" sx={{ color: '#374151', fontWeight: 700 }}>PayU</Typography>
+                              <Typography variant="caption" sx={{ color: '#6b7280' }}>{fmtPct((payu.total_commission + payu.total_gst_on_commission), (payu.total_amount_settled || 0))} of settled</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
+                              <Typography variant="body2" sx={{ color: '#374151' }}>Commission</Typography>
+                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>{formatCurrency(payu.total_commission)}</Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                              <Typography variant="body2" sx={{ color: '#374151' }}>GST</Typography>
+                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>{formatCurrency(payu.total_gst_on_commission)}</Typography>
+                            </Box>
+                          </Box>
+                        </Grid>
+                      )}
                     </Grid>
                   </Box>
                 </>

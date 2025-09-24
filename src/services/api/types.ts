@@ -96,6 +96,13 @@ export interface MainSummaryResponse {
     total_unreconciled_amount: number;
     total_unreconciled_count: number;
   };
+  // Top-level commission summary for payment providers
+  commission?: Array<{
+    platform: string; // e.g., 'paytm' | 'payu'
+    total_amount_settled: number;
+    total_commission: number;
+    total_gst_on_commission: number;
+  }>;
   Reconcile: {
     providers: {
       paytm?: MainSummaryProviderEntry;
