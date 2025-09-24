@@ -53,6 +53,7 @@ export const API_CONFIG = {
     
     // Transactions
     TRANSACTIONS: '/recon/transactions',
+    TOTAL_TRANSACTIONS: '/recon/total-transactions',
     TRANSACTION_DETAILS: '/recon/transactions/:id',
     TRANSACTION_UPDATE: '/recon/transactions/:id',
     TRANSACTION_DELETE: '/recon/transactions/:id',

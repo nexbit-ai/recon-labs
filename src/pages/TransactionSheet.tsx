@@ -45,7 +45,9 @@ import {
 } from '@mui/material';
 import ColumnFilterControls from '../components/ColumnFilterControls';
 import { api } from '../services/api';
-import { OrdersResponse, OrderItem, MarketplaceReconciliationResponse } from '../services/api/types';
+import { apiService } from '../services/api/apiService';
+import { API_CONFIG } from '../services/api/config';
+import { OrdersResponse, OrderItem, MarketplaceReconciliationResponse, TotalTransactionsResponse, TransactionRow as ApiTransactionRow, TransactionColumn } from '../services/api/types';
 import {
   ArrowBack as ArrowBackIcon,
   Search as SearchIcon,
@@ -1329,6 +1331,26 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [tabCounts, setTabCounts] = useState<{ settled: number | null; unsettled: number | null }>({ settled: null, unsettled: null });
   const [metadata, setMetadata] = useState<TransactionMetadata | null>(null);
+  
+  // New state for total transactions API
+  const [totalTransactionsData, setTotalTransactionsData] = useState<TotalTransactionsResponse | null>(null);
+  const [useNewAPI, setUseNewAPI] = useState(true); // Flag to switch between old and new API
+
+  // Get current data based on which API is being used
+  const getCurrentData = (): any[] => {
+    if (useNewAPI && totalTransactionsData) {
+      return totalTransactionsData.data;
+    }
+    return allTransactionData;
+  };
+
+  // Get current columns based on which API is being used
+  const getCurrentColumns = () => {
+    if (useNewAPI && totalTransactionsData) {
+      return totalTransactionsData.columns.map(col => col.title);
+    }
+    return visibleColumns;
+  };
 
 
   // Rely on MUI Menu's built-in outside click handling
@@ -1850,13 +1872,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Fetch data on component mount
   useEffect(() => {
-    setLoading(true);
-    // Start with settled transactions (activeTab = 0)
-    fetchOrders(1, 'settlement_matched');
-    // Prefetch counts for all tabs
-    fetchTabCount('settlement_matched');
-    fetchTabCount('unsettled');
-  }, []);
+    if (useNewAPI) {
+      // Use new total transactions API
+      fetchTotalTransactions(1);
+    } else {
+      // Use old API
+      setLoading(true);
+      // Start with settled transactions (activeTab = 0)
+      fetchOrders(1, 'settlement_matched');
+      // Prefetch counts for all tabs
+      fetchTabCount('settlement_matched');
+      fetchTabCount('unsettled');
+    }
+  }, [useNewAPI]);
 
   // Apply filters function - called when Apply button is clicked
   const applyFilters = () => {
@@ -1978,6 +2006,62 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   };
 
+  // Fetch data from new total transactions API
+  const fetchTotalTransactions = async (pageNumber: number = 1) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params: any = {
+        page: pageNumber,
+        limit: 50, // Default page size
+        platform: 'd2c' // Only send platform parameter
+      };
+      
+      console.log('Fetching total transactions with params:', params);
+      
+      // Use custom API call with specific organization ID for this API only
+      const response = await apiService.get<TotalTransactionsResponse>(
+        API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS, 
+        params,
+        {
+          headers: {
+            'X-Org-ID': '6ce6ee73-e1ef-4020-ad74-4ee45e731201',
+            'X-API-Key': 'kapiva-7b485b6a865b2b4a3d728ef2fd4f3'
+          }
+        }
+      );
+      
+      if (response.success && response.data) {
+        setTotalTransactionsData(response.data);
+        setTotalCount(response.data.pagination.total_count);
+        setCurrentPage(response.data.pagination.page);
+        
+        // Update tab counts based on the data
+        const settledCount = response.data.data.filter(row => 
+          row.status === 'settlement_matched' || row.status === 'payment_received'
+        ).length;
+        const unsettledCount = response.data.data.filter(row => 
+          row.status === 'unsettled' || row.status === 'short_received' || row.status === 'excess_received'
+        ).length;
+        
+        setTabCounts({
+          settled: settledCount,
+          unsettled: unsettledCount
+        });
+        
+        console.log('Total transactions fetched successfully:', response.data);
+      } else {
+        setError('Failed to fetch transactions');
+      }
+    } catch (err: any) {
+      console.error('Error fetching total transactions:', err);
+      setError(err.message || 'Failed to fetch transactions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Handle search
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
@@ -2081,7 +2165,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   };
 
   // Transaction details popup handlers for Status column
-  const handleTransactionDetailsOpen = (event: React.MouseEvent<HTMLElement>, row: TransactionRow) => {
+  const handleTransactionDetailsOpen = (event: React.MouseEvent<HTMLElement>, row: any) => {
     event.preventDefault();
     event.stopPropagation();
     
@@ -2096,7 +2180,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Filter data based on search, date range, and column filters
   useEffect(() => {
-    if (allTransactionData.length > 0) {
+    if (getCurrentData().length > 0) {
       let filtered = getCurrentData();
     
       // Search filter
@@ -2111,7 +2195,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Date range filter
       if (dateRange.start || dateRange.end) {
         filtered = filtered.filter(row => {
-          const orderDate = new Date(row["Invoice Date"]);
+          const orderDate = new Date(row["Invoice Date"] || row["invoice_date"]);
           const startDate = dateRange.start ? new Date(dateRange.start) : null;
           const endDate = dateRange.end ? new Date(dateRange.end) : null;
           
@@ -2131,7 +2215,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         const meta = COLUMN_META[columnKey] || { type: 'string' as const };
 
           filtered = filtered.filter(row => {
-          const value = row[columnKey as keyof TransactionRow] as any;
+          const value = (row as any)[columnKey];
             if (value === null || value === undefined) return false;
             
           switch (meta.type) {
@@ -2182,8 +2266,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleChangePage = (event: unknown, newPage: number) => {
     const newPageNumber = newPage + 1; // Convert from 0-based to 1-based
     setPage(newPage);
-    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-    fetchOrders(newPageNumber, remark);
+    
+    if (useNewAPI) {
+      fetchTotalTransactions(newPageNumber);
+    } else {
+      const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+      fetchOrders(newPageNumber, remark);
+    }
   };
 
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2264,25 +2353,25 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setPage(0); // Reset to first page when changing tabs
     setCurrentPage(1); // Reset current page
     
-    // Determine the correct remark based on the new tab value
-    const remark = newValue === 0 ? 'settlement_matched' : 'unsettled';
-    console.log(`Fetching data for tab ${newValue} with remark: ${remark}`);
-    fetchOrders(1, remark); // Fetch first page data with correct remark
+    if (useNewAPI) {
+      // Use new API - status filtering is handled in fetchTotalTransactions
+      fetchTotalTransactions(1);
+    } else {
+      // Use old API
+      const remark = newValue === 0 ? 'settlement_matched' : 'unsettled';
+      console.log(`Fetching data for tab ${newValue} with remark: ${remark}`);
+      fetchOrders(1, remark); // Fetch first page data with correct remark
+    }
   };
 
   // Handle transaction row click
-  const handleTransactionClick = (transaction: TransactionRow, event: React.MouseEvent<HTMLElement>) => {
+  const handleTransactionClick = (transaction: any, event: React.MouseEvent<HTMLElement>) => {
     setSelectedTransaction(transaction);
     setAnchorEl(event.currentTarget);
   };
 
 
 
-  // Get current data based on active tab
-  const getCurrentData = () => {
-    // For pagination, we work with the current page data
-    return allTransactionData;
-  };
 
   // Get visible columns
   const getVisibleColumns = () => {
@@ -2538,7 +2627,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 }}>
                   <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
                     <TableRow>
-                                              {visibleColumns.map((column, index) => (
+                                              {getCurrentColumns().map((column, index) => (
                           <TableCell
                             key={`header-${column}`}
                           sx={{
@@ -2582,9 +2671,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       </TableRow>
                   </TableHead>
                   <TableBody>
-                    {loading && allTransactionData.length === 0 ? (
+                    {loading && getCurrentData().length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={visibleColumns.length} sx={{ textAlign: 'center', py: 6 }}>
+                        <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 6 }}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                             <CircularProgress size={40} sx={{ color: '#1f2937' }} />
                             <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500 }}>
@@ -2595,7 +2684,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       </TableRow>
                     ) : paginationLoading ? (
                       <TableRow>
-                        <TableCell colSpan={visibleColumns.length} sx={{ textAlign: 'center', py: 4 }}>
+                        <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                             <CircularProgress size={30} sx={{ color: '#3b82f6' }} />
                             <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>
@@ -2604,18 +2693,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           </Box>
                         </TableCell>
                       </TableRow>
-                    ) : filteredData.length === 0 ? (
+                    ) : getCurrentData().length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={visibleColumns.length} sx={{ textAlign: 'center', py: 4 }}>
+                        <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
                           <Typography variant="body2" sx={{ color: '#6b7280' }}>
                             No transactions found matching your criteria.
                           </Typography>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredData
+                      getCurrentData()
                         .map((row, rowIndex) => {
-                        const isSelected = (selectedTransaction?.["Order ID"] || selectedTransaction?.["Order Item ID"]) === (row["Order ID"] || row["Order Item ID"]);
+                        const isSelected = (selectedTransaction?.["Order ID"] || selectedTransaction?.["Order Item ID"]) === (row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"]);
                         return (
                           <React.Fragment key={rowIndex}>
                                                           <TableRow 
@@ -2625,27 +2714,58 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   position: 'relative',
                                 }}
                               >
-                        {visibleColumns.map((column, colIndex) => {
-                          const value = (row as any)[column];
+                        {getCurrentColumns().map((column, colIndex) => {
+                          // For new API, we need to map column titles to row keys
+                          let value;
+                          if (useNewAPI && totalTransactionsData) {
+                            const columnDef = totalTransactionsData.columns.find(col => col.title === column);
+                            if (columnDef) {
+                              value = (row as any)[columnDef.key];
+                            }
+                          } else {
+                            value = (row as any)[column];
+                          }
                           
                           // Format value based on type
                           let displayValue = value;
-                          if (column === 'Reason') {
-                            // Default reason to the remark for now
-                            displayValue = (row as any)['Remark'] || value || '-';
-                          } else if (typeof value === 'number') {
-                            if (column === 'Order Value' || column === 'Settlement Value' || column === 'Difference') {
-                              displayValue = formatCurrency(value);
-                            } else {
-                              displayValue = value.toLocaleString('en-IN');
+                          
+                          if (useNewAPI && totalTransactionsData) {
+                            // Use column type information for formatting
+                            const columnDef = totalTransactionsData.columns.find(col => col.title === column);
+                            if (columnDef) {
+                              switch (columnDef.type) {
+                                case 'currency':
+                                  displayValue = formatCurrency(Number(value) || 0);
+                                  break;
+                                case 'date':
+                                  displayValue = formatDate(String(value));
+                                  break;
+                                case 'enum':
+                                  displayValue = String(value || '');
+                                  break;
+                                default:
+                                  displayValue = String(value || '');
+                              }
                             }
-                          } else if (column.includes('Date')) {
-                            displayValue = formatDate(value);
+                          } else {
+                            // Old API formatting
+                            if (column === 'Reason') {
+                              // Default reason to the remark for now
+                              displayValue = (row as any)['Remark'] || value || '-';
+                            } else if (typeof value === 'number') {
+                              if (column === 'Order Value' || column === 'Settlement Value' || column === 'Difference') {
+                                displayValue = formatCurrency(value);
+                              } else {
+                                displayValue = value.toLocaleString('en-IN');
+                              }
+                            } else if (column.includes('Date')) {
+                              displayValue = formatDate(value);
+                            }
                           }
                           
                           return (
                             <TableCell
-                              key={`${(row["Order ID"] || row["Order Item ID"])}-${column}-${colIndex}`}
+                              key={`${(row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"])}-${column}-${colIndex}`}
                               sx={{
                                 background: '#ffffff',
                                 textAlign: 'center',

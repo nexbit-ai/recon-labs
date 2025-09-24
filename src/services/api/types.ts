@@ -351,4 +351,48 @@ export interface OrdersResponse {
     total: number;
     totalPages: number;
   };
+}
+
+// Total Transactions API Types
+export interface TransactionColumn {
+  key: string;
+  title: string;
+  type: 'string' | 'currency' | 'date' | 'enum';
+  values?: string[]; // For enum type
+}
+
+export interface TransactionBreakup {
+  settlement_value: number;
+  shipping_courier: string;
+  settlement_provider: string;
+  recon_status: string;
+  sale_order_status: string;
+  shipping_package_status_code: string;
+}
+
+export interface TransactionRow {
+  order_id: string;
+  order_value: number;
+  settlement_value: number;
+  invoice_date: string;
+  settlement_date?: string;
+  diff: number;
+  status: string;
+  platform: string;
+  breakups?: TransactionBreakup;
+}
+
+export interface TotalTransactionsResponse {
+  columns: TransactionColumn[];
+  data: TransactionRow[];
+  message: string;
+  pagination: {
+    current_count: number;
+    has_next: boolean;
+    has_prev: boolean;
+    limit: number;
+    page: number;
+    total_count: number;
+    total_pages: number;
+  };
 } 

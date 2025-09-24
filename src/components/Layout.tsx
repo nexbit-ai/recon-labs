@@ -36,6 +36,7 @@ import {
   ReportProblemOutlined as ReportProblemIcon,
   LogoutOutlined as LogoutIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
+  TableChartOutlined as TableChartIcon,
 } from '@mui/icons-material';
 import { Badge } from '@mui/material';
 // import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
@@ -48,6 +49,7 @@ const drawerWidth = 240;
 
 const menuItems = [
   { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation' },
+  { text: 'Transactions', icon: <TableChartIcon />, path: '/total-transactions' },
   { text: 'Dispute', icon: <ReportProblemIcon />, path: '/dispute' },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping' },
   { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist' },

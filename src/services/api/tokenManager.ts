@@ -1,4 +1,5 @@
 import JWTService, { JWTPayload, StytchSessionData } from '../auth/jwtService';
+import { API_CONFIG } from './config';
 
 class TokenManager {
   private jwtToken: string | null = null;
@@ -66,6 +67,10 @@ class TokenManager {
       this.apiKey = localStorage.getItem('api_key');
       if (this.apiKey) {
         console.log('🔄 API key loaded from localStorage');
+      } else {
+        // Fallback to config API key
+        this.apiKey = API_CONFIG.API_KEY;
+        console.log('🔄 Using fallback API key from config');
       }
     }
     return this.apiKey;
@@ -80,6 +85,10 @@ class TokenManager {
       this.orgId = localStorage.getItem('organization_id');
       if (this.orgId) {
         console.log('🔄 Organization ID loaded from localStorage');
+      } else {
+        // Fallback to config organization ID
+        this.orgId = API_CONFIG.ORG_ID;
+        console.log('🔄 Using fallback organization ID from config');
       }
     }
     return this.orgId;
@@ -90,17 +99,35 @@ class TokenManager {
    */
   getApiHeaders(): Record<string, string> {
     const jwtToken = this.getJWTToken();
+    const orgId = this.getOrgId();
     
     if (jwtToken && !JWTService.isTokenExpired(jwtToken)) {
-      // Use JWT token
-      return {
+      // Use JWT token with organization ID header
+      const headers: Record<string, string> = {
         'Authorization': `Bearer ${jwtToken}`,
+        'Content-Type': 'application/json'
+      };
+      
+      // Add organization ID header if available
+      if (orgId) {
+        headers['X-Org-ID'] = orgId;
+      }
+      
+      return headers;
+    }
+    
+    // Fallback to legacy API key + org ID if available
+    const apiKey = this.getApiKey();
+    if (apiKey && orgId) {
+      return {
+        'X-API-Key': apiKey,
+        'X-Org-ID': orgId,
         'Content-Type': 'application/json'
       };
     }
     
     // No credentials available
-    console.error('❌ No valid JWT credentials available for API requests');
+    console.error('❌ No valid credentials available for API requests');
     return {
       'Content-Type': 'application/json'
     };

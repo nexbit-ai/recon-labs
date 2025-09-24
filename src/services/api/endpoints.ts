@@ -8,7 +8,8 @@ import {
   PaginationParams, 
   FilterParams,
   PaginatedResponse,
-  MarketplaceReconciliationResponse
+  MarketplaceReconciliationResponse,
+  TotalTransactionsResponse
 } from './types';
 
 // Authentication API
@@ -82,6 +83,10 @@ export const transactionsAPI = {
   // Get transactions list
   getTransactions: (params?: DateRangeParams & PaginationParams & FilterParams) =>
     apiService.get<PaginatedResponse<any>>(API_CONFIG.ENDPOINTS.TRANSACTIONS, params),
+
+  // Get total transactions list with dynamic columns
+  getTotalTransactions: (params?: PaginationParams & FilterParams) =>
+    apiService.get<TotalTransactionsResponse>(API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS, params),
 
   // Get single transaction
   getTransaction: (id: string) =>
