@@ -227,8 +227,8 @@ const MarketplaceReconciliation: React.FC = () => {
   // Date range filter state
   const [selectedDateRange, setSelectedDateRange] = useState('custom');
   const [dateRangeMenuAnchor, setDateRangeMenuAnchor] = useState<null | HTMLElement>(null);
-  const [customStartDate, setCustomStartDate] = useState<string>('2025-03-01');
-  const [customEndDate, setCustomEndDate] = useState<string>('2025-03-31');
+  const [customStartDate, setCustomStartDate] = useState<string>('2025-02-01');
+  const [customEndDate, setCustomEndDate] = useState<string>('2025-02-28');
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   // Date field filter for transactions-related queries
   const [dateField, setDateField] = useState<'settlement' | 'invoice'>('invoice');
@@ -1988,8 +1988,8 @@ const MarketplaceReconciliation: React.FC = () => {
                   {(() => {
                     // Use main-summary as the sole source for the summary math
                     const s = mainSummary?.summary as any;
-                    const netSalesAmount = Number(s?.net_sales_amount || 0);
-                    const netSalesCount = Number(s?.net_sales_orders || 0);
+                    const totalSalesAmount = Number(s?.total_transactions_amount || 0);
+                    const totalSalesCount = Number(s?.total_transaction_orders || 0);
 
                     const returnsAmount = Number(s?.total_return_amount || 0);
                     const returnsCount = Number(s?.total_return_orders || 0);
@@ -1998,13 +1998,13 @@ const MarketplaceReconciliation: React.FC = () => {
                     const cancellationsCount = Number(s?.total_cancellations_orders || 0);
 
                     // Calculate total sales using the formula
-                    const totalSalesAmount = netSalesAmount - returnsAmount - cancellationsAmount;
-                    const totalSalesCount = netSalesCount - returnsCount - cancellationsCount;
+                    const netSalesAmount = totalSalesAmount - returnsAmount - cancellationsAmount;
+                    const netSalesCount = totalSalesCount - returnsCount - cancellationsCount;
 
                     const sections = [
-                      { type: 'metric', label: 'Total Sales', amount: totalSalesAmount, count: totalSalesCount },
-                      { type: 'operator', symbol: '=' },
                       { type: 'metric', label: 'Net Sales', amount: netSalesAmount, count: netSalesCount },
+                      { type: 'operator', symbol: '=' },
+                      { type: 'metric', label: 'Total Sales', amount: totalSalesAmount, count: totalSalesCount },
                       { type: 'operator', symbol: '-' },
                       { type: 'metric', label: 'Returns', amount: returnsAmount, count: returnsCount },
                       { type: 'operator', symbol: '-' },
@@ -2312,45 +2312,73 @@ const MarketplaceReconciliation: React.FC = () => {
                         <Box>
                           {/* Reconciled Transactions Summary */}
                           {(() => {
-                            const expectedSalesAmount = parseAmount(reconciliationData.summaryData?.netSalesAsPerSalesReport?.amount || reconciliationData.summaryData?.totalTransaction?.amount || '0');
-                            const expectedSalesCount = Number(reconciliationData.summaryData?.netSalesAsPerSalesReport?.number || reconciliationData.summaryData?.totalTransaction?.number || 0);
-                            const settledAmount = parseAmount(reconciliationData.summaryData?.paymentReceivedAsPerSettlementReport?.amount || reconciliationData.summaryData?.totalReconciled?.amount || '0');
-                            const settledCount = Number(reconciliationData.summaryData?.paymentReceivedAsPerSettlementReport?.number || reconciliationData.summaryData?.totalReconciled?.number || 0);
+                            // Expected sales from mainSummary.summary
+                            const s = mainSummary?.summary as any;
+                            const expectedSalesAmount = Number(s?.net_sales_amount || 0);
+                            const expectedSalesCount = Number(s?.net_sales_orders || 0);
+
+                            // Compute matched totals from mainSummary.Reconcile providers
+                            const { gateways, cod } = splitGatewaysAndCod(mainSummary?.Reconcile);
+                            const sumAmount = (arr: any[]) => arr.reduce((acc, x) => acc + Number(x?.totalSaleAmount || 0), 0);
+                            const sumCount = (arr: any[]) => arr.reduce((acc, x) => acc + Number(x?.totalCount || 0), 0);
+                            const gatewaysAmount = sumAmount(gateways);
+                            const gatewaysCount = sumCount(gateways);
+                            const codAmount = sumAmount(cod);
+                            const codCount = sumCount(cod);
+                            const settledAmount = gatewaysAmount + codAmount;
+                            const settledCount = gatewaysCount + codCount;
                             const percentSettled = expectedSalesAmount === 0 ? 0 : Math.min(100, (settledAmount / expectedSalesAmount) * 100);
 
-                            // Use dynamic providers from mainSummary.Reconcile; split gateways vs COD
-                            const { gateways, cod } = splitGatewaysAndCod(mainSummary?.Reconcile);
-                            const totalSettled = settledAmount || 0;
-                            const totalSettledCount = settledCount || 0;
-                            // Compute each provider's share based on their sale amount within Reconcile
-                            const totalGatewayAmount = gateways.reduce((s, g) => s + g.totalSaleAmount, 0) + cod.reduce((s, c) => s + c.totalSaleAmount, 0);
-                            const providers = [
+                            // Providers list using raw Reconcile values
+                            const totalSettledAmount = settledAmount || 0;
+                            const totalSettledCount = settledCount || 0; // retained if needed elsewhere
+                            const providersBase = [
                               ...gateways.map(g => ({
                                 name: g.displayName,
                                 key: g.code,
                                 type: 'payment' as const,
                                 color: '#2563eb',
-                                share: totalGatewayAmount === 0 ? 0 : (g.totalSaleAmount / totalGatewayAmount),
+                                amount: Number(g.totalSaleAmount || 0),
+                                count: Number(g.totalCount || 0),
                               })),
-                              // Aggregate COD under one header item; child list shown in collapse
                               ...(cod.length > 0 ? [{
                                 name: 'Cash on Delivery',
                                 key: 'cod',
                                 type: 'cod' as const,
                                 color: '#10b981',
-                                share: totalGatewayAmount === 0 ? 0 : (cod.reduce((s, c) => s + c.totalSaleAmount, 0) / totalGatewayAmount),
+                                amount: codAmount,
+                                count: codCount,
                               }] : []),
-                            ].map((p) => ({
-                              ...p,
-                              amount: Math.round(totalSettled * p.share),
-                              count: Math.round(totalSettledCount * p.share),
-                              percentOfSettled: (() => {
-                                const expectedForPartner = expectedSalesAmount * p.share;
-                                const receivedForPartner = totalSettled * p.share;
-                                if (expectedForPartner === 0) return 0;
-                                return (receivedForPartner / expectedForPartner) * 100;
-                              })(),
-                            }));
+                            ];
+
+                            // Compute provider-level matched% = matched / (matched + unmatched)
+                            const unrecSplit = splitGatewaysAndCod(mainSummary?.UnReconcile);
+                            const codUnrecAmount = unrecSplit.cod.reduce((s, c) => s + Number(c.totalSaleAmount || 0), 0);
+
+                            const providers = providersBase.map((p) => {
+                              if (p.key === 'cod') {
+                                const matchedAmount = Number(p.amount || 0);
+                                const unmatchedAmount = Number(codUnrecAmount || 0);
+                                const denom = matchedAmount + unmatchedAmount;
+                                const percentMatched = denom === 0 ? 0 : (matchedAmount / denom) * 100;
+                                return {
+                                  ...p,
+                                  share: totalSettledAmount === 0 ? 0 : (Number(p.amount) / totalSettledAmount),
+                                  percentMatched,
+                                };
+                              }
+                              // gateways (payment providers)
+                              const matchedAmount = Number(p.amount || 0);
+                              const unrecForProvider = unrecSplit.gateways.find(g => g.code === p.key);
+                              const unmatchedAmount = Number(unrecForProvider?.totalSaleAmount || 0);
+                              const denom = matchedAmount + unmatchedAmount;
+                              const percentMatched = denom === 0 ? 0 : (matchedAmount / denom) * 100;
+                              return {
+                                ...p,
+                                share: totalSettledAmount === 0 ? 0 : (Number(p.amount) / totalSettledAmount),
+                                percentMatched,
+                              };
+                            });
 
                             return (
                               <>
@@ -2494,7 +2522,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                                   {provider.count.toLocaleString('en-IN')} orders
                                                 </Typography>
                                                 <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700 }}>
-                                                  {provider.percentOfSettled.toFixed(1)}% matched
+                                                  {Number(provider.percentMatched || 0).toFixed(1)}% matched
                                                 </Typography>
                                               </Box>
                                             </Box>
@@ -2507,16 +2535,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                                   </Typography>
                                                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                                                     {(splitGatewaysAndCod(mainSummary?.Reconcile).cod).map((lpRaw) => {
-                                                      const lpShare = (lpRaw.totalSaleAmount || 0) / Math.max(1, (splitGatewaysAndCod(mainSummary?.Reconcile).cod.reduce((s, c) => s + (c.totalSaleAmount || 0), 0)));
-                                                      const settledAmountForLp = Math.round(settledAmount * (provider.share || 0) * lpShare);
-                                                      const ordersForLp = Math.round((provider.count || 0) * lpShare);
-                                                      const percentOfExpected = (() => {
-                                                        const expectedForLp = expectedSalesAmount * (provider.share || 0) * lpShare;
-                                                        if (expectedForLp === 0) return 0;
-                                                        const receivedForLp = settledAmount * (provider.share || 0) * lpShare;
-                                                        return (receivedForLp / expectedForLp) * 100;
-                                                      })();
-                                                      const lp = { name: lpRaw.displayName, settledAmount: settledAmountForLp, orders: ordersForLp, percentOfExpected };
+                                                      const settledAmountForLp = Number(lpRaw.totalSaleAmount || 0);
+                                                      const ordersForLp = Number(lpRaw.totalCount || 0);
+                                                      // Find unmatched for this logistics partner within UnReconcile.cod by same code
+                                                      const unrecCodArray = splitGatewaysAndCod(mainSummary?.UnReconcile).cod;
+                                                      const unmatchedForLp = Number((unrecCodArray.find(c => c.code === lpRaw.code))?.totalSaleAmount || 0);
+                                                      const denom = settledAmountForLp + unmatchedForLp;
+                                                      const percentMatched = denom === 0 ? 0 : (settledAmountForLp / denom) * 100;
+                                                      const lp = { name: lpRaw.displayName, settledAmount: settledAmountForLp, orders: ordersForLp, percentMatched };
                                                       return (
                                                       <Box key={lp.name} sx={{
                                                         display: 'flex',
@@ -2537,7 +2563,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                                           <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(lp.settledAmount)}</Typography>
                                                           <Typography variant="caption" sx={{ color: '#6b7280' }}>{lp.orders.toLocaleString('en-IN')} orders • </Typography>
                                                           <Typography variant="caption" sx={{ color: '#059669', fontWeight: 700 }}>
-                                                            {lp.percentOfExpected.toFixed(1)}% matched
+                                                            {Number(lp.percentMatched || 0).toFixed(1)}% matched
                                                           </Typography>
                                                         </Box>
                                                       </Box>

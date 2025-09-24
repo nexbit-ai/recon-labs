@@ -83,8 +83,8 @@ export interface MainSummaryProviderEntry {
 export interface MainSummaryResponse {
   filters: MainSummaryFilters;
   summary: {
-    total_transactions: number; // monetary amount (per clarification)
-    total_orders: number;
+    total_transactions_amount: number; // monetary amount (per clarification)
+    total_transaction_orders: number;
     net_sales_amount: number;
     net_sales_orders: number;
     total_return_amount: number;
