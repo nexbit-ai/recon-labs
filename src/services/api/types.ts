@@ -62,6 +62,74 @@ export interface ApiRequestConfig extends RequestConfig {
 }
 
 // Marketplace Reconciliation Types - Updated to match new API contract
+// New Main Summary API types (v1/recon/main-summary)
+export interface MainSummaryFilters {
+  status: string;
+  platform: string;
+  date_field: string; // invoice_date | settlement_date
+  start_date: string; // YYYY-MM-DD
+  end_date: string;   // YYYY-MM-DD
+  organization_id?: string;
+}
+
+export interface MainSummaryProviderEntry {
+  platform: string; // provider code
+  total_count: number; // orders count
+  total_sale_amount: number; // monetary
+  total_comission?: number; // note: spelling per backend
+  total_gst_on_comission?: number; // note: spelling per backend
+}
+
+export interface MainSummaryResponse {
+  filters: MainSummaryFilters;
+  summary: {
+    total_transactions: number; // monetary amount (per clarification)
+    total_orders: number;
+    net_sales_amount: number;
+    net_sales_orders: number;
+    total_return_amount: number;
+    total_return_orders: number;
+    total_cancellations_amount: number;
+    total_cancellations_orders: number;
+    total_reconciled_amount: number;
+    total_reconciled_count: number;
+    total_unreconciled_amount: number;
+    total_unreconciled_count: number;
+  };
+  Reconcile: {
+    providers: {
+      paytm?: MainSummaryProviderEntry;
+      payU?: MainSummaryProviderEntry;
+      flipkart?: MainSummaryProviderEntry;
+      cod?: MainSummaryProviderEntry[];
+      [key: string]: any;
+    };
+  };
+  UnReconcile: {
+    summary: {
+      total_difference_amount: number;
+      total_orders_count: number;
+      total_matched_orders: number;
+      total_less_payment_received_orders: number;
+      total_less_payment_received_amount: number; // FE to show as negative
+      total_more_payment_received_orders: number;
+      total_more_payment_received_amount: number;
+    };
+    providers: {
+      paytm?: MainSummaryProviderEntry;
+      payU?: MainSummaryProviderEntry;
+      flipkart?: MainSummaryProviderEntry;
+      cod?: MainSummaryProviderEntry[];
+      [key: string]: any;
+    };
+    reasons: Array<{
+      name: string;
+      count: number;
+      amount: number;
+    }>;
+  };
+}
+
 export interface MarketplaceReconciliationResponse {
   grossSales: string;
   ordersDelivered: {

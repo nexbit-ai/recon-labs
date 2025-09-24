@@ -66,6 +66,7 @@ import {
   YAxis,
   BarChart,
   Bar,
+  LabelList,
 } from 'recharts';
 
 // Enhanced mock data for the new sales dashboard
@@ -126,7 +127,7 @@ const PROVIDER_AGEING_DATA: ProviderAgeing[] = [
 ];
 
 const AGEING_CHART_DATA = PROVIDER_AGEING_DATA.map((p) => {
-  const row: any = { provider: p.provider };
+  const row: any = { provider: p.provider, avgTat: p.averageDaysToSettle };
   AGE_BUCKETS.forEach((b) => { row[b] = p.distribution[b]; });
   return row;
 });
@@ -167,7 +168,8 @@ import {
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
 import { apiService } from '../services/api/apiService';
-import { MarketplaceReconciliationResponse } from '../services/api/types';
+import { MarketplaceReconciliationResponse, MainSummaryResponse } from '../services/api/types';
+import { api as apiIndex } from '../services/api';
 import { mockReconciliationData, getSafeReconciliationData, isValidReconciliationData } from '../data/mockReconciliationData';
 import { Platform } from '../data/mockData';
 import { padding } from '@mui/system';
@@ -179,6 +181,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
   const [reconciliationData, setReconciliationData] = useState<MarketplaceReconciliationResponse>(mockReconciliationData);
+  const [mainSummary, setMainSummary] = useState<MainSummaryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(false);
@@ -274,7 +277,7 @@ const MarketplaceReconciliation: React.FC = () => {
       const unrecCount = safeNum(reconciliationData.summaryData?.totalUnreconciled?.number);
       const unrecAmount = amt(reconciliationData.summaryData?.totalUnreconciled?.amount);
       const lessPayCount = safeNum(reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.number);
-      const lessPayAmount = amt(reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.amount);
+      const lessPayAmount = -Math.abs(amt(reconciliationData.summaryData?.totalUnreconciled?.lessPaymentReceivedFromFlipkart?.amount));
       const morePayCount = safeNum(reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.number);
       const morePayAmount = amt(reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.amount);
       const cancelledCount = safeNum(reconciliationData.summaryData?.returnedOrCancelledOrders?.number);
@@ -603,7 +606,82 @@ const MarketplaceReconciliation: React.FC = () => {
     return date >= start && date <= end;
   };
 
-  // Fetch reconciliation data based on date range
+  // Helpers for INR formatting and normalization for main summary
+  const formatINR = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n || 0);
+  const ensureNegative = (n: number) => (n == null ? 0 : -Math.abs(n));
+
+  const DISPLAY_NAME_MAP: Record<string, string> = {
+    paytm: 'Paytm',
+    payU: 'PayU',
+    flipkart: 'Flipkart',
+    grow_simple: 'Grow Simple',
+    shiprocket: 'Shiprocket',
+    delhivery: 'Delhivery',
+    dtdc: 'DTDC',
+    bluedart: 'Blue Dart',
+    shadowfax: 'Shadowfax',
+  };
+
+  type NormalizedProvider = {
+    code: string;
+    displayName: string;
+    totalCount: number;
+    totalSaleAmount: number;
+    totalCommission: number;
+    totalGstOnCommission: number;
+  };
+
+  const normalizeProvidersBlock = (block?: any): NormalizedProvider[] => {
+    if (!block || !block.providers) return [];
+    const { providers } = block;
+    const out: NormalizedProvider[] = [];
+    const pushOne = (p: any) => {
+      if (!p) return;
+      out.push({
+        code: p.platform,
+        displayName: DISPLAY_NAME_MAP[p.platform] || p.platform,
+        totalCount: Number(p.total_count || 0),
+        totalSaleAmount: Number(p.total_sale_amount || 0),
+        totalCommission: Number(p.total_comission || 0),
+        totalGstOnCommission: Number(p.total_gst_on_comission || 0),
+      });
+    };
+    // Known keys
+    pushOne(providers.paytm);
+    pushOne(providers.payU);
+    pushOne(providers.flipkart);
+    if (Array.isArray(providers.cod)) providers.cod.forEach(pushOne);
+    // Any other dynamic providers
+    Object.keys(providers).forEach((k) => {
+      if (k === 'paytm' || k === 'payU' || k === 'flipkart' || k === 'cod') return;
+      const val = providers[k];
+      if (Array.isArray(val)) val.forEach(pushOne); else pushOne(val);
+    });
+    return out;
+  };
+
+  const splitGatewaysAndCod = (block?: any): { gateways: NormalizedProvider[]; cod: NormalizedProvider[] } => {
+    if (!block || !block.providers) return { gateways: [], cod: [] };
+    const { providers } = block;
+    const mapOne = (p: any): NormalizedProvider => ({
+      code: p.platform,
+      displayName: DISPLAY_NAME_MAP[p.platform] || p.platform,
+      totalCount: Number(p.total_count || 0),
+      totalSaleAmount: Number(p.total_sale_amount || 0),
+      totalCommission: Number(p.total_comission || 0),
+      totalGstOnCommission: Number(p.total_gst_on_comission || 0),
+    });
+    const gateways: NormalizedProvider[] = [];
+    Object.keys(providers).forEach((k) => {
+      if (k === 'cod') return;
+      const val = providers[k];
+      if (val && typeof val === 'object') gateways.push(mapOne(val));
+    });
+    const codArray: NormalizedProvider[] = Array.isArray(providers.cod) ? providers.cod.map(mapOne) : [];
+    return { gateways, cod: codArray };
+  };
+
+  // Fetch reconciliation data based on date range (legacy fetch for existing UI)
   const fetchReconciliationDataByDateRange = async (dateRange: string) => {
     setLoading(true);
     setError(null);
@@ -645,7 +723,7 @@ const MarketplaceReconciliation: React.FC = () => {
           endDate = endOfMonth.toISOString().split('T')[0];
         }
       
-      // Call the backend API with date range
+      // Call the legacy stats API for existing UI
       console.log('API call with dates:', { start_date: startDate, end_date: endDate });
       const params: any = {
         start_date: startDate,
@@ -663,6 +741,27 @@ const MarketplaceReconciliation: React.FC = () => {
         setReconciliationData(mockReconciliationData);
         setUsingMockData(true);
         setError('Failed to fetch data from API, showing sample data');
+      }
+
+      // Also call main-summary for new sections
+      try {
+        const mainSummaryParams = {
+          start_date: startDate,
+          end_date: endDate,
+          date_field: dateField === 'invoice' ? 'invoice_date' : 'settlement_date',
+          platform: 'd2c',
+        };
+        const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
+        // ms is ApiResponse<any>; data is payload
+        const payload = (ms as any).data as MainSummaryResponse;
+        setMainSummary(payload);
+        // Update reasons from UnReconcile for UI where needed
+        if (payload?.UnReconcile?.reasons?.length) {
+          setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count })));
+        }
+      } catch (e) {
+        // Non-fatal for now
+        console.warn('main-summary fetch failed', e);
       }
     } catch (err) {
       console.error('Error fetching reconciliation data:', err);
@@ -698,6 +797,24 @@ const MarketplaceReconciliation: React.FC = () => {
         setReconciliationData(mockReconciliationData);
         setUsingMockData(true);
         setError('Failed to fetch data from API, showing sample data');
+      }
+
+      // Also call main-summary for new sections
+      try {
+        const mainSummaryParams = {
+          start_date: startDate,
+          end_date: endDate,
+          date_field: dateField === 'invoice' ? 'invoice_date' : 'settlement_date',
+          platform: 'd2c',
+        };
+        const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
+        const payload = (ms as any).data as MainSummaryResponse;
+        setMainSummary(payload);
+        if (payload?.UnReconcile?.reasons?.length) {
+          setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count })));
+        }
+      } catch (e) {
+        console.warn('main-summary fetch failed', e);
       }
     } catch (err) {
       console.error('Error fetching reconciliation data:', err);
@@ -1858,7 +1975,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   background: 'transparent',
                   borderBottom: 'none'
                 }}>
-                  <Typography variant="h6" sx={{ 
+                  <Typography variant="h3" sx={{ 
                     fontWeight: 600,
                     color: '#1f2937',
                     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -1869,20 +1986,21 @@ const MarketplaceReconciliation: React.FC = () => {
                 </Box>
                 <Box sx={{ px: 3, pb: 2, mt: 6 }}>
                   {(() => {
-                    // Calculate values for the simplified formula: Total Sales = Net Sales - Returns - Cancellations
-                    const netSalesAmount = parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport.amount);
-                    const netSalesCount = reconciliationData.summaryData.netSalesAsPerSalesReport.number;
-                    
-                    const returnsAmount = parseAmount(reconciliationData.ordersReturned?.amount || '0');
-                    const returnsCount = reconciliationData.ordersReturned?.number || 0;
-                    
-                    const cancellationsAmount = parseAmount(reconciliationData.summaryData?.returnedOrCancelledOrders?.amount || '0');
-                    const cancellationsCount = reconciliationData.summaryData?.returnedOrCancelledOrders?.number || 0;
-                    
+                    // Use main-summary as the sole source for the summary math
+                    const s = mainSummary?.summary as any;
+                    const netSalesAmount = Number(s?.net_sales_amount || 0);
+                    const netSalesCount = Number(s?.net_sales_orders || 0);
+
+                    const returnsAmount = Number(s?.total_return_amount || 0);
+                    const returnsCount = Number(s?.total_return_orders || 0);
+
+                    const cancellationsAmount = Number(s?.total_cancellations_amount || 0);
+                    const cancellationsCount = Number(s?.total_cancellations_orders || 0);
+
                     // Calculate total sales using the formula
                     const totalSalesAmount = netSalesAmount - returnsAmount - cancellationsAmount;
                     const totalSalesCount = netSalesCount - returnsCount - cancellationsCount;
-                    
+
                     const sections = [
                       { type: 'metric', label: 'Total Sales', amount: totalSalesAmount, count: totalSalesCount },
                       { type: 'operator', symbol: '=' },
@@ -1892,7 +2010,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       { type: 'operator', symbol: '-' },
                       { type: 'metric', label: 'Cancellations', amount: cancellationsAmount, count: cancellationsCount }
                     ];
-                    
+
                     return (
                       <Box sx={{ 
                         display: 'flex', 
@@ -1982,7 +2100,7 @@ const MarketplaceReconciliation: React.FC = () => {
               }}
             >
               <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ 
+                <Typography variant="h3" sx={{ 
                   fontWeight: 600, 
                   mb: 2, 
                   color: '#1f2937',
@@ -2006,12 +2124,14 @@ const MarketplaceReconciliation: React.FC = () => {
                       width: 140,
                       height: 140,
                       borderRadius: '100%',
-                      background: `conic-gradient(
-                        #10b981 0deg,
-                        #10b981 ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
-                        #ef4444 ${parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 360 : Math.min((1 - (parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales))) * 360, 360)}deg,
-                        #ef4444 360deg
-                      )`,
+                      background: (() => {
+                        const s = mainSummary?.summary as any;
+                        const unreconciledAmount = Number(s?.total_unreconciled_amount || 0);
+                        const baseAmount = Number(s?.net_sales_amount || 0);
+                        const matchedPct = baseAmount === 0 ? 100 : Math.max(0, Math.min(100, 100 - ((unreconciledAmount / baseAmount) * 100)));
+                        const matchedDeg = (matchedPct / 100) * 360;
+                        return `conic-gradient(#10b981 0deg, #10b981 ${matchedDeg}deg, #ef4444 ${matchedDeg}deg, #ef4444 360deg)`;
+                      })(),
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -2030,13 +2150,25 @@ const MarketplaceReconciliation: React.FC = () => {
                       }}>
                         <Typography variant="h4" sx={{
                           fontWeight: 500,
-                          color: getReconciliationColor(parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 100 : Math.max(0, 100 - ((parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales)) * 100))),
+                          color: (() => {
+                            const s = mainSummary?.summary as any;
+                            const unreconciledAmount = Number(s?.total_unreconciled_amount || 0);
+                            const baseAmount = Number(s?.net_sales_amount || 0);
+                            const pct = baseAmount === 0 ? 100 : Math.max(0, 100 - ((unreconciledAmount / baseAmount) * 100));
+                            return getReconciliationColor(pct);
+                          })(),
                           fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                           mb: 0.5,
                           fontSize: '1.5rem',
                           letterSpacing: '-0.02em'
                         }}>
-                          {parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? '100%' : `${Math.max(0, 100 - ((parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales)) * 100)).toFixed(1)}%`}
+                          {(() => {
+                            const s = mainSummary?.summary as any;
+                            const unreconciledAmount = Number(s?.total_unreconciled_amount || 0);
+                            const baseAmount = Number(s?.net_sales_amount || 0);
+                            const pct = baseAmount === 0 ? 100 : Math.max(0, 100 - ((unreconciledAmount / baseAmount) * 100));
+                            return `${pct.toFixed(1)}%`;
+                          })()}
                         </Typography>
                       </Box>
                     </Box>
@@ -2060,12 +2192,18 @@ const MarketplaceReconciliation: React.FC = () => {
                           Difference Amount
                         </Typography>
                     <Typography variant="h5" sx={{
-                      color: getReconciliationColor(parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) === 0 ? 100 : Math.max(0, 100 - ((parseAmount(reconciliationData.summaryData.totalUnreconciled.amount) / parseAmount(reconciliationData.grossSales)) * 100))),
+                      color: (() => {
+                        const diff = Number(mainSummary?.UnReconcile?.summary?.total_difference_amount || 0);
+                        const s = mainSummary?.summary as any;
+                        const baseAmount = Number(s?.net_sales_amount || 0);
+                        const pct = baseAmount === 0 ? 100 : Math.max(0, 100 - (Math.abs(diff) / baseAmount) * 100);
+                        return getReconciliationColor(pct);
+                      })(),
                         fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
                         fontWeight: 700,
                       letterSpacing: '-0.02em'
                       }}>
-                      {formatCurrency(parseAmount(reconciliationData.summaryData.totalUnreconciled.amount))}
+                      {formatCurrency(Number(mainSummary?.UnReconcile?.summary?.total_difference_amount || 0))}
                       </Typography>
                   </Box>
                 </Box>
@@ -2095,22 +2233,29 @@ const MarketplaceReconciliation: React.FC = () => {
                   const morePaymentAmount = parseAmount(reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.amount || '0');
                   const morePaymentCount = reconciliationData.summaryData?.totalUnreconciled?.excessPaymentReceivedFromFlipkart?.number || 0;
                   
-                  // Mock data for providers
-                  const providerData = [
-                    { name: 'PayU', amount: 15000, count: 45, type: 'payment' },
-                    { name: 'Paytm', amount: 12000, count: 38, type: 'payment' },
-                    { name: 'Delhivery', amount: 8500, count: 25, type: 'logistics' },
-                    { name: 'Blue Dart', amount: 6200, count: 18, type: 'logistics' },
-                    { name: 'DTDC', amount: 4800, count: 15, type: 'logistics' },
-                    { name: 'Shadowfax', amount: 3200, count: 12, type: 'logistics' },
-                    { name: 'BlitzNow', amount: 2100, count: 8, type: 'logistics' }
-                  ];
+                  // Providers for mismatched transactions from main-summary API (fallback to mock if unavailable)
+                  const providerData = mainSummary
+                    ? (() => {
+                        const split = splitGatewaysAndCod(mainSummary.UnReconcile);
+                        const gateways = split.gateways.map(p => ({ name: p.displayName, amount: p.totalSaleAmount, count: p.totalCount, type: 'payment' as const }));
+                        const codPartners = split.cod.map(p => ({ name: p.displayName, amount: p.totalSaleAmount, count: p.totalCount, type: 'logistics' as const }));
+                        return [...gateways, ...codPartners];
+                      })()
+                    : [
+                        { name: 'PayU', amount: 15000, count: 45, type: 'payment' as const },
+                        { name: 'Paytm', amount: 12000, count: 38, type: 'payment' as const },
+                        { name: 'Delhivery', amount: 8500, count: 25, type: 'logistics' as const },
+                        { name: 'Blue Dart', amount: 6200, count: 18, type: 'logistics' as const },
+                        { name: 'DTDC', amount: 4800, count: 15, type: 'logistics' as const },
+                        { name: 'Shadowfax', amount: 3200, count: 12, type: 'logistics' as const },
+                        { name: 'BlitzNow', amount: 2100, count: 8, type: 'logistics' as const }
+                      ];
 
                   return (
                     <Box>
                       {/* Header with Total Unreconciled */}
                       <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 3 }}>
-                        <Typography variant="h5" sx={{ 
+                        <Typography variant="h3" sx={{ 
                           fontWeight: 700, 
                           color: '#1f2937',
                           fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -2156,13 +2301,14 @@ const MarketplaceReconciliation: React.FC = () => {
                             }
                           }}
                         >
-                          <Tab label="Reconciled Transactions" />
-                          <Tab label="Unreconciled Transactions" />
+                          <Tab label="Matched Transactions" />
+                          <Tab label="Mismatched Transactions" />
+                          <Tab label="Unsettled Transactions" />
                         </Tabs>
                       </Box>
 
                       {/* Tab Content */}
-                      {transactionsTab === 0 && (
+                        {transactionsTab === 0 && (
                         <Box>
                           {/* Reconciled Transactions Summary */}
                           {(() => {
@@ -2172,20 +2318,35 @@ const MarketplaceReconciliation: React.FC = () => {
                             const settledCount = Number(reconciliationData.summaryData?.paymentReceivedAsPerSettlementReport?.number || reconciliationData.summaryData?.totalReconciled?.number || 0);
                             const percentSettled = expectedSalesAmount === 0 ? 0 : Math.min(100, (settledAmount / expectedSalesAmount) * 100);
 
-                            // Mock provider split for settled transactions (kept local, visual only)
-                            const providerSplits = [
-                              { name: 'Paytm', key: 'paytm', share: 0.35, color: '#1e40af', type: 'payment' },
-                              { name: 'PayU', key: 'payu', share: 0.40, color: '#2563eb', type: 'payment' },
-                              { name: 'Cash on Delivery', key: 'cod', share: 0.25, color: '#10b981', type: 'cod' },
-                            ];
-                            const providers = providerSplits.map((p) => ({
+                            // Use dynamic providers from mainSummary.Reconcile; split gateways vs COD
+                            const { gateways, cod } = splitGatewaysAndCod(mainSummary?.Reconcile);
+                            const totalSettled = settledAmount || 0;
+                            const totalSettledCount = settledCount || 0;
+                            // Compute each provider's share based on their sale amount within Reconcile
+                            const totalGatewayAmount = gateways.reduce((s, g) => s + g.totalSaleAmount, 0) + cod.reduce((s, c) => s + c.totalSaleAmount, 0);
+                            const providers = [
+                              ...gateways.map(g => ({
+                                name: g.displayName,
+                                key: g.code,
+                                type: 'payment' as const,
+                                color: '#2563eb',
+                                share: totalGatewayAmount === 0 ? 0 : (g.totalSaleAmount / totalGatewayAmount),
+                              })),
+                              // Aggregate COD under one header item; child list shown in collapse
+                              ...(cod.length > 0 ? [{
+                                name: 'Cash on Delivery',
+                                key: 'cod',
+                                type: 'cod' as const,
+                                color: '#10b981',
+                                share: totalGatewayAmount === 0 ? 0 : (cod.reduce((s, c) => s + c.totalSaleAmount, 0) / totalGatewayAmount),
+                              }] : []),
+                            ].map((p) => ({
                               ...p,
-                              amount: Math.round(settledAmount * p.share),
-                              count: Math.round((settledCount || 0) * p.share),
-                              // Percent of this partner's expected amount that has been received
+                              amount: Math.round(totalSettled * p.share),
+                              count: Math.round(totalSettledCount * p.share),
                               percentOfSettled: (() => {
                                 const expectedForPartner = expectedSalesAmount * p.share;
-                                const receivedForPartner = settledAmount * p.share;
+                                const receivedForPartner = totalSettled * p.share;
                                 if (expectedForPartner === 0) return 0;
                                 return (receivedForPartner / expectedForPartner) * 100;
                               })(),
@@ -2345,52 +2506,18 @@ const MarketplaceReconciliation: React.FC = () => {
                                                     Logistics partners who settled
                                                   </Typography>
                                                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                                    {[
-                                                      {
-                                                        name: 'Delhivery',
-                                                        settledAmount: Math.round(provider.amount * 0.36),
-                                                        orders: Math.round(provider.count * 0.36),
-                                                        percentOfExpected: (() => {
-                                                          const expectedForLp = expectedSalesAmount * provider.share * 0.36;
-                                                          if (expectedForLp === 0) return 0;
-                                                          const receivedForLp = settledAmount * provider.share * 0.36;
-                                                          return (receivedForLp / expectedForLp) * 100;
-                                                        })(),
-                                                      },
-                                                      {
-                                                        name: 'Blue Dart',
-                                                        settledAmount: Math.round(provider.amount * 0.28),
-                                                        orders: Math.round(provider.count * 0.28),
-                                                        percentOfExpected: (() => {
-                                                          const expectedForLp = expectedSalesAmount * provider.share * 0.28;
-                                                          if (expectedForLp === 0) return 0;
-                                                          const receivedForLp = settledAmount * provider.share * 0.28;
-                                                          return (receivedForLp / expectedForLp) * 100;
-                                                        })(),
-                                                      },
-                                                      {
-                                                        name: 'DTDC',
-                                                        settledAmount: Math.round(provider.amount * 0.22),
-                                                        orders: Math.round(provider.count * 0.22),
-                                                        percentOfExpected: (() => {
-                                                          const expectedForLp = expectedSalesAmount * provider.share * 0.22;
-                                                          if (expectedForLp === 0) return 0;
-                                                          const receivedForLp = settledAmount * provider.share * 0.22;
-                                                          return (receivedForLp / expectedForLp) * 100;
-                                                        })(),
-                                                      },
-                                                      {
-                                                        name: 'Ecom Express',
-                                                        settledAmount: Math.round(provider.amount * 0.14),
-                                                        orders: Math.round(provider.count * 0.14),
-                                                        percentOfExpected: (() => {
-                                                          const expectedForLp = expectedSalesAmount * provider.share * 0.14;
-                                                          if (expectedForLp === 0) return 0;
-                                                          const receivedForLp = settledAmount * provider.share * 0.14;
-                                                          return (receivedForLp / expectedForLp) * 100;
-                                                        })(),
-                                                      },
-                                                    ].map((lp) => (
+                                                    {(splitGatewaysAndCod(mainSummary?.Reconcile).cod).map((lpRaw) => {
+                                                      const lpShare = (lpRaw.totalSaleAmount || 0) / Math.max(1, (splitGatewaysAndCod(mainSummary?.Reconcile).cod.reduce((s, c) => s + (c.totalSaleAmount || 0), 0)));
+                                                      const settledAmountForLp = Math.round(settledAmount * (provider.share || 0) * lpShare);
+                                                      const ordersForLp = Math.round((provider.count || 0) * lpShare);
+                                                      const percentOfExpected = (() => {
+                                                        const expectedForLp = expectedSalesAmount * (provider.share || 0) * lpShare;
+                                                        if (expectedForLp === 0) return 0;
+                                                        const receivedForLp = settledAmount * (provider.share || 0) * lpShare;
+                                                        return (receivedForLp / expectedForLp) * 100;
+                                                      })();
+                                                      const lp = { name: lpRaw.displayName, settledAmount: settledAmountForLp, orders: ordersForLp, percentOfExpected };
+                                                      return (
                                                       <Box key={lp.name} sx={{
                                                         display: 'flex',
                                                         alignItems: 'center',
@@ -2414,7 +2541,8 @@ const MarketplaceReconciliation: React.FC = () => {
                                                           </Typography>
                                                         </Box>
                                                       </Box>
-                                                    ))}
+                                                    );
+                                                    })}
                                                   </Box>
                                                 </Box>
                                               </MuiCollapse>
@@ -2481,19 +2609,12 @@ const MarketplaceReconciliation: React.FC = () => {
                                             Provider Breakdown (Gateways + COD partners)
                                           </Typography>
                                           {(() => {
-                                            const cod = providers.find(p => p.key === 'cod');
-                                            const gateways = providers.filter(p => p.key !== 'cod');
-                                            const codAmount = cod ? cod.amount : 0;
-                                            const codPartners = [
-                                              { name: 'Delhivery', value: Math.round(codAmount * 0.36), color: '#0ea5e9' },
-                                              { name: 'Blue Dart', value: Math.round(codAmount * 0.28), color: '#10b981' },
-                                              { name: 'DTDC', value: Math.round(codAmount * 0.22), color: '#6366f1' },
-                                              { name: 'Ecom Express', value: Math.round(codAmount * 0.14), color: '#f59e0b' },
-                                            ];
-                                            const pieData = [
-                                              ...gateways.map(g => ({ name: g.name, value: g.amount, color: g.color })),
-                                              ...codPartners,
-                                            ];
+                                            const split = splitGatewaysAndCod(mainSummary?.Reconcile);
+                                            const total = split.gateways.reduce((s, g) => s + g.totalSaleAmount, 0) + split.cod.reduce((s, c) => s + c.totalSaleAmount, 0);
+                                            const palette = ['#2563eb', '#1e40af', '#0ea5e9', '#10b981', '#6366f1', '#f59e0b', '#7c3aed'];
+                                            const gatewaysPie = split.gateways.map((g, i) => ({ name: g.displayName, value: g.totalSaleAmount, color: palette[i % palette.length] }));
+                                            const codPie = split.cod.map((c, i) => ({ name: c.displayName, value: c.totalSaleAmount, color: palette[(i + gatewaysPie.length) % palette.length] }));
+                                            const pieData = [...gatewaysPie, ...codPie];
                                             return (
                                               <>
                                                 <Box sx={{ width: '100%', height: 240 }}>
@@ -2505,7 +2626,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                                         nameKey="name"
                                                         cx="50%"
                                                         cy="50%"
-                                                        innerRadius={50}
+                                                      innerRadius={66}
                                                         outerRadius={80}
                                                         paddingAngle={2}
                                                       >
@@ -2539,6 +2660,119 @@ const MarketplaceReconciliation: React.FC = () => {
                         </Box>
                       )}
 
+                      {transactionsTab === 2 && (
+                        <Box>
+                          {(() => {
+                            // Use API mainSummary.Unsettled for this section
+                            const unsettled = (mainSummary as any)?.Unsettled as any;
+                            const pendingPaymentAmount = Number(unsettled?.summary?.pending_payment_amount || 0);
+                            const pendingPaymentCount = Number(unsettled?.summary?.pending_payment_orders || 0);
+                            const totalUnsettledAmount = pendingPaymentAmount;
+
+                            // Split providers into gateways and COD using helpers
+                            const { gateways, cod } = splitGatewaysAndCod(unsettled);
+
+                            const COLOR_MAP: Record<string, string> = {
+                              paytm: '#1e40af',
+                              payU: '#2563eb',
+                              razorpay: '#0ea5e9',
+                              stripe: '#38bdf8',
+                              grow_simple: '#0ea5e9',
+                              shiprocket: '#10b981',
+                              delhivery: '#6366f1',
+                              dtdc: '#f59e0b',
+                              bluedart: '#14b8a6',
+                              shadowfax: '#ef4444',
+                            };
+
+                            const mapGateway = (g: any) => ({
+                              name: g.displayName,
+                              key: g.code,
+                              amount: Number(g.totalSaleAmount || 0),
+                              count: Number(g.totalCount || 0),
+                              color: COLOR_MAP[g.code] || '#3b82f6',
+                              type: 'payment' as const,
+                            });
+                            const mapCod = (c: any) => ({
+                              name: c.displayName,
+                              key: c.code,
+                              amount: Number(c.totalSaleAmount || 0),
+                              count: Number(c.totalCount || 0),
+                              color: COLOR_MAP[c.code] || '#10b981',
+                              type: 'cod' as const,
+                            });
+
+                            const pendingPaymentProviders = [
+                              ...gateways.map(mapGateway),
+                              ...cod.map(mapCod),
+                            ];
+
+                            const pendingPaymentPieData = pendingPaymentProviders.map(p => ({
+                              name: p.name,
+                              value: p.amount,
+                              color: p.color,
+                            }));
+                            // Pending deductions UI removed as requested
+
+                            return (
+                              <>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                  <Box>
+                                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(totalUnsettledAmount)}</Typography>
+                                    <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>Unsettled Amount</Typography>
+                                  </Box>
+                                  <Box sx={{ textAlign: 'right' }}>
+                                    <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>Pending payment</Typography>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                                        <Typography variant="body2" sx={{ color: '#b45309', fontWeight: 600 }}>Pending Payment</Typography>
+                                        <Typography variant="subtitle2" sx={{ color: '#d97706', fontWeight: 700 }}>{formatCurrency(pendingPaymentAmount)}</Typography>
+                                      </Box>
+                                      <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>{pendingPaymentCount.toLocaleString('en-IN')} Orders</Typography>
+                                    </Box>
+                                  </Box>
+                                </Box>
+
+                                <Grid container spacing={2} sx={{ mt: 1 }}>
+                                  <Grid item xs={12} md={6}>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1f2937' }}>Pending Payment by Providers</Typography>
+                                      {pendingPaymentProviders.map((provider, idx) => (
+                                        <Box key={`up-${provider.key}-${idx}`} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, px: 2, borderRadius: 1.5, background: '#f9fafb', border: '1px solid #f1f3f4' }}>
+                                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: provider.color }} />
+                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{provider.name}</Typography>
+                                            <Chip label={provider.type === 'cod' ? 'COD' : 'Payment'} size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: provider.type === 'cod' ? '#d1fae5' : '#dbeafe', color: provider.type === 'cod' ? '#065f46' : '#1e40af' }} />
+                                          </Box>
+                                          <Box sx={{ textAlign: 'right' }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(provider.amount)}</Typography>
+                                            <Typography variant="caption" sx={{ color: '#6b7280' }}>{provider.count.toLocaleString('en-IN')} orders</Typography>
+                                          </Box>
+                                        </Box>
+                                      ))}
+                                    </Box>
+                                  </Grid>
+                                  <Grid item xs={12} md={6}>
+                                    <Box sx={{ p: 2, border: '1px solid #f1f3f4', borderRadius: 2, background: '#fff', height: '100%' }}>
+                                      <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1 }}>Provider Breakdown (Pending Payment)</Typography>
+                                      <Box sx={{ width: '100%', height: 200 }}>
+                                        <ResponsiveContainer>
+                                          <PieChart>
+                                            <Pie data={pendingPaymentPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={70} paddingAngle={2}>
+                                              {pendingPaymentPieData.map((item, i) => (<Cell key={`upp-${i}`} fill={item.color} />))}
+                                            </Pie>
+                                            <RechartsTooltip formatter={(value) => formatCurrency(Number(value))} />
+                                          </PieChart>
+                                        </ResponsiveContainer>
+                                      </Box>
+                                    </Box>
+                                  </Grid>
+                                </Grid>
+                              </>
+                            );
+                          })()}
+                        </Box>
+                      )}
                       {transactionsTab === 1 && (
                         <Box>
                           {/* Total Unreconciled Summary */}
@@ -2833,17 +3067,20 @@ const MarketplaceReconciliation: React.FC = () => {
           <CardContent sx={{ p: 5 }}>
             {(() => {
               const baseAmount = parseAmount(reconciliationData.summaryData.netSalesAsPerSalesReport?.amount || reconciliationData.summaryData.totalTransaction?.amount || '0');
-              const overallCommissionRate = 2.1 / 100; // dummy overall rate 2.1%
-              const totalCommissionAmount = Math.round(baseAmount * overallCommissionRate);
-              // provider splits (dummy)
-              const providerSplits = [
-                { name: 'Paytm', key: 'paytm', share: 0.55, color: '#7A5DBF' },
-                { name: 'PayU', key: 'payu', share: 0.45, color: '#A79CDB' },
-              ];
-              const providerData = providerSplits.map(p => ({
-                ...p,
-                amount: Math.round(totalCommissionAmount * p.share),
-                percentOfSales: ((totalCommissionAmount * p.share) / baseAmount) * 100
+              // Build dynamic provider commission amounts from mainSummary.Reconcile providers
+              const allProviders = normalizeProvidersBlock(mainSummary?.Reconcile);
+              // Only payment gateways (Paytm, PayU) have commission & charges summary
+              const gatewayProviders = allProviders.filter(p => p.code === 'paytm' || p.code === 'payU');
+              if (gatewayProviders.length === 0) return null;
+              const totalSalesAcrossProviders = gatewayProviders.reduce((s, p) => s + p.totalSaleAmount, 0) || 1;
+              const totalCommissionAmount = gatewayProviders.reduce((s, p) => s + p.totalCommission + p.totalGstOnCommission, 0);
+              const palette2 = ['#7A5DBF', '#A79CDB', '#10B981', '#F59E0B', '#0EA5E9', '#6366F1', '#EF4444'];
+              const providerData = gatewayProviders.map((p, idx) => ({
+                name: p.displayName,
+                key: p.code,
+                color: palette2[idx % palette2.length],
+                amount: Math.round(p.totalCommission + p.totalGstOnCommission),
+                percentOfSales: ((p.totalCommission + p.totalGstOnCommission) / Math.max(1, baseAmount)) * 100,
               }));
               // charge types breakdown (dummy distribution across all providers)
               const chargeTypes = [
@@ -2860,7 +3097,7 @@ const MarketplaceReconciliation: React.FC = () => {
               }));
               return (
                 <>
-                  <Typography variant="h6" sx={{ 
+                  <Typography variant="h3" sx={{ 
                     fontWeight: 600, 
                     mb: 4, 
                     color: '#1f2937',
@@ -2880,7 +3117,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               data={providerData.map(p => ({ name: p.name, value: p.amount, color: p.color }))}
                               cx="50%"
                               cy="50%"
-                              innerRadius={110}
+                              innerRadius={122}
                               outerRadius={140}
                               paddingAngle={1}
                               cornerRadius={1}
@@ -2924,7 +3161,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             {formatCurrency(totalCommissionAmount)}
                           </Typography>
                           <Typography variant="body2" sx={{ mt: 0.5, color: '#059669', fontWeight: 600 }}>
-                            {(overallCommissionRate * 100).toFixed(2)}% of Net Sales
+                            {baseAmount > 0 ? ((totalCommissionAmount / baseAmount) * 100).toFixed(2) : '0.00'}% of Net Sales
                           </Typography>
                         </Box>
                         {providerData.map(p => (
@@ -2990,7 +3227,7 @@ const MarketplaceReconciliation: React.FC = () => {
           boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h6" sx={{ color: '#1f2937', fontWeight: 600 }}>
+            <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>
               Payment Ageing Analysis
             </Typography>
             <Chip label={`Avg TAT: ${overallAvgTAT} days`} sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 700 }} />
@@ -3012,69 +3249,31 @@ const MarketplaceReconciliation: React.FC = () => {
           </Box>
           <Box sx={{ width: '100%', height: 380 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={AGEING_CHART_DATA} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barCategoryGap={"35%"} barGap={4}>
+              <BarChart data={AGEING_CHART_DATA} margin={{ top: 40, right: 10, left: 0, bottom: 0 }} barCategoryGap={"25%"} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="provider" tick={{ fontSize: 12 }} interval={0} height={60} angle={-15} textAnchor="end" />
                 <YAxis unit="%" tick={{ fontSize: 12 }} domain={[0, 100]} />
                 <RechartsTooltip formatter={(v: any) => [`${v}%`, 'Share']} />
-                {AGE_BUCKETS.map((b) => (
-                  <Bar key={b} dataKey={b} stackId="a" fill={BUCKET_COLORS[b]} radius={0} barSize={18} />
+                {AGE_BUCKETS.map((b, idx) => (
+                  <Bar key={b} dataKey={b} stackId="a" fill={BUCKET_COLORS[b]} radius={0} barSize={22}>
+                    {idx === AGE_BUCKETS.length - 1 && (
+                      <LabelList
+                        dataKey="avgTat"
+                        position="top"
+                        formatter={(v: number) => `Avg TAT: ${Number(v).toFixed(1)}d`}
+                      />
+                    )}
+                  </Bar>
                 ))}
               </BarChart>
             </ResponsiveContainer>
           </Box>
         </Paper>
 
-        <Paper sx={{ 
-          p: 3, 
-          mb: 6, 
-          background: '#fff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '16px',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
-        }}>
-          <Typography variant="h6" sx={{ color: '#1f2937', fontWeight: 600, mb: 2 }}>
-            Provider TAT Summary
-          </Typography>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 700 }}>Provider</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="right">Avg TAT (days)</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="right">≤3d %</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="right">4–7d %</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="right">8–14d %</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }} align="right">{'>'}14d %</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {PROVIDER_AGEING_DATA.map((p) => {
-                  const le3 = p.distribution['<=1d'] + p.distribution['2-3d'];
-                  const d4_7 = p.distribution['4-7d'];
-                  const d8_14 = p.distribution['8-14d'];
-                  const gt14 = p.distribution['15-30d'] + p.distribution['>30d'];
-                  return (
-                    <TableRow key={p.provider} hover>
-                      <TableCell>{p.provider}</TableCell>
-                      <TableCell>
-                        <Chip size="small" label={p.type} sx={{ bgcolor: p.type === 'Payment Gateway' ? '#e3f2fd' : '#fff7e6', fontWeight: 700 }} />
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700 }}>{p.averageDaysToSettle.toFixed(1)}</TableCell>
-                      <TableCell align="right">{le3}%</TableCell>
-                      <TableCell align="right">{d4_7}%</TableCell>
-                      <TableCell align="right">{d8_14}%</TableCell>
-                      <TableCell align="right">{gt14}%</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
+        {/* Provider TAT Summary removed; avg TAT is annotated on bars above */}
 
-        {/* Tax Breakdown */}
+        {/* Tax Breakdown (TCS/TDS) section commented out as requested */}
+        {/*
         <Card sx={{ 
           mb: 6,
           background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
@@ -3157,6 +3356,7 @@ const MarketplaceReconciliation: React.FC = () => {
             </Grid>
           </CardContent>
         </Card>
+        */}
       </Box>
 
       {/* Sync Data Sources Modal */}

@@ -121,6 +121,12 @@ export const statsAPI = {
     apiService.get<MarketplaceReconciliationResponse>(API_CONFIG.ENDPOINTS.FETCH_STATS, params),
 };
 
+// Main Summary API (D2C / Marketplace unified summary)
+export const mainSummaryAPI = {
+  getMainSummary: (params: { start_date: string; end_date: string; date_field: 'invoice_date' | 'settlement_date' | string; platform?: string; status?: string }) =>
+    apiService.get<any>('/recon/main-summary', params),
+};
+
 // Reports API
 export const reportsAPI = {
   // Get reports list
@@ -252,6 +258,7 @@ export const api = {
   transactions: transactionsAPI,
   orders: ordersAPI,
   stats: statsAPI,
+  mainSummary: mainSummaryAPI,
   reports: reportsAPI,
   dataSources: dataSourcesAPI,
   ai: aiAPI,
