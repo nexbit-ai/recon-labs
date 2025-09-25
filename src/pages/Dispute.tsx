@@ -229,7 +229,7 @@ const DisputePage: React.FC = () => {
 
   // Platform selector state for dropdown (multi-select)
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Array<'flipkart' | 'amazon' | 'd2c'>>(['flipkart']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Array<'flipkart' | 'amazon' | 'd2c'>>(['d2c']);
 
   // Column filter state
   const [columnFilters, setColumnFilters] = useState<Record<string, any>>({});
@@ -261,6 +261,12 @@ const DisputePage: React.FC = () => {
       .filter(Boolean)
       .map(part => (part.charAt(0).toUpperCase() + part.slice(1)))
       .join(' ');
+  };
+
+  // Convert formatted reason label back to API format (lowercase with spaces)
+  const formatReasonForAPI = (reason?: string): string => {
+    if (!reason || reason.trim() === '') return '';
+    return reason.toLowerCase();
   };
 
   // Get current date range text for display
@@ -348,7 +354,7 @@ const DisputePage: React.FC = () => {
     // Reason enum → reason_in
     const reasonFilter = f['Reason'];
     if (reasonFilter && Array.isArray(reasonFilter) && reasonFilter.length > 0) {
-      (params as any).reason_in = reasonFilter.join(',');
+      (params as any).reason_in = reasonFilter.map(formatReasonForAPI).join(',');
     }
 
     // Remark (string or enums). Prefer remark_in for arrays, else remark
@@ -417,15 +423,18 @@ const DisputePage: React.FC = () => {
     setError(null);
     
     try {
-      // Check if D2C is selected alone
-      if (selectedPlatforms.length === 1 && selectedPlatforms.includes('d2c')) {
-        // Use D2C API with exact parameters as specified
+      // Check if D2C is selected (alone or with other platforms)
+      if (selectedPlatforms.includes('d2c')) {
+        // Use D2C API with exact parameters as specified (always keep platform=d2c)
         const queryParams = buildQueryParams(filtersOverride);
         const d2cParams = {
           recon_status: 'less_payment_received,more_payment_received',
           platform: 'd2c',
           pagination: false,
-          // Add D2C-specific filter parameters
+          // Default date range for D2C
+          invoice_date_from: '2025-02-01',
+          invoice_date_to: '2025-02-28',
+          // Add D2C-specific filter parameters (override defaults if provided)
           ...(queryParams.invoice_date_from && { invoice_date_from: queryParams.invoice_date_from }),
           ...(queryParams.invoice_date_to && { invoice_date_to: queryParams.invoice_date_to }),
           ...(queryParams.settlement_date_from && { settlement_date_from: queryParams.settlement_date_from }),
@@ -458,7 +467,7 @@ const DisputePage: React.FC = () => {
           setError('Failed to fetch D2C transactions data');
         }
       } else {
-        // Use regular API for other platforms
+        // Use regular API for non-D2C platforms
         const queryParams = buildQueryParams(filtersOverride);
         console.log('Fetching unreconciled orders with params:', queryParams);
         console.log('Date range:', queryParams.buyer_invoice_date_from, 'to', queryParams.buyer_invoice_date_to);
