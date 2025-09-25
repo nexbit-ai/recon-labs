@@ -59,6 +59,7 @@ export interface ApiRequestConfig extends RequestConfig {
   url: string;
   data?: any;
   params?: Record<string, any>;
+  useD2CHeaders?: boolean;
 }
 
 // Marketplace Reconciliation Types - Updated to match new API contract

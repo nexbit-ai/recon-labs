@@ -112,6 +112,13 @@ interface TransactionQueryParams {
   order_item_id?: string;
   remark?: string;
   pagination?: boolean;
+  // D2C-specific parameters
+  invoice_date_from?: string;
+  invoice_date_to?: string;
+  settlement_date_from?: string;
+  settlement_date_to?: string;
+  reason_in?: string;
+  order_id?: string;
 }
 
 // Transform API data to TransactionRow format
@@ -222,7 +229,7 @@ const DisputePage: React.FC = () => {
 
   // Platform selector state for dropdown (multi-select)
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Array<'flipkart' | 'amazon'>>(['flipkart']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Array<'flipkart' | 'amazon' | 'd2c'>>(['flipkart']);
 
   // Column filter state
   const [columnFilters, setColumnFilters] = useState<Record<string, any>>({});
@@ -236,6 +243,7 @@ const DisputePage: React.FC = () => {
     'Amount': { type: 'number' },
     'Settlement Value': { type: 'number' },
     'Order Date': { type: 'date' },
+    'Invoice Date': { type: 'date' },
     'Settlement Date': { type: 'date' },
     'Difference': { type: 'number' },
     'Remark': { type: 'enum' },
@@ -323,6 +331,13 @@ const DisputePage: React.FC = () => {
       if (orderDateFilter.to) params.order_date_to = orderDateFilter.to;
     }
 
+    // Invoice Date range (for D2C platform)
+    const invoiceDateFilter = f['Invoice Date'];
+    if (invoiceDateFilter && typeof invoiceDateFilter === 'object') {
+      if (invoiceDateFilter.from) (params as any).invoice_date_from = invoiceDateFilter.from;
+      if (invoiceDateFilter.to) (params as any).invoice_date_to = invoiceDateFilter.to;
+    }
+
     // Settlement Date range
     const settlementDateFilter = f['Settlement Date'];
     if (settlementDateFilter && typeof settlementDateFilter === 'object') {
@@ -402,36 +417,79 @@ const DisputePage: React.FC = () => {
     setError(null);
     
     try {
-      const queryParams = buildQueryParams(filtersOverride);
-      console.log('Fetching unreconciled orders with params:', queryParams);
-      console.log('Date range:', queryParams.buyer_invoice_date_from, 'to', queryParams.buyer_invoice_date_to);
-      console.log('Selected date range:', selectedDateRange);
-      console.log('Full queryParams object:', JSON.stringify(queryParams, null, 2));
-      
-      // Use the existing API service for transactions - pass queryParams directly like TransactionSheet does
-      const response = await api.transactions.getTransactions(queryParams as any);
-      
-      if (response.success && response.data) {
-        const responseData = response.data;
-        console.log('API Response:', responseData);
-        console.log('Response data type:', typeof responseData);
-        console.log('Response data keys:', Object.keys(responseData));
+      // Check if D2C is selected alone
+      if (selectedPlatforms.length === 1 && selectedPlatforms.includes('d2c')) {
+        // Use D2C API with exact parameters as specified
+        const queryParams = buildQueryParams(filtersOverride);
+        const d2cParams = {
+          recon_status: 'less_payment_received,more_payment_received',
+          platform: 'd2c',
+          pagination: false,
+          // Add D2C-specific filter parameters
+          ...(queryParams.invoice_date_from && { invoice_date_from: queryParams.invoice_date_from }),
+          ...(queryParams.invoice_date_to && { invoice_date_to: queryParams.invoice_date_to }),
+          ...(queryParams.settlement_date_from && { settlement_date_from: queryParams.settlement_date_from }),
+          ...(queryParams.settlement_date_to && { settlement_date_to: queryParams.settlement_date_to }),
+          ...(queryParams.reason_in && { reason_in: queryParams.reason_in }),
+          ...(queryParams.status_in && { status_in: queryParams.status_in }),
+          ...(queryParams.order_id && { order_id: queryParams.order_id }),
+          ...(queryParams.diff_min && { diff_min: queryParams.diff_min }),
+          ...(queryParams.diff_max && { diff_max: queryParams.diff_max })
+        };
         
-        // The data is directly in responseData.data array
-        const transactionData = responseData.data;
+        console.log('Fetching D2C transactions with params:', d2cParams);
+        const response = await api.transactions.getD2CTransactions(d2cParams);
         
-        console.log('Transaction data to process:', transactionData);
-        console.log('Transaction data length:', transactionData.length);
-        
-        if (Array.isArray(transactionData) && transactionData.length > 0) {
-          setApiRows(transactionData as any);
+        if (response.success && response.data) {
+          const responseData = response.data;
+          console.log('D2C API Response:', responseData);
+          
+          // Handle D2C API response structure
+          const transactionData = responseData.data || responseData;
+          
+          if (Array.isArray(transactionData) && transactionData.length > 0) {
+            setApiRows(transactionData as any);
+          } else {
+            console.error('No valid D2C transaction data found');
+            setError('No D2C transaction data received from API');
+          }
         } else {
-          console.error('No valid transaction data found');
-          setError('No transaction data received from API');
+          console.error('D2C API response not successful:', response);
+          setError('Failed to fetch D2C transactions data');
         }
       } else {
-        console.error('API response not successful:', response);
-        setError('Failed to fetch unreconciled orders data');
+        // Use regular API for other platforms
+        const queryParams = buildQueryParams(filtersOverride);
+        console.log('Fetching unreconciled orders with params:', queryParams);
+        console.log('Date range:', queryParams.buyer_invoice_date_from, 'to', queryParams.buyer_invoice_date_to);
+        console.log('Selected date range:', selectedDateRange);
+        console.log('Full queryParams object:', JSON.stringify(queryParams, null, 2));
+        
+        // Use the existing API service for transactions - pass queryParams directly like TransactionSheet does
+        const response = await api.transactions.getTransactions(queryParams as any);
+        
+        if (response.success && response.data) {
+          const responseData = response.data;
+          console.log('API Response:', responseData);
+          console.log('Response data type:', typeof responseData);
+          console.log('Response data keys:', Object.keys(responseData));
+          
+          // The data is directly in responseData.data array
+          const transactionData = responseData.data;
+          
+          console.log('Transaction data to process:', transactionData);
+          console.log('Transaction data length:', transactionData.length);
+          
+          if (Array.isArray(transactionData) && transactionData.length > 0) {
+            setApiRows(transactionData as any);
+          } else {
+            console.error('No valid transaction data found');
+            setError('No transaction data received from API');
+          }
+        } else {
+          console.error('API response not successful:', response);
+          setError('Failed to fetch unreconciled orders data');
+        }
       }
     } catch (err) {
       console.error('Error fetching unreconciled orders:', err);
@@ -501,10 +559,28 @@ const DisputePage: React.FC = () => {
       
       // Handle both API data and mock data
       if ('Order ID' in row) {
-        // API data (TransactionRow)
+        // API data (TransactionRow) - handle D2C specific fields
         switch (column) {
           case 'Order ID':
             value = (row as any)['Order ID'];
+            break;
+          case 'Amount':
+            value = (row as any).order_value;
+            break;
+          case 'Invoice Date':
+            value = (row as any).invoice_date;
+            break;
+          case 'Settlement Date':
+            value = (row as any).settlement_date;
+            break;
+          case 'Difference':
+            value = (row as any).diff;
+            break;
+          case 'Reason':
+            value = (row as any).breakups?.mismatch_reason;
+            break;
+          case 'Status':
+            value = (row as any).breakups?.recon_status;
             break;
           default:
             continue;
@@ -790,10 +866,12 @@ const DisputePage: React.FC = () => {
     if (disputeSubTab === 0 && Array.isArray(apiRows)) {
       (apiRows as any[]).forEach(row => {
         if (column === 'Reason') {
-          const v = row.reason || row.Remark;
+          // For D2C, use breakups.mismatch_reason, fallback to reason
+          const v = row.breakups?.mismatch_reason || row.reason || row.Remark;
           if (v) values.add(formatReasonLabel(String(v)));
         } else if (column === 'Status') {
-          const v = row.status;
+          // For D2C, use breakups.recon_status, fallback to status
+          const v = row.breakups?.recon_status || row.status;
           if (v) values.add(String(v));
         }
       });
@@ -930,7 +1008,7 @@ const DisputePage: React.FC = () => {
                   minWidth: 'auto', minHeight: 36, px: 1.5, fontSize: '0.7875rem', '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107,114,128,0.04)' }
                 }}
               >
-                {selectedPlatforms.length === 2 ? 'All' : (selectedPlatforms[0] === 'amazon' ? 'Amazon' : 'Flipkart')}
+                {selectedPlatforms.length === 3 ? 'All' : selectedPlatforms.length === 2 ? `${selectedPlatforms[0] === 'flipkart' ? 'Flipkart' : selectedPlatforms[0] === 'amazon' ? 'Amazon' : 'D2C'}, ${selectedPlatforms[1] === 'flipkart' ? 'Flipkart' : selectedPlatforms[1] === 'amazon' ? 'Amazon' : 'D2C'}` : (selectedPlatforms[0] === 'amazon' ? 'Amazon' : selectedPlatforms[0] === 'd2c' ? 'D2C' : 'Flipkart')}
               </Button>
               <Menu
                 anchorEl={platformMenuAnchorEl}
@@ -949,9 +1027,9 @@ const DisputePage: React.FC = () => {
                 }}
               >
                   <MenuItem
-                  selected={selectedPlatforms.length === 2}
+                  selected={selectedPlatforms.length === 3}
                   onClick={() => {
-                    const newSel: Array<'flipkart'|'amazon'> = ['flipkart','amazon'];
+                    const newSel: Array<'flipkart'|'amazon'|'d2c'> = ['flipkart','amazon','d2c'];
                     setSelectedPlatforms(newSel);
                     setPlatformMenuAnchorEl(null);
                     // With All selected, prefer backend flow
@@ -972,7 +1050,7 @@ const DisputePage: React.FC = () => {
                   selected={selectedPlatforms.includes('flipkart')}
                   onClick={() => {
                     const has = selectedPlatforms.includes('flipkart');
-                    const next = has ? selectedPlatforms.filter(p => p !== 'flipkart') : [...selectedPlatforms, 'flipkart'];
+                    const next: Array<'flipkart' | 'amazon' | 'd2c'> = has ? selectedPlatforms.filter(p => p !== 'flipkart') : [...selectedPlatforms, 'flipkart'];
                     setSelectedPlatforms(next);
                     // Close menu after toggle
                     setPlatformMenuAnchorEl(null);
@@ -1019,7 +1097,7 @@ const DisputePage: React.FC = () => {
                   selected={selectedPlatforms.includes('amazon')}
                   onClick={() => {
                     const has = selectedPlatforms.includes('amazon');
-                    const next = has ? selectedPlatforms.filter(p => p !== 'amazon') : [...selectedPlatforms, 'amazon'];
+                    const next: Array<'flipkart' | 'amazon' | 'd2c'> = has ? selectedPlatforms.filter(p => p !== 'amazon') : [...selectedPlatforms, 'amazon'];
                     setSelectedPlatforms(next);
                     setPlatformMenuAnchorEl(null);
                     // If amazon is selected alone, show demo; if combined with flipkart, backend
@@ -1059,6 +1137,27 @@ const DisputePage: React.FC = () => {
                   }}
                 >
                   Amazon
+                </MenuItem>
+                <MenuItem
+                  selected={selectedPlatforms.includes('d2c')}
+                  onClick={() => {
+                    const has = selectedPlatforms.includes('d2c');
+                    const next: Array<'flipkart' | 'amazon' | 'd2c'> = has ? selectedPlatforms.filter(p => p !== 'd2c') : [...selectedPlatforms, 'd2c'];
+                    setSelectedPlatforms(next);
+                    setPlatformMenuAnchorEl(null);
+                    // Always use API for D2C (no demo data)
+                    fetchUnreconciledOrders();
+                  }}
+                  sx={{
+                    mb: 0.25,
+                    borderRadius: '8px',
+                    '&.Mui-selected': { outline: '2px solid #111', outlineOffset: '-2px', backgroundColor: '#fff' },
+                    '&:hover': { backgroundColor: '#f3f4f6' },
+                    px: 1.25,
+                    py: 1
+                  }}
+                >
+                  D2C
                 </MenuItem>
               </Menu>
               <Button variant="contained" onClick={sendToFlipkart} disabled={selectedIds.length === 0} sx={{ backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' }, textTransform: 'none', fontWeight: 600 }}>
@@ -1133,8 +1232,8 @@ const DisputePage: React.FC = () => {
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Date</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Order Date', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Order Date') ? '#1f2937' : '#6b7280', background: isFilterActive('Order Date') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Order Date">
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Invoice Date</Typography>
+                          <IconButton size="small" onClick={(e) => openFilterPopover('Invoice Date', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Invoice Date') ? '#1f2937' : '#6b7280', background: isFilterActive('Invoice Date') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Invoice Date">
                             <FilterIcon fontSize="small" />
                           </IconButton>
                         </Box>
@@ -1529,14 +1628,14 @@ const DisputePage: React.FC = () => {
                              />
                     </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>{row.order_id}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{parseFloat(row.context?.buyer_invoice_amount || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.order_date}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{parseFloat(row.order_value || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.invoice_date}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.settlement_date}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>₹{parseFloat(row.diff || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Chip label={formatReasonLabel(row.reason || 'N/A')} size="small" sx={{ fontWeight: 600, color: '#1f2937', backgroundColor: '#e5e7eb', '& .MuiChip-label': { px: 1 } }} />
+                          <Chip label={formatReasonLabel(row.breakups?.mismatch_reason || 'N/A')} size="small" sx={{ fontWeight: 600, color: '#1f2937', backgroundColor: '#e5e7eb', '& .MuiChip-label': { px: 1 } }} />
                            </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.status}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.breakups?.recon_status || 'N/A'}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
                             <Button size="small" variant="outlined" onClick={() => handleMarkReconciled(row.order_id)} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#10b981', color: '#10b981', '&:hover': { borderColor: '#059669', backgroundColor: 'rgba(16, 185, 129, 0.04)' } }}>Mark Reconciled</Button>

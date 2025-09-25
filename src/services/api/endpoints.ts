@@ -88,6 +88,10 @@ export const transactionsAPI = {
   getTotalTransactions: (params?: PaginationParams & FilterParams) =>
     apiService.get<TotalTransactionsResponse>(API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS, params),
 
+  // Get D2C transactions with specific parameters
+  getD2CTransactions: (params?: { page?: number; limit?: number; recon_status?: string; platform?: string; pagination?: boolean }) =>
+    apiService.get<TotalTransactionsResponse>(API_CONFIG.ENDPOINTS.D2C_TRANSACTIONS, params, { useD2CHeaders: true }),
+
   // Get single transaction
   getTransaction: (id: string) =>
     apiService.get<any>(replaceUrlParams(API_CONFIG.ENDPOINTS.TRANSACTION_DETAILS, { id })),
