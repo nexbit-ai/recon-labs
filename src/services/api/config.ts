@@ -62,8 +62,7 @@ export const API_CONFIG = {
     // Orders
     ORDERS: '/recon/orders',
     
-    // Stats
-    FETCH_STATS: '/recon/fetchStats',
+    // Stats (legacy removed)
     
     // Reports
     REPORTS: '/reports',

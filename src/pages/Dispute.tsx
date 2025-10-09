@@ -121,6 +121,83 @@ interface TransactionQueryParams {
   order_id?: string;
 }
 
+// Generate dummy unreconciled data for demonstration
+const generateDummyUnreconciledData = () => {
+  const reasons = [
+    'customer_add_ons',
+    'shipping_charges',
+    'payment_gateway_fees',
+    'platform_commission',
+    'refund_processing_fee',
+    'late_delivery_penalty',
+    'inventory_mismatch',
+    'promotional_discount',
+    'tax_calculation_error',
+    'currency_conversion_fee'
+  ];
+
+  const statuses = [
+    'less_payment_received',
+    'more_payment_received',
+    'pending_reconciliation'
+  ];
+
+  const dummyData = [];
+  
+  for (let i = 1; i <= 25; i++) {
+    const orderValue = Math.floor(Math.random() * 50000) + 1000; // 1000 to 51000
+    const settlementValue = orderValue + (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2000) + 100; // Add/subtract random amount
+    const difference = settlementValue - orderValue;
+    const reason = reasons[Math.floor(Math.random() * reasons.length)];
+    const status = statuses[Math.floor(Math.random() * statuses.length)];
+    
+    // Generate dates within the last 30 days
+    const orderDate = new Date();
+    orderDate.setDate(orderDate.getDate() - Math.floor(Math.random() * 30));
+    
+    const settlementDate = new Date();
+    settlementDate.setDate(settlementDate.getDate() - Math.floor(Math.random() * 15));
+    
+    dummyData.push({
+      "Order ID": `ORD_${String(10000 + i).padStart(6, '0')}`,
+      "Order Value": orderValue,
+      "Settlement Value": settlementValue,
+      "Order Date": orderDate.toISOString().split('T')[0],
+      "Settlement Date": settlementDate.toISOString().split('T')[0],
+      "Difference": difference,
+      "Remark": difference > 0 ? "Short Amount Received" : "Excess Amount Received",
+      "Event Type": "Sale",
+      // Additional fields for compatibility
+      order_id: `ORD_${String(10000 + i).padStart(6, '0')}`,
+      order_value: orderValue.toString(),
+      settlement_value: settlementValue.toString(),
+      diff: difference.toString(),
+      invoice_date: orderDate.toISOString().split('T')[0],
+      settlement_date: settlementDate.toISOString().split('T')[0],
+      breakups: {
+        mismatch_reason: reason,
+        recon_status: status
+      },
+      reason: reason,
+      status: status,
+      originalData: {
+        order_id: `ORD_${String(10000 + i).padStart(6, '0')}`,
+        order_value: orderValue,
+        settlement_value: settlementValue,
+        diff: difference,
+        invoice_date: orderDate.toISOString().split('T')[0],
+        settlement_date: settlementDate.toISOString().split('T')[0],
+        breakups: {
+          mismatch_reason: reason,
+          recon_status: status
+        }
+      }
+    });
+  }
+  
+  return dummyData;
+};
+
 // Transform API data to TransactionRow format
 const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   // Helper function to parse currency/numeric strings
@@ -230,6 +307,7 @@ const DisputePage: React.FC = () => {
   // Platform selector state for dropdown (multi-select)
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedPlatforms, setSelectedPlatforms] = useState<Array<'flipkart' | 'amazon' | 'd2c'>>(['d2c']);
+  const [tempSelectedPlatforms, setTempSelectedPlatforms] = useState<Array<'flipkart' | 'amazon' | 'd2c'>>([]);
 
   // Column filter state
   const [columnFilters, setColumnFilters] = useState<Record<string, any>>({});
@@ -526,7 +604,13 @@ const DisputePage: React.FC = () => {
       }
       setMockRows(list);
     }
-  }, []);
+
+    // Add dummy data for unreconciled orders
+    if (disputeSubTab === 0 && apiRows.length === 0) {
+      const dummyUnreconciledData = generateDummyUnreconciledData();
+      setApiRows(dummyUnreconciledData as TransactionRow[]);
+    }
+  }, [disputeSubTab]);
 
   // Fetch unreconciled orders on component mount
   useEffect(() => {
@@ -795,18 +879,24 @@ const DisputePage: React.FC = () => {
 
   // Action handlers for unreconciled transactions
   const handleMarkReconciled = (id: string) => {
-    // For API data, we can't modify the status directly
-    // This would typically call an API to update the status
     console.log('Marking as reconciled:', id);
-
-    // Derive metadata from grouped unreconciled data to store a notification for Checklist
+    
+    // Remove the transaction from the list (simulate reconciliation)
+    setApiRows(prev => {
+      if (Array.isArray(prev)) {
+        return prev.filter((row: any) => row.order_id !== id) as TransactionRow[];
+      }
+      return prev;
+    });
+    
+    // Show success message
+    setSnackbarOpen(true);
+    
+    // Store notification for Checklist
     try {
-      if (disputeSubTab === 0 && Array.isArray(apiRows)) {
-        const groups = apiRows as any[];
-        const matched = groups.find(g => Array.isArray(g?.orderIds) && g.orderIds.includes(id));
-        if (matched) {
-          pushManualReconNotification(matched.reason || 'Unknown', matched.count || 1, matched.orderIds || [id]);
-        }
+      const matched = (apiRows as any[]).find(row => row.order_id === id);
+      if (matched) {
+        pushManualReconNotification(matched.breakups?.mismatch_reason || 'Unknown', 1, [id]);
       }
     } catch (err) {
       console.error('Failed to derive group for manual recon notification', err);
@@ -814,9 +904,17 @@ const DisputePage: React.FC = () => {
   };
 
   const handleRaiseDispute = (id: string) => {
-    // For API data, we can't modify the status directly
-    // This would typically call an API to update the status
     console.log('Raising dispute:', id);
+    
+    // Find the transaction data
+    const transaction = (apiRows as any[]).find(row => row.order_id === id);
+    if (transaction) {
+      openRaiseDispute({ 
+        reason: transaction.breakups?.mismatch_reason || 'Unknown', 
+        count: 1, 
+        orderIds: [id] 
+      });
+    }
   };
 
   // Column filter handlers
@@ -1011,7 +1109,7 @@ const DisputePage: React.FC = () => {
                 variant="outlined"
                 endIcon={<KeyboardArrowDownIcon />}
                 startIcon={<StorefrontIcon />}
-                onClick={(e) => setPlatformMenuAnchorEl(e.currentTarget)}
+                onClick={(e) => { setTempSelectedPlatforms(selectedPlatforms); setPlatformMenuAnchorEl(e.currentTarget); }}
                 sx={{
                   borderColor: '#6B7280', color: '#6B7280', textTransform: 'none',
                   minWidth: 'auto', minHeight: 36, px: 1.5, fontSize: '0.7875rem', '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107,114,128,0.04)' }
@@ -1035,139 +1133,54 @@ const DisputePage: React.FC = () => {
                   }
                 }}
               >
-                  <MenuItem
-                  selected={selectedPlatforms.length === 3}
-                  onClick={() => {
-                    const newSel: Array<'flipkart'|'amazon'|'d2c'> = ['flipkart','amazon','d2c'];
-                    setSelectedPlatforms(newSel);
-                    setPlatformMenuAnchorEl(null);
-                    // With All selected, prefer backend flow
-                    fetchUnreconciledOrders();
-                  }}
-                    sx={{
-                    mb: 0.5,
-                    borderRadius: '8px',
-                    '&.Mui-selected': { outline: '2px solid #111', outlineOffset: '-2px', backgroundColor: '#fff' },
-                    '&:hover': { backgroundColor: '#f3f4f6' },
-                    px: 1.25,
-                    py: 1
-                  }}
-                >
-                  All
-                  </MenuItem>
-                <MenuItem
-                  selected={selectedPlatforms.includes('flipkart')}
-                  onClick={() => {
-                    const has = selectedPlatforms.includes('flipkart');
-                    const next: Array<'flipkart' | 'amazon' | 'd2c'> = has ? selectedPlatforms.filter(p => p !== 'flipkart') : [...selectedPlatforms, 'flipkart'];
-                    setSelectedPlatforms(next);
-                    // Close menu after toggle
-                    setPlatformMenuAnchorEl(null);
-                    // If flipkart is present (either alone or with amazon), use backend
-                    if (next.includes('flipkart')) {
-                      fetchUnreconciledOrders();
-                    } else {
-                      // Only Amazon left
-                      const demoRows = Array.from({ length: 25 }).map((_, i) => {
-                        const id = `AMZ${100000 + i}`;
-                        const orderValue = (1500 + (i % 7) * 125).toFixed(2);
-                        const diffVal = ((i % 2 === 0 ? 1 : -1) * (50 + (i % 5) * 20)).toFixed(2);
-                        const orderDate = new Date(Date.now() - (i + 1) * 86400000).toISOString().slice(0, 10);
-                        const settlementDate = new Date(Date.now() - (i - 1) * 86400000).toISOString().slice(0, 10);
-                        const reasons = ['commission_mismatch', 'weight_discrepancy_fee', 'return_window_elapsed', 'shipping_overcharge', 'promo_fee_variance'];
-                        const reason = reasons[i % reasons.length];
-                        const status = 'short_received';
-                        return {
-                          order_id: id,
-                          order_date: orderDate,
-                          settlement_date: settlementDate,
-                          diff: diffVal,
-                          context: { buyer_invoice_amount: orderValue },
-                          reason,
-                          status,
-                        } as any;
-                      });
-                      setApiRows(demoRows);
-                      setPage(0);
-                    }
-                  }}
-                sx={{
-                    mb: 0.5,
-                    borderRadius: '8px',
-                    '&.Mui-selected': { outline: '2px solid #111', outlineOffset: '-2px', backgroundColor: '#fff' },
-                    '&:hover': { backgroundColor: '#f3f4f6' },
-                    px: 1.25,
-                    py: 1
-                }}
-              >
-                Flipkart
-                </MenuItem>
-                <MenuItem
-                  selected={selectedPlatforms.includes('amazon')}
-                  onClick={() => {
-                    const has = selectedPlatforms.includes('amazon');
-                    const next: Array<'flipkart' | 'amazon' | 'd2c'> = has ? selectedPlatforms.filter(p => p !== 'amazon') : [...selectedPlatforms, 'amazon'];
-                    setSelectedPlatforms(next);
-                    setPlatformMenuAnchorEl(null);
-                    // If amazon is selected alone, show demo; if combined with flipkart, backend
-                    if (next.length === 1 && next.includes('amazon')) {
-                      const demoRows = Array.from({ length: 25 }).map((_, i) => {
-                        const id = `AMZ${100000 + i}`;
-                        const orderValue = (1500 + (i % 7) * 125).toFixed(2);
-                        const diffVal = ((i % 2 === 0 ? 1 : -1) * (50 + (i % 5) * 20)).toFixed(2);
-                        const orderDate = new Date(Date.now() - (i + 1) * 86400000).toISOString().slice(0, 10);
-                        const settlementDate = new Date(Date.now() - (i - 1) * 86400000).toISOString().slice(0, 10);
-                        const reasons = ['commission_mismatch', 'weight_discrepancy_fee', 'return_window_elapsed', 'shipping_overcharge', 'promo_fee_variance'];
-                        const reason = reasons[i % reasons.length];
-                        const status = 'short_received';
-                        return {
-                          order_id: id,
-                          order_date: orderDate,
-                          settlement_date: settlementDate,
-                          diff: diffVal,
-                          context: { buyer_invoice_amount: orderValue },
-                          reason,
-                          status,
-                        } as any;
-                      });
-                      setApiRows(demoRows);
-                      setPage(0);
-                    } else {
-                      fetchUnreconciledOrders();
-                    }
-                  }}
-                  sx={{
-                    mb: 0.25,
-                    borderRadius: '8px',
-                    '&.Mui-selected': { outline: '2px solid #111', outlineOffset: '-2px', backgroundColor: '#fff' },
-                    '&:hover': { backgroundColor: '#f3f4f6' },
-                    px: 1.25,
-                    py: 1
-                  }}
-                >
-                  Amazon
-                </MenuItem>
-                <MenuItem
-                  selected={selectedPlatforms.includes('d2c')}
-                  onClick={() => {
-                    const has = selectedPlatforms.includes('d2c');
-                    const next: Array<'flipkart' | 'amazon' | 'd2c'> = has ? selectedPlatforms.filter(p => p !== 'd2c') : [...selectedPlatforms, 'd2c'];
-                    setSelectedPlatforms(next);
-                    setPlatformMenuAnchorEl(null);
-                    // Always use API for D2C (no demo data)
-                    fetchUnreconciledOrders();
-                  }}
-                  sx={{
-                    mb: 0.25,
-                    borderRadius: '8px',
-                    '&.Mui-selected': { outline: '2px solid #111', outlineOffset: '-2px', backgroundColor: '#fff' },
-                    '&:hover': { backgroundColor: '#f3f4f6' },
-                    px: 1.25,
-                    py: 1
-                  }}
-                >
-                  D2C
-                </MenuItem>
+                <Box sx={{ p: 1, minWidth: 240 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>Platforms</Typography>
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={() => {
+                        if (tempSelectedPlatforms.length === 3) setTempSelectedPlatforms([]);
+                        else setTempSelectedPlatforms(['flipkart','amazon','d2c']);
+                      }}
+                      sx={{ textTransform: 'none', minWidth: 'auto', px: 1 }}
+                    >
+                      {tempSelectedPlatforms.length === 3 ? 'Clear all' : 'Select all'}
+                    </Button>
+                  </Box>
+                  {(['flipkart','amazon','d2c'] as const).map((p) => (
+                    <MenuItem
+                      key={p}
+                      onClick={() => {
+                        setTempSelectedPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) as any : ([...prev, p] as any));
+                      }}
+                      sx={{ py: 1, px: 1, borderRadius: '8px' }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Checkbox size="small" checked={tempSelectedPlatforms.includes(p)} />
+                        <Box>
+                          <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p === 'flipkart' ? 'Flipkart' : p === 'amazon' ? 'Amazon' : 'D2C'}</Typography>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>{p === 'd2c' ? 'Website / D2C' : 'E-commerce marketplace'}</Typography>
+                        </Box>
+                      </Box>
+                    </MenuItem>
+                  ))}
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1, justifyContent: 'flex-end' }}>
+                    <Button variant="outlined" onClick={() => setPlatformMenuAnchorEl(null)} sx={{ textTransform: 'none', color: '#6b7280', borderColor: '#e5e7eb' }}>Cancel</Button>
+                    <Button
+                      variant="contained"
+                      disabled={tempSelectedPlatforms.length === 0}
+                      onClick={() => {
+                        setSelectedPlatforms(tempSelectedPlatforms);
+                        setPlatformMenuAnchorEl(null);
+                        fetchUnreconciledOrders();
+                      }}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      Apply
+                    </Button>
+                  </Box>
+                </Box>
               </Menu>
               <Button variant="contained" onClick={sendToFlipkart} disabled={selectedIds.length === 0} sx={{ backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' }, textTransform: 'none', fontWeight: 600 }}>
                 Send to Flipkart ({selectedIds.length})
@@ -1775,7 +1788,7 @@ const DisputePage: React.FC = () => {
         </Box>
       )}
 
-      <Snackbar open={snackbarOpen} autoHideDuration={2500} onClose={() => setSnackbarOpen(false)} message="Sent selected disputes to Flipkart" />
+      <Snackbar open={snackbarOpen} autoHideDuration={2500} onClose={() => setSnackbarOpen(false)} message="Transaction marked as reconciled successfully" />
 
       {/* Column Filter Popover */}
       <Popover

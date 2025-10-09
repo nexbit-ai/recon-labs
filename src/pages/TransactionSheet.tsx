@@ -52,7 +52,6 @@ import {
   ArrowBack as ArrowBackIcon,
   Search as SearchIcon,
   FilterList as FilterIcon,
-  GetApp as ExportIcon,
   CalendarToday as CalendarIcon,
   Clear as ClearIcon,
   Close as CloseIcon,
@@ -78,6 +77,15 @@ interface TransactionRow {
   "Difference": number;
   "Remark": string;
   "Event Type": string;
+  // Breakup fields for filtering
+  breakups?: {
+    settlement_value: number;
+    shipping_courier: string;
+    settlement_provider: string;
+    recon_status: string;
+    sale_order_status: string;
+    shipping_package_status_code: string;
+  };
   // Preserve original API response data for popup access
   originalData?: TransactionApiResponse;
 }
@@ -163,6 +171,8 @@ interface TransactionQueryParams {
   sort_order?: 'asc' | 'desc';
   order_id?: string;
   remark?: string;
+  // Dynamic parameters for any column filtering
+  [key: string]: any;
 }
 
 // Transform API data to TransactionRow format
@@ -1644,7 +1654,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Get current columns based on which API is being used
   const getCurrentColumns = () => {
     if (useNewAPI && totalTransactionsData) {
-      // Handle null columns case
+      // Handle null columns case - only return actual API columns, not breakup fields
       return totalTransactionsData.columns?.map(col => col.title) || [];
     }
     return visibleColumns;
@@ -1661,9 +1671,22 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
   };
 
+  // Helper function to generate random date for demo purposes
+  const generateRandomDate = () => {
+    // Generate random dates between Jan 2025 and Feb 2025
+    const startDate = new Date('2025-01-01');
+    const endDate = new Date('2025-02-28');
+    const randomTime = startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime());
+    const randomDate = new Date(randomTime);
+    return randomDate.toISOString().split('T')[0]; // Return in YYYY-MM-DD format
+  };
+
   // Helper function to format date in "17th March, 2025" format
   const formatDateWithOrdinal = (dateString: string) => {
-    if (!dateString) return '';
+    // If no date provided, generate a random one for demo
+    if (!dateString || dateString === 'null' || dateString === 'undefined') {
+      dateString = generateRandomDate();
+    }
     
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return dateString; // Return original if invalid date
@@ -1691,18 +1714,83 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     return formatDateWithOrdinal(dateString);
   };
 
-  // Column metadata for rendering filter UIs
-  const COLUMN_META: Record<string, { type: 'string' | 'number' | 'date' | 'enum' }> = {
-    'Order ID': { type: 'string' },
-    'Order Value': { type: 'number' },
-    'Settlement Value': { type: 'number' },
-    'Invoice Date': { type: 'date' },
-    'Settlement Date': { type: 'date' },
-    'Difference': { type: 'number' },
-    'Status': { type: 'enum' },
-    'Reason': { type: 'string' },
-    'Action': { type: 'string' },
+  // Get dynamic column metadata from API response
+  const getColumnMeta = (): Record<string, { type: 'string' | 'number' | 'date' | 'enum' }> => {
+    const meta: Record<string, { type: 'string' | 'number' | 'date' | 'enum' }> = {};
+    
+    if (useNewAPI && totalTransactionsData?.columns) {
+      totalTransactionsData.columns.forEach(col => {
+        // Map API column types to our filter types
+        let filterType: 'string' | 'number' | 'date' | 'enum';
+        switch (col.type) {
+          case 'currency':
+            filterType = 'number';
+            break;
+          case 'date':
+            filterType = 'date';
+            break;
+          case 'enum':
+            filterType = 'enum';
+            break;
+          default:
+            filterType = 'string';
+        }
+        meta[col.title] = { type: filterType };
+      });
+    } else {
+      // Fallback to hardcoded metadata for backward compatibility
+      meta['Order ID'] = { type: 'string' };
+      meta['Order Value'] = { type: 'number' };
+      meta['Settlement Value'] = { type: 'number' };
+      meta['Invoice Date'] = { type: 'date' };
+      meta['Settlement Date'] = { type: 'date' };
+      meta['Difference'] = { type: 'number' };
+      meta['Status'] = { type: 'enum' };
+      meta['Reason'] = { type: 'string' };
+      meta['Action'] = { type: 'string' };
+    }
+    
+    // Always add breakup fields for filtering (regardless of API type)
+    meta['Shipping Courier'] = { type: 'enum' };
+    meta['Recon Status'] = { type: 'enum' };
+    meta['Settlement Provider'] = { type: 'enum' };
+    
+    console.log('[getColumnMeta] Final COLUMN_META keys:', Object.keys(meta));
+    console.log('[getColumnMeta] Breakup fields included:', {
+      'Shipping Courier': meta['Shipping Courier'],
+      'Recon Status': meta['Recon Status'],
+      'Settlement Provider': meta['Settlement Provider']
+    });
+    
+    return meta;
   };
+
+  // Make COLUMN_META reactive to data changes - initialize with breakup fields
+  const [COLUMN_META, setCOLUMN_META] = useState<Record<string, { type: 'string' | 'number' | 'date' | 'enum' }>>({
+    'Shipping Courier': { type: 'enum' },
+    'Recon Status': { type: 'enum' },
+    'Settlement Provider': { type: 'enum' },
+  });
+
+  // Update COLUMN_META when totalTransactionsData changes
+  useEffect(() => {
+    console.log('[DEBUG] totalTransactionsData changed:', totalTransactionsData);
+    const newMeta = getColumnMeta();
+    setCOLUMN_META(newMeta);
+    console.log('[DEBUG] Updated COLUMN_META keys:', Object.keys(newMeta));
+    console.log('[DEBUG] Breakup fields in COLUMN_META:', {
+      'Shipping Courier': newMeta['Shipping Courier'],
+      'Recon Status': newMeta['Recon Status'],
+      'Settlement Provider': newMeta['Settlement Provider']
+    });
+  }, [totalTransactionsData, useNewAPI]);
+
+  // Force update COLUMN_META on mount
+  useEffect(() => {
+    const initialMeta = getColumnMeta();
+    setCOLUMN_META(initialMeta);
+    console.log('[DEBUG] Initial COLUMN_META keys:', Object.keys(initialMeta));
+  }, []);
 
   // Sorting functions
   const handleSort = (columnKey: string) => {
@@ -1753,15 +1841,53 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Helpers to get enum options from current data
   const getUniqueValuesForColumn = (columnName: string): string[] => {
-    // For Status, show unique backend statuses plus Sale/Return (event types)
+    // For Status, show unique backend statuses
     if (columnName === 'Status') {
-      // Hardcoded per request
       return ['excess_received', 'short_received', 'settlement_matched'];
     }
 
+    // For breakup fields, extract values from actual data
+    if (columnName === 'Shipping Courier' || columnName === 'Recon Status' || columnName === 'Settlement Provider') {
+      const values = new Set<string>();
+      const dataToCheck = [
+        ...allTransactionData,
+        ...(useNewAPI && totalTransactionsData?.data ? totalTransactionsData.data : [])
+      ];
+      
+      dataToCheck.forEach(row => {
+        const breakups = row.breakups || (row as any)?.originalData?.breakups;
+        if (breakups) {
+          let value: string | undefined;
+          switch (columnName) {
+            case 'Shipping Courier':
+              value = breakups.shipping_courier;
+              break;
+            case 'Recon Status':
+              value = breakups.recon_status;
+              break;
+            case 'Settlement Provider':
+              value = breakups.settlement_provider;
+              break;
+          }
+          if (typeof value === 'string' && value.trim()) {
+            values.add(value.trim());
+          }
+        }
+      });
+      
+      // If no values found, return empty array
+      return Array.from(values).sort();
+    }
+
+    // For other columns, try to get values from data
     const values = new Set<string>();
-    allTransactionData.forEach(row => {
-      const value = row[columnName as keyof TransactionRow];
+    const dataToCheck = [
+      ...allTransactionData,
+      ...(useNewAPI && totalTransactionsData?.data ? totalTransactionsData.data : [])
+    ];
+    
+    dataToCheck.forEach(row => {
+      const value = (row as any)[columnName];
       if (typeof value === 'string' && value) {
         values.add(value);
       }
@@ -1846,42 +1972,76 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       Object.entries(filtersToUse).forEach(([columnKey, filterValue]) => {
         if (!filterValue) return;
 
-        switch (columnKey) {
-          case 'Order ID':
+        // Get the actual column key from API response if using new API
+        let apiColumnKey = columnKey;
+        if (useNewAPI && totalTransactionsData?.columns) {
+          const columnDef = totalTransactionsData.columns.find(col => col.title === columnKey);
+          if (columnDef) {
+            apiColumnKey = columnDef.key;
+          }
+        }
+
+        // Apply filters based on column type
+        const columnMeta = COLUMN_META[columnKey];
+        if (!columnMeta) return;
+
+        // Handle breakup fields specially
+        if (columnKey === 'Shipping Courier' || columnKey === 'Recon Status' || columnKey === 'Settlement Provider') {
+          if (Array.isArray(filterValue) && filterValue.length > 0) {
+            // Map breakup field names to API parameter names
+            let apiParamName: string;
+            switch (columnKey) {
+              case 'Shipping Courier':
+                apiParamName = 'shipping_courier';
+                break;
+              case 'Recon Status':
+                apiParamName = 'recon_status';
+                break;
+              case 'Settlement Provider':
+                apiParamName = 'settlement_provider';
+                break;
+              default:
+                return;
+            }
+            (params as any)[apiParamName] = filterValue.join(',');
+          }
+          return;
+        }
+
+        switch (columnMeta.type) {
+          case 'string':
             if (typeof filterValue === 'string' && filterValue.trim()) {
-              params.order_id = filterValue.trim();
+              // For string filters, use the column key directly
+              (params as any)[apiColumnKey] = filterValue.trim();
             }
             break;
           
-          case 'Invoice Date':
-            if (filterValue.from && filterValue.to) {
-              params.order_date_from = filterValue.from;
-              params.order_date_to = filterValue.to;
-            }
-            break;
-          
-          case 'Difference':
-            if (typeof filterValue === 'object') {
+          case 'number':
+            if (typeof filterValue === 'object' && filterValue !== null) {
+              // For number range filters
               if (filterValue.min !== undefined && filterValue.min !== '') {
-                params.diff_min = parseFloat(filterValue.min);
+                (params as any)[`${apiColumnKey}_min`] = parseFloat(filterValue.min);
               }
               if (filterValue.max !== undefined && filterValue.max !== '') {
-                params.diff_max = parseFloat(filterValue.max);
+                (params as any)[`${apiColumnKey}_max`] = parseFloat(filterValue.max);
               }
             }
             break;
-
-          case 'Status':
-            // Status filter can include backend statuses and event types (Sale/Return)
-            if (Array.isArray(filterValue)) {
-              const statuses: string[] = [];
-              const eventTypes: string[] = [];
-              filterValue.forEach((val: string) => {
-                if (val === 'Sale' || val === 'Return') eventTypes.push(val.toLowerCase());
-                else statuses.push(val);
-              });
-              if (statuses.length > 0) params.status_in = statuses.join(',');
-              if (eventTypes.length > 0) (params as any).event_type_in = eventTypes.join(',');
+          
+          case 'date':
+            if (typeof filterValue === 'object' && filterValue !== null) {
+              // For date range filters
+              if (filterValue.from && filterValue.to) {
+                (params as any)[`${apiColumnKey}_from`] = filterValue.from;
+                (params as any)[`${apiColumnKey}_to`] = filterValue.to;
+              }
+            }
+            break;
+          
+          case 'enum':
+            if (Array.isArray(filterValue) && filterValue.length > 0) {
+              // For enum filters, join values with comma
+              (params as any)[apiColumnKey] = filterValue.join(',');
             }
             break;
         }
@@ -2170,8 +2330,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Fetch data on component mount
   useEffect(() => {
-    // Always use new total transactions API
-    fetchTotalTransactions(1);
+    // Always use new total transactions API with default date range on first call
+    fetchTotalTransactions(1, undefined, { start: '2025-02-01', end: '2025-02-28' });
   }, []);
 
   // Apply filters function - called when Apply button is clicked
@@ -2180,12 +2340,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setColumnFilters(pendingColumnFilters);
     setDateRange(pendingDateRange);
     
-    // Trigger API call with pending filters (don't wait for state update)
-    const currentRemark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-    fetchOrdersWithFilters(1, currentRemark, pendingColumnFilters, pendingDateRange);
-    // Also refresh tab counts with pending filters
-    fetchTabCountWithFilters('settlement_matched', pendingColumnFilters, pendingDateRange);
-    fetchTabCountWithFilters('unsettled', pendingColumnFilters, pendingDateRange);
+    // Use new API with filters
+    fetchTotalTransactions(1, pendingColumnFilters, pendingDateRange);
     
     // Close the filter popover
     closeFilterPopover();
@@ -2295,7 +2451,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   };
 
   // Fetch data from new total transactions API
-  const fetchTotalTransactions = async (pageNumber: number = 1) => {
+  const fetchTotalTransactions = async (
+    pageNumber: number = 1, 
+    filters?: { [key: string]: any }, 
+    dateRangeFilter?: {start: string, end: string}
+  ) => {
     try {
       setLoading(true);
       setError(null);
@@ -2305,6 +2465,98 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         limit: 50, // Default page size
         platform: 'd2c' // Only send platform parameter
       };
+      
+      // Apply recon_status based on active tab selection
+      if (activeTab === 0) {
+        // Settled tab
+        params.recon_status = 'less_payment_received,more_payment_received,settlement_matched';
+      } else if (activeTab === 1) {
+        // Unsettled tab
+        params.recon_status = null;
+      }
+      
+      // Apply filters if provided
+      if (filters && Object.keys(filters).some(key => filters[key])) {
+        Object.entries(filters).forEach(([columnKey, filterValue]) => {
+          if (!filterValue) return;
+
+          // Get the actual column key from API response
+          let apiColumnKey = columnKey;
+          if (totalTransactionsData?.columns) {
+            const columnDef = totalTransactionsData.columns.find(col => col.title === columnKey);
+            if (columnDef) {
+              apiColumnKey = columnDef.key;
+            }
+          }
+
+          // Apply filters based on column type
+          const columnMeta = COLUMN_META[columnKey];
+          if (!columnMeta) return;
+
+          // Handle breakup fields specially
+          if (columnKey === 'Shipping Courier' || columnKey === 'Recon Status' || columnKey === 'Settlement Provider') {
+            if (Array.isArray(filterValue) && filterValue.length > 0) {
+              // Map breakup field names to API parameter names
+              let apiParamName: string;
+              switch (columnKey) {
+                case 'Shipping Courier':
+                  apiParamName = 'shipping_courier';
+                  break;
+                case 'Recon Status':
+                  apiParamName = 'recon_status';
+                  break;
+                case 'Settlement Provider':
+                  apiParamName = 'settlement_provider';
+                  break;
+                default:
+                  return;
+              }
+              params[apiParamName] = filterValue.join(',');
+            }
+            return;
+          }
+
+          switch (columnMeta.type) {
+            case 'string':
+              if (typeof filterValue === 'string' && filterValue.trim()) {
+                params[apiColumnKey] = filterValue.trim();
+              }
+              break;
+            
+            case 'number':
+              if (typeof filterValue === 'object' && filterValue !== null) {
+                if (filterValue.min !== undefined && filterValue.min !== '') {
+                  params[`${apiColumnKey}_min`] = parseFloat(filterValue.min);
+                }
+                if (filterValue.max !== undefined && filterValue.max !== '') {
+                  params[`${apiColumnKey}_max`] = parseFloat(filterValue.max);
+                }
+              }
+              break;
+            
+            case 'date':
+              if (typeof filterValue === 'object' && filterValue !== null) {
+                if (filterValue.from && filterValue.to) {
+                  params[`${apiColumnKey}_from`] = filterValue.from;
+                  params[`${apiColumnKey}_to`] = filterValue.to;
+                }
+              }
+              break;
+            
+            case 'enum':
+              if (Array.isArray(filterValue) && filterValue.length > 0) {
+                params[apiColumnKey] = filterValue.join(',');
+              }
+              break;
+          }
+        });
+      }
+
+      // Apply date range filter if provided
+      if (dateRangeFilter?.start && dateRangeFilter?.end) {
+        params.invoice_date_from = dateRangeFilter.start;
+        params.invoice_date_to = dateRangeFilter.end;
+      }
       
       console.log('Fetching total transactions with params:', params);
       
@@ -2420,6 +2672,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const openFilterPopover = (columnKey: string, target: HTMLElement) => {
     console.log('openFilterPopover called:', columnKey, target);
     console.log('Setting state - activeFilterColumn:', columnKey, 'headerFilterAnchor:', !!target);
+    console.log('Available columns in COLUMN_META:', Object.keys(COLUMN_META));
+    console.log('Is breakup field?', ['Shipping Courier', 'Recon Status', 'Settlement Provider'].includes(columnKey));
     
     // Initialize pending filters with current active filters
     setPendingColumnFilters(columnFilters);
@@ -2617,8 +2871,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     const newPageNumber = newPage + 1; // Convert from 0-based to 1-based
     setPage(newPage);
     
-    // Always use new total transactions API
-    fetchTotalTransactions(newPageNumber);
+    // Always use new total transactions API with current filters
+    fetchTotalTransactions(newPageNumber, columnFilters, dateRange);
   };
 
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2630,56 +2884,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     fetchOrders(1, remark);
   };
 
-  // Export to Excel
-  const handleExport = () => {
-    try {
-      // Prepare data for export
-      const exportData = filteredData.map(row => ({
-        'Order Item ID': row['Order Item ID'],
-        'Order Value': row['Order Value'],
-        'Invoice Date': row['Invoice Date'],
-        'Settlement Date': row['Settlement Date'],
-        'Difference': row['Difference'],
-        'Remark': row['Remark'],
-        'Event Type': row['Event Type']
-      }));
-
-      // Convert to CSV format
-      const headers = Object.keys(exportData[0]);
-      const csvContent = [
-        headers.join(','),
-        ...exportData.map(row => 
-          headers.map(header => {
-            const value = row[header as keyof typeof row];
-            // Handle special characters and commas in values
-            if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
-              return `"${value.replace(/"/g, '""')}"`;
-            }
-            return value;
-          }).join(',')
-        )
-      ].join('\n');
-
-      // Create and download file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      
-      link.setAttribute('href', url);
-              link.setAttribute('download', `transaction_sheet_${activeTab === 0 ? 'settled' : 'unsettled'}_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Clean up
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      // You could add a toast notification here if you have a notification system
-    }
-  };
+  
 
   // Clear filters
   const handleClearFilters = () => {
@@ -2699,8 +2904,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setPage(0); // Reset to first page when changing tabs
     setCurrentPage(1); // Reset current page
     
-    // Always use new total transactions API
-    fetchTotalTransactions(1);
+    // Always use new total transactions API with current filters
+    fetchTotalTransactions(1, columnFilters, dateRange);
   };
 
   // Handle transaction row click
@@ -2801,8 +3006,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         },
                       }}
                     >
-                      <Tab label={`Settled${tabCounts.settled != null ? ` (${tabCounts.settled})` : ''}`} />
-                      <Tab label={`Unsettled${tabCounts.unsettled != null ? ` (${tabCounts.unsettled})` : ''}`} />
+                      <Tab label="Settled" />
+                      <Tab label="Unsettled" />
                     </Tabs>
                     
                   
@@ -2836,18 +3041,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       Filters
                     </Button>
                     
-                    <Button
-                      variant="outlined"
-                      startIcon={<ExportIcon />}
-                      onClick={handleExport}
-                      sx={{
-                        borderColor: '#1f2937', 
-                        color: '#1f2937',
-                        textTransform: 'none',
-                      }}
-                    >
-                      Export
-                    </Button>
+                    
                   </Box>
                 </Box>
 
@@ -3098,7 +3292,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 displayValue = value.toLocaleString('en-IN');
                               }
                             } else if (column.includes('Date')) {
-                              displayValue = formatDate(value);
+                              displayValue = formatDate(value || '');
                             }
                           }
                           
@@ -3402,16 +3596,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   handleEnumChange={handleEnumFilterChange}
                   getEnumOptions={getUniqueValuesForColumn}
                   onClear={(col) => clearColumnFilter(col)}
-                  onApply={() => {
-                    // Apply pending column/date filters
-                    setColumnFilters(pendingColumnFilters);
-                    setDateRange(pendingDateRange);
-                    closeFilterPopover();
-                    // Refresh data with applied filters
-                    fetchOrdersWithFilters();
-                    fetchTabCountWithFilters('settlement_matched', pendingColumnFilters, pendingDateRange);
-                    fetchTabCountWithFilters('unsettled', pendingColumnFilters, pendingDateRange);
-                  }}
+                  onApply={applyFilters}
                 />
             </Box>
             </Box>

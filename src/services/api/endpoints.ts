@@ -47,10 +47,6 @@ export const userAPI = {
 
 // Marketplace Reconciliation API
 export const reconciliationAPI = {
-  // Get reconciliation summary
-  getSummary: (params?: DateRangeParams) =>
-    apiService.get<MarketplaceReconciliationResponse>(API_CONFIG.ENDPOINTS.FETCH_STATS, params),
-
   // Get detailed reconciliation data
   getDetails: (params?: DateRangeParams & PaginationParams & FilterParams) =>
     apiService.get<PaginatedResponse<any>>(API_CONFIG.ENDPOINTS.RECONCILIATION_DETAILS, params),
@@ -125,14 +121,12 @@ export const ordersAPI = {
 
 // Stats API
 export const statsAPI = {
-  // Get reconciliation stats
-  getStats: (params?: DateRangeParams) =>
-    apiService.get<MarketplaceReconciliationResponse>(API_CONFIG.ENDPOINTS.FETCH_STATS, params),
+  // Deprecated: removed legacy stats API
 };
 
 // Main Summary API (D2C / Marketplace unified summary)
 export const mainSummaryAPI = {
-  getMainSummary: (params: { start_date: string; end_date: string; date_field: 'invoice_date' | 'settlement_date' | string; platform?: string; status?: string }) =>
+  getMainSummary: (params: { start_date: string; end_date: string; date_field: 'invoice_date' | 'settlement_date' | string; platform?: string[]; status?: string }) =>
     apiService.get<any>('/recon/main-summary', params),
 };
 

@@ -66,7 +66,7 @@ export interface ApiRequestConfig extends RequestConfig {
 // New Main Summary API types (v1/recon/main-summary)
 export interface MainSummaryFilters {
   status: string;
-  platform: string;
+  platform: string[];
   date_field: string; // invoice_date | settlement_date
   start_date: string; // YYYY-MM-DD
   end_date: string;   // YYYY-MM-DD
