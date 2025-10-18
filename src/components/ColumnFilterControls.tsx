@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, FormControl, InputLabel, Select, MenuItem, OutlinedInput, TextField, Button, FormGroup, FormControlLabel, Checkbox } from '@mui/material';
+import { Box, Typography, FormControl, InputLabel, Select, MenuItem, OutlinedInput, TextField, Button, FormGroup, FormControlLabel, Checkbox, Autocomplete, Chip } from '@mui/material';
 
 export interface ColumnMetaMap {
   [column: string]: { type: 'string' | 'number' | 'date' | 'enum' };
@@ -17,6 +17,9 @@ export interface ColumnFilterControlsProps {
   getEnumOptions?: (column: string) => string[];
   onClear: (column: string) => void;
   onApply: () => void;
+  // Order ID chips state and handlers
+  orderIdChips?: string[];
+  setOrderIdChips?: (chips: string[]) => void;
 }
 
 const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
@@ -31,6 +34,8 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
   getEnumOptions,
   onClear,
   onApply,
+  orderIdChips = [],
+  setOrderIdChips,
 }) => {
   const metaType = (columnMeta as any)[activeColumn]?.type || 'string';
   let enumOptions = activeColumn && getEnumOptions ? getEnumOptions(activeColumn) : [];
@@ -56,7 +61,7 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
         </TextField>
       </FormControl>
 
-      {activeColumn && metaType === 'string' && (
+      {activeColumn && metaType === 'string' && activeColumn !== 'Order ID' && (
         <>
           <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Contains</Typography>
           <TextField 
@@ -68,6 +73,53 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
           />
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
             <Button size="small" onClick={() => onClear(activeColumn)}>Clear</Button>
+            <Button size="small" variant="contained" onClick={onApply}>Apply</Button>
+          </Box>
+        </>
+      )}
+
+      {/* Special case for Order ID - chips input */}
+      {activeColumn === 'Order ID' && setOrderIdChips && (
+        <>
+          <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem', mb: 0.5 }}>
+            Order IDs (comma-separated or paste multiple)
+          </Typography>
+          <Autocomplete
+            multiple
+            freeSolo
+            options={[]}
+            value={orderIdChips}
+            onChange={(event, newValue) => {
+              setOrderIdChips(newValue as string[]);
+            }}
+            renderTags={(value, getTagProps) =>
+              value.map((option, index) => (
+                <Chip
+                  variant="outlined"
+                  label={option}
+                  size="small"
+                  {...getTagProps({ index })}
+                />
+              ))
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                size="small"
+                placeholder="Enter Order IDs"
+                sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem' } }}
+              />
+            )}
+            sx={{ width: '100%' }}
+          />
+          <Typography variant="caption" sx={{ color: '#9ca3af', fontSize: '0.65rem', mt: 0.5 }}>
+            Press Enter after each ID or paste comma-separated values
+          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+            <Button size="small" onClick={() => {
+              setOrderIdChips([]);
+              onClear(activeColumn);
+            }}>Clear</Button>
             <Button size="small" variant="contained" onClick={onApply}>Apply</Button>
           </Box>
         </>

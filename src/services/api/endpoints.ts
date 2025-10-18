@@ -76,10 +76,6 @@ export const reconciliationAPI = {
 
 // Transactions API
 export const transactionsAPI = {
-  // Get transactions list
-  getTransactions: (params?: DateRangeParams & PaginationParams & FilterParams) =>
-    apiService.get<PaginatedResponse<any>>(API_CONFIG.ENDPOINTS.TRANSACTIONS, params),
-
   // Get total transactions list with dynamic columns
   getTotalTransactions: (params?: PaginationParams & FilterParams) =>
     apiService.get<TotalTransactionsResponse>(API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS, params),
@@ -87,25 +83,6 @@ export const transactionsAPI = {
   // Get D2C transactions with specific parameters
   getD2CTransactions: (params?: { page?: number; limit?: number; recon_status?: string; platform?: string; pagination?: boolean }) =>
     apiService.get<TotalTransactionsResponse>(API_CONFIG.ENDPOINTS.D2C_TRANSACTIONS, params, { useD2CHeaders: true }),
-
-  // Get single transaction
-  getTransaction: (id: string) =>
-    apiService.get<any>(replaceUrlParams(API_CONFIG.ENDPOINTS.TRANSACTION_DETAILS, { id })),
-
-  // Update transaction
-  updateTransaction: (id: string, data: any) =>
-    apiService.put<any>(replaceUrlParams(API_CONFIG.ENDPOINTS.TRANSACTION_UPDATE, { id }), data),
-
-  // Delete transaction
-  deleteTransaction: (id: string) =>
-    apiService.delete(replaceUrlParams(API_CONFIG.ENDPOINTS.TRANSACTION_DELETE, { id })),
-
-  // Bulk operations
-  bulkUpdate: (ids: string[], data: any) =>
-    apiService.post(`${API_CONFIG.ENDPOINTS.TRANSACTIONS}/bulk-update`, { ids, data }),
-
-  bulkDelete: (ids: string[]) =>
-    apiService.post(`${API_CONFIG.ENDPOINTS.TRANSACTIONS}/bulk-delete`, { ids }),
 };
 
 // Orders API

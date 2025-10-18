@@ -52,12 +52,8 @@ export const API_CONFIG = {
     RECONCILIATION_UPLOAD: '/recon/upload',
     
     // Transactions
-    TRANSACTIONS: '/recon/transactions',
     TOTAL_TRANSACTIONS: '/recon/total-transactions',
     D2C_TRANSACTIONS: '/recon/total-transactions',
-    TRANSACTION_DETAILS: '/recon/transactions/:id',
-    TRANSACTION_UPDATE: '/recon/transactions/:id',
-    TRANSACTION_DELETE: '/recon/transactions/:id',
     
     // Orders
     ORDERS: '/recon/orders',

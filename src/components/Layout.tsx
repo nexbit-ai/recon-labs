@@ -40,7 +40,7 @@ import {
 import { Badge } from '@mui/material';
 // import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
 // @ts-ignore
-import logo from '../assets/logo.png';
+import logo from '../assets/logo_fresh.jpg';
 // @ts-ignore
 import userPhoto from '../assets/user-photo.jpg';
 

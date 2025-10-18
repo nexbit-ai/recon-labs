@@ -42,6 +42,7 @@ import {
   ListItemButton,
   ListItemText,
   ListSubheader,
+  Autocomplete,
 } from '@mui/material';
 import ColumnFilterControls from '../components/ColumnFilterControls';
 import { api } from '../services/api';
@@ -165,12 +166,15 @@ interface TransactionQueryParams {
   status_in?: string;
   order_date_from?: string;
   order_date_to?: string;
+  invoice_date_from?: string;
+  invoice_date_to?: string;
   diff_min?: number;
   diff_max?: number;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
   order_id?: string;
   remark?: string;
+  platform?: string;
   // Dynamic parameters for any column filtering
   [key: string]: any;
 }
@@ -1596,9 +1600,34 @@ interface TransactionSheetProps {
   transaction?: any;
   statsData?: MarketplaceReconciliationResponse | null;
   initialTab?: number;
+  dateRange?: { start: string; end: string };
 }
 
-const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0 }) => {
+// Complete mapping of UI columns to API parameters
+const COLUMN_TO_API_PARAM_MAP: Record<string, {
+  apiParam: string;
+  type: 'string' | 'number' | 'date' | 'enum';
+  supportedPlatforms?: ('flipkart' | 'd2c' | 'all')[];
+  usesInSuffix?: boolean; // For CSV filters like status_in
+}> = {
+  // Common filters (both platforms)
+  'Order ID': { apiParam: 'order_id', type: 'string' }, // Special: chips input
+  'Status': { apiParam: 'status_in', type: 'enum', usesInSuffix: true },
+  'Order Date': { apiParam: 'order_date', type: 'date' }, // → order_date_from/to
+  'Invoice Date': { apiParam: 'order_date', type: 'date' }, // alias
+  'Settlement Date': { apiParam: 'settlement_date', type: 'date' },
+  'Order Value': { apiParam: 'order_value', type: 'number', supportedPlatforms: ['flipkart'] },
+  'Settlement Value': { apiParam: 'settlement_value', type: 'number' },
+  'Difference': { apiParam: 'diff', type: 'number' },
+  
+  // D2C-specific CSV filters (with _in suffix support)
+  'Settlement Provider': { apiParam: 'settlement_provider_in', type: 'enum', supportedPlatforms: ['d2c'] },
+  'Recon Status': { apiParam: 'recon_status_in', type: 'enum', supportedPlatforms: ['d2c'] },
+  'Shipping Courier': { apiParam: 'shipping_courier_in', type: 'enum', supportedPlatforms: ['d2c'] },
+  'Mismatch Reason': { apiParam: 'mismatch_reason_in', type: 'enum', supportedPlatforms: ['d2c'] },
+};
+
+const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0, dateRange: propDateRange }) => {
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -1610,12 +1639,22 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     return initialTab;
   };
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateRange, setDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
+  // Use date range from props if provided, otherwise use empty state
+  const [dateRange, setDateRange] = useState<{start: string, end: string}>(
+    propDateRange || { start: '', end: '' }
+  );
   // Column filters can be string (contains), number range {min,max}, date range {from,to}, or enum string[]
   const [columnFilters, setColumnFilters] = useState<{ [key: string]: any }>({});
   // Pending filters that haven't been applied yet
   const [pendingColumnFilters, setPendingColumnFilters] = useState<{ [key: string]: any }>({});
   const [pendingDateRange, setPendingDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
+  // Platform filter state - now supports multi-select
+  const availablePlatforms = ['flipkart', 'd2c'] as const;
+  type Platform = typeof availablePlatforms[number];
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([...availablePlatforms]); // Default: all platforms selected
+  const [pendingSelectedPlatforms, setPendingSelectedPlatforms] = useState<Platform[]>([...availablePlatforms]); // Pending platforms before apply
+  // Order ID chips state
+  const [orderIdChips, setOrderIdChips] = useState<string[]>([]);
   const [filteredData, setFilteredData] = useState<TransactionRow[]>([]);
   const [allTransactionData, setAllTransactionData] = useState<TransactionRow[]>([]);
   const [page, setPage] = useState(0);
@@ -1754,12 +1793,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     meta['Shipping Courier'] = { type: 'enum' };
     meta['Recon Status'] = { type: 'enum' };
     meta['Settlement Provider'] = { type: 'enum' };
+    meta['Mismatch Reason'] = { type: 'enum' };
     
     console.log('[getColumnMeta] Final COLUMN_META keys:', Object.keys(meta));
     console.log('[getColumnMeta] Breakup fields included:', {
       'Shipping Courier': meta['Shipping Courier'],
       'Recon Status': meta['Recon Status'],
-      'Settlement Provider': meta['Settlement Provider']
+      'Settlement Provider': meta['Settlement Provider'],
+      'Mismatch Reason': meta['Mismatch Reason']
     });
     
     return meta;
@@ -1770,6 +1811,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     'Shipping Courier': { type: 'enum' },
     'Recon Status': { type: 'enum' },
     'Settlement Provider': { type: 'enum' },
+    'Mismatch Reason': { type: 'enum' },
   });
 
   // Update COLUMN_META when totalTransactionsData changes
@@ -1847,7 +1889,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
 
     // For breakup fields, extract values from actual data
-    if (columnName === 'Shipping Courier' || columnName === 'Recon Status' || columnName === 'Settlement Provider') {
+    if (columnName === 'Shipping Courier' || columnName === 'Recon Status' || columnName === 'Settlement Provider' || columnName === 'Mismatch Reason') {
       const values = new Set<string>();
       const dataToCheck = [
         ...allTransactionData,
@@ -1867,6 +1909,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               break;
             case 'Settlement Provider':
               value = breakups.settlement_provider;
+              break;
+            case 'Mismatch Reason':
+              value = (breakups as any).mismatch_reason;
               break;
           }
           if (typeof value === 'string' && value.trim()) {
@@ -1944,7 +1989,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     pageNumber: number = 1, 
     remark?: string, 
     overrideFilters?: { [key: string]: any }, 
-    overrideDateRange?: {start: string, end: string}
+    overrideDateRange?: {start: string, end: string},
+    overridePlatforms?: Platform[]
   ): TransactionQueryParams => {
     const params: TransactionQueryParams = {
       page: pageNumber,
@@ -1961,6 +2007,29 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       console.log('Setting API parameter: status_in = unsettled (for Unsettled tab)');
     }
 
+    // ALWAYS add invoice date range - this is required for all API calls
+    const dateRangeToUse = overrideDateRange || dateRange;
+    if (dateRangeToUse.start && dateRangeToUse.end) {
+      params.invoice_date_from = dateRangeToUse.start;
+      params.invoice_date_to = dateRangeToUse.end;
+      console.log('[buildQueryParams] Adding invoice date range:', { invoice_date_from: dateRangeToUse.start, invoice_date_to: dateRangeToUse.end });
+    } else {
+      console.warn('[buildQueryParams] No date range provided - API call may fail');
+    }
+
+    // ALWAYS add platform parameter as comma-separated list of selected platforms
+    const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
+    if (platformsToUse.length > 0) {
+      params.platform = platformsToUse.join(',');
+      console.log('[buildQueryParams] Platform parameter:', {
+        selectedPlatforms: platformsToUse,
+        platformParam: params.platform,
+        isAllSelected: platformsToUse.length === availablePlatforms.length
+      });
+    } else {
+      console.warn('[buildQueryParams] No platforms selected - API call may not return data');
+    }
+
     // Only add additional parameters if filters are explicitly applied
     if (overrideFilters || Object.keys(columnFilters).some(key => columnFilters[key])) {
       // Add sorting
@@ -1972,87 +2041,59 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       Object.entries(filtersToUse).forEach(([columnKey, filterValue]) => {
         if (!filterValue) return;
 
-        // Get the actual column key from API response if using new API
-        let apiColumnKey = columnKey;
-        if (useNewAPI && totalTransactionsData?.columns) {
-          const columnDef = totalTransactionsData.columns.find(col => col.title === columnKey);
-          if (columnDef) {
-            apiColumnKey = columnDef.key;
+        const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
+        if (!mapping) return;
+
+        // Check platform compatibility - allow if any selected platform supports it
+        if (mapping.supportedPlatforms) {
+          const isSupported = platformsToUse.some(p => mapping.supportedPlatforms!.includes(p as any));
+          if (!isSupported) {
+            return; // Skip filters not supported by any selected platform
           }
         }
 
-        // Apply filters based on column type
-        const columnMeta = COLUMN_META[columnKey];
-        if (!columnMeta) return;
+        const baseParam = mapping.apiParam;
 
-        // Handle breakup fields specially
-        if (columnKey === 'Shipping Courier' || columnKey === 'Recon Status' || columnKey === 'Settlement Provider') {
-          if (Array.isArray(filterValue) && filterValue.length > 0) {
-            // Map breakup field names to API parameter names
-            let apiParamName: string;
-            switch (columnKey) {
-              case 'Shipping Courier':
-                apiParamName = 'shipping_courier';
-                break;
-              case 'Recon Status':
-                apiParamName = 'recon_status';
-                break;
-              case 'Settlement Provider':
-                apiParamName = 'settlement_provider';
-                break;
-              default:
-                return;
-            }
-            (params as any)[apiParamName] = filterValue.join(',');
-          }
-          return;
-        }
-
-        switch (columnMeta.type) {
+        switch (mapping.type) {
           case 'string':
-            if (typeof filterValue === 'string' && filterValue.trim()) {
-              // For string filters, use the column key directly
-              (params as any)[apiColumnKey] = filterValue.trim();
+            if (columnKey === 'Order ID') {
+              // For Order ID, use chips array joined by comma
+              if (orderIdChips.length > 0) {
+                (params as any)[baseParam] = orderIdChips.join(',');
+              }
+            } else if (typeof filterValue === 'string' && filterValue.trim()) {
+              (params as any)[baseParam] = filterValue.trim();
             }
             break;
           
           case 'number':
             if (typeof filterValue === 'object' && filterValue !== null) {
-              // For number range filters
               if (filterValue.min !== undefined && filterValue.min !== '') {
-                (params as any)[`${apiColumnKey}_min`] = parseFloat(filterValue.min);
+                (params as any)[`${baseParam}_min`] = parseFloat(filterValue.min);
               }
               if (filterValue.max !== undefined && filterValue.max !== '') {
-                (params as any)[`${apiColumnKey}_max`] = parseFloat(filterValue.max);
+                (params as any)[`${baseParam}_max`] = parseFloat(filterValue.max);
               }
             }
             break;
           
           case 'date':
             if (typeof filterValue === 'object' && filterValue !== null) {
-              // For date range filters
               if (filterValue.from && filterValue.to) {
-                (params as any)[`${apiColumnKey}_from`] = filterValue.from;
-                (params as any)[`${apiColumnKey}_to`] = filterValue.to;
+                (params as any)[`${baseParam}_from`] = filterValue.from;
+                (params as any)[`${baseParam}_to`] = filterValue.to;
               }
             }
             break;
           
           case 'enum':
             if (Array.isArray(filterValue) && filterValue.length > 0) {
-              // For enum filters, join values with comma
-              (params as any)[apiColumnKey] = filterValue.join(',');
+              // Use the mapped API param which already includes _in suffix if needed
+              (params as any)[baseParam] = filterValue.join(',');
             }
             break;
         }
       });
-
-      // Apply date range filter if set
-      const dateRangeToUse = overrideDateRange || dateRange;
-      if (dateRangeToUse.start && dateRangeToUse.end) {
-        params.order_date_from = dateRangeToUse.start;
-        params.order_date_to = dateRangeToUse.end;
-      }
     }
 
     return params;
@@ -2084,7 +2125,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         .join('&');
       console.log(`Query string with applied filters:`, queryString);
       
-      const response = await api.transactions.getTransactions(queryParams as any);
+      const response = await api.transactions.getTotalTransactions(queryParams as any);
       
       if (response.success && response.data) {
         // Debug: Log the API response structure
@@ -2191,7 +2232,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   };
 
-  const fetchOrders = async (pageNumber: number = 1, remark?: string) => {
+  const fetchOrders = async (pageNumber: number = 1, remark?: string, overridePlatforms?: Platform[]) => {
     const isInitialLoad = pageNumber === 1 && allTransactionData.length === 0;
     
     if (!isInitialLoad) {
@@ -2200,8 +2241,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setError(null);
     
     try {
-      const queryParams = buildQueryParams(pageNumber, remark);
-      console.log(`Fetching orders with params:`, queryParams);
+      const queryParams = buildQueryParams(pageNumber, remark, undefined, undefined, overridePlatforms);
+      const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
+      console.log(`[fetchOrders] Current selectedPlatforms state:`, platformsToUse);
+      console.log(`[fetchOrders] Fetching orders with params:`, queryParams);
+      console.log(`[fetchOrders] Platform in params:`, queryParams.platform);
       
       // Example query string that would be sent to API:
       // status_in=unsettled&order_date_from=2025-04-01&order_date_to=2025-04-30&diff_min=-500&diff_max=0&sort_by=order_date&sort_order=desc&order_item_id=333981993553920100
@@ -2211,7 +2255,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         .join('&');
       console.log(`Query string:`, queryString);
       
-      const response = await api.transactions.getTransactions(queryParams as any);
+      const response = await api.transactions.getTotalTransactions(queryParams as any);
       
       if (response.success && response.data) {
         // Debug: Log the API response structure
@@ -2328,10 +2372,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   }, [location.state, navigate]);
 
+  // Sync propDateRange with local dateRange state
+  useEffect(() => {
+    if (propDateRange && (propDateRange.start !== dateRange.start || propDateRange.end !== dateRange.end)) {
+      setDateRange(propDateRange);
+      setPendingDateRange(propDateRange);
+    }
+  }, [propDateRange]);
+
   // Fetch data on component mount
   useEffect(() => {
-    // Always use new total transactions API with default date range on first call
-    fetchTotalTransactions(1, undefined, { start: '2025-02-01', end: '2025-02-28' });
+    // Use date range from props if provided, otherwise use default
+    const initialDateRange = propDateRange || { start: '2025-02-01', end: '2025-02-28' };
+    fetchTotalTransactions(1, undefined, initialDateRange);
   }, []);
 
   // Apply filters function - called when Apply button is clicked
@@ -2339,12 +2392,27 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Copy pending filters to active filters
     setColumnFilters(pendingColumnFilters);
     setDateRange(pendingDateRange);
+    setSelectedPlatforms(pendingSelectedPlatforms);
     
-    // Use new API with filters
-    fetchTotalTransactions(1, pendingColumnFilters, pendingDateRange);
+    // Use new API with filters and pending platforms
+    fetchTotalTransactions(1, pendingColumnFilters, pendingDateRange, pendingSelectedPlatforms);
     
     // Close the filter popover
     closeFilterPopover();
+  };
+
+  // Apply platform changes - called when Apply button next to platform selector is clicked
+  const applyPlatformFilter = () => {
+    console.log('[Apply Platform Filter] Applying platforms:', pendingSelectedPlatforms);
+    setSelectedPlatforms(pendingSelectedPlatforms);
+    setPage(0);
+    setCurrentPage(1);
+    if (useNewAPI) {
+      fetchTotalTransactions(1, columnFilters, dateRange, pendingSelectedPlatforms);
+    } else {
+      const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+      fetchOrders(1, remark, pendingSelectedPlatforms);
+    }
   };
 
   // Only refresh data when rowsPerPage changes (not filters)
@@ -2388,7 +2456,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const queryParams = buildQueryParams(1, remark, filters, dateRangeFilter);
       queryParams.limit = 1; // Only need metadata, not actual data
       
-      const response = await api.transactions.getTransactions(queryParams as any);
+      const response = await api.transactions.getTotalTransactions(queryParams as any);
       let count = 0;
       
       // Try to get count from metadata first
@@ -2422,7 +2490,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const queryParams = buildQueryParams(1, remark);
       queryParams.limit = 1; // Only need metadata, not actual data
       
-      const response = await api.transactions.getTransactions(queryParams as any);
+      const response = await api.transactions.getTotalTransactions(queryParams as any);
       let count = 0;
       
       // Try to get count from metadata first
@@ -2454,7 +2522,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const fetchTotalTransactions = async (
     pageNumber: number = 1, 
     filters?: { [key: string]: any }, 
-    dateRangeFilter?: {start: string, end: string}
+    dateRangeFilter?: {start: string, end: string},
+    overridePlatforms?: Platform[]
   ) => {
     try {
       setLoading(true);
@@ -2462,9 +2531,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       
       const params: any = {
         page: pageNumber,
-        limit: 50, // Default page size
-        platform: 'd2c' // Only send platform parameter
+        limit: rowsPerPage, // Use current rows per page setting
       };
+      
+      // ALWAYS add platform parameter as comma-separated list
+      const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
+      if (platformsToUse.length > 0) {
+        params.platform = platformsToUse.join(',');
+        console.log('[fetchTotalTransactions] Adding platform parameter:', params.platform);
+      } else {
+        console.warn('[fetchTotalTransactions] No platforms selected');
+      }
       
       // Apply recon_status based on active tab selection
       if (activeTab === 0) {
@@ -2480,56 +2557,38 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         Object.entries(filters).forEach(([columnKey, filterValue]) => {
           if (!filterValue) return;
 
-          // Get the actual column key from API response
-          let apiColumnKey = columnKey;
-          if (totalTransactionsData?.columns) {
-            const columnDef = totalTransactionsData.columns.find(col => col.title === columnKey);
-            if (columnDef) {
-              apiColumnKey = columnDef.key;
+          const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
+          if (!mapping) return;
+
+          // Check platform compatibility - allow if any selected platform supports it
+          if (mapping.supportedPlatforms) {
+            const isSupported = platformsToUse.some(p => mapping.supportedPlatforms!.includes(p as any));
+            if (!isSupported) {
+              return; // Skip filters not supported by any selected platform
             }
           }
 
-          // Apply filters based on column type
-          const columnMeta = COLUMN_META[columnKey];
-          if (!columnMeta) return;
+          const baseParam = mapping.apiParam;
 
-          // Handle breakup fields specially
-          if (columnKey === 'Shipping Courier' || columnKey === 'Recon Status' || columnKey === 'Settlement Provider') {
-            if (Array.isArray(filterValue) && filterValue.length > 0) {
-              // Map breakup field names to API parameter names
-              let apiParamName: string;
-              switch (columnKey) {
-                case 'Shipping Courier':
-                  apiParamName = 'shipping_courier';
-                  break;
-                case 'Recon Status':
-                  apiParamName = 'recon_status';
-                  break;
-                case 'Settlement Provider':
-                  apiParamName = 'settlement_provider';
-                  break;
-                default:
-                  return;
-              }
-              params[apiParamName] = filterValue.join(',');
-            }
-            return;
-          }
-
-          switch (columnMeta.type) {
+          switch (mapping.type) {
             case 'string':
-              if (typeof filterValue === 'string' && filterValue.trim()) {
-                params[apiColumnKey] = filterValue.trim();
+              if (columnKey === 'Order ID') {
+                // For Order ID, use chips array joined by comma
+                if (orderIdChips.length > 0) {
+                  params[baseParam] = orderIdChips.join(',');
+                }
+              } else if (typeof filterValue === 'string' && filterValue.trim()) {
+                params[baseParam] = filterValue.trim();
               }
               break;
             
             case 'number':
               if (typeof filterValue === 'object' && filterValue !== null) {
                 if (filterValue.min !== undefined && filterValue.min !== '') {
-                  params[`${apiColumnKey}_min`] = parseFloat(filterValue.min);
+                  params[`${baseParam}_min`] = parseFloat(filterValue.min);
                 }
                 if (filterValue.max !== undefined && filterValue.max !== '') {
-                  params[`${apiColumnKey}_max`] = parseFloat(filterValue.max);
+                  params[`${baseParam}_max`] = parseFloat(filterValue.max);
                 }
               }
               break;
@@ -2537,15 +2596,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
             case 'date':
               if (typeof filterValue === 'object' && filterValue !== null) {
                 if (filterValue.from && filterValue.to) {
-                  params[`${apiColumnKey}_from`] = filterValue.from;
-                  params[`${apiColumnKey}_to`] = filterValue.to;
+                  params[`${baseParam}_from`] = filterValue.from;
+                  params[`${baseParam}_to`] = filterValue.to;
                 }
               }
               break;
             
             case 'enum':
               if (Array.isArray(filterValue) && filterValue.length > 0) {
-                params[apiColumnKey] = filterValue.join(',');
+                // Use the mapped API param which already includes _in suffix if needed
+                params[baseParam] = filterValue.join(',');
               }
               break;
           }
@@ -2554,8 +2614,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       // Apply date range filter if provided
       if (dateRangeFilter?.start && dateRangeFilter?.end) {
-        params.invoice_date_from = dateRangeFilter.start;
-        params.invoice_date_to = dateRangeFilter.end;
+        params.order_date_from = dateRangeFilter.start;
+        params.order_date_to = dateRangeFilter.end;
       }
       
       console.log('Fetching total transactions with params:', params);
@@ -2891,6 +2951,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setSearchTerm('');
     setDateRange({ start: '', end: '' });
     setColumnFilters({});
+    setSelectedPlatforms([...availablePlatforms]); // Reset to all platforms selected
+    setPendingSelectedPlatforms([...availablePlatforms]); // Reset pending platforms too
+    setOrderIdChips([]); // Clear order ID chips
     setPage(0);
     setCurrentPage(1);
     const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
@@ -3041,13 +3104,158 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       Filters
                     </Button>
                     
+                    {/* Platform Filter Dropdown - Multi-select */}
+                    <FormControl variant="outlined" size="small" sx={{ minWidth: 180 }}>
+                      <InputLabel id="platform-filter-label">Platform</InputLabel>
+                      <Select
+                        labelId="platform-filter-label"
+                        id="platform-filter"
+                        multiple
+                        value={pendingSelectedPlatforms}
+                        onChange={(e) => {
+                          const value = e.target.value as Platform[];
+                          console.log('[Platform Selection] Pending platforms updated:', value);
+                          setPendingSelectedPlatforms(value);
+                        }}
+                        label="Platform"
+                        renderValue={(selected) => {
+                          if (selected.length === 0) {
+                            return 'No Platforms';
+                          }
+                          if (selected.length === availablePlatforms.length) {
+                            return 'All Platforms';
+                          }
+                          return selected.map(p => p === 'flipkart' ? 'Flipkart' : 'D2C').join(', ');
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            style: {
+                              maxHeight: 300,
+                            },
+                          },
+                          anchorOrigin: {
+                            vertical: 'bottom',
+                            horizontal: 'left',
+                          },
+                          transformOrigin: {
+                            vertical: 'top',
+                            horizontal: 'left',
+                          },
+                          sx: {
+                            zIndex: 10001,
+                          }
+                        }}
+                        sx={{
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#1f2937',
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#374151',
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#1f2937',
+                          },
+                        }}
+                      >
+                        {/* All option - not a selectable value, just a controller */}
+                        <MenuItem
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            // Toggle: if all are selected, deselect all; otherwise select all
+                            const newPlatforms = pendingSelectedPlatforms.length === availablePlatforms.length ? [] : [...availablePlatforms];
+                            console.log('[All Platforms Toggle] New pending selection:', newPlatforms);
+                            setPendingSelectedPlatforms(newPlatforms);
+                          }}
+                          sx={{ 
+                            backgroundColor: 'transparent !important',
+                            '&:hover': {
+                              backgroundColor: 'rgba(0, 0, 0, 0.04) !important',
+                            }
+                          }}
+                        >
+                          <Checkbox
+                            checked={pendingSelectedPlatforms.length === availablePlatforms.length}
+                            indeterminate={pendingSelectedPlatforms.length > 0 && pendingSelectedPlatforms.length < availablePlatforms.length}
+                          />
+                          <Typography sx={{ fontWeight: 600 }}>All Platforms</Typography>
+                        </MenuItem>
+                        {/* Individual platform options */}
+                        <MenuItem value="flipkart">
+                          <Checkbox checked={pendingSelectedPlatforms.includes('flipkart')} />
+                          <Typography>Flipkart</Typography>
+                        </MenuItem>
+                        <MenuItem value="d2c">
+                          <Checkbox checked={pendingSelectedPlatforms.includes('d2c')} />
+                          <Typography>D2C</Typography>
+                        </MenuItem>
+                      </Select>
+                    </FormControl>
+                    
+                    {/* Apply Button for Platform Filter */}
+                    <Button
+                      variant="contained"
+                      onClick={applyPlatformFilter}
+                      disabled={JSON.stringify(pendingSelectedPlatforms) === JSON.stringify(selectedPlatforms)}
+                      sx={{
+                        textTransform: 'none',
+                        backgroundColor: '#1f2937',
+                        '&:hover': { backgroundColor: '#374151' },
+                        '&:disabled': {
+                          backgroundColor: '#9ca3af',
+                          color: '#ffffff',
+                        },
+                      }}
+                    >
+                      Apply
+                    </Button>
                     
                   </Box>
                 </Box>
 
                 {/* Active filter chips row directly under the header row, aligned under back button */}
-                {!!Object.keys(columnFilters).filter(k => columnFilters[k]).length && (
+                {(!!Object.keys(columnFilters).filter(k => columnFilters[k]).length || selectedPlatforms.length < availablePlatforms.length || orderIdChips.length > 0) && (
                   <Box sx={{ml: 6, display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                    {/* Platform filter chips - show if not all platforms are selected */}
+                    {selectedPlatforms.length > 0 && selectedPlatforms.length < availablePlatforms.length && (
+                      <Chip
+                        key="platform-filter"
+                        label={`Platform: ${selectedPlatforms.map(p => p === 'flipkart' ? 'Flipkart' : 'D2C').join(', ')}`}
+                        onDelete={() => {
+                          setSelectedPlatforms([...availablePlatforms]);
+                          setPage(0);
+                          setCurrentPage(1);
+                          if (useNewAPI) {
+                            fetchTotalTransactions(1, columnFilters, dateRange, [...availablePlatforms]);
+                          } else {
+                            const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+                            fetchOrders(1, remark, [...availablePlatforms]);
+                          }
+                        }}
+                        size="small"
+                        sx={{ bgcolor: '#e0f2fe', color: '#0369a1', fontWeight: 600 }}
+                      />
+                    )}
+                    {/* Order ID chips */}
+                    {orderIdChips.length > 0 && (
+                      <Chip
+                        key="order-ids-filter"
+                        label={`Order IDs: ${orderIdChips.length} selected`}
+                        onDelete={() => {
+                          setOrderIdChips([]);
+                          setPage(0);
+                          setCurrentPage(1);
+                          if (useNewAPI) {
+                            fetchTotalTransactions(1, columnFilters, dateRange);
+                          } else {
+                            const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
+                            fetchOrders(1, remark);
+                          }
+                        }}
+                        size="small"
+                        sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600 }}
+                      />
+                    )}
                     {Object.entries(columnFilters).filter(([_, v]) => !!v).map(([key, val]) => (
                       <Chip
                         key={key}
@@ -3572,16 +3780,34 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 {/* Left: Full column list */}
                 <Box sx={{ width: 240, maxHeight: 320, overflowY: 'auto', borderRight: '1px solid #eee', pr: 1.5, pl: 0.5 }}>
                   <List dense subheader={<ListSubheader disableSticky sx={{ bgcolor: 'transparent', px: 0, fontSize: '0.75rem', color: '#6b7280' }}></ListSubheader>}>
-                    {Object.keys(COLUMN_META).map((col) => (
-                      <ListItemButton
-                        key={col}
-                        selected={activeFilterColumn === col}
-                        onClick={() => setActiveFilterColumn(col)}
-                        sx={{ borderRadius: 0.75, py: 0.75, px: 1 }}
-                      >
-                        <ListItemText primary={col} primaryTypographyProps={{ fontSize: '0.82rem' }} />
-                      </ListItemButton>
-                    ))}
+                    {Object.keys(COLUMN_META)
+                      .filter((col) => {
+                        // Filter columns based on selected platform
+                        const mapping = COLUMN_TO_API_PARAM_MAP[col];
+                        if (!mapping) return true; // Show columns without mapping
+                        if (!mapping.supportedPlatforms) return true; // Show columns available on all platforms
+                        // Show if supported by at least one selected platform
+                        return selectedPlatforms.some(p => mapping.supportedPlatforms!.includes(p as any));
+                      })
+                      .map((col) => (
+                        <ListItemButton
+                          key={col}
+                          selected={activeFilterColumn === col}
+                          onClick={() => setActiveFilterColumn(col)}
+                          sx={{ borderRadius: 0.75, py: 0.75, px: 1 }}
+                        >
+                          <ListItemText 
+                            primary={col} 
+                            primaryTypographyProps={{ fontSize: '0.82rem' }}
+                            secondary={
+                              COLUMN_TO_API_PARAM_MAP[col]?.supportedPlatforms 
+                                ? `(${COLUMN_TO_API_PARAM_MAP[col].supportedPlatforms?.join(', ')})` 
+                                : undefined
+                            }
+                            secondaryTypographyProps={{ fontSize: '0.65rem', color: '#9ca3af' }}
+                          />
+                        </ListItemButton>
+                      ))}
                   </List>
                 </Box>
                 {/* Right: Reusable controls */}
@@ -3597,6 +3823,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   getEnumOptions={getUniqueValuesForColumn}
                   onClear={(col) => clearColumnFilter(col)}
                   onApply={applyFilters}
+                  orderIdChips={orderIdChips}
+                  setOrderIdChips={setOrderIdChips}
                 />
             </Box>
             </Box>

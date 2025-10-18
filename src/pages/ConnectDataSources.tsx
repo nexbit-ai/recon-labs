@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Box, 
   Typography, 
@@ -21,7 +22,8 @@ import {
   CloudUpload as CloudUploadIcon,
   CheckCircle as CheckCircleIcon,
   Link as LinkIcon,
-  Description as ReportIcon
+  Description as ReportIcon,
+  UploadFile as UploadFileIcon
 } from '@mui/icons-material';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -82,6 +84,7 @@ const dataSources: DataSource[] = [
 ];
 
 const ConnectDataSources: React.FC = () => {
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<string[]>([]);
   const [settlementReport, setSettlementReport] = useState<File | null>(null);
   const [salesReport, setSalesReport] = useState<File | null>(null);
@@ -209,6 +212,67 @@ const ConnectDataSources: React.FC = () => {
             Connect Your Data Sources
           </Typography>
         </Box>
+
+        {/* Upload Documents Button Section */}
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: 3, 
+            mb: 3, 
+            background: '#ffffff',
+            borderRadius: '12px',
+            border: '1px solid #e5e7eb',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+              borderColor: '#111111'
+            }
+          }}
+          onClick={() => navigate('/upload-documents')}
+        >
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Box display="flex" alignItems="center" gap={2}>
+              <Box
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: '12px',
+                  background: '#111111',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <UploadFileIcon sx={{ fontSize: 32, color: '#ffffff' }} />
+              </Box>
+              <Box>
+                <Typography variant="h6" fontWeight={700} color="#1e293b" mb={0.5}>
+                  Upload Settlement Sheets
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Upload and manage your settlement sheets from D2C vendors.
+                </Typography>
+              </Box>
+            </Box>
+            <Button
+              variant="contained"
+              sx={{
+                background: '#111111',
+                color: '#ffffff',
+                fontWeight: 700,
+                px: 3,
+                py: 1.5,
+                '&:hover': {
+                  background: '#333333',
+                }
+              }}
+            >
+              Get Started
+            </Button>
+          </Box>
+        </Paper>
 
         {/* Connected Sources Section */}
         <Paper 

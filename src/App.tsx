@@ -22,6 +22,7 @@ import MarketplaceReconciliation from './pages/MarketplaceReconciliation';
 import DisputePage from './pages/Dispute';
 import Reports from './pages/Reports';
 import ConnectDataSources from './pages/ConnectDataSources';
+import UploadDocuments from './pages/UploadDocuments';
 import AIWorkflows from './pages/AIWorkflows';
 import Assistant from './pages/Assistant';
 import AIReconciliation from './pages/AIReconciliation';
@@ -432,6 +433,11 @@ function App() {
             <Route path="/connect-data-sources" element={
               <ProtectedRoute>
                 <Layout><ConnectDataSources /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/upload-documents" element={
+              <ProtectedRoute>
+                <Layout><UploadDocuments /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/ai-workflows" element={

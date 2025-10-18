@@ -494,6 +494,7 @@ const DisputePage: React.FC = () => {
   };
 
   // Fetch unreconciled orders from API
+  // NOTE: Dispute API endpoint not yet available - using dummy data
   const fetchUnreconciledOrders = async (filtersOverride?: Record<string, any>) => {
     if (disputeSubTab !== 0) return; // Only fetch for unreconciled tab
     
@@ -501,86 +502,17 @@ const DisputePage: React.FC = () => {
     setError(null);
     
     try {
-      // Check if D2C is selected (alone or with other platforms)
-      if (selectedPlatforms.includes('d2c')) {
-        // Use D2C API with exact parameters as specified (always keep platform=d2c)
-        const queryParams = buildQueryParams(filtersOverride);
-        const d2cParams = {
-          recon_status: 'less_payment_received,more_payment_received',
-          platform: 'd2c',
-          pagination: false,
-          // Default date range for D2C
-          invoice_date_from: '2025-02-01',
-          invoice_date_to: '2025-02-28',
-          // Add D2C-specific filter parameters (override defaults if provided)
-          ...(queryParams.invoice_date_from && { invoice_date_from: queryParams.invoice_date_from }),
-          ...(queryParams.invoice_date_to && { invoice_date_to: queryParams.invoice_date_to }),
-          ...(queryParams.settlement_date_from && { settlement_date_from: queryParams.settlement_date_from }),
-          ...(queryParams.settlement_date_to && { settlement_date_to: queryParams.settlement_date_to }),
-          ...(queryParams.reason_in && { reason_in: queryParams.reason_in }),
-          ...(queryParams.status_in && { status_in: queryParams.status_in }),
-          ...(queryParams.order_id && { order_id: queryParams.order_id }),
-          ...(queryParams.diff_min && { diff_min: queryParams.diff_min }),
-          ...(queryParams.diff_max && { diff_max: queryParams.diff_max })
-        };
-        
-        console.log('Fetching D2C transactions with params:', d2cParams);
-        const response = await api.transactions.getD2CTransactions(d2cParams);
-        
-        if (response.success && response.data) {
-          const responseData = response.data;
-          console.log('D2C API Response:', responseData);
-          
-          // Handle D2C API response structure
-          const transactionData = responseData.data || responseData;
-          
-          if (Array.isArray(transactionData) && transactionData.length > 0) {
-            setApiRows(transactionData as any);
-          } else {
-            console.error('No valid D2C transaction data found');
-            setError('No D2C transaction data received from API');
-          }
-        } else {
-          console.error('D2C API response not successful:', response);
-          setError('Failed to fetch D2C transactions data');
-        }
-      } else {
-        // Use regular API for non-D2C platforms
-        const queryParams = buildQueryParams(filtersOverride);
-        console.log('Fetching unreconciled orders with params:', queryParams);
-        console.log('Date range:', queryParams.buyer_invoice_date_from, 'to', queryParams.buyer_invoice_date_to);
-        console.log('Selected date range:', selectedDateRange);
-        console.log('Full queryParams object:', JSON.stringify(queryParams, null, 2));
-        
-        // Use the existing API service for transactions - pass queryParams directly like TransactionSheet does
-        const response = await api.transactions.getTransactions(queryParams as any);
-        
-        if (response.success && response.data) {
-          const responseData = response.data;
-          console.log('API Response:', responseData);
-          console.log('Response data type:', typeof responseData);
-          console.log('Response data keys:', Object.keys(responseData));
-          
-          // The data is directly in responseData.data array
-          const transactionData = responseData.data;
-          
-          console.log('Transaction data to process:', transactionData);
-          console.log('Transaction data length:', transactionData.length);
-          
-          if (Array.isArray(transactionData) && transactionData.length > 0) {
-            setApiRows(transactionData as any);
-          } else {
-            console.error('No valid transaction data found');
-            setError('No transaction data received from API');
-          }
-        } else {
-          console.error('API response not successful:', response);
-          setError('Failed to fetch unreconciled orders data');
-        }
-      }
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Generate and set dummy data
+      const dummyData = generateDummyUnreconciledData();
+      setApiRows(dummyData as TransactionRow[]);
+      
+      console.log('Using dummy data for disputes (API not yet available)');
     } catch (err) {
-      console.error('Error fetching unreconciled orders:', err);
-      setError('Failed to load unreconciled orders data. Please try again.');
+      console.error('Error generating dummy dispute data:', err);
+      setError('Failed to load dispute data. Please try again.');
     } finally {
       setApiLoading(false);
     }
