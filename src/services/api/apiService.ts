@@ -141,6 +141,27 @@ class ApiService {
 
     // Get authentication headers - use D2C headers if specified, otherwise use regular headers
     const authHeaders = useD2CHeaders ? tokenManager.getD2CApiHeaders() : tokenManager.getApiHeaders();
+    
+    // Log the token payload for debugging
+    if (authHeaders['Authorization']) {
+      const token = authHeaders['Authorization'].replace('Bearer ', '');
+      const decoded = JWTService.decodeToken(token);
+      if (decoded) {
+        console.log('📋 JWT Token Payload:', {
+          organization_id: decoded.organization_id,
+          organization_slug: decoded.organization_slug,
+          member_id: decoded.member_id,
+          roles: decoded.roles,
+          exp: new Date(decoded.exp! * 1000).toISOString(),
+        });
+      }
+    }
+    
+    // Log org ID header if present
+    if (authHeaders['X-Org-ID']) {
+      console.log('🏢 X-Org-ID Header:', authHeaders['X-Org-ID']);
+    }
+    
     Object.assign(headers, authHeaders);
 
     // Log the authentication method being used

@@ -79,18 +79,21 @@ class TokenManager {
    */
   getApiHeaders(): Record<string, string> {
     const jwtToken = this.getJWTToken();
-    const orgId = this.getOrgId();
     
     if (jwtToken && !JWTService.isTokenExpired(jwtToken)) {
+      // Decode token to get organization_id
+      const decoded = JWTService.decodeToken(jwtToken);
+      const organizationId = decoded?.organization_id || this.getOrgId();
+      
       // Use JWT token with organization ID header
       const headers: Record<string, string> = {
         'Authorization': `Bearer ${jwtToken}`,
         'Content-Type': 'application/json'
       };
       
-      // Add organization ID header if available
-      if (orgId) {
-        headers['X-Org-ID'] = orgId;
+      // Add organization ID header if available (prefer from token)
+      if (organizationId) {
+        headers['X-Org-ID'] = organizationId;
       }
       
       return headers;
@@ -98,6 +101,7 @@ class TokenManager {
     
     // Fallback to legacy API key + org ID if available
     const apiKey = this.getApiKey();
+    const orgId = this.getOrgId();
     if (apiKey && orgId) {
       return {
         'X-API-Key': apiKey,
@@ -131,14 +135,18 @@ class TokenManager {
     // Fallback to JWT if legacy credentials not available
     const jwtToken = this.getJWTToken();
     if (jwtToken && !JWTService.isTokenExpired(jwtToken)) {
+      // Decode token to get organization_id
+      const decoded = JWTService.decodeToken(jwtToken);
+      const organizationId = decoded?.organization_id || orgId;
+      
       const headers: Record<string, string> = {
         'Authorization': `Bearer ${jwtToken}`,
         'Content-Type': 'application/json'
       };
       
-      // Add organization ID header if available
-      if (orgId) {
-        headers['X-Org-ID'] = orgId;
+      // Add organization ID header if available (prefer from token)
+      if (organizationId) {
+        headers['X-Org-ID'] = organizationId;
       }
       
       return headers;

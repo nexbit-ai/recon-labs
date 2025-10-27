@@ -74,10 +74,10 @@ interface GroupedUnreconciledData {
 // API Response metadata types
 interface TransactionMetadata {
   counts: {
-    excess_received: number;
+    more_payment_received: number;
     settlement_matched: number;
     settled: number;
-    short_received: number;
+    less_payment_received: number;
     unsettled: number;
   };
   pagination: {
@@ -379,9 +379,9 @@ const DisputePage: React.FC = () => {
   const buildQueryParams = (filtersOverride?: Record<string, any>): TransactionQueryParams => {
     const params: TransactionQueryParams = {};
     const f = filtersOverride || columnFilters;
-    // Set status for unreconciled orders (short_received, excess_received)
+    // Set status for unreconciled orders (less_payment_received, more_payment_received)
     if (disputeSubTab === 0) {
-      params.status_in = 'short_received,excess_received';
+      params.status_in = 'less_payment_received,more_payment_received';
       params.pagination = false; // Disable pagination to get all unreconciled orders
     }
 

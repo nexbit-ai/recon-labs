@@ -363,23 +363,37 @@ export interface TransactionColumn {
 }
 
 export interface TransactionBreakup {
-  settlement_value: number;
-  shipping_courier: string;
-  settlement_provider: string;
-  recon_status: string;
-  sale_order_status: string;
-  shipping_package_status_code: string;
+  marketplace_fee?: number;
+  taxes?: number;
+  tcs?: number;
+  tds?: number;
+  shipping_courier?: string;
+  settlement_provider?: string;
+  recon_status?: string;
+  sale_order_status?: string;
+  shipping_package_status_code?: string;
 }
 
 export interface TransactionRow {
   order_id: string;
   order_value: number;
-  settlement_value: number;
+  settlement_amount: number;
   invoice_date: string;
   settlement_date?: string;
   diff: number;
-  status: string;
+  recon_status: string;
   platform: string;
+  event_type: string;
+  event_subtype: string;
+  settlement_provider: string;
+  metadata?: {
+    breakups?: {
+      marketplace_fee?: number;
+      taxes?: number;
+      tcs?: number;
+      tds?: number;
+    };
+  };
   breakups?: TransactionBreakup;
 }
 

@@ -78,54 +78,34 @@ interface TransactionRow {
   "Difference": number;
   "Remark": string;
   "Event Type": string;
-  // Breakup fields for filtering
-  breakups?: {
-    settlement_value: number;
-    shipping_courier: string;
-    settlement_provider: string;
-    recon_status: string;
-    sale_order_status: string;
-    shipping_package_status_code: string;
-  };
   // Preserve original API response data for popup access
   originalData?: TransactionApiResponse;
+  // Store recon_status and event_type directly for Status column rendering
+  recon_status?: string;
+  event_type?: string;
+  event_subtype?: string;
 }
 
 // API Response structure based on actual data
 interface TransactionApiResponse {
-  calculation: {
-    inputs: {
-      customer_addons_amount: string;
-      marketplace_fee: string;
-      offer_adjustments: string;
-      refund: string;
-      reverse: string;
-      seller_share_offer: string;
-      settlement_sale_value: string;
-      settlement_value: string;
-      taxes: string;
-      total_offer_amount: string;
+  order_id: string;
+  order_value: number;
+  settlement_amount: number;
+  invoice_date: string;
+  settlement_date: string;
+  diff: number;
+  platform: string;
+  event_type: string;
+  event_subtype: string;
+  recon_status: string;
+  settlement_provider: string;
+  metadata?: {
+    breakups?: {
+      marketplace_fee: number;
+      taxes: number;
+      tcs: number;
+      tds: number;
     };
-  };
-  context: {
-    buyer_invoice_amount: string;
-    tcs: string;
-    tds: string;
-  };
-  diff: string;
-  order_date: string;
-  order_item_id: string;
-  order_value: string;
-  settlement_date: string | null;
-  settlement_value: string;
-  status: string;
-  breakups?: {
-    settlement_value: number;
-    shipping_courier: string;
-    settlement_provider: string;
-    recon_status: string;
-    sale_order_status: string;
-    shipping_package_status_code: string;
   };
 }
 
@@ -137,10 +117,10 @@ interface TransactionData {
 // API Response metadata types
 interface TransactionMetadata {
   counts: {
-    excess_received: number;
+    more_payment_received: number;
     settlement_matched: number;
     settled: number
-    short_received: number;
+    less_payment_received: number;
     unsettled: number;
   };
   pagination: {
@@ -163,6 +143,7 @@ interface TransactionMetadata {
 interface TransactionQueryParams {
   page?: number;
   limit?: number;
+  status?: string;
   status_in?: string;
   order_date_from?: string;
   order_date_to?: string;
@@ -185,18 +166,15 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   console.log('OrderItem from API:', orderItem);
   console.log('Available fields in OrderItem:', Object.keys(orderItem));
   
-  // Check for the new API structure
-  if (orderItem.calculation?.inputs) {
-    console.log('New API structure found - calculation.inputs:', orderItem.calculation.inputs);
-  }
-  if (orderItem.context) {
-    console.log('New API structure found - context:', orderItem.context);
-  }
-  
-  // Helper function to parse currency/numeric strings
+  // Helper function to parse numeric values
   const parseNumericValue = (value: any): number => {
     if (value === null || value === undefined || value === '') {
       return 0;
+    }
+    
+    // If already a number, return it
+    if (typeof value === 'number') {
+      return value;
     }
     
     // Convert to string and clean it
@@ -210,24 +188,21 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   };
 
   // Extract values from the new API structure
-  const orderValue = parseNumericValue(orderItem.order_value || orderItem.buyer_invoice_amount);
-  const settlementValue = parseNumericValue(orderItem.settlement_value);
+  const orderValue = parseNumericValue(orderItem.order_value);
+  const settlementValue = parseNumericValue(orderItem.settlement_amount); // Changed from settlement_value to settlement_amount
   const difference = parseNumericValue(orderItem.diff);
   
   console.log('Parsed values - orderValue:', orderValue, 'settlementValue:', settlementValue, 'difference:', difference);
   
-  // (Deprecated) legacy path removed; order item id handled below
-  
-  // Determine remark based on API response
-  let remark = "unsettled";
-  if (orderItem.status === "settlement_matched") {
-    if (difference === 0) {
-      remark = "Matched";
-    } else if (difference > 0) {
-      remark = "Short Amount Received";
-    } else {
-      remark = "Excess Amount Received";
-    }
+  // Determine remark based on recon_status
+  let remark = "Unsettled";
+  const reconStatus = orderItem.recon_status;
+  if (reconStatus === "settlement_matched") {
+    remark = "Matched";
+  } else if (reconStatus === "less_payment_received") {
+    remark = "Less Payment Received";
+  } else if (reconStatus === "more_payment_received") {
+    remark = "More Payment Received";
   }
   
   // Determine settlement date from API response
@@ -243,25 +218,35 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   }
   
   // Determine IDs from API response
-  const backendOrderId: string | undefined = (orderItem as any).order_id || (orderItem as any).orderId;
-  let orderItemId: string | undefined = (orderItem as any).order_item_id || (orderItem as any).orderItemId;
-  if (!orderItemId || String(orderItemId).trim() === '') {
-    orderItemId = undefined;
+  const backendOrderId: string | undefined = orderItem.order_id;
+  
+  // Get invoice date
+  let invoiceDate = "";
+  if (orderItem.invoice_date) {
+    try {
+      invoiceDate = new Date(orderItem.invoice_date).toISOString().split('T')[0];
+    } catch (error) {
+      invoiceDate = orderItem.invoice_date;
+    }
   }
   
   return {
-    "Order ID": backendOrderId || orderItemId || `ORD_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-    "Order Item ID": orderItemId,
+    "Order ID": backendOrderId || `ORD_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    "Order Item ID": undefined,
     "Order Value": orderValue,
     "Settlement Value": settlementValue,
-    "Invoice Date": new Date(orderItem.order_date).toISOString().split('T')[0],
+    "Invoice Date": invoiceDate,
     "Settlement Date": settlementDate,
     "Difference": difference,
     "Remark": remark,
-    // Derive event type from order value: > 0 => Sale, else Return
-    "Event Type": orderValue > 0 ? "Sale" : "Return",
+    // Use event_type from API response
+    "Event Type": orderItem.event_type || "Sale",
     // Preserve the original API response data for popup access
     originalData: orderItem as TransactionApiResponse,
+    // Store recon_status and event_type directly for Status column rendering
+    recon_status: orderItem.recon_status,
+    event_type: orderItem.event_type,
+    event_subtype: orderItem.event_subtype,
   };
 };
 
@@ -1339,6 +1324,8 @@ const BreakupsModal: React.FC<{
       case 'complete':
       case 'settlement_matched':
         return '#059669';
+      case 'less_payment_received':
+      case 'more_payment_received':
       case 'pending':
       case 'processing':
         return '#d97706';
@@ -1614,7 +1601,6 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   'Order ID': { apiParam: 'order_id', type: 'string' }, // Special: chips input
   'Status': { apiParam: 'status_in', type: 'enum', usesInSuffix: true },
   'Order Date': { apiParam: 'order_date', type: 'date' }, // → order_date_from/to
-  'Invoice Date': { apiParam: 'order_date', type: 'date' }, // alias
   'Settlement Date': { apiParam: 'settlement_date', type: 'date' },
   'Order Value': { apiParam: 'order_value', type: 'number', supportedPlatforms: ['flipkart'] },
   'Settlement Value': { apiParam: 'settlement_value', type: 'number' },
@@ -1648,13 +1634,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Pending filters that haven't been applied yet
   const [pendingColumnFilters, setPendingColumnFilters] = useState<{ [key: string]: any }>({});
   const [pendingDateRange, setPendingDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
+  // Header date range state - for the date selector in the header next to platform selector
+  const [headerDateRange, setHeaderDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
+  const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
   // Platform filter state - now supports multi-select
   const availablePlatforms = ['flipkart', 'd2c'] as const;
   type Platform = typeof availablePlatforms[number];
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([...availablePlatforms]); // Default: all platforms selected
-  const [pendingSelectedPlatforms, setPendingSelectedPlatforms] = useState<Platform[]>([...availablePlatforms]); // Pending platforms before apply
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['flipkart']); // Default: flipkart only
+  const [pendingSelectedPlatforms, setPendingSelectedPlatforms] = useState<Platform[]>(['flipkart']); // Pending platforms before apply
   // Order ID chips state
   const [orderIdChips, setOrderIdChips] = useState<string[]>([]);
+  // Order ID search in header
+  const [orderIdSearch, setOrderIdSearch] = useState<string>('');
   const [filteredData, setFilteredData] = useState<TransactionRow[]>([]);
   const [allTransactionData, setAllTransactionData] = useState<TransactionRow[]>([]);
   const [page, setPage] = useState(0);
@@ -1670,6 +1661,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [breakupsAnchorEl, setBreakupsAnchorEl] = useState<HTMLElement | null>(null);
   const [breakupsOrderId, setBreakupsOrderId] = useState<string>('');
   const [totalCount, setTotalCount] = useState(0);
+  // Separate total counts for settled and unsettled tabs
+  const [settledTotalCount, setSettledTotalCount] = useState<number | null>(null);
+  const [unsettledTotalCount, setUnsettledTotalCount] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HTMLElement | null>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
@@ -1681,8 +1675,26 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [totalTransactionsData, setTotalTransactionsData] = useState<TotalTransactionsResponse | null>(null);
   const [useNewAPI, setUseNewAPI] = useState(true); // Always use new API
 
+  // Dual API state management for settled and unsettled data
+  const [settledData, setSettledData] = useState<TotalTransactionsResponse | null>(null);
+  const [unsettledData, setUnsettledData] = useState<TotalTransactionsResponse | null>(null);
+  const [dualApiLoading, setDualApiLoading] = useState(false);
+  const [hasInitialLoad, setHasInitialLoad] = useState(false);
+  const isFetchingRef = React.useRef(false);
+
   // Get current data based on which API is being used
   const getCurrentData = (): any[] => {
+    // Use dual API data if available (either can be null when filtering)
+    if (settledData !== null || unsettledData !== null) {
+      const currentData = activeTab === 0 ? settledData : unsettledData;
+      // Handle case where currentData is null (e.g., only settled statuses selected and on unsettled tab)
+      if (!currentData) {
+        return [];
+      }
+      return currentData.data || [];
+    }
+    
+    // Fallback to legacy single API data
     if (useNewAPI && totalTransactionsData) {
       // Handle null data case (0 results)
       return totalTransactionsData.data || [];
@@ -1692,6 +1704,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Get current columns based on which API is being used
   const getCurrentColumns = () => {
+    // Use dual API data if available (either can be null when filtering)
+    if (settledData !== null || unsettledData !== null) {
+      const currentData = activeTab === 0 ? settledData : unsettledData;
+      // Handle case where currentData is null (e.g., only settled statuses selected and on unsettled tab)
+      if (!currentData) {
+        return [];
+      }
+      return currentData.columns?.map(col => col.title) || [];
+    }
+    
+    // Fallback to legacy single API data
     if (useNewAPI && totalTransactionsData) {
       // Handle null columns case - only return actual API columns, not breakup fields
       return totalTransactionsData.columns?.map(col => col.title) || [];
@@ -1757,7 +1780,30 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const getColumnMeta = (): Record<string, { type: 'string' | 'number' | 'date' | 'enum' }> => {
     const meta: Record<string, { type: 'string' | 'number' | 'date' | 'enum' }> = {};
     
-    if (useNewAPI && totalTransactionsData?.columns) {
+    // Use dual API data if available (either can be null when filtering)
+    if (settledData !== null || unsettledData !== null) {
+      const currentData = activeTab === 0 ? settledData : unsettledData;
+      if (currentData?.columns) {
+        currentData.columns.forEach(col => {
+          // Map API column types to our filter types
+          let filterType: 'string' | 'number' | 'date' | 'enum';
+          switch (col.type) {
+            case 'currency':
+              filterType = 'number';
+              break;
+            case 'date':
+              filterType = 'date';
+              break;
+            case 'enum':
+              filterType = 'enum';
+              break;
+            default:
+              filterType = 'string';
+          }
+          meta[col.title] = { type: filterType };
+        });
+      }
+    } else if (useNewAPI && totalTransactionsData?.columns) {
       totalTransactionsData.columns.forEach(col => {
         // Map API column types to our filter types
         let filterType: 'string' | 'number' | 'date' | 'enum';
@@ -1781,12 +1827,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       meta['Order ID'] = { type: 'string' };
       meta['Order Value'] = { type: 'number' };
       meta['Settlement Value'] = { type: 'number' };
-      meta['Invoice Date'] = { type: 'date' };
       meta['Settlement Date'] = { type: 'date' };
       meta['Difference'] = { type: 'number' };
       meta['Status'] = { type: 'enum' };
       meta['Reason'] = { type: 'string' };
-      meta['Action'] = { type: 'string' };
     }
     
     // Always add breakup fields for filtering (regardless of API type)
@@ -1885,7 +1929,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const getUniqueValuesForColumn = (columnName: string): string[] => {
     // For Status, show unique backend statuses
     if (columnName === 'Status') {
-      return ['excess_received', 'short_received', 'settlement_matched'];
+      return ['more_payment_received', 'less_payment_received', 'settlement_matched'];
     }
 
     // For breakup fields, extract values from actual data
@@ -1897,26 +1941,28 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       ];
       
       dataToCheck.forEach(row => {
-        const breakups = row.breakups || (row as any)?.originalData?.breakups;
-        if (breakups) {
-          let value: string | undefined;
-          switch (columnName) {
-            case 'Shipping Courier':
-              value = breakups.shipping_courier;
-              break;
-            case 'Recon Status':
-              value = breakups.recon_status;
-              break;
-            case 'Settlement Provider':
-              value = breakups.settlement_provider;
-              break;
-            case 'Mismatch Reason':
-              value = (breakups as any).mismatch_reason;
-              break;
-          }
-          if (typeof value === 'string' && value.trim()) {
-            values.add(value.trim());
-          }
+        let value: string | undefined;
+        
+        // Check in originalData first (new API structure has these at root level)
+        const originalData = (row as any)?.originalData;
+        
+        switch (columnName) {
+          case 'Shipping Courier':
+            value = (row as any)?.shipping_courier || originalData?.shipping_courier;
+            break;
+          case 'Recon Status':
+            value = (row as any)?.recon_status || originalData?.recon_status;
+            break;
+          case 'Settlement Provider':
+            value = (row as any)?.settlement_provider || originalData?.settlement_provider;
+            break;
+          case 'Mismatch Reason':
+            value = (row as any)?.mismatch_reason || originalData?.mismatch_reason;
+            break;
+        }
+        
+        if (typeof value === 'string' && value.trim()) {
+          values.add(value.trim());
         }
       });
       
@@ -2000,19 +2046,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Set status based on remark or activeTab
     const remarkToUse = remark || (activeTab === 0 ? 'settlement_matched' : 'unsettled');
     if (remarkToUse === 'settlement_matched') {
-      params.status_in = 'settlement_matched';
-      console.log('Setting API parameter: status_in = settlement_matched (for Settled tab)');
+      // For settled tab, use status_in with comma-separated values
+      params.status_in = 'settlement_matched,less_payment_received,more_payment_received';
+      console.log('Setting API parameter: status_in = settlement_matched,less_payment_received,more_payment_received (for Settled tab)');
     } else if (remarkToUse === 'unsettled') {
-      params.status_in = 'unsettled';
-      console.log('Setting API parameter: status_in = unsettled (for Unsettled tab)');
+      // For unsettled tab, use status=unsettled (not status_in)
+      params.status = 'unsettled';
+      console.log('Setting API parameter: status = unsettled (for Unsettled tab)');
     }
 
     // ALWAYS add invoice date range - this is required for all API calls
     const dateRangeToUse = overrideDateRange || dateRange;
     if (dateRangeToUse.start && dateRangeToUse.end) {
-      params.invoice_date_from = dateRangeToUse.start;
-      params.invoice_date_to = dateRangeToUse.end;
-      console.log('[buildQueryParams] Adding invoice date range:', { invoice_date_from: dateRangeToUse.start, invoice_date_to: dateRangeToUse.end });
+      params.order_date_from = dateRangeToUse.start;
+      params.order_date_to = dateRangeToUse.end;
+      console.log('[buildQueryParams] Adding order date range:', { order_date_from: dateRangeToUse.start, order_date_to: dateRangeToUse.end });
     } else {
       console.warn('[buildQueryParams] No date range provided - API call may fail');
     }
@@ -2377,14 +2425,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     if (propDateRange && (propDateRange.start !== dateRange.start || propDateRange.end !== dateRange.end)) {
       setDateRange(propDateRange);
       setPendingDateRange(propDateRange);
+      setHeaderDateRange(propDateRange);
+      setPendingHeaderDateRange(propDateRange);
     }
   }, [propDateRange]);
 
   // Fetch data on component mount
   useEffect(() => {
     // Use date range from props if provided, otherwise use default
-    const initialDateRange = propDateRange || { start: '2025-02-01', end: '2025-02-28' };
-    fetchTotalTransactions(1, undefined, initialDateRange);
+    const initialDateRange = propDateRange || { start: '2025-03-01', end: '2025-03-31' };
+    setHeaderDateRange(initialDateRange);
+    setPendingHeaderDateRange(initialDateRange);
+    fetchDualTransactions(1, undefined, initialDateRange);
+    setHasInitialLoad(true);
   }, []);
 
   // Apply filters function - called when Apply button is clicked
@@ -2394,8 +2447,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setDateRange(pendingDateRange);
     setSelectedPlatforms(pendingSelectedPlatforms);
     
-    // Use new API with filters and pending platforms
-    fetchTotalTransactions(1, pendingColumnFilters, pendingDateRange, pendingSelectedPlatforms);
+    // Use dual API with filters and pending platforms
+    fetchDualTransactions(1, pendingColumnFilters, pendingDateRange, pendingSelectedPlatforms);
     
     // Close the filter popover
     closeFilterPopover();
@@ -2403,23 +2456,29 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Apply platform changes - called when Apply button next to platform selector is clicked
   const applyPlatformFilter = () => {
+    const platformsCommaSeparated = pendingSelectedPlatforms.join(',');
     console.log('[Apply Platform Filter] Applying platforms:', pendingSelectedPlatforms);
+    console.log('[Apply Platform Filter] Comma-separated platform parameter:', platformsCommaSeparated || 'EMPTY');
     setSelectedPlatforms(pendingSelectedPlatforms);
     setPage(0);
     setCurrentPage(1);
-    if (useNewAPI) {
-      fetchTotalTransactions(1, columnFilters, dateRange, pendingSelectedPlatforms);
-    } else {
-      const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-      fetchOrders(1, remark, pendingSelectedPlatforms);
-    }
+    fetchDualTransactions(1, columnFilters, dateRange, pendingSelectedPlatforms);
+  };
+
+  // Apply header date range changes - called when Apply button next to date selector is clicked
+  const applyHeaderDateRange = () => {
+    console.log('[Apply Header Date Range] Applying date range:', pendingHeaderDateRange);
+    setHeaderDateRange(pendingHeaderDateRange);
+    setDateRange(pendingHeaderDateRange);
+    setPage(0);
+    setCurrentPage(1);
+    fetchDualTransactions(1, columnFilters, pendingHeaderDateRange, selectedPlatforms);
   };
 
   // Only refresh data when rowsPerPage changes (not filters)
   useEffect(() => {
-    if (allTransactionData.length > 0) { // Only refetch if data has been loaded initially
-      const currentRemark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-      fetchOrders(1, currentRemark);
+    if (hasInitialLoad && (settledData || unsettledData)) { // Only refetch if data has been loaded initially
+      fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
     }
   }, [rowsPerPage]);
 
@@ -2518,6 +2577,240 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   };
 
+  // Dual API call function - fetches both settled and unsettled data simultaneously
+  const fetchDualTransactions = async (
+    pageNumber: number = 1, 
+    filters?: { [key: string]: any }, 
+    dateRangeFilter?: {start: string, end: string},
+    overridePlatforms?: Platform[],
+    orderIds?: string[]
+  ) => {
+    console.log('[fetchDualTransactions] Called with:', { pageNumber, filters, dateRangeFilter, overridePlatforms, orderIds });
+    
+    // Prevent duplicate calls from React Strict Mode
+    if (isFetchingRef.current) {
+      console.log('[fetchDualTransactions] Already fetching, skipping duplicate call');
+      return;
+    }
+    
+    const isInitialLoad = pageNumber === 1 && !settledData && !unsettledData;
+    
+    // Set the flag to prevent duplicate calls
+    isFetchingRef.current = true;
+    
+    if (!isInitialLoad) {
+      setPaginationLoading(true);
+    }
+    setDualApiLoading(true);
+    setError(null);
+    
+    try {
+      // Build base parameters
+      const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
+      
+      // Create settled API call parameters
+      const settledParams: any = {
+        page: pageNumber,
+        limit: rowsPerPage,
+      };
+      
+      // Convert filters to API parameters
+      if (filters && Object.keys(filters).length > 0) {
+        Object.entries(filters).forEach(([columnKey, filterValue]) => {
+          if (!filterValue) return;
+
+          const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
+          if (!mapping) {
+            // If no mapping, pass through as-is for backward compatibility
+            (settledParams as any)[columnKey] = filterValue;
+            return;
+          }
+
+          // Check platform compatibility
+          if (mapping.supportedPlatforms) {
+            const isSupported = platformsToUse.some(p => mapping.supportedPlatforms!.includes(p as any));
+            if (!isSupported) {
+              return; // Skip filters not supported by any selected platform
+            }
+          }
+
+          const baseParam = mapping.apiParam;
+
+          switch (mapping.type) {
+            case 'string':
+              if (columnKey === 'Order ID') {
+                // For Order ID, use chips array joined by comma
+                const orderIdsToUse = orderIds !== undefined ? orderIds : orderIdChips;
+                if (orderIdsToUse.length > 0) {
+                  settledParams[baseParam] = orderIdsToUse.join(',');
+                }
+              } else if (typeof filterValue === 'string' && filterValue.trim()) {
+                settledParams[baseParam] = filterValue.trim();
+              }
+              break;
+            
+            case 'number':
+              if (typeof filterValue === 'object' && filterValue !== null) {
+                if (filterValue.min !== undefined && filterValue.min !== '') {
+                  settledParams[`${baseParam}_min`] = parseFloat(filterValue.min);
+                }
+                if (filterValue.max !== undefined && filterValue.max !== '') {
+                  settledParams[`${baseParam}_max`] = parseFloat(filterValue.max);
+                }
+              }
+              break;
+            
+            case 'date':
+              if (typeof filterValue === 'object' && filterValue !== null) {
+                if (filterValue.from) {
+                  settledParams[`${baseParam}_from`] = filterValue.from;
+                }
+                if (filterValue.to) {
+                  settledParams[`${baseParam}_to`] = filterValue.to;
+                }
+              }
+              break;
+            
+            case 'enum':
+              if (Array.isArray(filterValue) && filterValue.length > 0) {
+                settledParams[baseParam] = filterValue.join(',');
+              }
+              break;
+          }
+        });
+      }
+      
+      // Add date range parameters with correct keys
+      if (dateRangeFilter?.start && dateRangeFilter?.end) {
+        settledParams.order_date_from = dateRangeFilter.start;
+        settledParams.order_date_to = dateRangeFilter.end;
+      }
+      
+      // Add platform parameter
+      if (platformsToUse.length > 0) {
+        settledParams.platform = platformsToUse.join(',');
+      }
+      
+      // Check if user has applied a Status filter
+      const statusFilter = filters?.['Status'];
+      const hasStatusFilter = statusFilter && Array.isArray(statusFilter) && statusFilter.length > 0;
+      
+      // Only set default status_in if no Status filter was applied by the user
+      // The filter conversion loop above may have already added status_in, so check first
+      if (!settledParams.status_in) {
+        // No status_in was set by filter conversion, use default for settled tab
+        settledParams.status_in = 'settlement_matched,less_payment_received,more_payment_received';
+      }
+      
+      // Create unsettled API call parameters
+      const unsettledParams = { ...settledParams };
+      
+      // Handle unsettled tab based on whether user selected specific statuses
+      if (hasStatusFilter && statusFilter.includes('unsettled')) {
+        // User selected unsettled - check if they also selected settled statuses
+        const settledStatuses = statusFilter.filter(s => s !== 'unsettled');
+        if (settledStatuses.length > 0) {
+          // User selected both settled and unsettled - need to handle both tabs
+          // Settled params already has the settled statuses
+          // For unsettled, remove settled statuses and use status='unsettled'
+          delete unsettledParams.status_in;
+          unsettledParams.status = 'unsettled';
+        } else {
+          // Only unsettled selected
+          delete unsettledParams.status_in;
+          unsettledParams.status = 'unsettled';
+        }
+      } else if (hasStatusFilter && !statusFilter.includes('unsettled')) {
+        // User only selected settled statuses - no data for unsettled tab
+        delete unsettledParams.status_in;
+        delete unsettledParams.status;
+      } else {
+        // Default: no status filter, use normal settled/unsettled split
+        delete unsettledParams.status_in;
+        unsettledParams.status = 'unsettled';
+      }
+      
+      console.log('[fetchDualTransactions] Settled params:', settledParams);
+      console.log('[fetchDualTransactions] Unsettled params:', unsettledParams);
+      
+      // Determine if we should make unsettled API call
+      const shouldFetchUnsettled = !hasStatusFilter || (hasStatusFilter && statusFilter.includes('unsettled'));
+      
+      // Make API calls (conditionally include unsettled)
+      const apiCalls: [Promise<any>, Promise<any>] = [
+        api.transactions.getTotalTransactions(settledParams),
+        shouldFetchUnsettled 
+          ? api.transactions.getTotalTransactions(unsettledParams)
+          : Promise.resolve({ success: true, data: null }) // Mock response when not fetching
+      ];
+      
+      const [settledResponse, unsettledResponse] = await Promise.all(apiCalls);
+      
+      // Process settled response
+      if (settledResponse.success) {
+        setSettledData(settledResponse.data);
+        console.log('[fetchDualTransactions] Settled data received:', settledResponse.data);
+        console.log('[fetchDualTransactions] Settled columns:', settledResponse.data?.columns);
+        console.log('[fetchDualTransactions] First settled row:', settledResponse.data?.data?.[0]);
+        if (settledResponse.data?.data?.[0]) {
+          const firstRow = settledResponse.data.data[0];
+          console.log('[fetchDualTransactions] settlement_amount in first row:', (firstRow as any).settlement_amount);
+          console.log('[fetchDualTransactions] settlement_value in first row:', (firstRow as any).settlement_value);
+          console.log('[fetchDualTransactions] All keys in first row:', Object.keys(firstRow));
+        }
+      } else {
+        console.error('[fetchDualTransactions] Settled API failed:', settledResponse);
+      }
+      
+      // Process unsettled response (only if we actually fetched it)
+      if (shouldFetchUnsettled && unsettledResponse.success) {
+        setUnsettledData(unsettledResponse.data);
+        console.log('[fetchDualTransactions] Unsettled data received:', unsettledResponse.data);
+        console.log('[fetchDualTransactions] Unsettled columns:', unsettledResponse.data?.columns);
+        console.log('[fetchDualTransactions] First unsettled row:', unsettledResponse.data?.data?.[0]);
+      } else {
+        console.error('[fetchDualTransactions] Unsettled API failed:', unsettledResponse);
+      }
+      
+      // Store total counts separately for settled and unsettled tabs
+      if (settledResponse.success && settledResponse.data?.pagination) {
+        setSettledTotalCount(settledResponse.data.pagination.total_count);
+      }
+      if (shouldFetchUnsettled && unsettledResponse.success && unsettledResponse.data?.pagination) {
+        setUnsettledTotalCount(unsettledResponse.data.pagination.total_count);
+      } else if (!shouldFetchUnsettled) {
+        // No unsettled data was fetched (user selected only settled statuses)
+        setUnsettledTotalCount(0);
+        setUnsettledData(null);
+      }
+      
+      // Update totalCount based on current active tab
+      if (activeTab === 0 && settledResponse.success && settledResponse.data?.pagination) {
+        setTotalCount(settledResponse.data.pagination.total_count);
+      } else if (activeTab === 1 && shouldFetchUnsettled && unsettledResponse.success && unsettledResponse.data?.pagination) {
+        setTotalCount(unsettledResponse.data.pagination.total_count);
+      }
+      
+      setCurrentPage(pageNumber);
+      
+      // Update tab counts based on the actual data received
+      if (settledResponse.success) {
+        setTabCounts({
+          settled: settledResponse.data?.data?.length || 0,
+          unsettled: (shouldFetchUnsettled && unsettledResponse.success) ? (unsettledResponse.data?.data?.length || 0) : 0,
+        });
+      }
+      
+    } catch (error) {
+      console.error('[fetchDualTransactions] Error:', error);
+      setError('Failed to fetch transaction data');
+    } finally {
+      setDualApiLoading(false);
+      setPaginationLoading(false);
+      isFetchingRef.current = false; // Reset the flag
+    }
+  };
+
   // Fetch data from new total transactions API
   const fetchTotalTransactions = async (
     pageNumber: number = 1, 
@@ -2543,13 +2836,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         console.warn('[fetchTotalTransactions] No platforms selected');
       }
       
-      // Apply recon_status based on active tab selection
+      // Apply status based on active tab selection
       if (activeTab === 0) {
-        // Settled tab
-        params.recon_status = 'less_payment_received,more_payment_received,settlement_matched';
+        // Settled tab - use status_in with comma-separated values
+        params.status_in = 'settlement_matched,less_payment_received,more_payment_received';
       } else if (activeTab === 1) {
-        // Unsettled tab
-        params.recon_status = null;
+        // Unsettled tab - use status=unsettled
+        params.status = 'unsettled';
       }
       
       // Apply filters if provided
@@ -2633,6 +2926,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       );
       
       if (response.success && response.data) {
+        console.log('API Response received:', response.data);
+        console.log('Columns:', response.data.columns);
+        console.log('First row of data:', response.data.data?.[0]);
+        
         setTotalTransactionsData(response.data);
         setTotalCount(response.data.pagination?.total_count || 0);
         setCurrentPage(response.data.pagination?.page || 1);
@@ -2642,10 +2939,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         
         // Update tab counts based on the data
         const settledCount = dataArray.filter(row => 
-          row.status === 'settlement_matched' || row.status === 'payment_received'
+          row.recon_status === 'settlement_matched' || row.recon_status === 'less_payment_received' || row.recon_status === 'more_payment_received'
         ).length;
         const unsettledCount = dataArray.filter(row => 
-          row.status === 'unsettled' || row.status === 'short_received' || row.status === 'excess_received'
+          row.recon_status === 'unsettled'
         ).length;
         
         setTabCounts({
@@ -2684,6 +2981,44 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       ...prev,
       [columnKey]: event.target.value,
     }));
+  };
+
+  // Handle Order ID search input change (don't trigger API yet)
+  const handleOrderIdSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setOrderIdSearch(value);
+  };
+
+  // Handle Order ID search button click
+  const handleOrderIdSearchClick = () => {
+    const value = orderIdSearch;
+    
+    // Convert comma-separated values to array
+    const orderIds = value.split(',').map(id => id.trim()).filter(id => id.length > 0);
+    setOrderIdChips(orderIds);
+    
+    // Trigger API call
+    setPage(0);
+    setCurrentPage(1);
+    
+    // Build query params with order IDs
+    const newFilters = { ...columnFilters };
+    if (orderIds.length > 0) {
+      fetchDualTransactions(1, newFilters, dateRange, selectedPlatforms, orderIds);
+    } else {
+      fetchDualTransactions(1, newFilters, dateRange, selectedPlatforms);
+    }
+  };
+
+  // Handle Order ID search clear
+  const handleOrderIdSearchClear = () => {
+    setOrderIdSearch('');
+    setOrderIdChips([]);
+    
+    // Trigger API call without order IDs
+    setPage(0);
+    setCurrentPage(1);
+    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
   };
 
   // Handle number range filter
@@ -2796,15 +3131,20 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Check multiple possible locations for breakups data
     let breakups = null;
     
-    // First, check if breakups is directly in the row (most likely for TOTAL_TRANSACTIONS API)
-    if (row.breakups) {
-      breakups = row.breakups;
-      console.log('Found breakups in row.breakups:', breakups);
+    // First, check if breakups is in metadata (for new API structure)
+    if ((row as any)?.originalData?.metadata?.breakups) {
+      breakups = (row as any).originalData.metadata.breakups;
+      console.log('Found breakups in originalData.metadata.breakups:', breakups);
     }
-    // Check if breakups is in originalData (for other APIs)
+    // Check if breakups is directly in originalData
     else if ((row as any)?.originalData?.breakups) {
       breakups = (row as any).originalData.breakups;
       console.log('Found breakups in originalData.breakups:', breakups);
+    }
+    // Check if breakups is directly in the row
+    else if (row.breakups) {
+      breakups = row.breakups;
+      console.log('Found breakups in row.breakups:', breakups);
     }
     // Check if breakups is in the raw data
     else if ((row as any)?.rawData?.breakups) {
@@ -2931,8 +3271,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     const newPageNumber = newPage + 1; // Convert from 0-based to 1-based
     setPage(newPage);
     
-    // Always use new total transactions API with current filters
-    fetchTotalTransactions(newPageNumber, columnFilters, dateRange);
+    // Always use dual API with current filters
+    fetchDualTransactions(newPageNumber, columnFilters, dateRange, selectedPlatforms);
   };
 
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2940,8 +3280,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setRowsPerPage(newRowsPerPage);
     setPage(0);
     // Reset to first page when changing rows per page
-    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-    fetchOrders(1, remark);
+    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
   };
 
   
@@ -2954,10 +3293,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setSelectedPlatforms([...availablePlatforms]); // Reset to all platforms selected
     setPendingSelectedPlatforms([...availablePlatforms]); // Reset pending platforms too
     setOrderIdChips([]); // Clear order ID chips
+    setOrderIdSearch(''); // Clear order ID search in header
     setPage(0);
     setCurrentPage(1);
-    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-    fetchOrders(1, remark);
+    fetchDualTransactions(1, {}, { start: '', end: '' }, [...availablePlatforms]);
   };
 
   // Handle tab change
@@ -2967,8 +3306,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setPage(0); // Reset to first page when changing tabs
     setCurrentPage(1); // Reset current page
     
-    // Always use new total transactions API with current filters
-    fetchTotalTransactions(1, columnFilters, dateRange);
+    // Update totalCount based on the new active tab
+    if (newValue === 0 && settledTotalCount !== null) {
+      // Settled tab
+      setTotalCount(settledTotalCount);
+    } else if (newValue === 1 && unsettledTotalCount !== null) {
+      // Unsettled tab
+      setTotalCount(unsettledTotalCount);
+    }
+    
+    // No API call needed - just switch the displayed data
+    // The data is already loaded from dual API calls
   };
 
   // Handle transaction row click
@@ -3069,8 +3417,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         },
                       }}
                     >
-                      <Tab label="Settled" />
-                      <Tab label="Unsettled" />
+                      <Tab label={`Settled${settledTotalCount !== null ? ` (${settledTotalCount})` : ''}`} />
+                      <Tab label={`Unsettled${unsettledTotalCount !== null ? ` (${unsettledTotalCount})` : ''}`} />
                     </Tabs>
                     
                   
@@ -3080,10 +3428,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     
                     <IconButton
                       onClick={() => {
-                        const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-                        fetchOrders(1, remark);
+                        fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
                       }}
-                      disabled={loading}
+                      disabled={loading || dualApiLoading}
                       sx={{
                         color: '#1f2937',
                         '&:hover': {
@@ -3104,111 +3451,233 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       Filters
                     </Button>
                     
-                    {/* Platform Filter Dropdown - Multi-select */}
-                    <FormControl variant="outlined" size="small" sx={{ minWidth: 180 }}>
-                      <InputLabel id="platform-filter-label">Platform</InputLabel>
-                      <Select
-                        labelId="platform-filter-label"
-                        id="platform-filter"
-                        multiple
-                        value={pendingSelectedPlatforms}
-                        onChange={(e) => {
-                          const value = e.target.value as Platform[];
-                          console.log('[Platform Selection] Pending platforms updated:', value);
-                          setPendingSelectedPlatforms(value);
+                    {/* Platform Filter - New Design with Checkboxes */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 1,
+                      padding: '8px 10px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      backgroundColor: '#f9fafb',
+                      height: '56px'
+                    }}>
+                      {/* Platform label */}
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1f2937', minWidth: '50px', fontSize: '0.75rem' }}>
+                        Platforms:
+                      </Typography>
+                      
+                      {/* Platform checkboxes */}
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        {availablePlatforms.map((platform) => (
+                          <Box 
+                            key={platform}
+                            sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center',
+                              cursor: 'pointer',
+                              '&:hover': {
+                                '& .MuiTypography-root': {
+                                  color: '#0ea5e9'
+                                }
+                              }
+                            }}
+                            onClick={() => {
+                              setPendingSelectedPlatforms(prev => 
+                                prev.includes(platform) 
+                                  ? prev.filter(p => p !== platform)
+                                  : [...prev, platform]
+                              );
+                            }}
+                          >
+                            <Checkbox 
+                              checked={pendingSelectedPlatforms.includes(platform)}
+                              size="small"
+                              sx={{ padding: '2px' }}
+                            />
+                            <Typography variant="body2" sx={{ color: '#374151', fontSize: '0.75rem' }}>
+                              {platform === 'flipkart' ? 'Flipkart' : 'D2C'}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                      
+                      {/* Divider */}
+                      <Box sx={{ width: '1px', height: '20px', backgroundColor: '#d1d5db', mx: 0.5 }} />
+                      
+                      {/* Select All button */}
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => {
+                          setPendingSelectedPlatforms([...availablePlatforms]);
                         }}
-                        label="Platform"
-                        renderValue={(selected) => {
-                          if (selected.length === 0) {
-                            return 'No Platforms';
-                          }
-                          if (selected.length === availablePlatforms.length) {
-                            return 'All Platforms';
-                          }
-                          return selected.map(p => p === 'flipkart' ? 'Flipkart' : 'D2C').join(', ');
-                        }}
-                        MenuProps={{
-                          PaperProps: {
-                            style: {
-                              maxHeight: 300,
-                            },
-                          },
-                          anchorOrigin: {
-                            vertical: 'bottom',
-                            horizontal: 'left',
-                          },
-                          transformOrigin: {
-                            vertical: 'top',
-                            horizontal: 'left',
-                          },
-                          sx: {
-                            zIndex: 10001,
-                          }
-                        }}
+                        disabled={pendingSelectedPlatforms.length === availablePlatforms.length}
                         sx={{
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#1f2937',
+                          textTransform: 'none',
+                          fontSize: '0.7rem',
+                          padding: '2px 8px',
+                          minWidth: 'auto',
+                          borderColor: '#d1d5db',
+                          color: '#6b7280',
+                          '&:hover': {
+                            borderColor: '#0ea5e9',
+                            color: '#0ea5e9',
+                            backgroundColor: 'rgba(14, 165, 233, 0.04)',
                           },
-                          '&:hover .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#374151',
+                          '&:disabled': {
+                            borderColor: '#e5e7eb',
+                            color: '#d1d5db',
+                          }
+                        }}
+                      >
+                        Select All
+                      </Button>
+                      
+                      {/* Clear All button */}
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => {
+                          setPendingSelectedPlatforms([]);
+                        }}
+                        disabled={pendingSelectedPlatforms.length === 0}
+                        sx={{
+                          textTransform: 'none',
+                          fontSize: '0.7rem',
+                          padding: '2px 8px',
+                          minWidth: 'auto',
+                          borderColor: '#d1d5db',
+                          color: '#6b7280',
+                          '&:hover': {
+                            borderColor: '#ef4444',
+                            color: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.04)',
                           },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#1f2937',
+                          '&:disabled': {
+                            borderColor: '#e5e7eb',
+                            color: '#d1d5db',
+                          }
+                        }}
+                      >
+                        Clear All
+                      </Button>
+                      
+                      {/* Divider */}
+                      <Box sx={{ width: '1px', height: '20px', backgroundColor: '#d1d5db', mx: 0.5 }} />
+                      
+                      {/* Apply Button */}
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={applyPlatformFilter}
+                        disabled={JSON.stringify(pendingSelectedPlatforms.sort()) === JSON.stringify(selectedPlatforms.sort())}
+                        sx={{
+                          textTransform: 'none',
+                          fontSize: '0.75rem',
+                          padding: '4px 12px',
+                          minWidth: 'auto',
+                          backgroundColor: '#1f2937',
+                          '&:hover': { backgroundColor: '#374151' },
+                          '&:disabled': {
+                            backgroundColor: '#9ca3af',
+                            color: '#ffffff',
                           },
                         }}
                       >
-                        {/* All option - not a selectable value, just a controller */}
-                        <MenuItem
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            // Toggle: if all are selected, deselect all; otherwise select all
-                            const newPlatforms = pendingSelectedPlatforms.length === availablePlatforms.length ? [] : [...availablePlatforms];
-                            console.log('[All Platforms Toggle] New pending selection:', newPlatforms);
-                            setPendingSelectedPlatforms(newPlatforms);
-                          }}
+                        Apply
+                      </Button>
+                    </Box>
+                    
+                    {/* Date Range Selector - New Design */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 1,
+                      padding: '8px 10px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      backgroundColor: '#f9fafb',
+                      height: '56px'
+                    }}>
+                      {/* Date label */}
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1f2937', minWidth: '65px', fontSize: '0.75rem' }}>
+                        Date Range:
+                      </Typography>
+                      
+                      {/* Date inputs */}
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        <TextField
+                          label="From"
+                          type="date"
+                          size="small"
+                          value={pendingHeaderDateRange.start}
+                          onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, start: e.target.value }))}
+                          InputLabelProps={{ shrink: true }}
                           sx={{ 
-                            backgroundColor: 'transparent !important',
-                            '&:hover': {
-                              backgroundColor: 'rgba(0, 0, 0, 0.04) !important',
+                            minWidth: 130,
+                            '& .MuiOutlinedInput-root': {
+                              backgroundColor: '#ffffff',
+                              fontSize: '0.75rem',
+                            },
+                            '& .MuiInputLabel-root': {
+                              fontSize: '0.75rem',
                             }
                           }}
-                        >
-                          <Checkbox
-                            checked={pendingSelectedPlatforms.length === availablePlatforms.length}
-                            indeterminate={pendingSelectedPlatforms.length > 0 && pendingSelectedPlatforms.length < availablePlatforms.length}
-                          />
-                          <Typography sx={{ fontWeight: 600 }}>All Platforms</Typography>
-                        </MenuItem>
-                        {/* Individual platform options */}
-                        <MenuItem value="flipkart">
-                          <Checkbox checked={pendingSelectedPlatforms.includes('flipkart')} />
-                          <Typography>Flipkart</Typography>
-                        </MenuItem>
-                        <MenuItem value="d2c">
-                          <Checkbox checked={pendingSelectedPlatforms.includes('d2c')} />
-                          <Typography>D2C</Typography>
-                        </MenuItem>
-                      </Select>
-                    </FormControl>
-                    
-                    {/* Apply Button for Platform Filter */}
-                    <Button
-                      variant="contained"
-                      onClick={applyPlatformFilter}
-                      disabled={JSON.stringify(pendingSelectedPlatforms) === JSON.stringify(selectedPlatforms)}
-                      sx={{
-                        textTransform: 'none',
-                        backgroundColor: '#1f2937',
-                        '&:hover': { backgroundColor: '#374151' },
-                        '&:disabled': {
-                          backgroundColor: '#9ca3af',
-                          color: '#ffffff',
-                        },
-                      }}
-                    >
-                      Apply
-                    </Button>
+                        />
+                        <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                          to
+                        </Typography>
+                        <TextField
+                          label="To"
+                          type="date"
+                          size="small"
+                          value={pendingHeaderDateRange.end}
+                          onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, end: e.target.value }))}
+                          InputLabelProps={{ shrink: true }}
+                          sx={{ 
+                            minWidth: 130,
+                            '& .MuiOutlinedInput-root': {
+                              backgroundColor: '#ffffff',
+                              fontSize: '0.75rem',
+                            },
+                            '& .MuiInputLabel-root': {
+                              fontSize: '0.75rem',
+                            }
+                          }}
+                        />
+                      </Box>
+                      
+                      {/* Divider */}
+                      <Box sx={{ width: '1px', height: '20px', backgroundColor: '#d1d5db', mx: 0.5 }} />
+                      
+                      {/* Apply Button */}
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={applyHeaderDateRange}
+                        disabled={
+                          !pendingHeaderDateRange.start || 
+                          !pendingHeaderDateRange.end ||
+                          (pendingHeaderDateRange.start === headerDateRange.start && 
+                           pendingHeaderDateRange.end === headerDateRange.end)
+                        }
+                        sx={{
+                          textTransform: 'none',
+                          fontSize: '0.75rem',
+                          padding: '4px 12px',
+                          minWidth: 'auto',
+                          backgroundColor: '#1f2937',
+                          '&:hover': { backgroundColor: '#374151' },
+                          '&:disabled': {
+                            backgroundColor: '#9ca3af',
+                            color: '#ffffff',
+                          },
+                        }}
+                      >
+                        Apply
+                      </Button>
+                    </Box>
                     
                   </Box>
                 </Box>
@@ -3225,12 +3694,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           setSelectedPlatforms([...availablePlatforms]);
                           setPage(0);
                           setCurrentPage(1);
-                          if (useNewAPI) {
-                            fetchTotalTransactions(1, columnFilters, dateRange, [...availablePlatforms]);
-                          } else {
-                            const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-                            fetchOrders(1, remark, [...availablePlatforms]);
-                          }
+                          fetchDualTransactions(1, columnFilters, dateRange, [...availablePlatforms]);
                         }}
                         size="small"
                         sx={{ bgcolor: '#e0f2fe', color: '#0369a1', fontWeight: 600 }}
@@ -3243,14 +3707,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         label={`Order IDs: ${orderIdChips.length} selected`}
                         onDelete={() => {
                           setOrderIdChips([]);
+                          setOrderIdSearch('');
                           setPage(0);
                           setCurrentPage(1);
-                          if (useNewAPI) {
-                            fetchTotalTransactions(1, columnFilters, dateRange);
-                          } else {
-                            const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-                            fetchOrders(1, remark);
-                          }
+                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
                         }}
                         size="small"
                         sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600 }}
@@ -3272,8 +3732,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             return p;
                           });
                                                       // Re-apply after deletion
-                            const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-                            fetchOrdersWithFilters(1, remark, next, pendingDateRange);
+                            fetchDualTransactions(1, next, pendingDateRange, selectedPlatforms);
                         }}
                       />
                     ))}
@@ -3290,8 +3749,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               sx={{ mb: 2 }}
               action={
                 <Button color="inherit" size="small" onClick={() => {
-                  const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-                  fetchOrders(1, remark);
+                  fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
                 }}>
                   Retry
                 </Button>
@@ -3302,7 +3760,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           )}
 
           {/* Loading Indicator */}
-          {loading && (
+          {(loading || dualApiLoading) && (
             <LinearProgress 
               sx={{ 
                 mb: 2,
@@ -3382,7 +3840,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             position: 'relative',
                           }}
                         >
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                             {/* Column Header */}
                               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
@@ -3406,13 +3864,82 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       {getSortIcon(column)}
                                     </IconButton>
                               </Box>
+                              {/* Order ID Search Bar */}
+                              {column === 'Order ID' && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <TextField
+                                    size="small"
+                                    placeholder="Enter Order IDs (comma-separated)"
+                                    value={orderIdSearch}
+                                    onChange={handleOrderIdSearchChange}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleOrderIdSearchClick();
+                                      }
+                                    }}
+                                    InputProps={{
+                                      startAdornment: (
+                                        <InputAdornment position="start">
+                                          <SearchIcon sx={{ fontSize: '0.9rem', color: '#6b7280' }} />
+                                        </InputAdornment>
+                                      ),
+                                    }}
+                                    sx={{
+                                      width: '280px',
+                                      '& .MuiOutlinedInput-root': {
+                                        height: '32px',
+                                        fontSize: '0.75rem',
+                                        background: 'white',
+                                      }
+                                    }}
+                                  />
+                                  <Button
+                                    variant="contained"
+                                    size="small"
+                                    onClick={handleOrderIdSearchClick}
+                                    disabled={loading || dualApiLoading}
+                                    sx={{
+                                      minWidth: 'auto',
+                                      px: 1.5,
+                                      height: '32px',
+                                      fontSize: '0.75rem',
+                                      bgcolor: '#3b82f6',
+                                      '&:hover': { bgcolor: '#2563eb' }
+                                    }}
+                                  >
+                                    Search
+                                  </Button>
+                                  {orderIdSearch && (
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      onClick={handleOrderIdSearchClear}
+                                      sx={{
+                                        minWidth: 'auto',
+                                        px: 1.5,
+                                        height: '32px',
+                                        fontSize: '0.75rem',
+                                        borderColor: '#d1d5db',
+                                        color: '#6b7280',
+                                        '&:hover': { 
+                                          borderColor: '#9ca3af',
+                                          bgcolor: '#f9fafb'
+                                        }
+                                      }}
+                                    >
+                                      Clear
+                                    </Button>
+                                  )}
+                                </Box>
+                              )}
                             </Box>
                           </TableCell>
                         ))}
                       </TableRow>
                   </TableHead>
                   <TableBody>
-                    {loading && getCurrentData().length === 0 ? (
+                    {(loading || dualApiLoading) && getCurrentData().length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 6 }}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
@@ -3458,10 +3985,37 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         {getCurrentColumns().map((column, colIndex) => {
                           // For new API, we need to map column titles to row keys
                           let value;
-                          if (useNewAPI && totalTransactionsData) {
+                          if (settledData !== null || unsettledData !== null) {
+                            // Use dual API data
+                            const currentData = activeTab === 0 ? settledData : unsettledData;
+                            const columnDef = currentData?.columns?.find(col => col.title === column);
+                            if (columnDef) {
+                              value = (row as any)[columnDef.key];
+                              
+                              // Fallback: if the key from column definition doesn't exist, try common alternatives
+                              if ((value === undefined || value === null || value === '') && column === 'Settlement Value') {
+                                // Try both common key names
+                                const fallbackValue = (row as any).settlement_amount || (row as any).settlement_value;
+                                if (fallbackValue !== undefined && fallbackValue !== null) {
+                                  value = fallbackValue;
+                                  console.log('[Settlement Value Fallback - Dual API] Column key:', columnDef.key, 'returned:', (row as any)[columnDef.key], 'Using fallback settlement_amount:', (row as any).settlement_amount);
+                                }
+                              }
+                            }
+                          } else if (useNewAPI && totalTransactionsData) {
                             const columnDef = totalTransactionsData.columns.find(col => col.title === column);
                             if (columnDef) {
                               value = (row as any)[columnDef.key];
+                              
+                              // Fallback: if the key from column definition doesn't exist, try common alternatives
+                              if ((value === undefined || value === null || value === '') && column === 'Settlement Value') {
+                                // Try both common key names
+                                const fallbackValue = (row as any).settlement_amount || (row as any).settlement_value;
+                                if (fallbackValue !== undefined && fallbackValue !== null) {
+                                  value = fallbackValue;
+                                  console.log('[Settlement Value Fallback - New API] Column key:', columnDef.key, 'returned:', (row as any)[columnDef.key], 'Using fallback settlement_amount:', (row as any).settlement_amount);
+                                }
+                              }
                             }
                           } else {
                             value = (row as any)[column];
@@ -3470,7 +4024,26 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           // Format value based on type
                           let displayValue = value;
                           
-                          if (useNewAPI && totalTransactionsData) {
+                          if (settledData !== null || unsettledData !== null) {
+                            // Use dual API data for formatting
+                            const currentData = activeTab === 0 ? settledData : unsettledData;
+                            const columnDef = currentData?.columns?.find(col => col.title === column);
+                            if (columnDef) {
+                              switch (columnDef.type) {
+                                case 'currency':
+                                  displayValue = formatCurrency(Number(value) || 0);
+                                  break;
+                                case 'date':
+                                  displayValue = formatDate(String(value));
+                                  break;
+                                case 'enum':
+                                  displayValue = String(value || '');
+                                  break;
+                                default:
+                                  displayValue = String(value || '');
+                              }
+                            }
+                          } else if (useNewAPI && totalTransactionsData) {
                             // Use column type information for formatting
                             const columnDef = totalTransactionsData.columns.find(col => col.title === column);
                             if (columnDef) {
@@ -3529,10 +4102,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {column === 'Status' ? (
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    {/* Recon Status from breakups */}
+                                    {/* Recon Status from row data */}
                                     {(() => {
-                                      const breakups = row.breakups || (row as any)?.originalData?.breakups;
-                                      const reconStatus = breakups?.recon_status;
+                                      const reconStatus = row.recon_status || (row as any)?.originalData?.recon_status;
                                       
                                       if (reconStatus) {
                                         let displayText = '';
@@ -3594,14 +4166,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       }
                                     })()}
                                     
-                                    {/* Event Type chip based on shipping_package_status_code */}
+                                    {/* Event Type chip based on event_type from API */}
                                     {(() => {
-                                      const breakups = row.breakups || (row as any)?.originalData?.breakups;
-                                      const shippingStatus = breakups?.shipping_package_status_code;
-                                      
-                                      // Determine if it's Sale or Return based on shipping status
-                                      const isSale = shippingStatus?.toLowerCase() === 'delivered';
-                                      const eventType = isSale ? 'Sale' : 'Return';
+                                      const eventType = row.event_type || (row as any)?.originalData?.event_type || 'Sale';
+                                      const isSale = eventType?.toLowerCase() === 'sale';
                                       
                                       return (
                                         <Chip
@@ -3782,6 +4350,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   <List dense subheader={<ListSubheader disableSticky sx={{ bgcolor: 'transparent', px: 0, fontSize: '0.75rem', color: '#6b7280' }}></ListSubheader>}>
                     {Object.keys(COLUMN_META)
                       .filter((col) => {
+                        // Exclude Order ID from filter sidebar
+                        if (col === 'Order ID') return false;
                         // Filter columns based on selected platform
                         const mapping = COLUMN_TO_API_PARAM_MAP[col];
                         if (!mapping) return true; // Show columns without mapping

@@ -251,8 +251,8 @@ const MarketplaceReconciliation: React.FC = () => {
   // Date range filter state
   const [selectedDateRange, setSelectedDateRange] = useState('custom');
   const [dateRangeMenuAnchor, setDateRangeMenuAnchor] = useState<null | HTMLElement>(null);
-  const [customStartDate, setCustomStartDate] = useState<string>('2025-02-01');
-  const [customEndDate, setCustomEndDate] = useState<string>('2025-02-28');
+  const [customStartDate, setCustomStartDate] = useState<string>('2025-03-01');
+  const [customEndDate, setCustomEndDate] = useState<string>('2025-03-31');
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   // Date field filter for transactions-related queries
   const [dateField, setDateField] = useState<'settlement' | 'invoice'>('invoice');
@@ -877,7 +877,7 @@ const MarketplaceReconciliation: React.FC = () => {
   };
   
   // Platform selector state
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['d2c']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['flipkart']);
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [tempSelectedPlatforms, setTempSelectedPlatforms] = useState<Platform[]>([]);
   

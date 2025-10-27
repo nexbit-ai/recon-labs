@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, FormControl, InputLabel, Select, MenuItem, OutlinedInput, TextField, Button, FormGroup, FormControlLabel, Checkbox, Autocomplete, Chip } from '@mui/material';
+import { Box, Typography, TextField, Button, FormGroup, FormControlLabel, Checkbox, Autocomplete, Chip } from '@mui/material';
 
 export interface ColumnMetaMap {
   [column: string]: { type: 'string' | 'number' | 'date' | 'enum' };
@@ -42,25 +42,11 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
   
   // For Transaction Sheet Status specifically, hardcode the three values
   if (activeColumn === 'Status') {
-    enumOptions = ['excess_received', 'short_received', 'settlement_matched'];
+    enumOptions = ['more_payment_received', 'less_payment_received', 'settlement_matched'];
   }
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, pr: 0 }}>
-      <FormControl size="small" sx={{ mb: 1.5, mt: 0.5, width: '60%' }}>
-      <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Column</Typography>
-        <TextField
-        size="small"
-          value={activeColumn || ''}
-          onChange={(e) => setActiveColumn(String(e.target.value))}
-          sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 } }}
-        >
-          {Object.keys(columnMeta).map((col) => (
-            <MenuItem key={col} value={col}>{col}</MenuItem>
-          ))}
-        </TextField>
-      </FormControl>
-
       {activeColumn && metaType === 'string' && activeColumn !== 'Order ID' && (
         <>
           <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Contains</Typography>
