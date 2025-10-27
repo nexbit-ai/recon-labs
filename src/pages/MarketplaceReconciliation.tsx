@@ -126,11 +126,20 @@ const PROVIDER_AGEING_DATA: ProviderAgeing[] = [
   { provider: 'Cashfree', type: 'Payment Gateway', averageDaysToSettle: 2.5, distribution: { '<=1d': 32, '2-3d': 46, '4-7d': 17, '8-14d': 4, '15-30d': 1, '>30d': 0 } },
 ];
 
-const AGEING_CHART_DATA = PROVIDER_AGEING_DATA.map((p) => {
-  const row: any = { provider: p.provider, avgTat: p.averageDaysToSettle };
-  AGE_BUCKETS.forEach((b) => { row[b] = p.distribution[b]; });
-  return row;
-});
+// Helper function to map provider code to display name
+const getProviderDisplayName = (code: string): string => {
+  const displayMap: Record<string, string> = {
+    'bluedart': 'Blue Dart',
+    'delhivery': 'Delhivery',
+    'dtdc': 'DTDC',
+    'grow_simple': 'Grow Simple',
+    'paytm': 'Paytm',
+    'payu': 'PayU',
+    'shadowfax': 'Shadowfax',
+    'shiprocket': 'Shiprocket',
+  };
+  return displayMap[code.toLowerCase()] || code;
+};
 import {
   StorefrontOutlined as StorefrontIcon,
   TrendingUp as TrendingUpIcon,
@@ -168,7 +177,7 @@ import {
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
 import { apiService } from '../services/api/apiService';
-import { MarketplaceReconciliationResponse, MainSummaryResponse } from '../services/api/types';
+import { MarketplaceReconciliationResponse, MainSummaryResponse, ProviderAgeingData, AgeingAnalysisResponse } from '../services/api/types';
 import { api as apiIndex } from '../services/api';
 import { mockReconciliationData, getSafeReconciliationData, isValidReconciliationData } from '../data/mockReconciliationData';
 import { Platform } from '../data/mockData';
@@ -177,6 +186,7 @@ import { padding } from '@mui/system';
 const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
   const [initialTsTab, setInitialTsTab] = useState<number>(0);
+  const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'd2c' | undefined>(undefined);
   const location = useLocation();
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
@@ -240,6 +250,10 @@ const MarketplaceReconciliation: React.FC = () => {
   const [unreconciledTab, setUnreconciledTab] = useState<number>(0); // 0: by reasons, 1: by providers
   const handleUnreconciledTabChange = (_: any, value: number) => setUnreconciledTab(value);
 
+  // Ageing analysis state
+  const [ageingData, setAgeingData] = useState<ProviderAgeingData[]>([]);
+  const [ageingLoading, setAgeingLoading] = useState(false);
+
   // Sync data sources state
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
@@ -258,10 +272,41 @@ const MarketplaceReconciliation: React.FC = () => {
   const [dateField, setDateField] = useState<'settlement' | 'invoice'>('invoice');
   const [unreconciledReasons, setUnreconciledReasons] = useState<Array<{ reason: string; count: number }>>([]);
   
-  // Ageing summary (Avg TAT across providers)
-  const overallAvgTAT = (
-    PROVIDER_AGEING_DATA.reduce((sum, p) => sum + p.averageDaysToSettle, 0) / PROVIDER_AGEING_DATA.length
-  ).toFixed(1);
+  // Ageing summary (Avg TAT across providers) - use real data if available, otherwise dummy
+  const overallAvgTAT = ageingData.length > 0 
+    ? (ageingData.reduce((sum, p) => sum + p.averageDaysToSettle, 0) / ageingData.length).toFixed(1)
+    : (PROVIDER_AGEING_DATA.reduce((sum, p) => sum + p.averageDaysToSettle, 0) / PROVIDER_AGEING_DATA.length).toFixed(1);
+
+  // Generate chart data from ageing data (convert counts to percentages for display)
+  const generateAgeingChartData = () => {
+    if (ageingData.length === 0) {
+      // Fallback to dummy data
+      return PROVIDER_AGEING_DATA.map((p) => {
+        const row: any = { provider: p.provider, avgTat: p.averageDaysToSettle };
+        AGE_BUCKETS.forEach((b) => { row[b] = p.distribution[b]; });
+        return row;
+      });
+    }
+
+    return ageingData.map((item) => {
+      const row: any = { 
+        provider: getProviderDisplayName(item.settlement_provider), 
+        avgTat: item.averageDaysToSettle 
+      };
+      
+      // Calculate total for percentage conversion
+      const total = AGE_BUCKETS.reduce((sum, bucket) => sum + (item.distribution[bucket] || 0), 0);
+      
+      // Convert counts to percentages
+      AGE_BUCKETS.forEach((bucket) => { 
+        row[bucket] = total > 0 ? (item.distribution[bucket] || 0) / total * 100 : 0;
+      });
+      
+      return row;
+    });
+  };
+
+  const ageingChartData = generateAgeingChartData();
 
   // Calendar popup state
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
@@ -875,6 +920,68 @@ const MarketplaceReconciliation: React.FC = () => {
       setUnreconciledReasons([]);
     }
   };
+
+  // Fetch ageing analysis data
+  const fetchAgeingAnalysis = async () => {
+    try {
+      setAgeingLoading(true);
+      
+      // Get current date range
+      let startDate: string;
+      let endDate: string;
+      const today = new Date();
+      
+      if (selectedDateRange === 'custom') {
+        startDate = customStartDate;
+        endDate = customEndDate;
+      } else if (selectedDateRange === 'today') {
+        startDate = today.toISOString().split('T')[0];
+        endDate = today.toISOString().split('T')[0];
+      } else if (selectedDateRange === 'this-week') {
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        startDate = startOfWeek.toISOString().split('T')[0];
+        endDate = endOfWeek.toISOString().split('T')[0];
+      } else if (selectedDateRange === 'this-month') {
+        startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        endDate = endOfMonth.toISOString().split('T')[0];
+      } else if (selectedDateRange === 'this-year') {
+        startDate = `${today.getFullYear()}-01-01`;
+        endDate = `${today.getFullYear()}-12-31`;
+      } else {
+        // Fallback to current month
+        startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        endDate = endOfMonth.toISOString().split('T')[0];
+      }
+      
+      // Determine platform parameter
+      const platformParam = selectedPlatforms.length > 0 ? selectedPlatforms.join(',') : undefined;
+      
+      const params = {
+        platform: platformParam,
+        invoice_date_from: startDate,
+        invoice_date_to: endDate,
+      };
+      
+      const response = await apiIndex.ageingAnalysis.getAgeingAnalysis(params);
+      
+      if (response.success && response.data?.data?.providerAgeingData) {
+        setAgeingData(response.data.data.providerAgeingData);
+      } else {
+        console.warn('Ageing analysis API returned unexpected format:', response);
+        setAgeingData([]);
+      }
+    } catch (error) {
+      console.error('Error fetching ageing analysis:', error);
+      setAgeingData([]);
+    } finally {
+      setAgeingLoading(false);
+    }
+  };
   
   // Platform selector state
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['flipkart']);
@@ -1441,6 +1548,8 @@ const MarketplaceReconciliation: React.FC = () => {
     } else {
       fetchUnreconciledReasonsByDateRange(selectedDateRange);
     }
+    // Fetch ageing analysis data
+    fetchAgeingAnalysis();
   }, [selectedDateRange, customStartDate, customEndDate, dateField, selectedPlatforms]);
 
   // Load sales overview data
@@ -2019,9 +2128,9 @@ const MarketplaceReconciliation: React.FC = () => {
                     const cancellationsAmount = Number(s?.total_cancellations_amount || 0);
                     const cancellationsCount = Number(s?.total_cancellations_orders || 0);
 
-                    // Calculate total sales using the formula
-                    const netSalesAmount = totalSalesAmount - returnsAmount - cancellationsAmount;
-                    const netSalesCount = totalSalesCount - returnsCount - cancellationsCount;
+                    // Use API-provided net sales values
+                    const netSalesAmount = Number(s?.net_sales_amount || 0);
+                    const netSalesCount = Number(s?.net_sales_orders || 0);
 
                     const sections = [
                       { type: 'metric', label: 'Net Sales', amount: netSalesAmount, count: netSalesCount },
@@ -2403,14 +2512,13 @@ const MarketplaceReconciliation: React.FC = () => {
                         <Box>
                           {/* Reconciled Transactions Summary */}
                           {(() => {
-                            // Revenue calculation: total_transactions_amount - total_unreconciled_amount
                             const s = mainSummary?.summary as any;
-                            const totalTransactionsAmount = Number(s?.total_transactions_amount || 0);
-                            const totalUnsettledAmount = Number(s?.total_unsettled_amount || 0);
-                            const expectedSalesAmount = totalTransactionsAmount - totalUnsettledAmount;
+                            
+                            // Revenue from API summary: net_sales_amount
+                            const expectedSalesAmount = Number(s?.net_sales_amount || 0);
                             const expectedSalesCount = Number(s?.net_sales_orders || 0);
 
-                            // Matched totals from API response
+                            // Matched totals from API response (reconciled)
                             const matchedAmount = Number(s?.total_reconciled_amount || 0);
                             const matchedCount = Number(s?.total_reconciled_count || 0);
                             const percentSettled = expectedSalesAmount === 0 ? 0 : Math.min(100, (matchedAmount / expectedSalesAmount) * 100);
@@ -2972,8 +3080,23 @@ const MarketplaceReconciliation: React.FC = () => {
                                                   }
                                                 }}
                                                 onClick={() => {
-                                                  // TODO: Replace with actual link when provided
-                                                  console.log(`View ${provider.name} unsettled transactions`);
+                                                  // Navigate to TransactionSheet with unsettled tab and platform filter
+                                                  setInitialTsTab(1); // Unsettled tab (0 = Settled, 1 = Unsettled)
+                                                  // Determine platform based on provider
+                                                  // Provider names like "Flipkart" indicate the platform
+                                                  const providerName = provider.name.toLowerCase();
+                                                  const providerKey = provider.key.toLowerCase();
+                                                  
+                                                  let platform: 'flipkart' | 'd2c' = 'flipkart'; // Default to flipkart
+                                                  
+                                                  if (providerKey === 'flipkart' || providerName.includes('flipkart')) {
+                                                    platform = 'flipkart';
+                                                  } else if (providerKey === 'd2c' || providerName.includes('d2c') || providerName.includes('direct')) {
+                                                    platform = 'd2c';
+                                                  }
+                                                  
+                                                  setSelectedProviderPlatform(platform);
+                                                  setShowTransactionSheet(true);
                                                 }}
                                               >
                                                 View {provider.name} transactions
@@ -3647,32 +3770,39 @@ const MarketplaceReconciliation: React.FC = () => {
               }> | undefined;
               if (!commissionArray || commissionArray.length === 0) return null;
 
-              const byPlatform = (name: string) => commissionArray.find(c => c.platform?.toLowerCase() === name);
-              const paytm = byPlatform('paytm');
-              const payu = byPlatform('payu');
-
-              const totalCommissionCharges = (paytm?.total_commission || 0) + (payu?.total_commission || 0);
-              const totalGstOnCommission = (paytm?.total_gst_on_commission || 0) + (payu?.total_gst_on_commission || 0);
-
               const fmtPct = (commissionPlusGst: number, base: number) => {
                 if (!base || base === 0) return '0.00%';
                 return `${((commissionPlusGst / base) * 100).toFixed(2)}%`;
               };
 
-              // Prepare donut data (same colors as before)
+              // Platform color mapping (extensible for all platforms)
               const palette2 = ['#7A5DBF', '#A79CDB', '#10B981', '#F59E0B', '#0EA5E9', '#6366F1', '#EF4444'];
-              const providerOrder: Array<{ key: string; label: string; color: string }> = [
-                { key: 'paytm', label: 'Paytm', color: palette2[0] },
-                { key: 'payu', label: 'PayU', color: palette2[1] },
-              ];
-              const providerData = providerOrder
-                .map(p => {
-                  const row = byPlatform(p.key);
-                  if (!row) return null;
-                  const amount = Math.round((row.total_commission || 0) + (row.total_gst_on_commission || 0));
-                  return { name: p.label, value: amount, color: p.color };
+              const platformColors: Record<string, string> = {
+                'paytm': palette2[0],
+                'payu': palette2[1],
+                'flipkart': palette2[2],
+                'amazon': palette2[3],
+                'myntra': palette2[4],
+              };
+
+              // Build providerData dynamically from API data
+              // Commission values are typically negative (charges/deductions), so we use absolute value for display
+              const providerData = commissionArray
+                .map((item, idx) => {
+                  const commissionValue = (item.total_commission || 0) + (item.total_gst_on_commission || 0);
+                  return {
+                    name: item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1) || `Platform ${idx + 1}`,
+                    value: Math.abs(commissionValue), // Use absolute value for display
+                    originalSignedValue: commissionValue, // Keep original for calculations
+                    color: platformColors[item.platform?.toLowerCase() || ''] || palette2[idx % palette2.length],
+                    originalData: item
+                  };
                 })
-                .filter(Boolean) as Array<{ name: string; value: number; color: string }>;
+                .filter(item => item.value !== 0); // Only show providers with actual charges (positive or negative)
+
+              // Calculate totals dynamically from all providers (use absolute values for display)
+              const totalCommissionCharges = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_commission || 0), 0));
+              const totalGstOnCommission = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_gst_on_commission || 0), 0));
 
               return (
                 <>
@@ -3687,31 +3817,89 @@ const MarketplaceReconciliation: React.FC = () => {
                   </Typography>
 
                   <Grid container spacing={3}>
-                    {/* Donut chart (restored) */}
+                    {/* Conditional rendering based on provider count */}
                     <Grid item xs={12} md={8}>
                       <Box sx={{ height: 360 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={providerData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={122}
-                              outerRadius={140}
-                              paddingAngle={1}
-                              cornerRadius={1}
-                              dataKey="value"
-                            >
-                              {providerData.map((p, idx) => (
-                                <Cell key={`prov-${idx}`} fill={p.color} />
-                              ))}
-                            </Pie>
-                            <RechartsTooltip formatter={(value: any, name: string) => [formatCurrency(Number(value)), name]} />
-                            <Legend verticalAlign="bottom" height={36} formatter={(value, entry) => (
-                              <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>{value}</span>
-                            )} />
-                          </PieChart>
-                        </ResponsiveContainer>
+                        {providerData.length === 1 ? (
+                          // Single Provider - Show detailed gradient card
+                          <Box sx={{
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: `linear-gradient(135deg, ${providerData[0].color}22 0%, ${providerData[0].color}11 100%)`,
+                            borderRadius: '20px',
+                            border: `2px solid ${providerData[0].color}`,
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            <Box sx={{ 
+                              textAlign: 'center',
+                              position: 'relative',
+                              zIndex: 2,
+                              p: 4
+                            }}>
+                              <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, color: '#1f2937' }}>
+                                {providerData[0].name}
+                              </Typography>
+                              <Typography variant="h3" sx={{ fontWeight: 700, mb: 3, color: providerData[0].color }}>
+                                {formatCurrency(providerData[0].value)}
+                              </Typography>
+                              <Box sx={{ 
+                                display: 'inline-block',
+                                px: 3, 
+                                py: 1.5,
+                                borderRadius: '20px',
+                                background: `${providerData[0].color}15`,
+                                border: `1px solid ${providerData[0].color}`,
+                                color: providerData[0].color,
+                                fontWeight: 600
+                              }}>
+                                {fmtPct(
+                                  providerData[0].value,
+                                  providerData[0].originalData.total_amount_settled || 0
+                                )} of settled amount
+                              </Box>
+                            </Box>
+                          </Box>
+                        ) : providerData.length > 1 ? (
+                          // Multiple Providers - Show pie chart
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={providerData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={122}
+                                outerRadius={140}
+                                paddingAngle={1}
+                                cornerRadius={1}
+                                dataKey="value"
+                              >
+                                {providerData.map((p, idx) => (
+                                  <Cell key={`prov-${idx}`} fill={p.color} />
+                                ))}
+                              </Pie>
+                              <RechartsTooltip formatter={(value: any, name: string) => [formatCurrency(Number(value)), name]} />
+                              <Legend verticalAlign="bottom" height={36} formatter={(value, entry) => (
+                                <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>{value}</span>
+                              )} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          // No data - show message
+                          <Box sx={{ 
+                            height: '100%', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            color: '#6b7280',
+                            border: '2px dashed #e5e7eb',
+                            borderRadius: '20px'
+                          }}>
+                            <Typography variant="h6">No commission data available</Typography>
+                          </Box>
+                        )}
                       </Box>
                     </Grid>
                     {/* KPI cards (totals) */}
@@ -3729,44 +3917,38 @@ const MarketplaceReconciliation: React.FC = () => {
                     </Grid>
                   </Grid>
 
+                  {/* Dynamic provider breakdown */}
                   <Box sx={{ mt: 4 }}>
                     <Grid container spacing={2}>
-                      {paytm && (
-                        <Grid item xs={12} md={6}>
+                      {commissionArray.map((item, idx) => (
+                        <Grid key={idx} item xs={12} md={providerData.length === 1 ? 12 : 6}>
                           <Box sx={{ p: 3, borderRadius: '14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(229,231,235,0.6)' }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                              <Typography variant="body2" sx={{ color: '#374151', fontWeight: 700 }}>Paytm</Typography>
-                              <Typography variant="caption" sx={{ color: '#6b7280' }}>{fmtPct((paytm.total_commission + paytm.total_gst_on_commission), (paytm.total_amount_settled || 0))} of settled</Typography>
+                              <Typography variant="body2" sx={{ color: '#374151', fontWeight: 700 }}>
+                                {item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1) || 'Unknown Platform'}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                                {fmtPct(
+                                  Math.abs((item.total_commission || 0) + (item.total_gst_on_commission || 0)),
+                                  item.total_amount_settled || 0
+                                )} of settled
+                              </Typography>
                             </Box>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
                               <Typography variant="body2" sx={{ color: '#374151' }}>Commission</Typography>
-                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>{formatCurrency(paytm.total_commission)}</Typography>
+                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
+                                {formatCurrency(Math.abs(item.total_commission))}
+                              </Typography>
                             </Box>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
                               <Typography variant="body2" sx={{ color: '#374151' }}>GST</Typography>
-                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>{formatCurrency(paytm.total_gst_on_commission)}</Typography>
+                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
+                                {formatCurrency(Math.abs(item.total_gst_on_commission))}
+                              </Typography>
                             </Box>
                           </Box>
                         </Grid>
-                      )}
-                      {payu && (
-                        <Grid item xs={12} md={6}>
-                          <Box sx={{ p: 3, borderRadius: '14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(229,231,235,0.6)' }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                              <Typography variant="body2" sx={{ color: '#374151', fontWeight: 700 }}>PayU</Typography>
-                              <Typography variant="caption" sx={{ color: '#6b7280' }}>{fmtPct((payu.total_commission + payu.total_gst_on_commission), (payu.total_amount_settled || 0))} of settled</Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
-                              <Typography variant="body2" sx={{ color: '#374151' }}>Commission</Typography>
-                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>{formatCurrency(payu.total_commission)}</Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                              <Typography variant="body2" sx={{ color: '#374151' }}>GST</Typography>
-                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>{formatCurrency(payu.total_gst_on_commission)}</Typography>
-                            </Box>
-                          </Box>
-                        </Grid>
-                      )}
+                      ))}
                     </Grid>
                   </Box>
                 </>
@@ -3788,7 +3970,10 @@ const MarketplaceReconciliation: React.FC = () => {
             <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>
               Payment Ageing Analysis
             </Typography>
-            <Chip label={`Avg TAT: ${overallAvgTAT} days`} sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 700 }} />
+            <Chip 
+              label={ageingLoading ? 'Loading...' : `Avg TAT: ${overallAvgTAT} days`} 
+              sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 700 }} 
+            />
           </Box>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
             {AGE_BUCKETS.map((b) => (
@@ -3806,25 +3991,31 @@ const MarketplaceReconciliation: React.FC = () => {
             ))}
           </Box>
           <Box sx={{ width: '100%', height: 380 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={AGEING_CHART_DATA} margin={{ top: 40, right: 10, left: 0, bottom: 0 }} barCategoryGap={"25%"} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="provider" tick={{ fontSize: 12 }} interval={0} height={60} angle={-15} textAnchor="end" />
-                <YAxis unit="%" tick={{ fontSize: 12 }} domain={[0, 100]} />
-                <RechartsTooltip formatter={(v: any) => [`${v}%`, 'Share']} />
-                {AGE_BUCKETS.map((b, idx) => (
-                  <Bar key={b} dataKey={b} stackId="a" fill={BUCKET_COLORS[b]} radius={0} barSize={22}>
-                    {idx === AGE_BUCKETS.length - 1 && (
-                      <LabelList
-                        dataKey="avgTat"
-                        position="top"
-                        formatter={(v: number) => `Avg TAT: ${Number(v).toFixed(1)}d`}
-                      />
-                    )}
-                  </Bar>
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
+            {ageingLoading ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={ageingChartData} margin={{ top: 40, right: 10, left: 0, bottom: 0 }} barCategoryGap={"25%"} barGap={4}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="provider" tick={{ fontSize: 12 }} interval={0} height={60} angle={-15} textAnchor="end" />
+                  <YAxis unit="%" tick={{ fontSize: 12 }} domain={[0, 100]} />
+                  <RechartsTooltip formatter={(v: any) => [`${v}%`, 'Share']} />
+                  {AGE_BUCKETS.map((b, idx) => (
+                    <Bar key={b} dataKey={b} stackId="a" fill={BUCKET_COLORS[b]} radius={0} barSize={22}>
+                      {idx === AGE_BUCKETS.length - 1 && (
+                        <LabelList
+                          dataKey="avgTat"
+                          position="top"
+                          formatter={(v: number) => `Avg TAT: ${Number(v).toFixed(1)}d`}
+                        />
+                      )}
+                    </Bar>
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </Box>
         </Paper>
 
@@ -4131,10 +4322,14 @@ const MarketplaceReconciliation: React.FC = () => {
           }}
         >
           <TransactionSheet 
-            onBack={() => setShowTransactionSheet(false)} 
+            onBack={() => {
+              setShowTransactionSheet(false);
+              setSelectedProviderPlatform(undefined);
+            }} 
             statsData={reconciliationData}
             initialTab={initialTsTab}
             dateRange={{ start: customStartDate, end: customEndDate }}
+            initialPlatforms={selectedProviderPlatform && initialTsTab === 1 ? [selectedProviderPlatform] : undefined}
           />
         </Box>
       )}

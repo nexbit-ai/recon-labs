@@ -410,4 +410,32 @@ export interface TotalTransactionsResponse {
     total_count: number;
     total_pages: number;
   };
+}
+
+// Ageing Analysis Types
+export interface ProviderAgeingDistribution {
+  '<=1d': number;
+  '2-3d': number;
+  '4-7d': number;
+  '8-14d': number;
+  '15-30d': number;
+  '>30d': number;
+}
+
+export interface ProviderAgeingData {
+  settlement_provider: string;
+  averageDaysToSettle: number;
+  distribution: ProviderAgeingDistribution;
+}
+
+export interface AgeingAnalysisResponse {
+  data: {
+    providerAgeingData: ProviderAgeingData[];
+  };
+}
+
+export interface AgeingAnalysisParams {
+  platform?: string;
+  invoice_date_from: string;
+  invoice_date_to: string;
 } 

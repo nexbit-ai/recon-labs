@@ -51,9 +51,11 @@ import ColumnFilterControls from '../components/ColumnFilterControls';
 // Type definitions for transaction data based on API response
 interface TransactionRow {
   "Order ID": string;
-  "Order Value": number;
+  "Amount": number;
+  "Order Value"?: number; // Kept for compatibility
   "Settlement Value": number;
-  "Order Date": string;
+  "Invoice Date": string;
+  "Order Date"?: string; // Kept for compatibility
   "Settlement Date": string;
   "Difference": number;
   "Remark": string;
@@ -253,9 +255,11 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   
   return {
     "Order ID": orderItemId,
-    "Order Value": orderValue,
+    "Amount": orderValue,
+    "Order Value": orderValue, // Kept for compatibility
     "Settlement Value": settlementValue,
-    "Order Date": new Date(orderItem.order_date).toISOString().split('T')[0],
+    "Invoice Date": new Date(orderItem.order_date).toISOString().split('T')[0],
+    "Order Date": new Date(orderItem.order_date).toISOString().split('T')[0], // Kept for compatibility
     "Settlement Date": settlementDate,
     "Difference": difference,
     "Remark": remark,
@@ -303,6 +307,8 @@ const DisputePage: React.FC = () => {
   // Pagination for unreconciled tab
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  // Total count for pagination
+  const [totalCount, setTotalCount] = useState(0);
 
   // Platform selector state for dropdown (multi-select)
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -494,7 +500,6 @@ const DisputePage: React.FC = () => {
   };
 
   // Fetch unreconciled orders from API
-  // NOTE: Dispute API endpoint not yet available - using dummy data
   const fetchUnreconciledOrders = async (filtersOverride?: Record<string, any>) => {
     if (disputeSubTab !== 0) return; // Only fetch for unreconciled tab
     
@@ -502,23 +507,81 @@ const DisputePage: React.FC = () => {
     setError(null);
     
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Build query parameters
+      const params = buildQueryParams(filtersOverride);
       
-      // Generate and set dummy data
-      const dummyData = generateDummyUnreconciledData();
-      setApiRows(dummyData as TransactionRow[]);
+      // Add the unreconciled status filter
+      params.status_in = 'less_payment_received,more_payment_received';
       
-      console.log('Using dummy data for disputes (API not yet available)');
+      // Call the API
+      const response = await api.transactions.getTotalTransactions(params as any);
+      
+      if (response.success && response.data) {
+        const responseData = response.data as any;
+        const transactionData = responseData.transactions || responseData.data || [];
+        
+        // Transform API data to TransactionRow format
+        const transformedRows: TransactionRow[] = [];
+        
+        if (Array.isArray(transactionData)) {
+          transactionData.forEach((transaction: any) => {
+            // Parse numeric values
+            const parseNumeric = (value: any): number => {
+              if (!value) return 0;
+              const cleaned = String(value).replace(/[₹$,\s]/g, '').replace(/[^\d.-]/g, '').trim();
+              return parseFloat(cleaned) || 0;
+            };
+            
+            // Format dates
+            const formatDate = (date: string | Date): string => {
+              if (!date) return '';
+              try {
+                return new Date(date).toISOString().split('T')[0];
+              } catch {
+                return '';
+              }
+            };
+            
+            transformedRows.push({
+              "Order ID": transaction.order_item_id || transaction.order_id || '',
+              "Amount": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount),
+              "Order Value": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount), // Keep for compatibility
+              "Settlement Value": parseNumeric(transaction.settlement_value),
+              "Invoice Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date),
+              "Order Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date), // Keep for compatibility
+              "Settlement Date": formatDate(transaction.settlement_date),
+              "Difference": parseNumeric(transaction.diff || transaction.difference),
+              "Remark": transaction.breakups?.mismatch_reason || transaction.remark || 'Not Available',
+              "Event Type": transaction.event_type || transaction.eventType || 'Sale',
+              originalData: transaction
+            });
+          });
+        }
+        
+        setApiRows(transformedRows);
+        
+        // Update pagination from response
+        if (response.data.pagination) {
+          setTotalCount(response.data.pagination.total_count);
+        }
+        
+        console.log('Fetched unreconciled orders from API:', transformedRows.length);
+      } else {
+        console.error('API returned no data');
+        setApiRows([]);
+        setTotalCount(0);
+      }
     } catch (err) {
-      console.error('Error generating dummy dispute data:', err);
+      console.error('Error fetching unreconciled orders:', err);
       setError('Failed to load dispute data. Please try again.');
+      setApiRows([]);
+      setTotalCount(0);
     } finally {
       setApiLoading(false);
     }
   };
 
-  // Load mock data for other tabs and fetch unreconciled orders on mount
+  // Load mock data for other tabs on mount
   useEffect(() => {
     if (mockRows.length === 0) {
       const remarks = ['Short Amount Received', 'Excess Amount Received', 'Pending Settlement'];
@@ -536,13 +599,7 @@ const DisputePage: React.FC = () => {
       }
       setMockRows(list);
     }
-
-    // Add dummy data for unreconciled orders
-    if (disputeSubTab === 0 && apiRows.length === 0) {
-      const dummyUnreconciledData = generateDummyUnreconciledData();
-      setApiRows(dummyUnreconciledData as TransactionRow[]);
-    }
-  }, [disputeSubTab]);
+  }, []);
 
   // Fetch unreconciled orders on component mount
   useEffect(() => {
@@ -698,7 +755,7 @@ const DisputePage: React.FC = () => {
 
   // Selection helpers for visible rows in Unreconciled tab
   const visibleIds: string[] = disputeSubTab === 0
-    ? (paginatedCurrent as any[]).map((r) => r.order_id)
+    ? (paginatedCurrent as any[]).map((r) => r["Order ID"] || r.originalData?.order_item_id || r.originalData?.order_id || r.order_id || '')
     : [];
   const allSelectedInView = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
   const someSelectedInView = visibleIds.some(id => selectedIds.includes(id)) && !allSelectedInView;
@@ -816,7 +873,10 @@ const DisputePage: React.FC = () => {
     // Remove the transaction from the list (simulate reconciliation)
     setApiRows(prev => {
       if (Array.isArray(prev)) {
-        return prev.filter((row: any) => row.order_id !== id) as TransactionRow[];
+        return prev.filter((row: any) => {
+          const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
+          return orderId !== id;
+        }) as TransactionRow[];
       }
       return prev;
     });
@@ -826,9 +886,12 @@ const DisputePage: React.FC = () => {
     
     // Store notification for Checklist
     try {
-      const matched = (apiRows as any[]).find(row => row.order_id === id);
+      const matched = (apiRows as any[]).find(row => {
+        const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
+        return orderId === id;
+      });
       if (matched) {
-        pushManualReconNotification(matched.breakups?.mismatch_reason || 'Unknown', 1, [id]);
+        pushManualReconNotification(matched.originalData?.breakups?.mismatch_reason || matched["Remark"] || 'Unknown', 1, [id]);
       }
     } catch (err) {
       console.error('Failed to derive group for manual recon notification', err);
@@ -839,10 +902,13 @@ const DisputePage: React.FC = () => {
     console.log('Raising dispute:', id);
     
     // Find the transaction data
-    const transaction = (apiRows as any[]).find(row => row.order_id === id);
+    const transaction = (apiRows as any[]).find(row => {
+      const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
+      return orderId === id;
+    });
     if (transaction) {
       openRaiseDispute({ 
-        reason: transaction.breakups?.mismatch_reason || 'Unknown', 
+        reason: transaction.originalData?.breakups?.mismatch_reason || transaction["Remark"] || 'Unknown', 
         count: 1, 
         orderIds: [id] 
       });
@@ -1569,31 +1635,42 @@ const DisputePage: React.FC = () => {
                 {(disputeSubTab === 0 ? paginatedCurrent : current).map((row: any, index: number) => {
                   if (disputeSubTab === 0) {
                     // Flat detailed row for unreconciled orders
+                    const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || '';
+                    const amount = row["Amount"] || row["Order Value"] || 0;
+                    const settlementValue = row["Settlement Value"] || 0;
+                    const invoiceDate = row["Invoice Date"] || row["Order Date"] || '';
+                    const settlementDate = row["Settlement Date"] || '';
+                    const difference = row["Difference"] || 0;
+                    const remark = row["Remark"] || 'Not Available';
+                    const eventType = row["Event Type"] || 'Sale';
+                    const reason = 'Not Available'; // API doesn't provide reason
+                    const status = row.originalData?.breakups?.recon_status || 'less_payment_received';
+                    
                      return (
                       <TableRow key={`flat-${index}`} sx={{ '&:hover': { background: '#f3f4f6' }, transition: 'all 0.3s ease' }}>
                         <TableCell padding="checkbox">
                              <Checkbox
-                            checked={selectedIds.includes(row.order_id)}
-                            onChange={() => toggleRow(row.order_id)}
+                            checked={selectedIds.includes(orderId)}
+                            onChange={() => toggleRow(orderId)}
                                sx={{
                                  color: '#6b7280',
                               '&.Mui-checked': { color: '#1f2937' },
                                }}
                              />
                     </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>{row.order_id}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{parseFloat(row.order_value || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.invoice_date}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.settlement_date}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>₹{parseFloat(row.diff || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>{orderId}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{invoiceDate}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{settlementDate}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>₹{difference.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Chip label={formatReasonLabel(row.breakups?.mismatch_reason || 'N/A')} size="small" sx={{ fontWeight: 600, color: '#1f2937', backgroundColor: '#e5e7eb', '& .MuiChip-label': { px: 1 } }} />
+                          <Chip label={reason} size="small" sx={{ fontWeight: 600, color: '#1f2937', backgroundColor: '#e5e7eb', '& .MuiChip-label': { px: 1 } }} />
                            </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.breakups?.recon_status || 'N/A'}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{status}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                            <Button size="small" variant="outlined" onClick={() => handleMarkReconciled(row.order_id)} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#10b981', color: '#10b981', '&:hover': { borderColor: '#059669', backgroundColor: 'rgba(16, 185, 129, 0.04)' } }}>Mark Reconciled</Button>
-                            <Button size="small" variant="outlined" onClick={() => openRaiseDispute({ reason: row.reason, count: 1, orderIds: [row.order_id] })} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#6b7280', color: '#6b7280', '&:hover': { borderColor: '#4b5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' } }}>Raise Dispute</Button>
+                            <Button size="small" variant="outlined" onClick={() => handleMarkReconciled(orderId)} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#10b981', color: '#10b981', '&:hover': { borderColor: '#059669', backgroundColor: 'rgba(16, 185, 129, 0.04)' } }}>Mark Reconciled</Button>
+                            <Button size="small" variant="outlined" onClick={() => handleRaiseDispute(orderId)} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#6b7280', color: '#6b7280', '&:hover': { borderColor: '#4b5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' } }}>Raise Dispute</Button>
                              </Box>
                            </TableCell>
                   </TableRow>
@@ -1603,7 +1680,7 @@ const DisputePage: React.FC = () => {
                  })}
                 {(disputeSubTab === 0 ? paginatedCurrent : current).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
+                    <TableCell colSpan={9} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
                   </TableRow>
                 )}
               </TableBody>

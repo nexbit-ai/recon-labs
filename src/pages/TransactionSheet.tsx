@@ -1588,6 +1588,7 @@ interface TransactionSheetProps {
   statsData?: MarketplaceReconciliationResponse | null;
   initialTab?: number;
   dateRange?: { start: string; end: string };
+  initialPlatforms?: ('flipkart' | 'd2c')[];
 }
 
 // Complete mapping of UI columns to API parameters
@@ -1613,7 +1614,7 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   'Mismatch Reason': { apiParam: 'mismatch_reason_in', type: 'enum', supportedPlatforms: ['d2c'] },
 };
 
-const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0, dateRange: propDateRange }) => {
+const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0, dateRange: propDateRange, initialPlatforms }) => {
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -1640,12 +1641,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Platform filter state - now supports multi-select
   const availablePlatforms = ['flipkart', 'd2c'] as const;
   type Platform = typeof availablePlatforms[number];
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['flipkart']); // Default: flipkart only
-  const [pendingSelectedPlatforms, setPendingSelectedPlatforms] = useState<Platform[]>(['flipkart']); // Pending platforms before apply
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(initialPlatforms || ['flipkart']); // Default: flipkart only
+  const [pendingSelectedPlatforms, setPendingSelectedPlatforms] = useState<Platform[]>(initialPlatforms || ['flipkart']); // Pending platforms before apply
   // Order ID chips state
   const [orderIdChips, setOrderIdChips] = useState<string[]>([]);
   // Order ID search in header
   const [orderIdSearch, setOrderIdSearch] = useState<string>('');
+  // Order ID search bar visibility
+  const [showOrderIdSearch, setShowOrderIdSearch] = useState(false);
   const [filteredData, setFilteredData] = useState<TransactionRow[]>([]);
   const [allTransactionData, setAllTransactionData] = useState<TransactionRow[]>([]);
   const [page, setPage] = useState(0);
@@ -1653,7 +1656,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [loading, setLoading] = useState(false);
   const [paginationLoading, setPaginationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(getInitialTab() === 0 ? 0 : getInitialTab() === 1 ? 1 : 0);
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = getInitialTab();
+    return tab === 1 ? 1 : 0; // 0 = Settled, 1 = Unsettled
+  });
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionRow | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [breakupsModalOpen, setBreakupsModalOpen] = useState(false);
@@ -2420,6 +2426,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   }, [location.state, navigate]);
 
+  // Handle initialTab prop changes (when opening TransactionSheet with different initialTab)
+  useEffect(() => {
+    if (initialTab !== undefined) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
   // Sync propDateRange with local dateRange state
   useEffect(() => {
     if (propDateRange && (propDateRange.start !== dateRange.start || propDateRange.end !== dateRange.end)) {
@@ -3014,6 +3027,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleOrderIdSearchClear = () => {
     setOrderIdSearch('');
     setOrderIdChips([]);
+    setShowOrderIdSearch(false);
     
     // Trigger API call without order IDs
     setPage(0);
@@ -3294,6 +3308,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setPendingSelectedPlatforms([...availablePlatforms]); // Reset pending platforms too
     setOrderIdChips([]); // Clear order ID chips
     setOrderIdSearch(''); // Clear order ID search in header
+    setShowOrderIdSearch(false); // Hide order ID search bar
     setPage(0);
     setCurrentPage(1);
     fetchDualTransactions(1, {}, { start: '', end: '' }, [...availablePlatforms]);
@@ -3708,6 +3723,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         onDelete={() => {
                           setOrderIdChips([]);
                           setOrderIdSearch('');
+                          setShowOrderIdSearch(false);
                           setPage(0);
                           setCurrentPage(1);
                           fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
@@ -3863,13 +3879,43 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     >
                                       {getSortIcon(column)}
                                     </IconButton>
+                                    {/* Magnifying glass button for Order ID search */}
+                                    {column === 'Order ID' && (
+                                      <IconButton 
+                                        size="small" 
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setShowOrderIdSearch(!showOrderIdSearch);
+                                        }}
+                                        sx={{
+                                          ml: 0.5,
+                                          color: showOrderIdSearch ? '#1f2937' : '#6b7280',
+                                          background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
+                                          '&:hover': { background: '#f3f4f6' },
+                                        }}
+                                        aria-label="Toggle search"
+                                      >
+                                        <SearchIcon sx={{ fontSize: '1rem' }} />
+                                      </IconButton>
+                                    )}
                               </Box>
-                              {/* Order ID Search Bar */}
-                              {column === 'Order ID' && (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              {/* Order ID Search Bar - Expandable */}
+                              {column === 'Order ID' && showOrderIdSearch && (
+                                <Box 
+                                  sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 0.5,
+                                    animation: 'expand 0.3s ease-in-out',
+                                    '@keyframes expand': {
+                                      '0%': { width: '0', opacity: 0 },
+                                      '100%': { width: '280px', opacity: 1 }
+                                    }
+                                  }}
+                                >
                                   <TextField
                                     size="small"
-                                    placeholder="Enter Order IDs (comma-separated)"
                                     value={orderIdSearch}
                                     onChange={handleOrderIdSearchChange}
                                     onKeyDown={(e) => {
@@ -3879,9 +3925,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       }
                                     }}
                                     InputProps={{
-                                      startAdornment: (
-                                        <InputAdornment position="start">
-                                          <SearchIcon sx={{ fontSize: '0.9rem', color: '#6b7280' }} />
+                                      endAdornment: (
+                                        <InputAdornment position="end">
+                                          <IconButton
+                                            size="small"
+                                            onClick={handleOrderIdSearchClick}
+                                            disabled={loading || dualApiLoading}
+                                            sx={{ p: 0.5 }}
+                                          >
+                                            <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                          </IconButton>
                                         </InputAdornment>
                                       ),
                                     }}
@@ -3894,43 +3947,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       }
                                     }}
                                   />
-                                  <Button
-                                    variant="contained"
-                                    size="small"
-                                    onClick={handleOrderIdSearchClick}
-                                    disabled={loading || dualApiLoading}
-                                    sx={{
-                                      minWidth: 'auto',
-                                      px: 1.5,
-                                      height: '32px',
-                                      fontSize: '0.75rem',
-                                      bgcolor: '#3b82f6',
-                                      '&:hover': { bgcolor: '#2563eb' }
-                                    }}
-                                  >
-                                    Search
-                                  </Button>
-                                  {orderIdSearch && (
-                                    <Button
-                                      variant="outlined"
-                                      size="small"
-                                      onClick={handleOrderIdSearchClear}
-                                      sx={{
-                                        minWidth: 'auto',
-                                        px: 1.5,
-                                        height: '32px',
-                                        fontSize: '0.75rem',
-                                        borderColor: '#d1d5db',
-                                        color: '#6b7280',
-                                        '&:hover': { 
-                                          borderColor: '#9ca3af',
-                                          bgcolor: '#f9fafb'
-                                        }
-                                      }}
-                                    >
-                                      Clear
-                                    </Button>
-                                  )}
                                 </Box>
                               )}
                             </Box>

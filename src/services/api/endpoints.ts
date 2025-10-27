@@ -9,7 +9,8 @@ import {
   FilterParams,
   PaginatedResponse,
   MarketplaceReconciliationResponse,
-  TotalTransactionsResponse
+  TotalTransactionsResponse,
+  AgeingAnalysisResponse
 } from './types';
 
 // Authentication API
@@ -105,6 +106,12 @@ export const statsAPI = {
 export const mainSummaryAPI = {
   getMainSummary: (params: { start_date: string; end_date: string; date_field: 'invoice_date' | 'settlement_date' | string; platform?: string[]; status?: string }) =>
     apiService.get<any>('/recon/main-summary', params),
+};
+
+// Ageing Analysis API
+export const ageingAnalysisAPI = {
+  getAgeingAnalysis: (params: { platform?: string; invoice_date_from: string; invoice_date_to: string }) =>
+    apiService.get<any>(API_CONFIG.ENDPOINTS.AGEING_ANALYSIS, params),
 };
 
 // Reports API
@@ -239,6 +246,7 @@ export const api = {
   orders: ordersAPI,
   stats: statsAPI,
   mainSummary: mainSummaryAPI,
+  ageingAnalysis: ageingAnalysisAPI,
   reports: reportsAPI,
   dataSources: dataSourcesAPI,
   ai: aiAPI,
