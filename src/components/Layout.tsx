@@ -29,7 +29,7 @@ import {
   SettingsOutlined as SettingsIcon,
   AttachMoneyOutlined as AttachMoneyIcon,
   StorageOutlined as StorageIcon,
-  ChatOutlined as ChatIcon,
+  // ChatOutlined as ChatIcon,
   StorefrontOutlined as StorefrontIcon,
   ReceiptOutlined as ReceiptIcon,
   AccountBalanceOutlined as AccountBalanceIcon,
@@ -51,7 +51,7 @@ const menuItems = [
   { text: 'Dispute', icon: <ReportProblemIcon />, path: '/dispute' },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping' },
   { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist' },
-  { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
+  // { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {

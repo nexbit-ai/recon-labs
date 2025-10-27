@@ -2006,50 +2006,6 @@ const MarketplaceReconciliation: React.FC = () => {
                   </Box>
                 </Menu>
                 </Box>
-
-                {/* Sync Data Sources Button */}
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, mt: 1 }}>
-                  <Button
-                    variant="outlined"
-                    startIcon={<SyncIcon />}
-                    onClick={handleSyncDataSources}
-                    disabled={syncLoading}
-                    sx={{
-                      mt: 1.5,
-                      borderRadius: '6px',
-                      borderColor: '#6B7280',
-                      color: '#6B7280',
-                      textTransform: 'none',
-                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontWeight: 500,
-                      minHeight: 36,
-                      px: 1.5,
-                      fontSize: '0.7875rem',
-                      '&:hover': {
-                        borderColor: '#4B5563',
-                        backgroundColor: 'rgba(107, 114, 128, 0.04)',
-                      },
-                      '&:disabled': {
-                        borderColor: '#d0d0d0',
-                        color: '#d0d0d0',
-                      },
-                    }}
-                  >
-                    {syncLoading ? 'Syncing...' : 'Sync Data'}
-                  </Button>
-                  {/* Last Synced Text (below) */}
-                  <Typography variant="caption" sx={{
-                    color: '#666666',
-                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                    fontSize: '0.75rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                  }}>
-                    <ScheduleIcon sx={{ fontSize: '0.75rem' }} />
-                     synced: {formatLastSynced(lastSynced)}
-                  </Typography>
-                </Box>
               </Box>
             </Box>
             
