@@ -962,12 +962,15 @@ const MarketplaceReconciliation: React.FC = () => {
       if (resp.success && resp.data) {
         const summaryData = resp.data as any;
         const unreconciledReasons = summaryData.UnReconcile?.reasons || [];
-        
-        // Transform the reasons data to match the expected format
-        const list = Object.entries(unreconciledReasons)
-          .map(([reason, count]) => ({ reason, count: count as number }))
-          .sort((a, b) => b.count - a.count);
-        
+
+        // Transform reasons array [{ name, count, amount }] -> [{ reason, count }]
+        const list = (Array.isArray(unreconciledReasons) ? unreconciledReasons : [])
+          .map((r: any) => ({
+            reason: r?.name ?? String(r?.reason ?? ''),
+            count: Number(r?.count) || 0,
+          }))
+          .sort((a: any, b: any) => b.count - a.count);
+
         setUnreconciledReasons(list);
       } else {
         setUnreconciledReasons([]);
