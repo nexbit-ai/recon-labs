@@ -3515,51 +3515,88 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   
                   </Box>
                   
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 1, 
+                    flexWrap: { xs: 'wrap', md: 'nowrap' },
+                    width: '100%',
+                    maxWidth: '100%',
+                    justifyContent: 'space-between'
+                  }}>
                     
-                    <IconButton
-                      onClick={() => {
-                        fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
-                      }}
-                      disabled={loading || dualApiLoading}
-                      sx={{
-                        color: '#1f2937',
-                        '&:hover': {
-                          background: '#f9fafb',
-                        },
-                        transition: 'all 0.3s ease',
-                      }}
-                    >
-                      <RefreshIcon />
-                    </IconButton>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+                      <IconButton
+                        onClick={() => {
+                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
+                        }}
+                        disabled={loading || dualApiLoading}
+                        sx={{
+                          color: '#1f2937',
+                          '&:hover': {
+                            background: '#f9fafb',
+                          },
+                          transition: 'all 0.3s ease',
+                        }}
+                      >
+                        <RefreshIcon />
+                      </IconButton>
+                      
+                      <Button
+                        variant="outlined"
+                        startIcon={<FilterIcon />}
+                        onClick={(e) => openFilterPopover('Status', e.currentTarget as any)}
+                        sx={{ 
+                          textTransform: 'none', 
+                          borderColor: '#1f2937', 
+                          color: '#1f2937',
+                          fontSize: '0.75rem',
+                          padding: '6px 12px',
+                          minWidth: 'auto',
+                        }}
+                      >
+                        Filters
+                      </Button>
+                    </Box>
                     
-                    <Button
-                      variant="outlined"
-                      startIcon={<FilterIcon />}
-                      onClick={(e) => openFilterPopover('Status', e.currentTarget as any)}
-                      sx={{ textTransform: 'none', borderColor: '#1f2937', color: '#1f2937' }}
-                    >
-                      Filters
-                    </Button>
-                    
-                    {/* Platform Filter - New Design with Checkboxes */}
                     <Box sx={{ 
                       display: 'flex', 
                       alignItems: 'center', 
                       gap: 1,
-                      padding: '8px 10px',
+                      flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                      marginLeft: { xs: 0, sm: 'auto' },
+                      justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+                      width: { xs: '100%', sm: 'auto' }
+                    }}>
+                    {/* Platform Filter - New Design with Checkboxes */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 0.5,
+                      padding: '6px 8px',
                       border: '1px solid #e5e7eb',
                       borderRadius: '8px',
                       backgroundColor: '#f9fafb',
-                      height: '56px'
+                      height: { xs: 'auto', sm: '48px' },
+                      flex: { xs: '1 1 100%', sm: '0 1 auto' },
+                      minWidth: 0,
+                      maxWidth: { xs: '100%', sm: '500px' },
+                      flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                      rowGap: { xs: 0.5, sm: 0 },
                     }}>
                       {/* Platform label */}
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1f2937', minWidth: '50px', fontSize: '0.75rem' }}>
+                      <Typography variant="body2" sx={{ 
+                        fontWeight: 600, 
+                        color: '#1f2937', 
+                        fontSize: '0.7rem',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}>
                         Platforms:
                       </Typography>
                       
                       {/* Platform checkboxes */}
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
                         {availablePlatforms.map((platform) => (
                           <Box 
                             key={platform}
@@ -3584,9 +3621,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             <Checkbox 
                               checked={pendingSelectedPlatforms.includes(platform)}
                               size="small"
-                              sx={{ padding: '2px' }}
+                              sx={{ padding: '2px', '& svg': { fontSize: '18px' } }}
                             />
-                            <Typography variant="body2" sx={{ color: '#374151', fontSize: '0.75rem' }}>
+                            <Typography variant="body2" sx={{ color: '#374151', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
                               {platform === 'flipkart' ? 'Flipkart' : 'D2C'}
                             </Typography>
                           </Box>
@@ -3594,7 +3631,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       </Box>
                       
                       {/* Divider */}
-                      <Box sx={{ width: '1px', height: '20px', backgroundColor: '#d1d5db', mx: 0.5 }} />
+                      <Box sx={{ width: '1px', height: '18px', backgroundColor: '#d1d5db', mx: 0.25, flexShrink: 0 }} />
                       
                       {/* Select All button */}
                       <Button
@@ -3606,11 +3643,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         disabled={pendingSelectedPlatforms.length === availablePlatforms.length}
                         sx={{
                           textTransform: 'none',
-                          fontSize: '0.7rem',
-                          padding: '2px 8px',
+                          fontSize: '0.65rem',
+                          padding: '2px 6px',
                           minWidth: 'auto',
                           borderColor: '#d1d5db',
                           color: '#6b7280',
+                          flexShrink: 0,
                           '&:hover': {
                             borderColor: '#0ea5e9',
                             color: '#0ea5e9',
@@ -3622,7 +3660,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           }
                         }}
                       >
-                        Select All
+                        All
                       </Button>
                       
                       {/* Clear All button */}
@@ -3635,11 +3673,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         disabled={pendingSelectedPlatforms.length === 0}
                         sx={{
                           textTransform: 'none',
-                          fontSize: '0.7rem',
-                          padding: '2px 8px',
+                          fontSize: '0.65rem',
+                          padding: '2px 6px',
                           minWidth: 'auto',
                           borderColor: '#d1d5db',
                           color: '#6b7280',
+                          flexShrink: 0,
                           '&:hover': {
                             borderColor: '#ef4444',
                             color: '#ef4444',
@@ -3651,11 +3690,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           }
                         }}
                       >
-                        Clear All
+                        Clear
                       </Button>
                       
                       {/* Divider */}
-                      <Box sx={{ width: '1px', height: '20px', backgroundColor: '#d1d5db', mx: 0.5 }} />
+                      <Box sx={{ width: '1px', height: '18px', backgroundColor: '#d1d5db', mx: 0.25, flexShrink: 0 }} />
                       
                       {/* Apply Button */}
                       <Button
@@ -3665,10 +3704,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         disabled={JSON.stringify(pendingSelectedPlatforms.sort()) === JSON.stringify(selectedPlatforms.sort())}
                         sx={{
                           textTransform: 'none',
-                          fontSize: '0.75rem',
-                          padding: '4px 12px',
+                          fontSize: '0.7rem',
+                          padding: '3px 10px',
                           minWidth: 'auto',
                           backgroundColor: '#1f2937',
+                          flexShrink: 0,
                           '&:hover': { backgroundColor: '#374151' },
                           '&:disabled': {
                             backgroundColor: '#9ca3af',
@@ -3684,20 +3724,31 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     <Box sx={{ 
                       display: 'flex', 
                       alignItems: 'center', 
-                      gap: 1,
-                      padding: '8px 10px',
+                      gap: 0.5,
+                      padding: '6px 8px',
                       border: '1px solid #e5e7eb',
                       borderRadius: '8px',
                       backgroundColor: '#f9fafb',
-                      height: '56px'
+                      height: { xs: 'auto', sm: '48px' },
+                      flex: { xs: '1 1 100%', sm: '0 1 auto' },
+                      minWidth: 0,
+                      maxWidth: { xs: '100%', sm: '420px' },
+                      flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                      rowGap: { xs: 0.5, sm: 0 },
                     }}>
                       {/* Date label */}
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1f2937', minWidth: '65px', fontSize: '0.75rem' }}>
+                      <Typography variant="body2" sx={{ 
+                        fontWeight: 600, 
+                        color: '#1f2937', 
+                        fontSize: '0.7rem',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}>
                         Date Range:
                       </Typography>
                       
                       {/* Date inputs */}
-                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flex: '1 1 auto', minWidth: 0 }}>
                         <TextField
                           label="From"
                           type="date"
@@ -3706,17 +3757,23 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, start: e.target.value }))}
                           InputLabelProps={{ shrink: true }}
                           sx={{ 
-                            minWidth: 130,
+                            flex: '1 1 0',
+                            minWidth: 0,
+                            maxWidth: '110px',
                             '& .MuiOutlinedInput-root': {
                               backgroundColor: '#ffffff',
-                              fontSize: '0.75rem',
+                              fontSize: '0.7rem',
+                              padding: '4px 8px',
                             },
                             '& .MuiInputLabel-root': {
-                              fontSize: '0.75rem',
+                              fontSize: '0.7rem',
+                            },
+                            '& input': {
+                              padding: '6px 4px',
                             }
                           }}
                         />
-                        <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                        <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.7rem', flexShrink: 0 }}>
                           to
                         </Typography>
                         <TextField
@@ -3727,20 +3784,26 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, end: e.target.value }))}
                           InputLabelProps={{ shrink: true }}
                           sx={{ 
-                            minWidth: 130,
+                            flex: '1 1 0',
+                            minWidth: 0,
+                            maxWidth: '110px',
                             '& .MuiOutlinedInput-root': {
                               backgroundColor: '#ffffff',
-                              fontSize: '0.75rem',
+                              fontSize: '0.7rem',
+                              padding: '4px 8px',
                             },
                             '& .MuiInputLabel-root': {
-                              fontSize: '0.75rem',
+                              fontSize: '0.7rem',
+                            },
+                            '& input': {
+                              padding: '6px 4px',
                             }
                           }}
                         />
                       </Box>
                       
                       {/* Divider */}
-                      <Box sx={{ width: '1px', height: '20px', backgroundColor: '#d1d5db', mx: 0.5 }} />
+                      <Box sx={{ width: '1px', height: '18px', backgroundColor: '#d1d5db', mx: 0.25, flexShrink: 0 }} />
                       
                       {/* Apply Button */}
                       <Button
@@ -3755,10 +3818,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         }
                         sx={{
                           textTransform: 'none',
-                          fontSize: '0.75rem',
-                          padding: '4px 12px',
+                          fontSize: '0.7rem',
+                          padding: '3px 10px',
                           minWidth: 'auto',
                           backgroundColor: '#1f2937',
+                          flexShrink: 0,
                           '&:hover': { backgroundColor: '#374151' },
                           '&:disabled': {
                             backgroundColor: '#9ca3af',
@@ -3770,6 +3834,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       </Button>
                     </Box>
                     
+                    </Box>
                   </Box>
                 </Box>
 

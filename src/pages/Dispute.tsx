@@ -344,13 +344,10 @@ const DisputePage: React.FC = () => {
   const COLUMN_META = {
     'Order ID': { type: 'string' },
     'Order Value': { type: 'number' },
-    'Amount': { type: 'number' },
     'Settlement Value': { type: 'number' },
-    'Order Date': { type: 'date' },
     'Invoice Date': { type: 'date' },
     'Settlement Date': { type: 'date' },
     'Difference': { type: 'number' },
-    'Remark': { type: 'enum' },
     'Reason': { type: 'enum' },
     'Event Type': { type: 'enum' },
     'Status': { type: 'enum' }
@@ -434,12 +431,6 @@ const DisputePage: React.FC = () => {
       }
     }
 
-    const orderDateFilter = f['Order Date'];
-    if (orderDateFilter && typeof orderDateFilter === 'object') {
-      if (orderDateFilter.from) params.order_date_from = orderDateFilter.from;
-      if (orderDateFilter.to) params.order_date_to = orderDateFilter.to;
-    }
-
     // Invoice Date range (for D2C platform)
     const invoiceDateFilter = f['Invoice Date'];
     if (invoiceDateFilter && typeof invoiceDateFilter === 'object') {
@@ -458,16 +449,6 @@ const DisputePage: React.FC = () => {
     const reasonFilter = f['Reason'];
     if (reasonFilter && Array.isArray(reasonFilter) && reasonFilter.length > 0) {
       (params as any).reason_in = reasonFilter.map(formatReasonForAPI).join(',');
-    }
-
-    // Remark (string or enums). Prefer remark_in for arrays, else remark
-    const remarkFilter = f['Remark'];
-    if (remarkFilter) {
-      if (Array.isArray(remarkFilter) && remarkFilter.length > 0) {
-        (params as any).remark_in = remarkFilter.join(',');
-      } else if (typeof remarkFilter === 'string' && remarkFilter.trim() !== '') {
-        params.remark = remarkFilter.trim();
-      }
     }
 
     // Event Type enum → event_type_in
@@ -665,9 +646,6 @@ const DisputePage: React.FC = () => {
           case 'Order ID':
             value = (row as any)['Order ID'];
             break;
-          case 'Amount':
-            value = (row as any).order_value;
-            break;
           case 'Invoice Date':
             value = (row as any).invoice_date;
             break;
@@ -701,17 +679,11 @@ const DisputePage: React.FC = () => {
           case 'Settlement Value':
             value = Math.abs((row as any).difference) + 900;
             break;
-          case 'Order Date':
-            value = (row as any).orderDate;
-            break;
           case 'Settlement Date':
             value = '-';
             break;
           case 'Difference':
             value = Math.abs((row as any).difference);
-            break;
-          case 'Remark':
-            value = (row as any).remark;
             break;
           case 'Event Type':
             value = (row as any).eventType;
@@ -1060,9 +1032,6 @@ const DisputePage: React.FC = () => {
     mockRows.forEach(row => {
       let value: string | undefined;
       switch (column) {
-        case 'Remark':
-          value = row.remark;
-          break;
         case 'Event Type':
           value = row.eventType;
           break;
@@ -1394,12 +1363,7 @@ const DisputePage: React.FC = () => {
                         )}
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Amount</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Amount', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Amount') ? '#1f2937' : '#6b7280', background: isFilterActive('Amount') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Amount">
-                            <FilterIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Value</Typography>
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
@@ -1655,30 +1619,9 @@ const DisputePage: React.FC = () => {
                         position: 'relative',
                         py: 1,
                       }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                              Order Date
-                            </Typography>
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openFilterPopover('Order Date', e.currentTarget);
-                              }}
-                              sx={{
-                                ml: 0.5,
-                                color: isFilterActive('Order Date') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Order Date') ? '#e5e7eb' : 'transparent',
-                                '&:hover': { background: '#f3f4f6' },
-                              }}
-                              aria-label="Filter Order Date"
-                            >
-                              <FilterIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
+                          Order Date
+                        </Typography>
                       </TableCell>
                       <TableCell sx={{
                         fontWeight: 700,
@@ -1763,30 +1706,9 @@ const DisputePage: React.FC = () => {
                         position: 'relative',
                         py: 1,
                       }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                              Remark
-                            </Typography>
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openFilterPopover('Remark', e.currentTarget);
-                              }}
-                              sx={{
-                                ml: 0.5,
-                                color: isFilterActive('Remark') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Remark') ? '#e5e7eb' : 'transparent',
-                                '&:hover': { background: '#f3f4f6' },
-                              }}
-                              aria-label="Filter Remark"
-                            >
-                              <FilterIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
+                          Remark
+                        </Typography>
                       </TableCell>
                       <TableCell sx={{
                         fontWeight: 700,
