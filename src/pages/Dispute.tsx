@@ -45,7 +45,10 @@ import {
   StorefrontOutlined as StorefrontIcon,
   FilterList as FilterIcon,
   Close as CloseIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
+  UnfoldMore as UnfoldMoreIcon
 } from '@mui/icons-material';
 import { api } from '../services/api';
 import ColumnFilterControls from '../components/ColumnFilterControls';
@@ -340,6 +343,9 @@ const DisputePage: React.FC = () => {
   const [orderIdSearch, setOrderIdSearch] = useState<string>('');
   const [showOrderIdSearch, setShowOrderIdSearch] = useState<boolean>(false);
 
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
   // Column metadata for filter types
   const COLUMN_META = {
     'Order ID': { type: 'string' },
@@ -351,6 +357,16 @@ const DisputePage: React.FC = () => {
     'Reason': { type: 'enum' },
     'Event Type': { type: 'enum' },
     'Status': { type: 'enum' }
+  };
+
+  // Mapping of sortable UI columns to backend sort_by values
+  const COLUMN_TO_SORT_BY_MAP: Record<string, string> = {
+    'Order Value': 'order_value',
+    'Settlement Value': 'settlement_value',
+    'Invoice Date': 'invoice_date',
+    'Settlement Date': 'settlement_date',
+    'Difference': 'diff',
+    'Status': 'status',
   };
 
   // Format backend reason keys like "customer_add_ons" into human-friendly labels like "Customer Add Ons"
@@ -398,6 +414,40 @@ const DisputePage: React.FC = () => {
     setDateRangeMenuAnchor(null);
   };
 
+  // Sorting functions
+  const handleSort = (columnKey: string) => {
+    // Only allow sorting for supported columns
+    const sortBy = COLUMN_TO_SORT_BY_MAP[columnKey];
+    if (!sortBy) return;
+
+    // Compute next sort state deterministically
+    let nextSort: { key: string; direction: 'asc' | 'desc' } | null;
+    if (sortConfig?.key === columnKey) {
+      if (sortConfig.direction === 'asc') {
+        nextSort = { key: columnKey, direction: 'desc' };
+      } else {
+        nextSort = null; // Remove sorting -> backend default applies
+      }
+    } else {
+      nextSort = { key: columnKey, direction: 'asc' };
+    }
+
+    setSortConfig(nextSort);
+
+    // Trigger server-side refetch with sorting (reset to first page)
+    setPage(0);
+    fetchUnreconciledOrders();
+  };
+
+  const getSortIcon = (columnKey: string) => {
+    if (sortConfig?.key !== columnKey) {
+      return <UnfoldMoreIcon fontSize="small" />;
+    }
+    return sortConfig.direction === 'asc' 
+      ? <ArrowUpwardIcon fontSize="small" /> 
+      : <ArrowDownwardIcon fontSize="small" />;
+  };
+
   // Build query parameters for API calls
   const buildQueryParams = (filtersOverride?: Record<string, any>): TransactionQueryParams => {
     const params: TransactionQueryParams = {};
@@ -406,6 +456,12 @@ const DisputePage: React.FC = () => {
     if (disputeSubTab === 0) {
       params.status_in = 'less_payment_received,more_payment_received';
       params.pagination = false; // Disable pagination to get all unreconciled orders
+    }
+
+    // Add sorting parameters
+    if (sortConfig && COLUMN_TO_SORT_BY_MAP[sortConfig.key]) {
+      params.sort_by = COLUMN_TO_SORT_BY_MAP[sortConfig.key];
+      params.sort_order = sortConfig.direction;
     }
 
     // Map applied column filters to API params (server-side filtering)
@@ -1297,9 +1353,6 @@ const DisputePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order ID</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Order ID', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Order ID') ? '#1f2937' : '#6b7280', background: isFilterActive('Order ID') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Order ID">
-                            <FilterIcon fontSize="small" />
-                          </IconButton>
                           <IconButton 
                             size="small" 
                             onClick={(e) => {
@@ -1363,45 +1416,120 @@ const DisputePage: React.FC = () => {
                         )}
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Value</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Value</Typography>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Order Value');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Order Value' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Order Value' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Order Value']}
+                            aria-label="Sort Order Value"
+                          >
+                            {getSortIcon('Order Value')}
+                          </IconButton>
+                        </Box>
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Invoice Date</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Invoice Date', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Invoice Date') ? '#1f2937' : '#6b7280', background: isFilterActive('Invoice Date') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Invoice Date">
-                            <FilterIcon fontSize="small" />
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Invoice Date');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Invoice Date' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Invoice Date' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Invoice Date']}
+                            aria-label="Sort Invoice Date"
+                          >
+                            {getSortIcon('Invoice Date')}
                           </IconButton>
                         </Box>
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Date</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Settlement Date', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Settlement Date') ? '#1f2937' : '#6b7280', background: isFilterActive('Settlement Date') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Settlement Date">
-                            <FilterIcon fontSize="small" />
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Settlement Date');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Settlement Date' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Settlement Date' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Settlement Date']}
+                            aria-label="Sort Settlement Date"
+                          >
+                            {getSortIcon('Settlement Date')}
                           </IconButton>
                         </Box>
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 120, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Difference</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Difference', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Difference') ? '#1f2937' : '#6b7280', background: isFilterActive('Difference') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Difference">
-                            <FilterIcon fontSize="small" />
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Difference');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Difference' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Difference' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Difference']}
+                            aria-label="Sort Difference"
+                          >
+                            {getSortIcon('Difference')}
                           </IconButton>
                         </Box>
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Reason</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Reason', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Reason') ? '#1f2937' : '#6b7280', background: isFilterActive('Reason') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Reason">
-                            <FilterIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Reason</Typography>
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 120, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Status</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Status', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Status') ? '#1f2937' : '#6b7280', background: isFilterActive('Status') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Status">
-                            <FilterIcon fontSize="small" />
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Status');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Status' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Status' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Status']}
+                            aria-label="Sort Status"
+                          >
+                            {getSortIcon('Status')}
                           </IconButton>
                         </Box>
                       </TableCell>
@@ -1452,23 +1580,6 @@ const DisputePage: React.FC = () => {
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
                               Order ID
                             </Typography>
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openFilterPopover('Order ID', e.currentTarget);
-                              }}
-                              sx={{
-                                ml: 0.5,
-                                color: isFilterActive('Order ID') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Order ID') ? '#e5e7eb' : 'transparent',
-                                '&:hover': { background: '#f3f4f6' },
-                              }}
-                              aria-label="Filter Order ID"
-                            >
-                              <FilterIcon fontSize="small" />
-                            </IconButton>
                             <IconButton 
                               size="small" 
                               onClick={(e) => {
@@ -1554,17 +1665,18 @@ const DisputePage: React.FC = () => {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                openFilterPopover('Order Value', e.currentTarget);
+                                handleSort('Order Value');
                               }}
                               sx={{
                                 ml: 0.5,
-                                color: isFilterActive('Order Value') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Order Value') ? '#e5e7eb' : 'transparent',
+                                color: sortConfig?.key === 'Order Value' ? '#1f2937' : '#6b7280',
+                                background: sortConfig?.key === 'Order Value' ? '#e5e7eb' : 'transparent',
                                 '&:hover': { background: '#f3f4f6' },
                               }}
-                              aria-label="Filter Order Value"
+                              disabled={!COLUMN_TO_SORT_BY_MAP['Order Value']}
+                              aria-label="Sort Order Value"
                             >
-                              <FilterIcon fontSize="small" />
+                              {getSortIcon('Order Value')}
                             </IconButton>
                           </Box>
                         </Box>
@@ -1593,17 +1705,18 @@ const DisputePage: React.FC = () => {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                openFilterPopover('Settlement Value', e.currentTarget);
+                                handleSort('Settlement Value');
                               }}
                               sx={{
                                 ml: 0.5,
-                                color: isFilterActive('Settlement Value') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Settlement Value') ? '#e5e7eb' : 'transparent',
+                                color: sortConfig?.key === 'Settlement Value' ? '#1f2937' : '#6b7280',
+                                background: sortConfig?.key === 'Settlement Value' ? '#e5e7eb' : 'transparent',
                                 '&:hover': { background: '#f3f4f6' },
                               }}
-                              aria-label="Filter Settlement Value"
+                              disabled={!COLUMN_TO_SORT_BY_MAP['Settlement Value']}
+                              aria-label="Sort Settlement Value"
                             >
-                              <FilterIcon fontSize="small" />
+                              {getSortIcon('Settlement Value')}
                             </IconButton>
                           </Box>
                         </Box>
@@ -1644,17 +1757,18 @@ const DisputePage: React.FC = () => {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                openFilterPopover('Settlement Date', e.currentTarget);
+                                handleSort('Settlement Date');
                               }}
                               sx={{
                                 ml: 0.5,
-                                color: isFilterActive('Settlement Date') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Settlement Date') ? '#e5e7eb' : 'transparent',
+                                color: sortConfig?.key === 'Settlement Date' ? '#1f2937' : '#6b7280',
+                                background: sortConfig?.key === 'Settlement Date' ? '#e5e7eb' : 'transparent',
                                 '&:hover': { background: '#f3f4f6' },
                               }}
-                              aria-label="Filter Settlement Date"
+                              disabled={!COLUMN_TO_SORT_BY_MAP['Settlement Date']}
+                              aria-label="Sort Settlement Date"
                             >
-                              <FilterIcon fontSize="small" />
+                              {getSortIcon('Settlement Date')}
                             </IconButton>
                           </Box>
                         </Box>
@@ -1680,17 +1794,18 @@ const DisputePage: React.FC = () => {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                openFilterPopover('Difference', e.currentTarget);
+                                handleSort('Difference');
                               }}
                               sx={{
                                 ml: 0.5,
-                                color: isFilterActive('Difference') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Difference') ? '#e5e7eb' : 'transparent',
+                                color: sortConfig?.key === 'Difference' ? '#1f2937' : '#6b7280',
+                                background: sortConfig?.key === 'Difference' ? '#e5e7eb' : 'transparent',
                                 '&:hover': { background: '#f3f4f6' },
                               }}
-                              aria-label="Filter Difference"
+                              disabled={!COLUMN_TO_SORT_BY_MAP['Difference']}
+                              aria-label="Sort Difference"
                             >
-                              <FilterIcon fontSize="small" />
+                              {getSortIcon('Difference')}
                             </IconButton>
                           </Box>
                         </Box>
@@ -1726,23 +1841,6 @@ const DisputePage: React.FC = () => {
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
                               Event Type
                             </Typography>
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openFilterPopover('Event Type', e.currentTarget);
-                              }}
-                              sx={{
-                                ml: 0.5,
-                                color: isFilterActive('Event Type') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Event Type') ? '#e5e7eb' : 'transparent',
-                                '&:hover': { background: '#f3f4f6' },
-                              }}
-                              aria-label="Filter Event Type"
-                            >
-                              <FilterIcon fontSize="small" />
-                            </IconButton>
                           </Box>
                         </Box>
                       </TableCell>

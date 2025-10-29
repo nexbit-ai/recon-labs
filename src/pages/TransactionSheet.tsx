@@ -3522,52 +3522,43 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     flexWrap: { xs: 'wrap', md: 'nowrap' },
                     width: '100%',
                     maxWidth: '100%',
-                    justifyContent: 'space-between'
+                    justifyContent: 'flex-end'
                   }}>
                     
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-                      <IconButton
-                        onClick={() => {
-                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
-                        }}
-                        disabled={loading || dualApiLoading}
-                        sx={{
-                          color: '#1f2937',
-                          '&:hover': {
-                            background: '#f9fafb',
-                          },
-                          transition: 'all 0.3s ease',
-                        }}
-                      >
-                        <RefreshIcon />
-                      </IconButton>
-                      
-                      <Button
-                        variant="outlined"
-                        startIcon={<FilterIcon />}
-                        onClick={(e) => openFilterPopover('Status', e.currentTarget as any)}
-                        sx={{ 
-                          textTransform: 'none', 
-                          borderColor: '#1f2937', 
-                          color: '#1f2937',
-                          fontSize: '0.75rem',
-                          padding: '6px 12px',
-                          minWidth: 'auto',
-                        }}
-                      >
-                        Filters
-                      </Button>
-                    </Box>
+                    <IconButton
+                      onClick={() => {
+                        fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
+                      }}
+                      disabled={loading || dualApiLoading}
+                      sx={{
+                        color: '#1f2937',
+                        '&:hover': {
+                          background: '#f9fafb',
+                        },
+                        transition: 'all 0.3s ease',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <RefreshIcon />
+                    </IconButton>
                     
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 1,
-                      flexWrap: { xs: 'wrap', sm: 'nowrap' },
-                      marginLeft: { xs: 0, sm: 'auto' },
-                      justifyContent: { xs: 'flex-start', sm: 'flex-end' },
-                      width: { xs: '100%', sm: 'auto' }
-                    }}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<FilterIcon />}
+                      onClick={(e) => openFilterPopover('Status', e.currentTarget as any)}
+                      sx={{ 
+                        textTransform: 'none', 
+                        borderColor: '#1f2937', 
+                        color: '#1f2937',
+                        flexShrink: 0,
+                        fontSize: '0.75rem',
+                        padding: '6px 12px',
+                        minWidth: 'auto',
+                      }}
+                    >
+                      Filters
+                    </Button>
+                    
                     {/* Platform Filter - New Design with Checkboxes */}
                     <Box sx={{ 
                       display: 'flex', 
@@ -3834,7 +3825,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       </Button>
                     </Box>
                     
-                    </Box>
                   </Box>
                 </Box>
 
