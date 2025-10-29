@@ -1702,6 +1702,16 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   'Mismatch Reason': { apiParam: 'mismatch_reason_in', type: 'enum', supportedPlatforms: ['d2c'] },
 };
 
+// Mapping of sortable UI columns to backend sort_by values
+const COLUMN_TO_SORT_BY_MAP: Record<string, string> = {
+  'Order Date': 'order_date',
+  'Settlement Date': 'settlement_date',
+  'Order Value': 'order_value',
+  'Settlement Value': 'settlement_value',
+  'Difference': 'diff',
+  'Status': 'status',
+};
+
 const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0, dateRange: propDateRange, initialPlatforms }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -1974,17 +1984,28 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Sorting functions
   const handleSort = (columnKey: string) => {
-    setSortConfig(prevConfig => {
-      if (prevConfig?.key === columnKey) {
-        if (prevConfig.direction === 'asc') {
-          return { key: columnKey, direction: 'desc' };
-        } else {
-          return null; // Remove sorting
-        }
+    // Only allow sorting for supported columns
+    const sortBy = COLUMN_TO_SORT_BY_MAP[columnKey];
+    if (!sortBy) return;
+
+    // Compute next sort state deterministically
+    let nextSort: { key: string; direction: 'asc' | 'desc' } | null;
+    if (sortConfig?.key === columnKey) {
+      if (sortConfig.direction === 'asc') {
+        nextSort = { key: columnKey, direction: 'desc' };
       } else {
-        return { key: columnKey, direction: 'asc' };
+        nextSort = null; // Remove sorting -> backend default applies
       }
-    });
+    } else {
+      nextSort = { key: columnKey, direction: 'asc' };
+    }
+
+    setSortConfig(nextSort);
+
+    // Trigger server-side refetch with sorting (reset to first page)
+    setPage(0);
+    setCurrentPage(1);
+    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
   };
 
   const getSortIcon = (columnKey: string) => {
@@ -2534,7 +2555,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Fetch data on component mount
   useEffect(() => {
     // Use date range from props if provided, otherwise use default
-    const initialDateRange = propDateRange || { start: '2025-03-01', end: '2025-03-31' };
+    const initialDateRange = propDateRange || { start: '2025-04-01', end: '2025-04-30' };
     setHeaderDateRange(initialDateRange);
     setPendingHeaderDateRange(initialDateRange);
     fetchDualTransactions(1, undefined, initialDateRange);
@@ -2790,6 +2811,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Add platform parameter
       if (platformsToUse.length > 0) {
         settledParams.platform = platformsToUse.join(',');
+      }
+
+      // Apply sorting if present
+      if (sortConfig && COLUMN_TO_SORT_BY_MAP[sortConfig.key]) {
+        settledParams.sort_by = COLUMN_TO_SORT_BY_MAP[sortConfig.key];
+        settledParams.sort_order = sortConfig.direction;
       }
       
       // Check if user has applied a Status filter
@@ -3924,6 +3951,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         background: sortConfig?.key === column ? '#e5e7eb' : 'transparent',
                                         '&:hover': { background: '#f3f4f6' },
                                       }}
+                                      disabled={!COLUMN_TO_SORT_BY_MAP[column]}
                                       aria-label={`Sort ${column}`}
                                     >
                                       {getSortIcon(column)}

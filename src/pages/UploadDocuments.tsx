@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, Grid, Breadcrumbs, Link, Chip, Button, Alert, CircularProgress } from '@mui/material';
+import { Box, Typography, Paper, Grid, Breadcrumbs, Link, Chip, Button, Alert, CircularProgress, Drawer, Divider } from '@mui/material';
 import { 
   CalendarToday as CalendarIcon,
   CheckCircle as CheckCircleIcon,
   LocalShipping as ShippingIcon,
   ChevronRight as ChevronRightIcon,
   Home as HomeIcon,
-  CloudUpload as CloudUploadIcon
+  CloudUpload as CloudUploadIcon,
+  ArrowForward as ArrowForwardIcon
 } from '@mui/icons-material';
 import { API_CONFIG } from '../services/api/config';
 import { tokenManager } from '../services/api/tokenManager';
@@ -34,6 +35,8 @@ interface UploadListResponse {
 }
 
 const vendors: Vendor[] = [
+  { id: 'amazon', name: 'Amazon' },
+  { id: 'flipkart', name: 'Flipkart' },
   { id: 'delhivery', name: 'Delhivery' },
   { id: 'bluedart', name: 'Blue Dart' },
   { id: 'blitznow', name: 'BlitzNow' },
@@ -64,9 +67,16 @@ const UploadDocuments: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [uploadingVendor, setUploadingVendor] = useState<string | null>(null);
+  // Marketplace files (per kind)
+  const [marketplaceFiles, setMarketplaceFiles] = useState<Record<string, { sales: File | null; settlement: File | null }>>({
+    amazon: { sales: null, settlement: null },
+    flipkart: { sales: null, settlement: null },
+  });
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
   const [loadingUploads, setLoadingUploads] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [rightPanelVendor, setRightPanelVendor] = useState<'amazon' | 'flipkart' | null>(null);
 
   const handleYearClick = (year: number) => {
     setSelectedYear(year);
@@ -96,6 +106,16 @@ const UploadDocuments: React.FC = () => {
     setCurrentView('months');
     setUploadStatus(null);
     setUploadedDocuments([]); // Clear uploaded documents
+  };
+
+  const openRightPanel = (vendorId: 'amazon' | 'flipkart') => {
+    setRightPanelVendor(vendorId);
+    setRightPanelOpen(true);
+  };
+
+  const closeRightPanel = () => {
+    setRightPanelOpen(false);
+    setRightPanelVendor(null);
   };
 
   // Fetch list of already uploaded documents for a specific month
@@ -239,19 +259,93 @@ const UploadDocuments: React.FC = () => {
     }
   };
 
+  // Marketplace uploads (Amazon/Flipkart) with separate Sales and Settlement
+  const setMarketplaceFile = (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'settlement', file: File | null) => {
+    setMarketplaceFiles((prev) => ({
+      ...prev,
+      [vendorId]: { ...prev[vendorId], [kind]: file },
+    }));
+  };
+
+  const handleMarketplaceUpload = async (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'settlement') => {
+    const file = marketplaceFiles[vendorId]?.[kind];
+    if (!file || selectedYear === null || selectedMonth === null) return;
+
+    const key = `${vendorId}_${kind}`;
+    setUploadingVendor(key);
+    setUploadStatus(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('description', `${vendorId} ${kind} sheet for ${months[selectedMonth]} ${selectedYear}`);
+      formData.append('month', months[selectedMonth]);
+      formData.append('year', selectedYear.toString());
+      formData.append('report_type', key.toLowerCase());
+
+      let customToken: string | null = null;
+      if (session) {
+        try {
+          const customSessionData = {
+            member_id: session.member_id,
+            member_session_id: session.member_session_id,
+            organization_id: API_CONFIG.ORG_ID,
+            organization_slug: session.organization_slug,
+            roles: session.roles,
+          };
+          customToken = await JWTService.generateToken(customSessionData);
+        } catch (error) {
+          console.error('❌ Failed to generate custom token:', error);
+        }
+      }
+
+      const headers: Record<string, string> = {
+        'x-api-key': API_CONFIG.API_KEY,
+        'x-org-id': API_CONFIG.ORG_ID,
+      };
+      if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/v1/recon/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+        throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
+      }
+
+      await response.json();
+      setUploadStatus({ type: 'success', message: `Successfully uploaded ${kind} file for ${vendorId}` });
+
+      // refresh list
+      if (selectedYear !== null && selectedMonth !== null) {
+        await fetchUploadedDocuments(selectedYear, selectedMonth);
+      }
+    } catch (error) {
+      console.error('❌ Upload error:', error);
+      setUploadStatus({ type: 'error', message: error instanceof Error ? error.message : 'Failed to upload file. Please try again.' });
+    } finally {
+      setUploadingVendor(null);
+    }
+  };
+
   const isMonthCompleted = (year: number, monthIndex: number) => {
     const monthKey = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
     return completedMonths.includes(monthKey);
   };
 
   // Check if a vendor already has an uploaded document
-  const isVendorUploaded = (vendorId: string): boolean => {
-    return uploadedDocuments.some(doc => doc.report_type.toLowerCase() === vendorId.toLowerCase());
+  const isVendorUploaded = (vendorId: string, kind?: 'sales' | 'settlement'): boolean => {
+    const key = kind ? `${vendorId}_${kind}` : vendorId;
+    return uploadedDocuments.some(doc => doc.report_type.toLowerCase() === key.toLowerCase());
   };
 
   // Get uploaded document for a vendor
-  const getUploadedDocument = (vendorId: string): UploadedDocument | undefined => {
-    return uploadedDocuments.find(doc => doc.report_type.toLowerCase() === vendorId.toLowerCase());
+  const getUploadedDocument = (vendorId: string, kind?: 'sales' | 'settlement'): UploadedDocument | undefined => {
+    const key = kind ? `${vendorId}_${kind}` : vendorId;
+    return uploadedDocuments.find(doc => doc.report_type.toLowerCase() === key.toLowerCase());
   };
 
   return (
@@ -482,10 +576,110 @@ const UploadDocuments: React.FC = () => {
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 800 }}>
               {vendors.map((vendor) => {
+                const isMarketplace = vendor.id === 'amazon' || vendor.id === 'flipkart';
+
+                if (isMarketplace) {
+                  const isUploaded = isVendorUploaded(vendor.id, 'sales') || isVendorUploaded(vendor.id, 'settlement');
+                  const uploadedDoc = getUploadedDocument(vendor.id, 'sales') || getUploadedDocument(vendor.id, 'settlement');
+                  const isUploading = uploadingVendor === `${vendor.id}_sales` || uploadingVendor === `${vendor.id}_settlement` || uploadingVendor === vendor.id;
+
+                  return (
+                    <Paper
+                      key={vendor.id}
+                      elevation={0}
+                      sx={{
+                        p: 3,
+                        border: isUploaded ? '2px solid #dcfce7' : '2px solid #e5e7eb',
+                        borderRadius: '12px',
+                        transition: 'all 0.3s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 2,
+                        opacity: isUploading ? 0.9 : 1,
+                        background: isUploaded ? '#f0fdf4' : '#ffffff',
+                        '&:hover': {
+                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                          borderColor: isUploaded ? '#bbf7d0' : '#d1d5db'
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                        <Box
+                          sx={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: '8px',
+                            background: isUploaded ? '#dcfce7' : '#f8fafc',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {isUploaded ? (
+                            <CheckCircleIcon sx={{ fontSize: 24, color: '#16a34a' }} />
+                          ) : (
+                            <ShippingIcon sx={{ fontSize: 24, color: '#111111' }} />
+                          )}
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="subtitle1" fontWeight={700} color="#111111">
+                              {vendor.name}
+                            </Typography>
+                            {isUploaded && (
+                              <Chip 
+                                label="Uploaded" 
+                                size="small" 
+                                sx={{ 
+                                  background: '#16a34a',
+                                  color: '#ffffff',
+                                  fontWeight: 600,
+                                  fontSize: '10px',
+                                  height: '20px'
+                                }} 
+                              />
+                            )}
+                          </Box>
+                          {isUploaded && uploadedDoc ? (
+                            <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mt: 0.5 }}>
+                              {uploadedDoc.filename} • {new Date(uploadedDoc.upload_date).toLocaleDateString()}
+                            </Typography>
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">
+                              Upload sales and settlement sheets
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+
+                      <Button
+                        variant={isUploaded ? 'outlined' : 'contained'}
+                        onClick={() => openRightPanel(vendor.id as 'amazon' | 'flipkart')}
+                        endIcon={<ArrowForwardIcon />}
+                        sx={{
+                          background: isUploaded ? '#ffffff' : '#111111',
+                          color: isUploaded ? '#111111' : '#ffffff',
+                          borderColor: isUploaded ? '#e5e7eb' : 'transparent',
+                          fontWeight: 600,
+                          px: 3,
+                          py: 1.2,
+                          '&:hover': {
+                            background: isUploaded ? '#f8fafc' : '#333333',
+                            borderColor: isUploaded ? '#d1d5db' : 'transparent',
+                          }
+                        }}
+                      >
+                        Upload files
+                      </Button>
+                    </Paper>
+                  );
+                }
+
+                // Default (single settlement sheet) vendors
                 const isUploading = uploadingVendor === vendor.id;
                 const isUploaded = isVendorUploaded(vendor.id);
                 const uploadedDoc = getUploadedDocument(vendor.id);
-                
                 return (
                   <Paper
                     key={vendor.id}
@@ -563,7 +757,7 @@ const UploadDocuments: React.FC = () => {
                       type="file"
                       onChange={(e) => {
                         handleFileUpload(vendor.id, e.target.files?.[0] || null);
-                        e.target.value = ''; // Reset input so same file can be uploaded again
+                        e.target.value = '';
                       }}
                       disabled={isUploading}
                     />
@@ -600,6 +794,113 @@ const UploadDocuments: React.FC = () => {
           </Paper>
         )}
       </Box>
+      {/* Right-side drawer for marketplace uploads */}
+      <Drawer anchor="right" open={rightPanelOpen} onClose={closeRightPanel} PaperProps={{ sx: { width: { xs: '100%', sm: 480 } } }}>
+        <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>
+            {rightPanelVendor ? (rightPanelVendor === 'amazon' ? 'Amazon' : 'Flipkart') : 'Marketplace'} uploads
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {selectedYear !== null && selectedMonth !== null ? `${months[selectedMonth]} ${selectedYear}` : 'Select a month and year'}
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+
+          {rightPanelVendor && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {/* Sales */}
+              <Paper elevation={0} sx={{ p: 2, border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Sales report (XLSX/CSV)</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <input
+                    accept=".xlsx,.xls,.csv"
+                    style={{ display: 'none' }}
+                    id={`drawer-${rightPanelVendor}-sales`}
+                    type="file"
+                    onChange={(e) => {
+                      setMarketplaceFile(rightPanelVendor, 'sales', e.target.files?.[0] || null);
+                      e.target.value = '';
+                    }}
+                  />
+                  <label htmlFor={`drawer-${rightPanelVendor}-sales`}>
+                    <Button variant="outlined" component="span" startIcon={<CloudUploadIcon />}>Choose file</Button>
+                  </label>
+                  <Typography variant="caption" color="text.secondary">
+                    {marketplaceFiles[rightPanelVendor]?.sales?.name || 'No file selected'}
+                  </Typography>
+                </Box>
+                <Box sx={{ mt: 1 }}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    disabled={!marketplaceFiles[rightPanelVendor]?.sales}
+                    onClick={() => handleMarketplaceUpload(rightPanelVendor, 'sales')}
+                    sx={{ background: '#111111', '&:hover': { background: '#333333' } }}
+                  >
+                    Upload sales
+                  </Button>
+                </Box>
+              </Paper>
+
+              {/* Settlement */}
+              <Paper elevation={0} sx={{ p: 2, border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Settlement report (XLSX/CSV)</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <input
+                    accept=".xlsx,.xls,.csv"
+                    style={{ display: 'none' }}
+                    id={`drawer-${rightPanelVendor}-settlement`}
+                    type="file"
+                    onChange={(e) => {
+                      setMarketplaceFile(rightPanelVendor, 'settlement', e.target.files?.[0] || null);
+                      e.target.value = '';
+                    }}
+                  />
+                  <label htmlFor={`drawer-${rightPanelVendor}-settlement`}>
+                    <Button variant="outlined" component="span" startIcon={<CloudUploadIcon />}>Choose file</Button>
+                  </label>
+                  <Typography variant="caption" color="text.secondary">
+                    {marketplaceFiles[rightPanelVendor]?.settlement?.name || 'No file selected'}
+                  </Typography>
+                </Box>
+                <Box sx={{ mt: 1 }}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    disabled={!marketplaceFiles[rightPanelVendor]?.settlement}
+                    onClick={() => handleMarketplaceUpload(rightPanelVendor, 'settlement')}
+                    sx={{ background: '#111111', '&:hover': { background: '#333333' } }}
+                  >
+                    Upload settlement
+                  </Button>
+                </Box>
+              </Paper>
+
+              {/* Upload both */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Tip: you can upload files one by one or together
+                </Typography>
+                <Button
+                  size="small"
+                  variant="text"
+                  disabled={!marketplaceFiles[rightPanelVendor]?.sales || !marketplaceFiles[rightPanelVendor]?.settlement}
+                  onClick={async () => {
+                    await handleMarketplaceUpload(rightPanelVendor, 'sales');
+                    await handleMarketplaceUpload(rightPanelVendor, 'settlement');
+                  }}
+                >
+                  Upload both
+                </Button>
+              </Box>
+            </Box>
+          )}
+
+          <Box sx={{ mt: 'auto' }}>
+            <Divider sx={{ my: 2 }} />
+            <Button fullWidth variant="outlined" onClick={closeRightPanel}>Close</Button>
+          </Box>
+        </Box>
+      </Drawer>
     </Box>
   );
 };

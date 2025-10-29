@@ -32,6 +32,7 @@ import {
   InputLabel,
   Select,
   OutlinedInput,
+  InputAdornment,
   TablePagination,
   Dialog,
   DialogTitle,
@@ -43,7 +44,8 @@ import {
   KeyboardArrowDown as KeyboardArrowDownIcon, 
   StorefrontOutlined as StorefrontIcon,
   FilterList as FilterIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { api } from '../services/api';
 import ColumnFilterControls from '../components/ColumnFilterControls';
@@ -275,14 +277,26 @@ const DisputePage: React.FC = () => {
   // State for date filtering
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   const [selectedDateRange, setSelectedDateRange] = useState<'this-month' | 'last-month' | 'this-year' | 'custom'>('custom');
-  const [customStartDate, setCustomStartDate] = useState('2025-03-01');
-  const [customEndDate, setCustomEndDate] = useState('2025-03-31');
+  const [customStartDate, setCustomStartDate] = useState('2025-04-01');
+  const [customEndDate, setCustomEndDate] = useState('2025-04-30');
   const [tempStartDate, setTempStartDate] = useState('');
   const [tempEndDate, setTempEndDate] = useState('');
 
   // Calendar popup state
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
   const calendarPopupRef = useRef<HTMLDivElement>(null);
+  
+  // Initialize from URL query params if provided (e.g., from main page navigation)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get('from');
+    const to = params.get('to');
+    if (from && to) {
+      setSelectedDateRange('custom');
+      setCustomStartDate(from);
+      setCustomEndDate(to);
+    }
+  }, []);
   
   // Date range menu state
   const [dateRangeMenuAnchor, setDateRangeMenuAnchor] = useState<HTMLElement | null>(null);
@@ -320,6 +334,11 @@ const DisputePage: React.FC = () => {
   const [columnFilters, setColumnFilters] = useState<Record<string, any>>({});
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HTMLElement | null>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string>('');
+
+  // Order ID search states (match TransactionSheet behavior)
+  const [orderIdChips, setOrderIdChips] = useState<string[]>([]);
+  const [orderIdSearch, setOrderIdSearch] = useState<string>('');
+  const [showOrderIdSearch, setShowOrderIdSearch] = useState<boolean>(false);
 
   // Column metadata for filter types
   const COLUMN_META = {
@@ -398,10 +417,9 @@ const DisputePage: React.FC = () => {
       params.status_in = statusFilter.join(',');
     }
 
-    const orderIdFilter = f['Order ID'];
-    if (orderIdFilter && typeof orderIdFilter === 'string' && orderIdFilter.trim() !== '') {
-      // Backend expects order_id here (not order_item_id)
-      (params as any).order_id = orderIdFilter.trim();
+    // Order ID chips → order_id (CSV)
+    if (orderIdChips.length > 0) {
+      (params as any).order_id = orderIdChips.join(',');
     }
 
     const diffFilter = f['Difference'];
@@ -998,6 +1016,30 @@ const DisputePage: React.FC = () => {
     fetchUnreconciledOrders();
   };
 
+  // Order ID search handlers (mirror TransactionSheet)
+  const handleOrderIdSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setOrderIdSearch(value);
+  };
+
+  const handleOrderIdSearchClick = () => {
+    const value = orderIdSearch;
+    const ids = value.split(',').map(id => id.trim()).filter(id => id.length > 0);
+    setOrderIdChips(ids);
+    // Trigger API call
+    setPage(0);
+    fetchUnreconciledOrders();
+  };
+
+  const handleOrderIdSearchClear = () => {
+    setOrderIdSearch('');
+    setOrderIdChips([]);
+    setShowOrderIdSearch(false);
+    // Trigger API call without order IDs
+    setPage(0);
+    fetchUnreconciledOrders();
+  };
+
   const getUniqueValuesForColumn = (column: string) => {
     const values = new Set<string>();
     // Include values from API rows when in Unreconciled tab
@@ -1084,6 +1126,22 @@ const DisputePage: React.FC = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               {/* Applied filter summary (left of Filter button) */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', maxWidth: 520 }}>
+                {/* Order ID chips summary (matches TransactionSheet behavior) */}
+                {orderIdChips.length > 0 && (
+                  <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, border: '1px solid #e5e7eb', borderRadius: '9999px', fontSize: '0.75rem', color: '#111827', background: '#e0f2fe' }}>
+                    <span>{`Order IDs: ${orderIdChips.length} selected`}</span>
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        handleOrderIdSearchClear();
+                      }}
+                      sx={{ p: 0.25, color: '#6b7280', '&:hover': { color: '#111827' } }}
+                      aria-label={`Clear Order IDs`}
+                    >
+                      <CloseIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Box>
+                )}
                 {Object.entries(columnFilters).map(([col, val]) => {
                   if (!val || (typeof val === 'string' && !val.trim()) || (Array.isArray(val) && val.length === 0)) return null;
                   let label = '';
@@ -1273,7 +1331,67 @@ const DisputePage: React.FC = () => {
                           <IconButton size="small" onClick={(e) => openFilterPopover('Order ID', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Order ID') ? '#1f2937' : '#6b7280', background: isFilterActive('Order ID') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Order ID">
                             <FilterIcon fontSize="small" />
                           </IconButton>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowOrderIdSearch(!showOrderIdSearch);
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: showOrderIdSearch ? '#1f2937' : '#6b7280',
+                              background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            aria-label="Toggle search"
+                          >
+                            <SearchIcon sx={{ fontSize: '1rem' }} />
+                          </IconButton>
                         </Box>
+                        {showOrderIdSearch && (
+                          <Box 
+                            sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              mt: 0.5
+                            }}
+                          >
+                            <TextField
+                              size="small"
+                              value={orderIdSearch}
+                              onChange={handleOrderIdSearchChange}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleOrderIdSearchClick();
+                                }
+                              }}
+                              InputProps={{
+                                endAdornment: (
+                                  <InputAdornment position="end">
+                                    <IconButton
+                                      size="small"
+                                      onClick={handleOrderIdSearchClick}
+                                      sx={{ p: 0.5 }}
+                                    >
+                                      <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                    </IconButton>
+                                  </InputAdornment>
+                                ),
+                              }}
+                              sx={{
+                                width: '280px',
+                                '& .MuiOutlinedInput-root': {
+                                  height: '32px',
+                                  fontSize: '0.75rem',
+                                  background: 'white',
+                                }
+                              }}
+                            />
+                          </Box>
+                        )}
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
@@ -1387,7 +1505,67 @@ const DisputePage: React.FC = () => {
                             >
                               <FilterIcon fontSize="small" />
                             </IconButton>
+                            <IconButton 
+                              size="small" 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setShowOrderIdSearch(!showOrderIdSearch);
+                              }}
+                              sx={{
+                                ml: 0.5,
+                                color: showOrderIdSearch ? '#1f2937' : '#6b7280',
+                                background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
+                                '&:hover': { background: '#f3f4f6' },
+                              }}
+                              aria-label="Toggle search"
+                            >
+                              <SearchIcon sx={{ fontSize: '1rem' }} />
+                            </IconButton>
                           </Box>
+                          {showOrderIdSearch && (
+                            <Box 
+                              sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                mt: 0.5
+                              }}
+                            >
+                              <TextField
+                                size="small"
+                                value={orderIdSearch}
+                                onChange={handleOrderIdSearchChange}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleOrderIdSearchClick();
+                                  }
+                                }}
+                                InputProps={{
+                                  endAdornment: (
+                                    <InputAdornment position="end">
+                                      <IconButton
+                                        size="small"
+                                        onClick={handleOrderIdSearchClick}
+                                        sx={{ p: 0.5 }}
+                                      >
+                                        <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                      </IconButton>
+                                    </InputAdornment>
+                                  ),
+                                }}
+                                sx={{
+                                  width: '280px',
+                                  '& .MuiOutlinedInput-root': {
+                                    height: '32px',
+                                    fontSize: '0.75rem',
+                                    background: 'white',
+                                  }
+                                }}
+                              />
+                            </Box>
+                          )}
                         </Box>
                       </TableCell>
                       <TableCell sx={{
@@ -1873,7 +2051,7 @@ const DisputePage: React.FC = () => {
           {/* Left: Full column list */}
           <Box sx={{ width: 240, maxHeight: 320, overflowY: 'auto', borderRight: '1px solid #eee', pr: 1.5, pl: 0.5 }}>
             <List dense subheader={<ListSubheader disableSticky sx={{ bgcolor: 'transparent', px: 0, fontSize: '0.75rem', color: '#6b7280' }}></ListSubheader>}>
-              {Object.keys(COLUMN_META).map((col) => (
+              {Object.keys(COLUMN_META).filter(col => col !== 'Order ID').map((col) => (
                 <ListItemButton
                   key={col}
                   selected={activeFilterColumn === col}

@@ -265,8 +265,8 @@ const MarketplaceReconciliation: React.FC = () => {
   // Date range filter state
   const [selectedDateRange, setSelectedDateRange] = useState('custom');
   const [dateRangeMenuAnchor, setDateRangeMenuAnchor] = useState<null | HTMLElement>(null);
-  const [customStartDate, setCustomStartDate] = useState<string>('2025-03-01');
-  const [customEndDate, setCustomEndDate] = useState<string>('2025-03-31');
+  const [customStartDate, setCustomStartDate] = useState<string>('2025-04-01');
+  const [customEndDate, setCustomEndDate] = useState<string>('2025-04-30');
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   // Date field filter for transactions-related queries
   const [dateField, setDateField] = useState<'settlement' | 'invoice'>('invoice');
@@ -1588,13 +1588,8 @@ const MarketplaceReconciliation: React.FC = () => {
     fetchReconciliationData(newMonth);
   };
 
-  // Unified data fetch effect: triggers on relevant inputs; guarded for dev StrictMode
-  const didInitRef = useRef(false);
+  // Unified data fetch effect: triggers on relevant inputs
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') {
-      if (didInitRef.current) return;
-      didInitRef.current = true;
-    }
     if (selectedDateRange === 'custom') {
       if (customStartDate && customEndDate) {
         fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
@@ -1639,6 +1634,35 @@ const MarketplaceReconciliation: React.FC = () => {
       navigate('/marketplace-reconciliation', { replace: true });
     }
   }, [location.search, showTransactionSheet, navigate]);
+
+  // Compute effective date range for TransactionSheet based on current selection
+  const effectiveDateRangeForTs = (() => {
+    let start = customStartDate;
+    let end = customEndDate;
+    const today = new Date();
+    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    if (selectedDateRange !== 'custom') {
+      if (selectedDateRange === 'today') {
+        start = fmt(today);
+        end = fmt(today);
+      } else if (selectedDateRange === 'this-week') {
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        start = fmt(startOfWeek);
+        end = fmt(endOfWeek);
+      } else if (selectedDateRange === 'this-month') {
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        start = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+        end = fmt(endOfMonth);
+      } else if (selectedDateRange === 'this-year') {
+        start = `${today.getFullYear()}-01-01`;
+        end = `${today.getFullYear()}-12-31`;
+      }
+    }
+    return { start, end };
+  })();
 
   return (
     <Box sx={{ 
@@ -2229,7 +2253,7 @@ const MarketplaceReconciliation: React.FC = () => {
           {/* Reconciliation Status */}
           <Grid item xs={12} md={5}>
                           <Card 
-                onClick={() => navigate('/dispute')}
+                onClick={() => navigate(`/dispute?from=${effectiveDateRangeForTs.start}&to=${effectiveDateRangeForTs.end}`)}
                 sx={{ 
                 background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
                 borderRadius: '16px',
@@ -2414,7 +2438,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={() => navigate('/dispute')}
+                            onClick={() => navigate(`/dispute?from=${effectiveDateRangeForTs.start}&to=${effectiveDateRangeForTs.end}`)}
                             sx={{
                               borderColor: '#6366f1',
                               color: '#6366f1',
@@ -4393,7 +4417,7 @@ const MarketplaceReconciliation: React.FC = () => {
             }} 
             statsData={reconciliationData}
             initialTab={initialTsTab}
-            dateRange={{ start: customStartDate, end: customEndDate }}
+            dateRange={effectiveDateRangeForTs}
             initialPlatforms={selectedProviderPlatform && initialTsTab === 1 ? [selectedProviderPlatform] : undefined}
           />
         </Box>
