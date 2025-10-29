@@ -1677,6 +1677,7 @@ interface TransactionSheetProps {
   initialTab?: number;
   dateRange?: { start: string; end: string };
   initialPlatforms?: ('flipkart' | 'd2c')[];
+  initialFilters?: { [key: string]: any };
 }
 
 // Complete mapping of UI columns to API parameters
@@ -1705,14 +1706,14 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
 // Mapping of sortable UI columns to backend sort_by values
 const COLUMN_TO_SORT_BY_MAP: Record<string, string> = {
   'Order Date': 'order_date',
+  'Invoice Date': 'invoice_date',
   'Settlement Date': 'settlement_date',
   'Order Value': 'order_value',
   'Settlement Value': 'settlement_value',
   'Difference': 'diff',
-  'Status': 'status',
 };
 
-const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0, dateRange: propDateRange, initialPlatforms }) => {
+const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0, dateRange: propDateRange, initialPlatforms, initialFilters: propsInitialFilters }) => {
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -1729,9 +1730,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     propDateRange || { start: '', end: '' }
   );
   // Column filters can be string (contains), number range {min,max}, date range {from,to}, or enum string[]
-  const [columnFilters, setColumnFilters] = useState<{ [key: string]: any }>({});
+  const [columnFilters, setColumnFilters] = useState<{ [key: string]: any }>(propsInitialFilters || {});
   // Pending filters that haven't been applied yet
-  const [pendingColumnFilters, setPendingColumnFilters] = useState<{ [key: string]: any }>({});
+  const [pendingColumnFilters, setPendingColumnFilters] = useState<{ [key: string]: any }>(propsInitialFilters || {});
   const [pendingDateRange, setPendingDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
   // Header date range state - for the date selector in the header next to platform selector
   const [headerDateRange, setHeaderDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
@@ -1752,6 +1753,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(100);
   const [loading, setLoading] = useState(false);
+  const [isSorting, setIsSorting] = useState(false);
   const [paginationLoading, setPaginationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(() => {
@@ -1983,7 +1985,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   }, []);
 
   // Sorting functions
-  const handleSort = (columnKey: string) => {
+  const handleSort = async (columnKey: string) => {
     // Only allow sorting for supported columns
     const sortBy = COLUMN_TO_SORT_BY_MAP[columnKey];
     if (!sortBy) return;
@@ -2005,16 +2007,24 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Trigger server-side refetch with sorting (reset to first page)
     setPage(0);
     setCurrentPage(1);
-    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
+    setIsSorting(true);
+    try {
+      // applySortOverride=true ensures that when nextSort is null (neutral),
+      // we send no sort params instead of falling back to previous state
+      await fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, undefined, nextSort, true);
+    } finally {
+      setIsSorting(false);
+    }
   };
 
   const getSortIcon = (columnKey: string) => {
     if (sortConfig?.key !== columnKey) {
       return <UnfoldMoreIcon fontSize="small" />;
     }
+    // Flipped: show Down arrow for ascending, Up arrow for descending
     return sortConfig.direction === 'asc' 
-      ? <ArrowUpwardIcon fontSize="small" /> 
-      : <ArrowDownwardIcon fontSize="small" />;
+      ? <ArrowDownwardIcon fontSize="small" /> 
+      : <ArrowUpwardIcon fontSize="small" />;
   };
 
   const sortData = (data: TransactionRow[]) => {
@@ -2558,7 +2568,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     const initialDateRange = propDateRange || { start: '2025-04-01', end: '2025-04-30' };
     setHeaderDateRange(initialDateRange);
     setPendingHeaderDateRange(initialDateRange);
-    fetchDualTransactions(1, undefined, initialDateRange);
+    fetchDualTransactions(1, propsInitialFilters, initialDateRange);
     setHasInitialLoad(true);
   }, []);
 
@@ -2705,7 +2715,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     filters?: { [key: string]: any }, 
     dateRangeFilter?: {start: string, end: string},
     overridePlatforms?: Platform[],
-    orderIds?: string[]
+    orderIds?: string[],
+    sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
+    applySortOverride?: boolean
   ) => {
     console.log('[fetchDualTransactions] Called with:', { pageNumber, filters, dateRangeFilter, overridePlatforms, orderIds });
     
@@ -2813,10 +2825,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         settledParams.platform = platformsToUse.join(',');
       }
 
-      // Apply sorting if present
-      if (sortConfig && COLUMN_TO_SORT_BY_MAP[sortConfig.key]) {
-        settledParams.sort_by = COLUMN_TO_SORT_BY_MAP[sortConfig.key];
-        settledParams.sort_order = sortConfig.direction;
+      // Apply sorting if present (use override if explicitly requested to avoid state lag)
+      const sortToUse = applySortOverride ? sortOverride : sortConfig;
+      if (sortToUse && COLUMN_TO_SORT_BY_MAP[sortToUse.key]) {
+        settledParams.sort_by = COLUMN_TO_SORT_BY_MAP[sortToUse.key];
+        settledParams.sort_order = sortToUse.direction;
       }
       
       // Check if user has applied a Status filter
@@ -2856,6 +2869,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         // Default: no status filter, use normal settled/unsettled split
         delete unsettledParams.status_in;
         unsettledParams.status = 'unsettled';
+      }
+
+      // Ensure Order ID search is always applied even if not present in column filters
+      const effectiveOrderIds = (orderIds !== undefined ? orderIds : orderIdChips) || [];
+      if (Array.isArray(effectiveOrderIds) && effectiveOrderIds.length > 0) {
+        const orderIdsCsv = effectiveOrderIds.join(',');
+        settledParams.order_id = orderIdsCsv;
+        unsettledParams.order_id = orderIdsCsv;
       }
       
       console.log('[fetchDualTransactions] Settled params:', settledParams);
@@ -3541,7 +3562,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       onClick={() => {
                         fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
                       }}
-                      disabled={loading || dualApiLoading}
+                      disabled={(loading || dualApiLoading) && !isSorting}
                       sx={{
                         color: '#1f2937',
                         '&:hover': {
@@ -3919,7 +3940,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           )}
 
           {/* Loading Indicator */}
-          {(loading || dualApiLoading) && (
+          {(loading || dualApiLoading) && !isSorting && (
             <LinearProgress 
               sx={{ 
                 mb: 2,
@@ -3934,7 +3955,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           )}
 
           {/* Pagination Loading Indicator */}
-          {paginationLoading && (
+          {paginationLoading && !isSorting && (
             <LinearProgress 
               sx={{ 
                 mb: 2,
@@ -4074,7 +4095,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                           <IconButton
                                             size="small"
                                             onClick={handleOrderIdSearchClick}
-                                            disabled={loading || dualApiLoading}
+                                            disabled={(loading || dualApiLoading) && !isSorting}
                                             sx={{ p: 0.5 }}
                                           >
                                             <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
@@ -4099,7 +4120,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       </TableRow>
                   </TableHead>
                   <TableBody>
-                    {(loading || dualApiLoading) && getCurrentData().length === 0 ? (
+                    {(loading || dualApiLoading) && !isSorting && getCurrentData().length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 6 }}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
@@ -4110,7 +4131,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           </Box>
                         </TableCell>
                       </TableRow>
-                    ) : paginationLoading ? (
+                    ) : (paginationLoading && !isSorting) ? (
                       <TableRow>
                         <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>

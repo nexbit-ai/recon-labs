@@ -185,6 +185,7 @@ import { padding } from '@mui/system';
 
 const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
+  const [initialTsFilters, setInitialTsFilters] = useState<{ [key: string]: any } | undefined>(undefined);
   const [initialTsTab, setInitialTsTab] = useState<number>(0);
   const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'd2c' | undefined>(undefined);
   const location = useLocation();
@@ -911,6 +912,10 @@ const MarketplaceReconciliation: React.FC = () => {
   // Fetch unreconciled reasons by date range preset
   const fetchUnreconciledReasonsByDateRange = async (dateRange: string) => {
     try {
+      // For custom range, only proceed if both dates are selected
+      if (dateRange === 'custom' && (!customStartDate || !customEndDate)) {
+        return;
+      }
       let startDate: string;
       let endDate: string;
       const today = new Date();
@@ -983,6 +988,10 @@ const MarketplaceReconciliation: React.FC = () => {
 
   // Fetch ageing analysis data
   const fetchAgeingAnalysis = async () => {
+    // For custom range, wait until both dates are selected
+    if (selectedDateRange === 'custom' && (!customStartDate || !customEndDate)) {
+      return;
+    }
     try {
       setAgeingLoading(true);
       
@@ -1598,13 +1607,18 @@ const MarketplaceReconciliation: React.FC = () => {
       fetchReconciliationDataByDateRange(selectedDateRange);
     }
     // Keep unreconciled reasons in sync
-    if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
-      fetchUnreconciledReasonsWithDates(customStartDate, customEndDate);
+    if (selectedDateRange === 'custom') {
+      if (customStartDate && customEndDate) {
+        fetchUnreconciledReasonsWithDates(customStartDate, customEndDate);
+      }
+      // For custom with only one date selected, do not fetch
     } else {
       fetchUnreconciledReasonsByDateRange(selectedDateRange);
     }
-    // Fetch ageing analysis data
-    fetchAgeingAnalysis();
+    // Fetch ageing analysis data (only when both dates are set for custom)
+    if (selectedDateRange !== 'custom' || (customStartDate && customEndDate)) {
+      fetchAgeingAnalysis();
+    }
   }, [selectedDateRange, customStartDate, customEndDate, dateField, selectedPlatforms]);
 
   // Load sales overview data
@@ -2434,6 +2448,29 @@ const MarketplaceReconciliation: React.FC = () => {
                         }}>
                           Transactions Summary
                         </Typography>
+                        {transactionsTab === 0 && (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => {
+                              setInitialTsFilters({ Status: ['settlement_matched'] });
+                              setInitialTsTab(0);
+                              setShowTransactionSheet(true);
+                            }}
+                            sx={{
+                              borderColor: '#6366f1',
+                              color: '#6366f1',
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              '&:hover': {
+                                borderColor: '#4f46e5',
+                                backgroundColor: 'rgba(99, 102, 241, 0.04)',
+                              }
+                            }}
+                          >
+                            View Matched Transactions
+                          </Button>
+                        )}
                         {transactionsTab === 1 && (
                           <Button
                             variant="outlined"
@@ -2451,6 +2488,29 @@ const MarketplaceReconciliation: React.FC = () => {
                             }}
                           >
                             View Mismatched Transactions
+                          </Button>
+                        )}
+                        {transactionsTab === 2 && (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => {
+                              setInitialTsFilters(undefined);
+                              setInitialTsTab(1);
+                              setShowTransactionSheet(true);
+                            }}
+                            sx={{
+                              borderColor: '#6366f1',
+                              color: '#6366f1',
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              '&:hover': {
+                                borderColor: '#4f46e5',
+                                backgroundColor: 'rgba(99, 102, 241, 0.04)',
+                              }
+                            }}
+                          >
+                            View Unsettled Transactions
                           </Button>
                         )}
                       </Box>
@@ -4419,6 +4479,7 @@ const MarketplaceReconciliation: React.FC = () => {
             initialTab={initialTsTab}
             dateRange={effectiveDateRangeForTs}
             initialPlatforms={selectedProviderPlatform && initialTsTab === 1 ? [selectedProviderPlatform] : undefined}
+            initialFilters={initialTsFilters}
           />
         </Box>
       )}

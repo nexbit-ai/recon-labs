@@ -288,6 +288,9 @@ const DisputePage: React.FC = () => {
   // Calendar popup state
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
   const calendarPopupRef = useRef<HTMLDivElement>(null);
+  // StrictMode-safe initial-run guards
+  const isInitialRenderRef = useRef(true);
+  const hasFetchedOnInitialRef = useRef(false);
   
   // Initialize from URL query params if provided (e.g., from main page navigation)
   useEffect(() => {
@@ -366,7 +369,6 @@ const DisputePage: React.FC = () => {
     'Invoice Date': 'invoice_date',
     'Settlement Date': 'settlement_date',
     'Difference': 'diff',
-    'Status': 'status',
   };
 
   // Format backend reason keys like "customer_add_ons" into human-friendly labels like "Customer Add Ons"
@@ -436,20 +438,46 @@ const DisputePage: React.FC = () => {
 
     // Trigger server-side refetch with sorting (reset to first page)
     setPage(0);
-    fetchUnreconciledOrders();
+    fetchUnreconciledOrders(undefined, nextSort, true);
   };
 
   const getSortIcon = (columnKey: string) => {
     if (sortConfig?.key !== columnKey) {
       return <UnfoldMoreIcon fontSize="small" />;
     }
+    // Flipped: show Down arrow for ascending, Up arrow for descending
     return sortConfig.direction === 'asc' 
-      ? <ArrowUpwardIcon fontSize="small" /> 
-      : <ArrowDownwardIcon fontSize="small" />;
+      ? <ArrowDownwardIcon fontSize="small" /> 
+      : <ArrowUpwardIcon fontSize="small" />;
   };
 
+  // Match Transaction Sheet date display: e.g., "17th March, 2025"
+  const formatDateWithOrdinal = (dateString: string) => {
+    if (!dateString || dateString === 'null' || dateString === 'undefined') return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    const day = date.getDate();
+    const month = date.toLocaleDateString('en-US', { month: 'long' });
+    const year = date.getFullYear();
+    const getOrdinalSuffix = (d: number) => {
+      if (d > 3 && d < 21) return 'th';
+      switch (d % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+      }
+    };
+    return `${day}${getOrdinalSuffix(day)} ${month}, ${year}`;
+  };
+
+  const formatDate = (dateString: string) => formatDateWithOrdinal(dateString);
+
   // Build query parameters for API calls
-  const buildQueryParams = (filtersOverride?: Record<string, any>): TransactionQueryParams => {
+  const buildQueryParams = (
+    filtersOverride?: Record<string, any>,
+    orderIdsCsvOverride?: string
+  ): TransactionQueryParams => {
     const params: TransactionQueryParams = {};
     const f = filtersOverride || columnFilters;
     // Set status for unreconciled orders (less_payment_received, more_payment_received)
@@ -470,9 +498,15 @@ const DisputePage: React.FC = () => {
       params.status_in = statusFilter.join(',');
     }
 
-    // Order ID chips → order_id (CSV)
-    if (orderIdChips.length > 0) {
-      (params as any).order_id = orderIdChips.join(',');
+    // Order ID filter → order_id (CSV) with explicit override support to avoid async state timing
+    let orderIdsCsv: string | undefined;
+    if (orderIdsCsvOverride !== undefined) {
+      orderIdsCsv = orderIdsCsvOverride;
+    } else {
+      orderIdsCsv = orderIdChips.length > 0 ? orderIdChips.join(',') : '';
+    }
+    if (orderIdsCsv !== undefined && orderIdsCsv !== '') {
+      (params as any).order_id = orderIdsCsv;
     }
 
     const diffFilter = f['Difference'];
@@ -487,11 +521,11 @@ const DisputePage: React.FC = () => {
       }
     }
 
-    // Invoice Date range (for D2C platform)
+    // Date range filter: align with Transactions page → order_date_from/to
     const invoiceDateFilter = f['Invoice Date'];
     if (invoiceDateFilter && typeof invoiceDateFilter === 'object') {
-      if (invoiceDateFilter.from) (params as any).invoice_date_from = invoiceDateFilter.from;
-      if (invoiceDateFilter.to) (params as any).invoice_date_to = invoiceDateFilter.to;
+      if (invoiceDateFilter.from) (params as any).order_date_from = invoiceDateFilter.from;
+      if (invoiceDateFilter.to) (params as any).order_date_to = invoiceDateFilter.to;
     }
 
     // Settlement Date range
@@ -518,14 +552,14 @@ const DisputePage: React.FC = () => {
       const now = new Date();
       const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
       const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
-      params.buyer_invoice_date_from = firstDay.toISOString().split('T')[0];
-      params.buyer_invoice_date_to = lastDay.toISOString().split('T')[0];
+      params.order_date_from = firstDay.toISOString().split('T')[0];
+      params.order_date_to = lastDay.toISOString().split('T')[0];
     } else if (selectedDateRange === 'last-month') {
       const now = new Date();
       const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1));
       const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 0));
-      params.buyer_invoice_date_from = firstDay.toISOString().split('T')[0];
-      params.buyer_invoice_date_to = lastDay.toISOString().split('T')[0];
+      params.order_date_from = firstDay.toISOString().split('T')[0];
+      params.order_date_to = lastDay.toISOString().split('T')[0];
     } else if (selectedDateRange === 'this-year') {
       const now = new Date();
       const currentYear = now.getFullYear();
@@ -535,28 +569,33 @@ const DisputePage: React.FC = () => {
       const lastDay = new Date(Date.UTC(currentYear, 11, 31)); // December 31st (month 11)
       
       // Format dates as YYYY-MM-DD using UTC methods
-      params.buyer_invoice_date_from = firstDay.toISOString().split('T')[0];
-      params.buyer_invoice_date_to = lastDay.toISOString().split('T')[0];
+      params.order_date_from = firstDay.toISOString().split('T')[0];
+      params.order_date_to = lastDay.toISOString().split('T')[0];
       
     } else if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
-      params.buyer_invoice_date_from = customStartDate;
-      params.buyer_invoice_date_to = customEndDate;
+      params.order_date_from = customStartDate;
+      params.order_date_to = customEndDate;
     }
     
     // Ensure we always have default dates if none are set
-    if (!params.buyer_invoice_date_from || !params.buyer_invoice_date_to) {
+    if (!(params as any).order_date_from || !(params as any).order_date_to) {
       const now = new Date();
       const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
       const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
-      params.buyer_invoice_date_from = firstDay.toISOString().split('T')[0];
-      params.buyer_invoice_date_to = lastDay.toISOString().split('T')[0];
+      (params as any).order_date_from = firstDay.toISOString().split('T')[0];
+      (params as any).order_date_to = lastDay.toISOString().split('T')[0];
     }
 
     return params;
   };
 
   // Fetch unreconciled orders from API
-  const fetchUnreconciledOrders = async (filtersOverride?: Record<string, any>) => {
+  const fetchUnreconciledOrders = async (
+    filtersOverride?: Record<string, any>,
+    sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
+    applySortOverride?: boolean,
+    orderIdsCsvOverride?: string
+  ) => {
     if (disputeSubTab !== 0) return; // Only fetch for unreconciled tab
     
     setApiLoading(true);
@@ -564,7 +603,21 @@ const DisputePage: React.FC = () => {
     
     try {
       // Build query parameters
-      const params = buildQueryParams(filtersOverride);
+      const params = buildQueryParams(filtersOverride, orderIdsCsvOverride);
+
+      // If explicitly applying override: when null, clear sort; when provided, set it
+      if (applySortOverride) {
+        delete (params as any).sort_by;
+        delete (params as any).sort_order;
+        if (sortOverride && COLUMN_TO_SORT_BY_MAP[sortOverride.key]) {
+          params.sort_by = COLUMN_TO_SORT_BY_MAP[sortOverride.key];
+          params.sort_order = sortOverride.direction;
+        }
+      } else if (sortOverride && COLUMN_TO_SORT_BY_MAP[sortOverride.key]) {
+        // Backward compatibility if called without applySortOverride
+        params.sort_by = COLUMN_TO_SORT_BY_MAP[sortOverride.key];
+        params.sort_order = sortOverride.direction;
+      }
       
       // Add the unreconciled status filter
       params.status_in = 'less_payment_received,more_payment_received';
@@ -657,20 +710,24 @@ const DisputePage: React.FC = () => {
     }
   }, []);
 
-  // Fetch unreconciled orders on component mount
+  // Mark initial render complete (used to avoid StrictMode double-fetch)
   useEffect(() => {
-    if (disputeSubTab === 0) {
-      // On initial load, selectedDateRange is 'custom' with March 2025 defaults,
-      // so buildQueryParams will use buyer_invoice_date_from/to accordingly.
-      fetchUnreconciledOrders();
-    }
+    isInitialRenderRef.current = false;
   }, []);
 
-  // Fetch API data when switching to unreconciled tab
+  // Fetch API data when switching to unreconciled tab or when relevant inputs change
   useEffect(() => {
-    if (disputeSubTab === 0) {
-      fetchUnreconciledOrders();
+    if (disputeSubTab !== 0) return;
+    // On initial render in dev StrictMode this effect runs twice.
+    // Guard so we only fetch once on the true initial render, then allow future changes.
+    if (isInitialRenderRef.current) {
+      if (!hasFetchedOnInitialRef.current) {
+        hasFetchedOnInitialRef.current = true;
+        fetchUnreconciledOrders();
+      }
+      return;
     }
+    fetchUnreconciledOrders();
   }, [disputeSubTab, selectedDateRange, customStartDate, customEndDate]);
 
   // Get current rows based on active tab
@@ -1048,6 +1105,12 @@ const DisputePage: React.FC = () => {
   const handleOrderIdSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setOrderIdSearch(value);
+    // If cleared, immediately refetch without order_id filter
+    if (value.trim() === '') {
+      setOrderIdChips([]);
+      setPage(0);
+      fetchUnreconciledOrders(undefined, undefined, undefined, '');
+    }
   };
 
   const handleOrderIdSearchClick = () => {
@@ -1056,7 +1119,7 @@ const DisputePage: React.FC = () => {
     setOrderIdChips(ids);
     // Trigger API call
     setPage(0);
-    fetchUnreconciledOrders();
+    fetchUnreconciledOrders(undefined, undefined, undefined, ids.join(','));
   };
 
   const handleOrderIdSearchClear = () => {
@@ -1065,7 +1128,7 @@ const DisputePage: React.FC = () => {
     setShowOrderIdSearch(false);
     // Trigger API call without order IDs
     setPage(0);
-    fetchUnreconciledOrders();
+    fetchUnreconciledOrders(undefined, undefined, undefined, '');
   };
 
   const getUniqueValuesForColumn = (column: string) => {
@@ -1891,13 +1954,75 @@ const DisputePage: React.FC = () => {
                     </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>{orderId}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{invoiceDate}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{settlementDate}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{formatDate(invoiceDate)}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{formatDate(settlementDate)}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>₹{difference.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           <Chip label={reason} size="small" sx={{ fontWeight: 600, color: '#1f2937', backgroundColor: '#e5e7eb', '& .MuiChip-label': { px: 1 } }} />
                            </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{status}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                            {(() => {
+                              const reconStatus = (row as any).recon_status || row.originalData?.recon_status || row.originalData?.breakups?.recon_status || status;
+                              let displayText = '';
+                              let backgroundColor = '';
+                              let textColor = '';
+                              switch (reconStatus) {
+                                case 'settlement_matched':
+                                  displayText = 'Settlement Matched';
+                                  backgroundColor = '#dcfce7';
+                                  textColor = '#059669';
+                                  break;
+                                case 'less_payment_received':
+                                  displayText = 'Less Payment Received';
+                                  backgroundColor = '#fef3c7';
+                                  textColor = '#d97706';
+                                  break;
+                                case 'more_payment_received':
+                                  displayText = 'More Payment Received';
+                                  backgroundColor = '#fef3c7';
+                                  textColor = '#d97706';
+                                  break;
+                                default:
+                                  displayText = 'Unsettled';
+                                  backgroundColor = '#fee2e2';
+                                  textColor = '#dc2626';
+                              }
+                              return (
+                                <Chip
+                                  label={displayText}
+                                  size="small"
+                                  sx={{
+                                    background: backgroundColor,
+                                    color: textColor,
+                                    fontWeight: 600,
+                                    fontSize: '0.75rem',
+                                    height: 24,
+                                    '& .MuiChip-label': { px: 1 },
+                                  }}
+                                />
+                              );
+                            })()}
+                            {(() => {
+                              const eventType = (row as any).event_type || row["Event Type"] || row.originalData?.event_type || 'Sale';
+                              const isSale = String(eventType || '').toLowerCase() === 'sale';
+                              return (
+                                <Chip
+                                  label={eventType}
+                                  size="small"
+                                  sx={{
+                                    background: isSale ? '#dcfce7' : '#fee2e2',
+                                    color: isSale ? '#059669' : '#dc2626',
+                                    fontWeight: 600,
+                                    fontSize: '0.75rem',
+                                    height: 24,
+                                    '& .MuiChip-label': { px: 1 },
+                                  }}
+                                />
+                              );
+                            })()}
+                          </Box>
+                        </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
                             <Button size="small" variant="outlined" onClick={() => handleMarkReconciled(orderId)} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#10b981', color: '#10b981', '&:hover': { borderColor: '#059669', backgroundColor: 'rgba(16, 185, 129, 0.04)' } }}>Mark Reconciled</Button>
