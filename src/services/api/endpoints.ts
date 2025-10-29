@@ -86,6 +86,15 @@ export const transactionsAPI = {
     apiService.get<TotalTransactionsResponse>(API_CONFIG.ENDPOINTS.D2C_TRANSACTIONS, params, { useD2CHeaders: true }),
 };
 
+// Reconciliation manual actions API
+export const manualActionsAPI = {
+  // Trigger manual action for selected orders on a specific platform
+  manualAction: (platform: string, payload: { order_ids: string[]; note: string }) =>
+    apiService.post<any>(`${API_CONFIG.ENDPOINTS.RECON_MANUAL_ACTION}?platform=${encodeURIComponent(platform)}`,
+      payload
+    ),
+};
+
 // Orders API
 export const ordersAPI = {
   // Get orders list
@@ -243,6 +252,7 @@ export const api = {
   user: userAPI,
   reconciliation: reconciliationAPI,
   transactions: transactionsAPI,
+  manualActions: manualActionsAPI,
   orders: ordersAPI,
   stats: statsAPI,
   mainSummary: mainSummaryAPI,

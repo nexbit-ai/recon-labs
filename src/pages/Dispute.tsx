@@ -301,6 +301,7 @@ const DisputePage: React.FC = () => {
   const [mockRows, setMockRows] = useState<Array<{ id: string; orderItemId: string; orderDate: string; difference: number; remark: string; eventType: string; status: 'unreconciled' | 'open' | 'raised'; }>>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMsg, setSnackbarMsg] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [apiLoading, setApiLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -867,35 +868,67 @@ const DisputePage: React.FC = () => {
   };
 
   // Action handlers for unreconciled transactions
-  const handleMarkReconciled = (id: string) => {
-    console.log('Marking as reconciled:', id);
-    
-    // Remove the transaction from the list (simulate reconciliation)
-    setApiRows(prev => {
-      if (Array.isArray(prev)) {
-        return prev.filter((row: any) => {
-          const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
-          return orderId !== id;
-        }) as TransactionRow[];
-      }
-      return prev;
-    });
-    
-    // Show success message
-    setSnackbarOpen(true);
-    
-    // Store notification for Checklist
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [noteInput, setNoteInput] = useState<string>('');
+  const [pendingOrderIds, setPendingOrderIds] = useState<string[]>([]);
+
+  const openNoteDialog = (orderIds: string[]) => {
+    setPendingOrderIds(orderIds);
+    setNoteInput('');
+    setNoteDialogOpen(true);
+  };
+
+  const closeNoteDialog = () => {
+    setNoteDialogOpen(false);
+    setPendingOrderIds([]);
+    setNoteInput('');
+  };
+
+  const confirmManualAction = async () => {
+    if (pendingOrderIds.length === 0) return;
     try {
-      const matched = (apiRows as any[]).find(row => {
-        const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
-        return orderId === id;
+      const platform = 'flipkart';
+      await api.manualActions.manualAction(platform, { order_ids: pendingOrderIds, note: noteInput || '' });
+
+      // Optimistically remove reconciled rows
+      setApiRows(prev => {
+        if (Array.isArray(prev)) {
+          const ids = new Set(pendingOrderIds);
+          return prev.filter((row: any) => {
+            const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
+            return !ids.has(orderId);
+          }) as TransactionRow[];
+        }
+        return prev;
       });
-      if (matched) {
-        pushManualReconNotification(matched.originalData?.breakups?.mismatch_reason || matched["Remark"] || 'Unknown', 1, [id]);
+
+      // Push notification for checklist
+      try {
+        // Derive a reason from the first matched row
+        const first = (apiRows as any[]).find(row => {
+          const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
+          return orderId === pendingOrderIds[0];
+        });
+        const reason = first?.originalData?.breakups?.mismatch_reason || first?.["Remark"] || 'Unknown';
+        pushManualReconNotification(reason, pendingOrderIds.length, pendingOrderIds);
+      } catch (e) {
+        console.error('Failed to push notification', e);
       }
-    } catch (err) {
-      console.error('Failed to derive group for manual recon notification', err);
+
+      setSnackbarMsg('Manual action submitted successfully');
+      setSnackbarOpen(true);
+    } catch (error) {
+      console.error('Manual action failed', error);
+      setSnackbarMsg('Failed to submit manual action');
+      setSnackbarOpen(true);
+    } finally {
+      closeNoteDialog();
+      setSelectedIds([]);
     }
+  };
+
+  const handleMarkReconciled = (id: string) => {
+    openNoteDialog([id]);
   };
 
   const handleRaiseDispute = (id: string) => {
@@ -1747,10 +1780,7 @@ const DisputePage: React.FC = () => {
                 <Box sx={{ display: 'flex', gap: 1.5 }}>
                   <Button
                     variant="outlined"
-                    onClick={() => {
-                      selectedIds.forEach(id => handleMarkReconciled(id));
-                      setSelectedIds([]);
-                    }}
+                    onClick={() => openNoteDialog(selectedIds)}
                     sx={{
                       fontSize: '0.875rem',
                       py: 0.5,
@@ -1797,7 +1827,29 @@ const DisputePage: React.FC = () => {
         </Box>
       )}
 
-      <Snackbar open={snackbarOpen} autoHideDuration={2500} onClose={() => setSnackbarOpen(false)} message="Transaction marked as reconciled successfully" />
+      <Snackbar open={snackbarOpen} autoHideDuration={2500} onClose={() => setSnackbarOpen(false)} message={snackbarMsg || 'Done'} />
+
+      {/* Note Dialog for Manual Action */}
+      <Dialog open={noteDialogOpen} onClose={closeNoteDialog} PaperProps={{ sx: { borderRadius: 1, minWidth: 420 } }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Add a note</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: '#374151', mb: 2 }}>Selected orders: {pendingOrderIds.length}</Typography>
+          <TextField
+            label="Note"
+            placeholder="Add a short note..."
+            value={noteInput}
+            onChange={(e) => setNoteInput(e.target.value)}
+            fullWidth
+            multiline
+            minRows={3}
+            size="small"
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button variant="text" onClick={closeNoteDialog} sx={{ color: '#111827' }}>Cancel</Button>
+          <Button variant="contained" onClick={confirmManualAction} sx={{ boxShadow: 'none' }}>Submit</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Column Filter Popover */}
       <Popover

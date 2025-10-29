@@ -50,6 +50,7 @@ export const API_CONFIG = {
     RECONCILIATION_TRENDS: '/reconciliation/trends',
     RECONCILIATION_EXPORT: '/reconciliation/export',
     RECONCILIATION_UPLOAD: '/recon/upload',
+    RECON_MANUAL_ACTION: '/recon/manual-action',
     
     // Transactions
     TOTAL_TRANSACTIONS: '/recon/total-transactions',

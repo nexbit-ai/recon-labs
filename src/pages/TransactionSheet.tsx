@@ -198,7 +198,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   let remark = "Unsettled";
   const reconStatus = orderItem.recon_status;
   if (reconStatus === "settlement_matched") {
-    remark = "Matched";
+    remark = "Settlement Matched";
   } else if (reconStatus === "less_payment_received") {
     remark = "Less Payment Received";
   } else if (reconStatus === "more_payment_received") {
@@ -1252,7 +1252,7 @@ const TransactionDetailsPopup: React.FC<{
             </Typography>
             <Typography variant="body2" sx={{ 
               fontWeight: 600, 
-              color: status === 'Matched' ? '#059669' : '#dc2626',
+              color: status === 'Settlement Matched' ? '#059669' : '#dc2626',
               fontSize: '0.75rem'
             }}>
               {status}
@@ -1299,65 +1299,45 @@ const TransactionDetailsPopup: React.FC<{
 const BreakupsModal: React.FC<{ 
   open: boolean;
   onClose: () => void;
-  breakups: any;
+  breakups: any; // This is now the full row
   orderId: string;
   anchorEl: HTMLElement | null;
 }> = ({ open, onClose, breakups, orderId, anchorEl }) => {
   if (!open || !breakups || !anchorEl) return null;
 
-  const formatValue = (value: any) => {
-    if (typeof value === 'number') {
-      return value.toLocaleString('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2,
-      });
-    }
-    return value || 'N/A';
-  };
+  // Extract the breakups object from metadata
+  // The metadata.breakups is directly on the row object
+  const breakupsObj = (breakups as any)?.metadata?.breakups;
+  if (!breakupsObj) return null;
 
-  const getStatusColor = (status: any) => {
-    const statusStr = String(status || '').toLowerCase();
-    switch (statusStr) {
-      case 'delivered':
-      case 'complete':
-      case 'settlement_matched':
-        return '#059669';
-      case 'less_payment_received':
-      case 'more_payment_received':
-      case 'pending':
-      case 'processing':
-        return '#d97706';
-      case 'cancelled':
-      case 'failed':
-        return '#dc2626';
-      default:
-        return '#6b7280';
-    }
-  };
-
-  // Dynamically create breakups data from whatever fields are available
-  const breakupsData = Object.entries(breakups).map(([key, value]) => {
-    // Convert snake_case to Title Case for display
-    const label = key
-      .split('_')
+  // Convert snake_case keys to readable format: remove underscores and capitalize first letter
+  const formatKey = (key: string) => {
+    return key.split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
-    
-    // Determine if it's a currency field
-    const isCurrency = key.includes('value') || key.includes('amount') || key.includes('price');
-    
-    // Determine if it's a status field
-    const isStatus = key.includes('status') || key.includes('state');
-    
-    return {
-      label,
-      value,
-      isCurrency,
-      isStatus
-    };
-  });
+  };
+
+  // Format currency value
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
+  // Extract main values from the row
+  // The row object has the data directly at the top level
+  const orderValue = (breakups as any)?.order_value || 0;
+  const settlementValue = (breakups as any)?.settlement_amount || 0;
+  const diff = (breakups as any)?.diff || 0;
+
+  // Get entries from breakups object
+  const breakupsData = Object.entries(breakupsObj).map(([key, value]) => ({
+    label: formatKey(key),
+    value: Number(value) || 0
+  }));
 
   // Calculate smart positioning similar to TransactionDetailsPopup
   const getPopupPosition = () => {
@@ -1535,7 +1515,42 @@ const BreakupsModal: React.FC<{
 
         {/* Content */}
         <Box sx={{ p: 2, maxHeight: position.maxHeight ? `${position.maxHeight - 80}px` : '300px', overflowY: 'auto' }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {/* Order Value */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                p: 1.5,
+                background: '#f0f9ff',
+                borderRadius: '6px',
+                border: '1px solid #bae6fd',
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 600,
+                  color: '#0c4a6e',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Order Value
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 700,
+                  color: '#0c4a6e',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {formatCurrency(orderValue)}
+              </Typography>
+            </Box>
+
+            {/* Breakups */}
             {breakupsData.map((item, index) => (
               <Box
                 key={index}
@@ -1544,6 +1559,7 @@ const BreakupsModal: React.FC<{
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   p: 1.5,
+                  pl: 3,
                   background: '#f9fafb',
                   borderRadius: '6px',
                   border: '1px solid #e5e7eb',
@@ -1554,26 +1570,98 @@ const BreakupsModal: React.FC<{
                   sx={{
                     fontWeight: 500,
                     color: '#374151',
-                    minWidth: '120px',
                     fontSize: '0.75rem',
                   }}
                 >
-                  {item.label}:
+                  {item.label}
                 </Typography>
                 <Typography
                   variant="body2"
                   sx={{
                     fontWeight: 600,
-                    color: item.isStatus ? getStatusColor(item.value) : '#111827',
-                    textAlign: 'right',
-                    flex: 1,
+                    color: '#111827',
                     fontSize: '0.75rem',
                   }}
                 >
-                  {item.isCurrency ? formatValue(item.value) : item.value || 'N/A'}
+                  {formatCurrency(item.value)}
                 </Typography>
               </Box>
             ))}
+
+            {/* Divider */}
+            <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
+
+            {/* Settlement Value (Negative) */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                p: 1.5,
+                pl: 3,
+                background: '#fef2f2',
+                borderRadius: '6px',
+                border: '1px solid #fecaca',
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 500,
+                  color: '#991b1b',
+                  fontSize: '0.75rem',
+                }}
+              >
+                Settlement Value
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 600,
+                  color: '#991b1b',
+                  fontSize: '0.75rem',
+                }}
+              >
+                {formatCurrency(-settlementValue)}
+              </Typography>
+            </Box>
+
+            {/* Divider */}
+            <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
+
+            {/* Difference */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                p: 1.5,
+                background: diff === 0 ? '#f0fdf4' : '#fef2f2',
+                borderRadius: '6px',
+                border: diff === 0 ? '1px solid #86efac' : '1px solid #fca5a5',
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 700,
+                  color: diff === 0 ? '#166534' : '#991b1b',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Difference
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 800,
+                  color: diff === 0 ? '#166534' : '#991b1b',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {formatCurrency(diff)}
+              </Typography>
+            </Box>
           </Box>
         </Box>
       </Box>
@@ -1995,7 +2083,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Helper: chip colors for remark values
   const getRemarkChipColors = (remark: string): { background: string; color: string } => {
     switch (remark) {
-      case 'Matched':
+      case 'Settlement Matched':
         return { background: '#dcfce7', color: '#059669' };
       case 'Excess Amount Received':
         return { background: '#fef3c7', color: '#d97706' };
@@ -3137,58 +3225,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     event.preventDefault();
     event.stopPropagation();
     
-    console.log('Row data for breakups:', row);
-    console.log('Row keys:', Object.keys(row));
-    console.log('Row has breakups property:', 'breakups' in row);
-    console.log('Row breakups value:', row.breakups);
-    
-    // Check multiple possible locations for breakups data
-    let breakups = null;
-    
-    // First, check if breakups is in metadata (for new API structure)
-    if ((row as any)?.originalData?.metadata?.breakups) {
-      breakups = (row as any).originalData.metadata.breakups;
-      console.log('Found breakups in originalData.metadata.breakups:', breakups);
-    }
-    // Check if breakups is directly in originalData
-    else if ((row as any)?.originalData?.breakups) {
-      breakups = (row as any).originalData.breakups;
-      console.log('Found breakups in originalData.breakups:', breakups);
-    }
-    // Check if breakups is directly in the row
-    else if (row.breakups) {
-      breakups = row.breakups;
-      console.log('Found breakups in row.breakups:', breakups);
-    }
-    // Check if breakups is in the raw data
-    else if ((row as any)?.rawData?.breakups) {
-      breakups = (row as any).rawData.breakups;
-      console.log('Found breakups in rawData.breakups:', breakups);
-    }
-    // Check if the entire row is the breakups data (flexible approach)
-    else if (row && typeof row === 'object' && !row.order_id && !row['Order ID']) {
-      // If it doesn't have order_id or Order ID, it might be breakups data itself
-      breakups = row;
-      console.log('Using entire row as breakups data:', breakups);
-    }
-    
     // Extract order ID from the row data
     const orderId = row.order_id || row['Order ID'] || row['Order Item ID'] || row.order_item_id || 'Unknown';
     
-    if (breakups && Object.keys(breakups).length > 0) {
-      console.log('Opening breakups modal with data:', breakups);
-      setSelectedBreakups(breakups);
-      setBreakupsOrderId(orderId);
-      setBreakupsAnchorEl(event.currentTarget);
-      setBreakupsModalOpen(true);
-    } else {
-      console.log('No breakups data available for this transaction');
-      console.log('Available data:', row);
-      console.log('Row structure:', JSON.stringify(row, null, 2));
-      
-      // As a fallback, show all available data in the modal
-      // This helps debug what data is actually available
-      console.log('Showing all available data as fallback');
+    // Get breakups from metadata.breakups
+    let breakups = null;
+    if ((row as any)?.originalData?.metadata?.breakups) {
+      breakups = (row as any).originalData.metadata.breakups;
+    } else if (row.metadata?.breakups) {
+      breakups = row.metadata.breakups;
+    }
+    
+    if (breakups && typeof breakups === 'object' && Object.keys(breakups).length > 0) {
+      // Store the full row so we can access order_value, settlement_value, and diff
       setSelectedBreakups(row);
       setBreakupsOrderId(orderId);
       setBreakupsAnchorEl(event.currentTarget);
@@ -4129,7 +4178,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         
                                         switch (reconStatus) {
                                           case 'settlement_matched':
-                                            displayText = 'Matched';
+                                            displayText = 'Settlement Matched';
                                             backgroundColor = '#dcfce7';
                                             textColor = '#059669';
                                             break;

@@ -166,39 +166,49 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
               // Get current selected values
               const selectedValues = Array.isArray(pendingFilters[activeColumn]) ? pendingFilters[activeColumn] : [];
               
-              return optionsToRender.map((option) => (
-                <FormControlLabel
-                  key={option}
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={selectedValues.includes(option)}
-                      onChange={(e) => {
-                        const isChecked = e.target.checked;
-                        const newValues = isChecked 
-                          ? [...selectedValues, option]
-                          : selectedValues.filter(val => val !== option);
-                        
-                        // Update pending filters directly
-                        const newPendingFilters = { ...pendingFilters };
-                        newPendingFilters[activeColumn] = newValues;
-                        handleEnumChange(activeColumn)({ target: { value: newValues } });
-                      }}
-                    />
-                  }
-                  label={
-                    <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                      {option}
-                    </Typography>
-                  }
-                  sx={{ 
-                    '& .MuiFormControlLabel-label': { 
-                      fontSize: '0.8rem',
-                      marginLeft: 0.5
+              return optionsToRender.map((option) => {
+                // Format option label: convert snake_case to Title Case
+                const formatOptionLabel = (str: string): string => {
+                  return str
+                    .split('_')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' ');
+                };
+                
+                return (
+                  <FormControlLabel
+                    key={option}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={selectedValues.includes(option)}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          const newValues = isChecked 
+                            ? [...selectedValues, option]
+                            : selectedValues.filter(val => val !== option);
+                          
+                          // Update pending filters directly
+                          const newPendingFilters = { ...pendingFilters };
+                          newPendingFilters[activeColumn] = newValues;
+                          handleEnumChange(activeColumn)({ target: { value: newValues } });
+                        }}
+                      />
                     }
-                  }}
-                />
-              ));
+                    label={
+                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        {formatOptionLabel(option)}
+                      </Typography>
+                    }
+                    sx={{ 
+                      '& .MuiFormControlLabel-label': { 
+                        fontSize: '0.8rem',
+                        marginLeft: 0.5
+                      }
+                    }}
+                  />
+                );
+              });
             })()}
           </FormGroup>
           
