@@ -361,6 +361,12 @@ const MarketplaceReconciliation: React.FC = () => {
         rows.push(['Summary', 'Total Reconciled (amount)', String(safeNum(s.total_reconciled_amount))]);
         rows.push(['Summary', 'Total Unreconciled (count)', String(safeNum(s.total_unreconciled_count))]);
         rows.push(['Summary', 'Total Unreconciled (amount)', String(safeNum(s.total_unreconciled_amount))]);
+
+        // If present, also include expected net sales vs matched for context
+        if (s.net_sales_amount != null || s.net_sales_orders != null) {
+          rows.push(['Summary', 'Net Sales Amount (expected)', String(safeNum(s.net_sales_amount))]);
+          rows.push(['Summary', 'Net Sales Orders (expected)', String(safeNum(s.net_sales_orders))]);
+        }
       } else if (reconciliationData?.summaryData) {
         const sd = reconciliationData.summaryData as any;
         const grossSales = amt(reconciliationData.grossSales);
@@ -405,6 +411,57 @@ const MarketplaceReconciliation: React.FC = () => {
             });
           }
         }
+      }
+
+      // Settled tab providers (when visible): include Reconcile providers with amounts and counts
+      if (typeof (mainSummary as any)?.Reconcile !== 'undefined') {
+        const { gateways, cod } = splitGatewaysAndCod((mainSummary as any)?.Reconcile);
+        const allProviders = [
+          ...gateways.map((g: any) => ({ section: 'Settled by Providers', name: g.displayName, amount: safeNum(g.totalSaleAmount), count: safeNum(g.totalCount) })),
+          ...cod.map((c: any) => ({ section: 'Settled by Providers (COD)', name: c.displayName, amount: safeNum(c.totalSaleAmount), count: safeNum(c.totalCount) })),
+        ];
+        if (allProviders.length > 0) {
+          rows.push(['', '', '']);
+          rows.push(['Settled by Providers', 'Provider', 'Amount']);
+          allProviders.forEach((p) => rows.push([p.section, String(p.name), String(p.amount)]));
+          rows.push(['Settled by Providers', 'Provider', 'Orders']);
+          allProviders.forEach((p) => rows.push([p.section, String(p.name), String(p.count)]));
+        }
+      }
+
+      // Unsettled (Pending Payment) providers if available on screen from main-summary
+      if (typeof (mainSummary as any)?.Unsettled !== 'undefined') {
+        const unsettled = (mainSummary as any).Unsettled;
+        const { gateways, cod } = splitGatewaysAndCod(unsettled);
+        const allUnsettled = [
+          ...gateways.map((g: any) => ({ section: 'Pending Payment by Providers', name: g.displayName, amount: safeNum(g.totalSaleAmount), count: safeNum(g.totalCount) })),
+          ...cod.map((c: any) => ({ section: 'Pending Payment (COD)', name: c.displayName, amount: safeNum(c.totalSaleAmount), count: safeNum(c.totalCount) })),
+        ];
+        if (allUnsettled.length > 0) {
+          rows.push(['', '', '']);
+          rows.push(['Pending Payment by Providers', 'Provider', 'Amount']);
+          allUnsettled.forEach((p) => rows.push([p.section, String(p.name), String(p.amount)]));
+          rows.push(['Pending Payment by Providers', 'Provider', 'Orders']);
+          allUnsettled.forEach((p) => rows.push([p.section, String(p.name), String(p.count)]));
+        }
+      }
+
+      // Commission & Charges section from main-summary
+      const commissionArray = (mainSummary as any)?.commission as Array<{
+        platform: string;
+        total_amount_settled: number;
+        total_commission: number;
+        total_gst_on_commission: number;
+      }> | undefined;
+      if (commissionArray && commissionArray.length > 0) {
+        rows.push(['', '', '']);
+        rows.push(['Commission & Charges', 'Platform', 'Value']);
+        commissionArray.forEach((item) => {
+          const name = item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1);
+          rows.push(['Commission & Charges', `${name} - Total Amount Settled`, String(safeNum(item.total_amount_settled))]);
+          rows.push(['Commission & Charges', `${name} - Commission`, String(safeNum(item.total_commission))]);
+          rows.push(['Commission & Charges', `${name} - GST on Commission`, String(safeNum(item.total_gst_on_commission))]);
+        });
       }
 
       const csv = rows
@@ -3950,6 +4007,55 @@ const MarketplaceReconciliation: React.FC = () => {
             {ageingLoading ? (
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                 <CircularProgress />
+              </Box>
+            ) : ageingData.length === 1 ? (
+              // Single-vendor minimalist greyscale layout
+              <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                {(() => {
+                  const single = ageingData[0];
+                  const total = AGE_BUCKETS.reduce((sum, bucket) => sum + (single.distribution[bucket] || 0), 0);
+                  const percents = AGE_BUCKETS.map((bucket) => ({
+                    bucket,
+                    value: total > 0 ? ((single.distribution[bucket] || 0) / total) * 100 : 0,
+                  }));
+                  const GREYS: Record<typeof AGE_BUCKETS[number], string> = {
+                    '<=1d': '#d9d9d9',
+                    '2-3d': '#bfbfbf',
+                    '4-7d': '#a6a6a6',
+                    '8-14d': '#8c8c8c',
+                    '15-30d': '#737373',
+                    '>30d': '#595959',
+                  };
+                  return (
+                    <>
+                      <Typography variant="h2" sx={{ color: '#111827', fontWeight: 700, lineHeight: 1, mb: 0.5 }}>
+                        {Number(single.averageDaysToSettle).toFixed(1)}
+                        <Typography component="span" variant="h6" sx={{ color: '#6b7280', fontWeight: 500, ml: 1 }}>days</Typography>
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#6b7280', mb: 2 }}>
+                        {getProviderDisplayName(single.settlement_provider)}
+                      </Typography>
+                      <Box sx={{ width: '100%', maxWidth: 720 }}>
+                        <Box sx={{ height: 16, borderRadius: '9999px', overflow: 'hidden', bgcolor: '#e5e7eb' }}>
+                          <Box sx={{ display: 'flex', width: '100%', height: '100%' }}>
+                            {percents.map(({ bucket, value }) => (
+                              <Box key={bucket} sx={{ width: `${value}%`, height: '100%', bgcolor: GREYS[bucket] }} />
+                            ))}
+                          </Box>
+                        </Box>
+                        <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 1 }}>
+                          {percents.map(({ bucket, value }) => (
+                            <Box key={bucket} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                              <Box sx={{ width: 10, height: 10, borderRadius: 2, bgcolor: GREYS[bucket], border: '1px solid #e5e7eb' }} />
+                              <Typography variant="caption" sx={{ color: '#4b5563' }}>{bucket}</Typography>
+                              <Typography variant="caption" sx={{ color: '#9ca3af', ml: 'auto' }}>{Math.round(value)}%</Typography>
+                            </Box>
+                          ))}
+                        </Box>
+                      </Box>
+                    </>
+                  );
+                })()}
               </Box>
             ) : (
               <ResponsiveContainer width="100%" height="100%">

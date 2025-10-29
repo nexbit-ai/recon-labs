@@ -365,6 +365,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           minHeight: '100vh',
           backgroundColor: 'background.default',
+          pt: 2,
         }}
       >
         {children}
