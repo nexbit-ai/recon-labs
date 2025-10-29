@@ -3455,8 +3455,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               border: '1px solid #e5e7eb'
             }}>
               <CardContent sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap:  2}}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, gap: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
                     <IconButton
                       onClick={onBack}
                       size="small"
@@ -3464,6 +3464,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         background: '#1f2937',
                         color: 'white',
                         mt: -2,
+                        flexShrink: 0,
                         '&:hover': {
                           background: '#374151',
                           transform: 'scale(1.05)',
@@ -3479,6 +3480,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       letterSpacing: '-0.02em',
                       py: 0.5,
                       mt: -2,
+                      flexShrink: 0,
                     }}>
                       Transaction Sheet
                     </Typography>
@@ -3488,14 +3490,24 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       value={activeTab} 
                       onChange={handleTabChange}
                       sx={{
+                        minWidth: 'fit-content',
+                        flexShrink: 0,
+                        ml: 1,
+                        '& .MuiTabs-flexContainer': {
+                          gap: 0.5,
+                        },
                         '& .MuiTab-root': {
                           minHeight: 32,
                           fontSize: '0.875rem',
                           fontWeight: 600,
                           textTransform: 'none',
                           color: '#6b7280',
-                          px: 2,
+                          px: 2.5,
                           py: 0.5,
+                          minWidth: 'fit-content',
+                          whiteSpace: 'nowrap',
+                          overflow: 'visible',
+                          textOverflow: 'clip',
                           '&.Mui-selected': {
                             color: '#1f2937',
                             fontWeight: 700,
