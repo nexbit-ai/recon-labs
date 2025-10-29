@@ -162,9 +162,7 @@ interface TransactionQueryParams {
 
 // Transform API data to TransactionRow format
 const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
-  // Debug logging to see what we're getting from the API
-  console.log('OrderItem from API:', orderItem);
-  console.log('Available fields in OrderItem:', Object.keys(orderItem));
+  // Debug logging removed
   
   // Helper function to parse numeric values
   const parseNumericValue = (value: any): number => {
@@ -192,7 +190,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   const settlementValue = parseNumericValue(orderItem.settlement_amount); // Changed from settlement_value to settlement_amount
   const difference = parseNumericValue(orderItem.diff);
   
-  console.log('Parsed values - orderValue:', orderValue, 'settlementValue:', settlementValue, 'difference:', difference);
+  // Debug logging removed
   
   // Determine remark based on recon_status
   let remark = "Unsettled";
@@ -825,10 +823,7 @@ const TransactionDetailsPopup: React.FC<{
   // Access the preserved original API response data
   const originalData = (transaction as any)?.originalData || {};
   
-  // Debug logging to see what data we have
-  console.log('Transaction for popup:', transaction);
-  console.log('Original API data:', originalData);
-  console.log('Available fields in originalData:', Object.keys(originalData));
+  // Debug logging removed
   
   // Get values from the actual API response structure
   const orderValue = transaction["Order Value"] || 0;
@@ -855,40 +850,7 @@ const TransactionDetailsPopup: React.FC<{
   const difference = parseFloat(originalData.diff || 0);
   const status = transaction["Remark"] || "Nan";
   
-  // Debug logging for individual field values
-  console.log('Field values extracted:');
-  console.log('- Collection Received:', {
-    settlement_value: calculationInputs.settlement_value,
-    final: collectionReceived
-  });
-  console.log('- Marketplace Fee:', {
-    marketplace_fee: calculationInputs.marketplace_fee,
-    final: marketplaceFee
-  });
-  console.log('- Taxes:', {
-    taxes: calculationInputs.taxes,
-    final: taxes
-  });
-  console.log('- Total Offer Amount:', {
-    total_offer_amount: calculationInputs.total_offer_amount,
-    final: totalOfferAmount
-  });
-  console.log('- Seller Share Offer:', {
-    seller_share_offer: calculationInputs.seller_share_offer,
-    final: sellerShareOffer
-  });
-  console.log('- TDS Deducted:', {
-    tds: context.tds,
-    final: tdsDeducted
-  });
-  console.log('- TCS Deducted:', {
-    tcs: context.tcs,
-    final: tcsDeducted
-  });
-  console.log('- Difference:', {
-    diff: originalData.diff,
-    final: difference
-  });
+  // Debug logging removed
 
   // Calculate smart positioning
   const getPopupPosition = () => {
@@ -1219,11 +1181,8 @@ const TransactionDetailsPopup: React.FC<{
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('Info icon clicked!');
-                  console.log('Current formulaAnchorEl:', formulaAnchorEl);
-                  console.log('Setting new anchor:', e.currentTarget);
+                  
                   setFormulaAnchorEl(e.currentTarget);
-                  console.log('After setting - formulaAnchorEl:', e.currentTarget);
                 }}
                 sx={{
                   p: 0,
@@ -1265,7 +1224,6 @@ const TransactionDetailsPopup: React.FC<{
           open={Boolean(formulaAnchorEl)}
           anchorEl={formulaAnchorEl}
           onClose={() => {
-            console.log('Closing formula popover');
             setFormulaAnchorEl(null);
           }}
           anchorOrigin={{
@@ -1945,13 +1903,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     meta['Settlement Provider'] = { type: 'enum' };
     meta['Mismatch Reason'] = { type: 'enum' };
     
-    console.log('[getColumnMeta] Final COLUMN_META keys:', Object.keys(meta));
-    console.log('[getColumnMeta] Breakup fields included:', {
-      'Shipping Courier': meta['Shipping Courier'],
-      'Recon Status': meta['Recon Status'],
-      'Settlement Provider': meta['Settlement Provider'],
-      'Mismatch Reason': meta['Mismatch Reason']
-    });
+    // Debug logging removed
     
     return meta;
   };
@@ -1966,22 +1918,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Update COLUMN_META when totalTransactionsData changes
   useEffect(() => {
-    console.log('[DEBUG] totalTransactionsData changed:', totalTransactionsData);
     const newMeta = getColumnMeta();
     setCOLUMN_META(newMeta);
-    console.log('[DEBUG] Updated COLUMN_META keys:', Object.keys(newMeta));
-    console.log('[DEBUG] Breakup fields in COLUMN_META:', {
-      'Shipping Courier': newMeta['Shipping Courier'],
-      'Recon Status': newMeta['Recon Status'],
-      'Settlement Provider': newMeta['Settlement Provider']
-    });
+    
   }, [totalTransactionsData, useNewAPI]);
 
   // Force update COLUMN_META on mount
   useEffect(() => {
     const initialMeta = getColumnMeta();
     setCOLUMN_META(initialMeta);
-    console.log('[DEBUG] Initial COLUMN_META keys:', Object.keys(initialMeta));
   }, []);
 
   // Sorting functions
@@ -2173,11 +2118,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     if (remarkToUse === 'settlement_matched') {
       // For settled tab, use status_in with comma-separated values
       params.status_in = 'settlement_matched,less_payment_received,more_payment_received';
-      console.log('Setting API parameter: status_in = settlement_matched,less_payment_received,more_payment_received (for Settled tab)');
+      
     } else if (remarkToUse === 'unsettled') {
       // For unsettled tab, use status=unsettled (not status_in)
       params.status = 'unsettled';
-      console.log('Setting API parameter: status = unsettled (for Unsettled tab)');
+      
     }
 
     // ALWAYS add invoice date range - this is required for all API calls
@@ -2185,7 +2130,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     if (dateRangeToUse.start && dateRangeToUse.end) {
       params.order_date_from = dateRangeToUse.start;
       params.order_date_to = dateRangeToUse.end;
-      console.log('[buildQueryParams] Adding order date range:', { order_date_from: dateRangeToUse.start, order_date_to: dateRangeToUse.end });
+      
     } else {
       console.warn('[buildQueryParams] No date range provided - API call may fail');
     }
@@ -2194,11 +2139,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
     if (platformsToUse.length > 0) {
       params.platform = platformsToUse.join(',');
-      console.log('[buildQueryParams] Platform parameter:', {
-        selectedPlatforms: platformsToUse,
-        platformParam: params.platform,
-        isAllSelected: platformsToUse.length === availablePlatforms.length
-      });
+      
     } else {
       console.warn('[buildQueryParams] No platforms selected - API call may not return data');
     }
@@ -2288,7 +2229,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     
     try {
       const queryParams = buildQueryParams(pageNumber, remark, filters, dateRangeFilter);
-      console.log(`Fetching orders with applied filters:`, queryParams);
+      
       
       // Example query string that would be sent to API:
       // status_in=unsettled&order_date_from=2025-04-01&order_date_to=2025-04-30&diff_min=-500&diff_max=0&sort_by=order_date&sort_order=desc&order_item_id=333981993553920100
@@ -2296,16 +2237,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         .filter(([_, value]) => value !== undefined && value !== null && value !== '')
         .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
         .join('&');
-      console.log(`Query string with applied filters:`, queryString);
+      
       
       const response = await api.transactions.getTotalTransactions(queryParams as any);
       
       if (response.success && response.data) {
         // Debug: Log the API response structure
-        console.log('API Response:', response.data);
+        
         const responseData = response.data as any;
         const transactionData = responseData.transactions || responseData.orders || responseData;
-        console.log('Transactions:', transactionData);
+        
         
         // Handle metadata if available
         if ((response.data as any).meta) {
@@ -2330,11 +2271,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         if (Array.isArray(transactionData)) {
           // If transactionData is directly an array of transactions
           transactionData.forEach((transaction: any, transactionIndex: number) => {
-            console.log(`Transaction ${transactionIndex}:`, transaction);
+            
             if (transaction.order_items) {
               // If it's in the old orders format
               transaction.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
-                console.log(`OrderItem ${itemIndex} in Transaction ${transactionIndex}:`, orderItem);
+                
                 transactionRows.push(transformOrderItemToTransactionRow(orderItem));
               });
             } else {
@@ -2344,7 +2285,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           });
         } else if (transactionData && typeof transactionData === 'object') {
           // If transactionData is an object, check if it has array properties
-          console.log('TransactionData is an object:', transactionData);
+          
           
           // Try to find array properties that might contain the actual data
           const possibleArrays = ['transactions', 'orders', 'data', 'items'];
@@ -2352,13 +2293,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           
           for (const key of possibleArrays) {
             if (Array.isArray(transactionData[key])) {
-              console.log(`Found data array in property: ${key}`);
+              
               transactionData[key].forEach((item: any, index: number) => {
-                console.log(`${key} ${index}:`, item);
+                
                 if (item.order_items) {
                   // If it's in the old orders format
                   item.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
-                    console.log(`OrderItem ${itemIndex} in ${key} ${index}:`, orderItem);
+                    
                     transactionRows.push(transformOrderItemToTransactionRow(orderItem));
                   });
                 } else {
@@ -2416,9 +2357,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     try {
       const queryParams = buildQueryParams(pageNumber, remark, undefined, undefined, overridePlatforms);
       const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
-      console.log(`[fetchOrders] Current selectedPlatforms state:`, platformsToUse);
-      console.log(`[fetchOrders] Fetching orders with params:`, queryParams);
-      console.log(`[fetchOrders] Platform in params:`, queryParams.platform);
+      
       
       // Example query string that would be sent to API:
       // status_in=unsettled&order_date_from=2025-04-01&order_date_to=2025-04-30&diff_min=-500&diff_max=0&sort_by=order_date&sort_order=desc&order_item_id=333981993553920100
@@ -2426,16 +2365,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         .filter(([_, value]) => value !== undefined && value !== null && value !== '')
         .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
         .join('&');
-      console.log(`Query string:`, queryString);
+      
       
       const response = await api.transactions.getTotalTransactions(queryParams as any);
       
       if (response.success && response.data) {
         // Debug: Log the API response structure
-        console.log('API Response:', response.data);
+        
         const responseData = response.data as any;
         const transactionData = responseData.transactions || responseData.orders || responseData;
-        console.log('Transactions:', transactionData);
+        
         
         // Handle metadata if available
         if ((response.data as any).meta) {
@@ -2460,11 +2399,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         if (Array.isArray(transactionData)) {
           // If transactionData is directly an array of transactions
           transactionData.forEach((transaction: any, transactionIndex: number) => {
-            console.log(`Transaction ${transactionIndex}:`, transaction);
+            
             if (transaction.order_items) {
               // If it's in the old orders format
               transaction.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
-                console.log(`OrderItem ${itemIndex} in Transaction ${transactionIndex}:`, orderItem);
+                
                 transactionRows.push(transformOrderItemToTransactionRow(orderItem));
               });
             } else {
@@ -2474,7 +2413,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           });
         } else if (transactionData && typeof transactionData === 'object') {
           // If transactionData is an object, check if it has array properties
-          console.log('TransactionData is an object:', transactionData);
+          
           
           // Try to find array properties that might contain the actual data
           const possibleArrays = ['transactions', 'orders', 'data', 'items'];
@@ -2482,13 +2421,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           
           for (const key of possibleArrays) {
             if (Array.isArray(transactionData[key])) {
-              console.log(`Found data array in property: ${key}`);
+              
               transactionData[key].forEach((item: any, index: number) => {
-                console.log(`${key} ${index}:`, item);
+                
                 if (item.order_items) {
                   // If it's in the old orders format
                   item.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
-                    console.log(`OrderItem ${itemIndex} in ${key} ${index}:`, orderItem);
+                    
                     transactionRows.push(transformOrderItemToTransactionRow(orderItem));
                   });
                 } else {
@@ -2589,8 +2528,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Apply platform changes - called when Apply button next to platform selector is clicked
   const applyPlatformFilter = () => {
     const platformsCommaSeparated = pendingSelectedPlatforms.join(',');
-    console.log('[Apply Platform Filter] Applying platforms:', pendingSelectedPlatforms);
-    console.log('[Apply Platform Filter] Comma-separated platform parameter:', platformsCommaSeparated || 'EMPTY');
+    
     setSelectedPlatforms(pendingSelectedPlatforms);
     setPage(0);
     setCurrentPage(1);
@@ -2599,7 +2537,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Apply header date range changes - called when Apply button next to date selector is clicked
   const applyHeaderDateRange = () => {
-    console.log('[Apply Header Date Range] Applying date range:', pendingHeaderDateRange);
+    
     setHeaderDateRange(pendingHeaderDateRange);
     setDateRange(pendingHeaderDateRange);
     setPage(0);
@@ -2719,11 +2657,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
     applySortOverride?: boolean
   ) => {
-    console.log('[fetchDualTransactions] Called with:', { pageNumber, filters, dateRangeFilter, overridePlatforms, orderIds });
+    
     
     // Prevent duplicate calls from React Strict Mode
     if (isFetchingRef.current) {
-      console.log('[fetchDualTransactions] Already fetching, skipping duplicate call');
       return;
     }
     
@@ -2879,8 +2816,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         unsettledParams.order_id = orderIdsCsv;
       }
       
-      console.log('[fetchDualTransactions] Settled params:', settledParams);
-      console.log('[fetchDualTransactions] Unsettled params:', unsettledParams);
+      
       
       // Determine if we should make unsettled API call
       const shouldFetchUnsettled = !hasStatusFilter || (hasStatusFilter && statusFilter.includes('unsettled'));
@@ -2898,15 +2834,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Process settled response
       if (settledResponse.success) {
         setSettledData(settledResponse.data);
-        console.log('[fetchDualTransactions] Settled data received:', settledResponse.data);
-        console.log('[fetchDualTransactions] Settled columns:', settledResponse.data?.columns);
-        console.log('[fetchDualTransactions] First settled row:', settledResponse.data?.data?.[0]);
-        if (settledResponse.data?.data?.[0]) {
-          const firstRow = settledResponse.data.data[0];
-          console.log('[fetchDualTransactions] settlement_amount in first row:', (firstRow as any).settlement_amount);
-          console.log('[fetchDualTransactions] settlement_value in first row:', (firstRow as any).settlement_value);
-          console.log('[fetchDualTransactions] All keys in first row:', Object.keys(firstRow));
-        }
+        
       } else {
         console.error('[fetchDualTransactions] Settled API failed:', settledResponse);
       }
@@ -2914,9 +2842,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Process unsettled response (only if we actually fetched it)
       if (shouldFetchUnsettled && unsettledResponse.success) {
         setUnsettledData(unsettledResponse.data);
-        console.log('[fetchDualTransactions] Unsettled data received:', unsettledResponse.data);
-        console.log('[fetchDualTransactions] Unsettled columns:', unsettledResponse.data?.columns);
-        console.log('[fetchDualTransactions] First unsettled row:', unsettledResponse.data?.data?.[0]);
+        
       } else {
         console.error('[fetchDualTransactions] Unsettled API failed:', unsettledResponse);
       }
@@ -2980,7 +2906,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
       if (platformsToUse.length > 0) {
         params.platform = platformsToUse.join(',');
-        console.log('[fetchTotalTransactions] Adding platform parameter:', params.platform);
       } else {
         console.warn('[fetchTotalTransactions] No platforms selected');
       }
@@ -3060,7 +2985,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         params.order_date_to = dateRangeFilter.end;
       }
       
-      console.log('Fetching total transactions with params:', params);
+      
       
       // Use custom API call with specific organization ID for this API only
       const response = await apiService.get<TotalTransactionsResponse>(
@@ -3075,9 +3000,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       );
       
       if (response.success && response.data) {
-        console.log('API Response received:', response.data);
-        console.log('Columns:', response.data.columns);
-        console.log('First row of data:', response.data.data?.[0]);
         
         setTotalTransactionsData(response.data);
         setTotalCount(response.data.pagination?.total_count || 0);
@@ -3099,7 +3021,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           unsettled: unsettledCount
         });
         
-        console.log('Total transactions fetched successfully:', response.data);
+        
       } else {
         setError('Failed to fetch transactions');
       }
@@ -3222,10 +3144,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Open/close popover for a column
   const openFilterPopover = (columnKey: string, target: HTMLElement) => {
-    console.log('openFilterPopover called:', columnKey, target);
-    console.log('Setting state - activeFilterColumn:', columnKey, 'headerFilterAnchor:', !!target);
-    console.log('Available columns in COLUMN_META:', Object.keys(COLUMN_META));
-    console.log('Is breakup field?', ['Shipping Courier', 'Recon Status', 'Settlement Provider'].includes(columnKey));
     
     // Initialize pending filters with current active filters
     setPendingColumnFilters(columnFilters);
@@ -3234,18 +3152,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setActiveFilterColumn(columnKey);
     setHeaderFilterAnchor(target);
     
-    // Debug: Check state after a short delay
-    setTimeout(() => {
-      console.log('State after 50ms:', { 
-        activeFilterColumn: columnKey, 
-        headerFilterAnchor: !!target,
-        shouldRender: Boolean(target) && Boolean(columnKey)
-      });
-    }, 50);
+    
   };
 
   const closeFilterPopover = () => {
-    console.log('closeFilterPopover called');
     setHeaderFilterAnchor(null);
     setActiveFilterColumn(null);
   };
@@ -3266,10 +3176,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     event.preventDefault();
     event.stopPropagation();
     
-    // Debug logging to see what data we're passing to the popup
-    console.log('Opening popup for row:', row);
-    console.log('Row data structure:', Object.keys(row));
-    console.log('Original data in row:', (row as any).originalData);
     
     setSelectedTransaction(row);
     setAnchorEl(event.currentTarget);
@@ -3420,7 +3326,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Handle tab change
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    console.log(`Tab changed from ${activeTab} to ${newValue}`);
     setActiveTab(newValue);
     setPage(0); // Reset to first page when changing tabs
     setCurrentPage(1); // Reset current page
@@ -4196,7 +4101,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 const fallbackValue = (row as any).settlement_amount || (row as any).settlement_value;
                                 if (fallbackValue !== undefined && fallbackValue !== null) {
                                   value = fallbackValue;
-                                  console.log('[Settlement Value Fallback - Dual API] Column key:', columnDef.key, 'returned:', (row as any)[columnDef.key], 'Using fallback settlement_amount:', (row as any).settlement_amount);
+                                  
                                 }
                               }
                             }
@@ -4211,7 +4116,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 const fallbackValue = (row as any).settlement_amount || (row as any).settlement_value;
                                 if (fallbackValue !== undefined && fallbackValue !== null) {
                                   value = fallbackValue;
-                                  console.log('[Settlement Value Fallback - New API] Column key:', columnDef.key, 'returned:', (row as any)[columnDef.key], 'Using fallback settlement_amount:', (row as any).settlement_amount);
+                                  
                                 }
                               }
                             }
@@ -4474,11 +4379,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         {/* Filter Menu Portal - Rendered outside table container */}
         {(() => {
           const shouldRender = Boolean(headerFilterAnchor) && Boolean(activeFilterColumn);
-          console.log('Portal render check:', { 
-            headerFilterAnchor: !!headerFilterAnchor, 
-            activeFilterColumn, 
-            shouldRender 
-          });
+          
           return shouldRender;
         })() && (
           <Portal>
