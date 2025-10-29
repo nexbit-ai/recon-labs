@@ -3136,6 +3136,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleOrderIdSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setOrderIdSearch(value);
+    // If cleared via typing, immediately clear filter and refetch without order_id
+    if (value.trim() === '') {
+      setOrderIdChips([]);
+      setPage(0);
+      setCurrentPage(1);
+      fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, []);
+    }
   };
 
   // Handle Order ID search button click
@@ -3168,7 +3175,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Trigger API call without order IDs
     setPage(0);
     setCurrentPage(1);
-    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
+    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, []);
   };
 
   // Handle number range filter
@@ -3408,7 +3415,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setShowOrderIdSearch(false); // Hide order ID search bar
     setPage(0);
     setCurrentPage(1);
-    fetchDualTransactions(1, {}, { start: '', end: '' }, [...availablePlatforms]);
+    fetchDualTransactions(1, {}, { start: '', end: '' }, [...availablePlatforms], []);
   };
 
   // Handle tab change
@@ -3890,7 +3897,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           setShowOrderIdSearch(false);
                           setPage(0);
                           setCurrentPage(1);
-                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
+                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, []);
                         }}
                         size="small"
                         sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600 }}
@@ -4092,6 +4099,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     InputProps={{
                                       endAdornment: (
                                         <InputAdornment position="end">
+                                          {orderIdSearch?.trim() && (
+                                            <IconButton
+                                              size="small"
+                                              onClick={handleOrderIdSearchClear}
+                                              disabled={(loading || dualApiLoading) && !isSorting}
+                                              sx={{ p: 0.5, mr: 0.25 }}
+                                            >
+                                              <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
+                                            </IconButton>
+                                          )}
                                           <IconButton
                                             size="small"
                                             onClick={handleOrderIdSearchClick}
