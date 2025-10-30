@@ -93,8 +93,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (option === 'Settings') {
       // Navigate to settings page or show settings modal
       console.log('Settings clicked');
-    } else if (option === 'Security') {
-      navigate('/security');
     } else if (option === 'Pricing') {
       navigate('/pricing');
     } else if (option === 'Logout') {
@@ -271,7 +269,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
           <MenuItem onClick={() => handleMenuOption('Settings')}>Settings</MenuItem>
-          <MenuItem onClick={() => handleMenuOption('Security')}>Security</MenuItem>
+          <MenuItem onClick={() => handleMenuOption('Pricing')}>Pricing</MenuItem>
           <MenuItem onClick={() => handleMenuOption('Logout')}>
             <LogoutIcon sx={{ mr: 1 }} />
             Logout

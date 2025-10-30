@@ -1937,7 +1937,13 @@ const DisputePage: React.FC = () => {
                     const difference = row["Difference"] || 0;
                     const remark = row["Remark"] || 'Not Available';
                     const eventType = row["Event Type"] || 'Sale';
-                    const reason = 'Not Available'; // API doesn't provide reason
+                    // Show reason from mismatch_reason metadata
+                    let reason = (row.originalData?.metadata?.mismatch_reason || '').trim();
+                    if (reason) {
+                      reason = reason.charAt(0).toUpperCase() + reason.slice(1);
+                    } else {
+                      reason = '';
+                    }
                     const status = row.originalData?.breakups?.recon_status || 'less_payment_received';
                     
                      return (
@@ -2060,21 +2066,20 @@ const DisputePage: React.FC = () => {
 
       {/* Minimal Raise Dispute Dialog */}
       <Dialog open={raiseDialogOpen} onClose={closeRaiseDispute} PaperProps={{ sx: { borderRadius: 1, minWidth: 420 } }}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Raise dispute to Flipkart</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ color: '#374151', mb: 0.5 }}>Reason: {formatReasonLabel(selectedRaiseGroup?.reason || 'Unknown')}</Typography>
-          <Typography variant="body2" sx={{ color: '#374151', mb: 2 }}>Total orders: {selectedRaiseGroup?.count || 0}</Typography>
-          <TextField
-            label="Description"
-            placeholder="Add a short note for this dispute..."
-            value={raiseDescription}
-            onChange={(e) => setRaiseDescription(e.target.value)}
-            fullWidth
-            multiline
-            minRows={3}
-            size="small"
-          />
-        </DialogContent>
+      <DialogTitle sx={{ fontWeight: 700 }}>Raise dispute to Flipkart</DialogTitle>
+<DialogContent>
+  <Typography variant="body2" sx={{ color: '#374151', mb: 2 }}>Total orders: {selectedRaiseGroup?.count || 0}</Typography>
+  <TextField
+    label="Description"
+    placeholder="Add a short note for this dispute..."
+    value={raiseDescription}
+    onChange={(e) => setRaiseDescription(e.target.value)}
+    fullWidth
+    multiline
+    minRows={3}
+    size="small"
+  />
+</DialogContent>
         <DialogActions sx={{ px: 2, pb: 2 }}>
           <Button variant="text" onClick={closeRaiseDispute} sx={{ color: '#111827' }}>Cancel</Button>
           <Button variant="contained" onClick={sendRaiseDispute} sx={{ boxShadow: 'none' }}>Send</Button>
@@ -2122,8 +2127,27 @@ const DisputePage: React.FC = () => {
                   <Button
                     variant="outlined"
                     onClick={() => {
-                      selectedIds.forEach(id => handleRaiseDispute(id));
-                      setSelectedIds([]);
+                      if (selectedIds.length === 1) {
+                        handleRaiseDispute(selectedIds[0]);
+                      } else if (selectedIds.length > 1) {
+                        const selectedTransactions = (apiRows as any[]).filter(row => {
+                          const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
+                          return selectedIds.includes(orderId);
+                        });
+                        const reasons = selectedTransactions.map(tr => tr?.originalData?.breakups?.mismatch_reason || tr["Remark"] || 'Unknown');
+                        const uniqueReasons = Array.from(new Set(reasons.filter(r => r !== undefined && r !== null)));
+                        let popupReason = '';
+                        if (uniqueReasons.length === 1) {
+                          popupReason = uniqueReasons[0];
+                        } else {
+                          popupReason = 'Multiple reasons';
+                        }
+                        openRaiseDispute({
+                          reason: popupReason,
+                          count: selectedIds.length,
+                          orderIds: selectedIds.slice(),
+                        });
+                      }
                     }}
                     sx={{
                       fontSize: '0.875rem',
