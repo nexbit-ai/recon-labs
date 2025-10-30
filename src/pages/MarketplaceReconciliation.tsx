@@ -2173,17 +2173,17 @@ const MarketplaceReconciliation: React.FC = () => {
                   {(() => {
                     // Use main-summary as the sole source for the summary math
                     const s = mainSummary?.summary as any;
-                    const totalSalesAmount = Number(s?.total_transactions_amount || 0);
+                    const totalSalesAmount = Math.abs(Number(s?.total_transactions_amount || 0));
                     const totalSalesCount = Number(s?.total_transaction_orders || 0);
 
-                    const returnsAmount = Number(s?.total_return_amount || 0);
+                    const returnsAmount = Math.abs(Number(s?.total_return_amount || 0));
                     const returnsCount = Number(s?.total_return_orders || 0);
 
-                    const cancellationsAmount = Number(s?.total_cancellations_amount || 0);
+                    const cancellationsAmount = Math.abs(Number(s?.total_cancellations_amount || 0));
                     const cancellationsCount = Number(s?.total_cancellations_orders || 0);
 
                     // Use API-provided net sales values
-                    const netSalesAmount = Number(s?.net_sales_amount || 0);
+                    const netSalesAmount = Math.abs(Number(s?.net_sales_amount || 0));
                     const netSalesCount = Number(s?.net_sales_orders || 0);
 
                     const sections = [
