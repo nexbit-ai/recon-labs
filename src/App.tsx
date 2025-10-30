@@ -26,7 +26,6 @@ import UploadDocuments from './pages/UploadDocuments';
 import AIWorkflows from './pages/AIWorkflows';
 import Assistant from './pages/Assistant';
 import AIReconciliation from './pages/AIReconciliation';
-import Pricing from './pages/Pricing';
 import Bookkeeping from './pages/Bookkeeping';
 
 // Components
@@ -452,11 +451,6 @@ function App() {
             <Route path="/ai-reconciliation" element={
               <ProtectedRoute>
                 <Layout><AIReconciliation /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/pricing" element={
-              <ProtectedRoute>
-                <Layout><Pricing /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/bookkeeping" element={
