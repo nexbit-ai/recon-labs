@@ -21,7 +21,7 @@ import RecentActivities from './pages/RecentActivities';
 import MarketplaceReconciliation from './pages/MarketplaceReconciliation';
 import DisputePage from './pages/Dispute';
 import Reports from './pages/Reports';
-import ConnectDataSources from './pages/ConnectDataSources';
+// import ConnectDataSources from './pages/ConnectDataSources'; // Deprecated
 import UploadDocuments from './pages/UploadDocuments';
 import AIWorkflows from './pages/AIWorkflows';
 import Assistant from './pages/Assistant';
@@ -426,11 +426,6 @@ function App() {
             <Route path="/finance-dashboard" element={
               <ProtectedRoute>
                 <Layout><MarketplaceReconciliation /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/connect-data-sources" element={
-              <ProtectedRoute>
-                <Layout><ConnectDataSources /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/upload-documents" element={

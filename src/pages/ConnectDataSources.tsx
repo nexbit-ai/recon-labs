@@ -1,3 +1,6 @@
+// --------------------
+// DEPRECATED - Only upload is needed for data sources now. This page has been commented out as per new requirements.
+// --------------------
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 

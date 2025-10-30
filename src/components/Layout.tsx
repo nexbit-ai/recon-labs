@@ -198,13 +198,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         ))}
       </List>
       <Box sx={{ mb: 2 }}>
+        {/* Upload nav button added instead of Data Sources (was here) */}
         <ListItem disablePadding>
-          <ListItemButton 
-            onClick={() => navigate('/connect-data-sources')} 
-            selected={location.pathname === '/connect-data-sources'}
-            sx={{ 
-              borderRadius: 0, 
-              mr: 2, 
+          <ListItemButton
+            onClick={() => navigate('/upload-documents')}
+            selected={location.pathname === '/upload-documents'}
+            sx={{
+              borderRadius: 0,
+              mr: 2,
               my: 0.25,
               '&.Mui-selected': {
                 backgroundColor: theme.palette.primary.main + '15',
@@ -214,22 +215,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               },
             }}
           >
-            <ListItemIcon 
-              sx={{ 
-                color: location.pathname === '/connect-data-sources' ? theme.palette.primary.main : 'inherit',
-                minWidth: 36 
-              }}
-            >
-              <StorageIcon />
+            <ListItemIcon sx={{ minWidth: 36 }}>
+              {/* Use the built-in Upload icon from MUI */}
+              <CompareArrowsIcon />
             </ListItemIcon>
-            <ListItemText 
-              primary="Data Sources" 
-              sx={{
-                color: location.pathname === '/connect-data-sources' ? theme.palette.primary.main : 'inherit',
-              }}
+            <ListItemText
+              primary={<Typography sx={{ fontWeight: 500 }}>Upload</Typography>}
+              sx={{ color: location.pathname === '/upload-documents' ? theme.palette.primary.main : 'inherit' }}
             />
           </ListItemButton>
         </ListItem>
+        {/* Data Sources nav commented out: only upload is now shown to user. */}
         <ListItem disablePadding>
           <ListItemButton onClick={handleSettingsClick} sx={{ borderRadius: 0, mr: 2, my: 0.25 }}>
             <ListItemIcon sx={{ minWidth: 36 }}>
