@@ -42,15 +42,17 @@ import {
   ListItemButton,
   ListItemText,
   ListSubheader,
+  Autocomplete,
 } from '@mui/material';
 import ColumnFilterControls from '../components/ColumnFilterControls';
 import { api } from '../services/api';
-import { OrdersResponse, OrderItem, MarketplaceReconciliationResponse } from '../services/api/types';
+import { apiService } from '../services/api/apiService';
+import { API_CONFIG } from '../services/api/config';
+import { OrdersResponse, OrderItem, MarketplaceReconciliationResponse, TotalTransactionsResponse, TransactionRow as ApiTransactionRow, TransactionColumn } from '../services/api/types';
 import {
   ArrowBack as ArrowBackIcon,
   Search as SearchIcon,
   FilterList as FilterIcon,
-  GetApp as ExportIcon,
   CalendarToday as CalendarIcon,
   Clear as ClearIcon,
   Close as CloseIcon,
@@ -71,43 +73,40 @@ interface TransactionRow {
   "Order Item ID"?: string;
   "Order Value": number;
   "Settlement Value": number;
-  "Order Date": string;
+  "Invoice Date": string;
   "Settlement Date": string;
   "Difference": number;
   "Remark": string;
   "Event Type": string;
   // Preserve original API response data for popup access
   originalData?: TransactionApiResponse;
+  // Store recon_status and event_type directly for Status column rendering
+  recon_status?: string;
+  event_type?: string;
+  event_subtype?: string;
 }
 
 // API Response structure based on actual data
 interface TransactionApiResponse {
-  calculation: {
-    inputs: {
-      customer_addons_amount: string;
-      marketplace_fee: string;
-      offer_adjustments: string;
-      refund: string;
-      reverse: string;
-      seller_share_offer: string;
-      settlement_sale_value: string;
-      settlement_value: string;
-      taxes: string;
-      total_offer_amount: string;
+  order_id: string;
+  order_value: number;
+  settlement_amount: number;
+  invoice_date: string;
+  settlement_date: string;
+  diff: number;
+  platform: string;
+  event_type: string;
+  event_subtype: string;
+  recon_status: string;
+  settlement_provider: string;
+  metadata?: {
+    breakups?: {
+      marketplace_fee: number;
+      taxes: number;
+      tcs: number;
+      tds: number;
     };
   };
-  context: {
-    buyer_invoice_amount: string;
-    tcs: string;
-    tds: string;
-  };
-  diff: string;
-  order_date: string;
-  order_item_id: string;
-  order_value: string;
-  settlement_date: string | null;
-  settlement_value: string;
-  status: string;
 }
 
 interface TransactionData {
@@ -118,10 +117,10 @@ interface TransactionData {
 // API Response metadata types
 interface TransactionMetadata {
   counts: {
-    excess_received: number;
+    more_payment_received: number;
     settlement_matched: number;
     settled: number
-    short_received: number;
+    less_payment_received: number;
     unsettled: number;
   };
   pagination: {
@@ -144,35 +143,36 @@ interface TransactionMetadata {
 interface TransactionQueryParams {
   page?: number;
   limit?: number;
+  status?: string;
   status_in?: string;
   order_date_from?: string;
   order_date_to?: string;
+  invoice_date_from?: string;
+  invoice_date_to?: string;
   diff_min?: number;
   diff_max?: number;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
   order_id?: string;
   remark?: string;
+  platform?: string;
+  // Dynamic parameters for any column filtering
+  [key: string]: any;
 }
 
 // Transform API data to TransactionRow format
 const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
-  // Debug logging to see what we're getting from the API
-  console.log('OrderItem from API:', orderItem);
-  console.log('Available fields in OrderItem:', Object.keys(orderItem));
+  // Debug logging removed
   
-  // Check for the new API structure
-  if (orderItem.calculation?.inputs) {
-    console.log('New API structure found - calculation.inputs:', orderItem.calculation.inputs);
-  }
-  if (orderItem.context) {
-    console.log('New API structure found - context:', orderItem.context);
-  }
-  
-  // Helper function to parse currency/numeric strings
+  // Helper function to parse numeric values
   const parseNumericValue = (value: any): number => {
     if (value === null || value === undefined || value === '') {
       return 0;
+    }
+    
+    // If already a number, return it
+    if (typeof value === 'number') {
+      return value;
     }
     
     // Convert to string and clean it
@@ -186,24 +186,21 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   };
 
   // Extract values from the new API structure
-  const orderValue = parseNumericValue(orderItem.order_value || orderItem.buyer_invoice_amount);
-  const settlementValue = parseNumericValue(orderItem.settlement_value);
+  const orderValue = parseNumericValue(orderItem.order_value);
+  const settlementValue = parseNumericValue(orderItem.settlement_amount); // Changed from settlement_value to settlement_amount
   const difference = parseNumericValue(orderItem.diff);
   
-  console.log('Parsed values - orderValue:', orderValue, 'settlementValue:', settlementValue, 'difference:', difference);
+  // Debug logging removed
   
-  // (Deprecated) legacy path removed; order item id handled below
-  
-  // Determine remark based on API response
-  let remark = "unsettled";
-  if (orderItem.status === "settlement_matched") {
-    if (difference === 0) {
-      remark = "Matched";
-    } else if (difference > 0) {
-      remark = "Short Amount Received";
-    } else {
-      remark = "Excess Amount Received";
-    }
+  // Determine remark based on recon_status
+  let remark = "Unsettled";
+  const reconStatus = orderItem.recon_status;
+  if (reconStatus === "settlement_matched") {
+    remark = "Settlement Matched";
+  } else if (reconStatus === "less_payment_received") {
+    remark = "Less Payment Received";
+  } else if (reconStatus === "more_payment_received") {
+    remark = "More Payment Received";
   }
   
   // Determine settlement date from API response
@@ -219,25 +216,35 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   }
   
   // Determine IDs from API response
-  const backendOrderId: string | undefined = (orderItem as any).order_id || (orderItem as any).orderId;
-  let orderItemId: string | undefined = (orderItem as any).order_item_id || (orderItem as any).orderItemId;
-  if (!orderItemId || String(orderItemId).trim() === '') {
-    orderItemId = undefined;
+  const backendOrderId: string | undefined = orderItem.order_id;
+  
+  // Get invoice date
+  let invoiceDate = "";
+  if (orderItem.invoice_date) {
+    try {
+      invoiceDate = new Date(orderItem.invoice_date).toISOString().split('T')[0];
+    } catch (error) {
+      invoiceDate = orderItem.invoice_date;
+    }
   }
   
   return {
-    "Order ID": backendOrderId || orderItemId || `ORD_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-    "Order Item ID": orderItemId,
+    "Order ID": backendOrderId || `ORD_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    "Order Item ID": undefined,
     "Order Value": orderValue,
     "Settlement Value": settlementValue,
-    "Order Date": new Date(orderItem.order_date).toISOString().split('T')[0],
+    "Invoice Date": invoiceDate,
     "Settlement Date": settlementDate,
     "Difference": difference,
     "Remark": remark,
-    // Derive event type from order value: > 0 => Sale, else Return
-    "Event Type": orderValue > 0 ? "Sale" : "Return",
+    // Use event_type from API response
+    "Event Type": orderItem.event_type || "Sale",
     // Preserve the original API response data for popup access
     originalData: orderItem as TransactionApiResponse,
+    // Store recon_status and event_type directly for Status column rendering
+    recon_status: orderItem.recon_status,
+    event_type: orderItem.event_type,
+    event_subtype: orderItem.event_subtype,
   };
 };
 
@@ -247,7 +254,7 @@ const mockTransactionData: TransactionData = {
     "Order Item ID",
     "Order Value",
     "Settlement Value",
-    "Order Date",
+    "Invoice Date",
     "Settlement Date",
     "Difference",
     "Remark",
@@ -259,7 +266,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12345",
       "Order Value": 1200,
       "Settlement Value": 1200,
-      "Order Date": "2025-01-15",
+      "Invoice Date": "2025-01-15",
       "Settlement Date": "2025-01-20",
       "Difference": 0,
       "Remark": "Matched",
@@ -269,7 +276,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12346",
       "Order Value": 850,
       "Settlement Value": 850,
-      "Order Date": "2025-01-16",
+      "Invoice Date": "2025-01-16",
       "Settlement Date": "2025-01-21",
       "Difference": 0,
       "Remark": "Matched",
@@ -279,7 +286,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12347",
       "Order Value": 2100,
       "Settlement Value": 2100,
-      "Order Date": "2025-01-17",
+      "Invoice Date": "2025-01-17",
       "Settlement Date": "2025-01-22",
       "Difference": 0,
       "Remark": "Matched",
@@ -289,7 +296,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12349",
       "Order Value": 1600,
       "Settlement Value": 1600,
-      "Order Date": "2025-01-19",
+      "Invoice Date": "2025-01-19",
       "Settlement Date": "2025-01-24",
       "Difference": 0,
       "Remark": "Matched",
@@ -299,7 +306,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12350",
       "Order Value": 950,
       "Settlement Value": 950,
-      "Order Date": "2025-01-20",
+      "Invoice Date": "2025-01-20",
       "Settlement Date": "2025-01-25",
       "Difference": 0,
       "Remark": "Matched",
@@ -309,7 +316,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12351",
       "Order Value": 1800,
       "Settlement Value": 1800,
-      "Order Date": "2025-01-21",
+      "Invoice Date": "2025-01-21",
       "Settlement Date": "2025-01-26",
       "Difference": 0,
       "Remark": "Matched",
@@ -319,7 +326,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12352",
       "Order Value": 1350,
       "Settlement Value": 1350,
-      "Order Date": "2025-01-22",
+      "Invoice Date": "2025-01-22",
       "Settlement Date": "2025-01-27",
       "Difference": 0,
       "Remark": "Matched",
@@ -329,7 +336,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12353",
       "Order Value": 2200,
       "Settlement Value": 2200,
-      "Order Date": "2025-01-23",
+      "Invoice Date": "2025-01-23",
       "Settlement Date": "2025-01-28",
       "Difference": 0,
       "Remark": "Matched",
@@ -339,7 +346,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12354",
       "Order Value": 1100,
       "Settlement Value": 1100,
-      "Order Date": "2025-01-24",
+      "Invoice Date": "2025-01-24",
       "Settlement Date": "2025-01-29",
       "Difference": 0,
       "Remark": "Matched",
@@ -349,7 +356,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12355",
       "Order Value": 1700,
       "Settlement Value": 1700,
-      "Order Date": "2025-01-25",
+      "Invoice Date": "2025-01-25",
       "Settlement Date": "2025-01-30",
       "Difference": 0,
       "Remark": "Matched",
@@ -359,7 +366,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12356",
       "Order Value": 1400,
       "Settlement Value": 1400,
-      "Order Date": "2025-01-26",
+      "Invoice Date": "2025-01-26",
       "Settlement Date": "2025-02-01",
       "Difference": 0,
       "Remark": "Matched",
@@ -369,7 +376,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12357",
       "Order Value": 1900,
       "Settlement Value": 1900,
-      "Order Date": "2025-01-27",
+      "Invoice Date": "2025-01-27",
       "Settlement Date": "2025-02-02",
       "Difference": 0,
       "Remark": "Matched",
@@ -379,7 +386,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12358",
       "Order Value": 1250,
       "Settlement Value": 1250,
-      "Order Date": "2025-01-28",
+      "Invoice Date": "2025-01-28",
       "Settlement Date": "2025-02-03",
       "Difference": 0,
       "Remark": "Matched",
@@ -389,7 +396,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12359",
       "Order Value": 2300,
       "Settlement Value": 2300,
-      "Order Date": "2025-01-29",
+      "Invoice Date": "2025-01-29",
       "Settlement Date": "2025-02-04",
       "Difference": 0,
       "Remark": "Matched",
@@ -399,7 +406,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12360",
       "Order Value": 1000,
       "Settlement Value": 1000,
-      "Order Date": "2025-01-30",
+      "Invoice Date": "2025-01-30",
       "Settlement Date": "2025-02-05",
       "Difference": 0,
       "Remark": "Matched",
@@ -409,7 +416,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12361",
       "Order Value": 1550,
       "Settlement Value": 1550,
-      "Order Date": "2025-02-01",
+      "Invoice Date": "2025-02-01",
       "Settlement Date": "2025-02-06",
       "Difference": 0,
       "Remark": "Matched",
@@ -419,7 +426,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12362",
       "Order Value": 2000,
       "Settlement Value": 2000,
-      "Order Date": "2025-02-02",
+      "Invoice Date": "2025-02-02",
       "Settlement Date": "2025-02-07",
       "Difference": 0,
       "Remark": "Matched",
@@ -429,7 +436,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12363",
       "Order Value": 1150,
       "Settlement Value": 1150,
-      "Order Date": "2025-02-03",
+      "Invoice Date": "2025-02-03",
       "Settlement Date": "2025-02-08",
       "Difference": 0,
       "Remark": "Matched",
@@ -439,7 +446,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12364",
       "Order Value": 1750,
       "Settlement Value": 1750,
-      "Order Date": "2025-02-04",
+      "Invoice Date": "2025-02-04",
       "Settlement Date": "2025-02-09",
       "Difference": 0,
       "Remark": "Matched",
@@ -449,7 +456,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12365",
       "Order Value": 1300,
       "Settlement Value": 1300,
-      "Order Date": "2025-02-05",
+      "Invoice Date": "2025-02-05",
       "Settlement Date": "2025-02-10",
       "Difference": 0,
       "Remark": "Matched",
@@ -459,7 +466,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12366",
       "Order Value": 1850,
       "Settlement Value": 1850,
-      "Order Date": "2025-02-06",
+      "Invoice Date": "2025-02-06",
       "Settlement Date": "2025-02-11",
       "Difference": 0,
       "Remark": "Matched",
@@ -469,7 +476,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12367",
       "Order Value": 1450,
       "Settlement Value": 1450,
-      "Order Date": "2025-02-07",
+      "Invoice Date": "2025-02-07",
       "Settlement Date": "2025-02-12",
       "Difference": 0,
       "Remark": "Matched",
@@ -479,7 +486,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12368",
       "Order Value": 1950,
       "Settlement Value": 1950,
-      "Order Date": "2025-02-08",
+      "Invoice Date": "2025-02-08",
       "Settlement Date": "2025-02-13",
       "Difference": 0,
       "Remark": "Matched",
@@ -489,7 +496,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12369",
       "Order Value": 1200,
       "Settlement Value": 1200,
-      "Order Date": "2025-02-09",
+      "Invoice Date": "2025-02-09",
       "Settlement Date": "2025-02-14",
       "Difference": 0,
       "Remark": "Matched",
@@ -500,7 +507,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12348",
       "Order Value": 750,
       "Settlement Value": 750,
-      "Order Date": "2025-01-18",
+      "Invoice Date": "2025-01-18",
       "Settlement Date": "2025-01-23",
       "Difference": -50,
       "Remark": "Excess Amount Received",
@@ -510,7 +517,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12370",
       "Order Value": 800,
       "Settlement Value": 800,
-      "Order Date": "2025-02-10",
+      "Invoice Date": "2025-02-10",
       "Settlement Date": "2025-02-15",
       "Difference": 25,
       "Remark": "Short Amount Received",
@@ -520,7 +527,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12371",
       "Order Value": 650,
       "Settlement Value": 650,
-      "Order Date": "2025-02-11",
+      "Invoice Date": "2025-02-11",
       "Settlement Date": "2025-02-16",
       "Difference": -30,
       "Remark": "Excess Amount Received",
@@ -530,7 +537,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12372",
       "Order Value": 900,
       "Settlement Value": 900,
-      "Order Date": "2025-02-12",
+      "Invoice Date": "2025-02-12",
       "Settlement Date": "2025-02-17",
       "Difference": 45,
       "Remark": "Short Amount Received",
@@ -540,7 +547,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12373",
       "Order Value": 550,
       "Settlement Value": 550,
-      "Order Date": "2025-02-13",
+      "Invoice Date": "2025-02-13",
       "Settlement Date": "2025-02-18",
       "Difference": -20,
       "Remark": "Excess Amount Received",
@@ -550,7 +557,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12374",
       "Order Value": 700,
       "Settlement Value": 700,
-      "Order Date": "2025-02-14",
+      "Invoice Date": "2025-02-14",
       "Settlement Date": "2025-02-19",
       "Difference": 35,
       "Remark": "Short Amount Received",
@@ -560,7 +567,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12375",
       "Order Value": 450,
       "Settlement Value": 450,
-      "Order Date": "2025-02-15",
+      "Invoice Date": "2025-02-15",
       "Settlement Date": "2025-02-20",
       "Difference": -15,
       "Remark": "Excess Amount Received",
@@ -570,7 +577,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12376",
       "Order Value": 600,
       "Settlement Value": 600,
-      "Order Date": "2025-02-16",
+      "Invoice Date": "2025-02-16",
       "Settlement Date": "2025-02-21",
       "Difference": 40,
       "Remark": "Short Amount Received",
@@ -580,7 +587,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12377",
       "Order Value": 850,
       "Settlement Value": 850,
-      "Order Date": "2025-02-17",
+      "Invoice Date": "2025-02-17",
       "Settlement Date": "2025-02-22",
       "Difference": -25,
       "Remark": "Excess Amount Received",
@@ -590,7 +597,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12378",
       "Order Value": 500,
       "Settlement Value": 500,
-      "Order Date": "2025-02-18",
+      "Invoice Date": "2025-02-18",
       "Settlement Date": "2025-02-23",
       "Difference": 30,
       "Remark": "Short Amount Received",
@@ -601,7 +608,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12379",
       "Order Value": 750,
       "Settlement Value": 750,
-      "Order Date": "2025-02-19",
+      "Invoice Date": "2025-02-19",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Pending Settlement",
@@ -611,7 +618,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12380",
       "Order Value": 400,
       "Settlement Value": 400,
-      "Order Date": "2025-02-20",
+      "Invoice Date": "2025-02-20",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Return Initiated",
@@ -621,7 +628,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12381",
       "Order Value": 650,
       "Settlement Value": 650,
-      "Order Date": "2025-02-21",
+      "Invoice Date": "2025-02-21",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Pending Settlement",
@@ -631,7 +638,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12382",
       "Order Value": 900,
       "Settlement Value": 900,
-      "Order Date": "2025-02-22",
+      "Invoice Date": "2025-02-22",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Return Initiated",
@@ -641,7 +648,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12383",
       "Order Value": 550,
       "Settlement Value": 550,
-      "Order Date": "2025-02-23",
+      "Invoice Date": "2025-02-23",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Pending Settlement",
@@ -651,7 +658,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12384",
       "Order Value": 800,
       "Settlement Value": 800,
-      "Order Date": "2025-02-24",
+      "Invoice Date": "2025-02-24",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Return Initiated",
@@ -661,7 +668,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12385",
       "Order Value": 700,
       "Settlement Value": 700,
-      "Order Date": "2025-02-25",
+      "Invoice Date": "2025-02-25",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Pending Settlement",
@@ -671,7 +678,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12386",
       "Order Value": 600,
       "Settlement Value": 600,
-      "Order Date": "2025-02-26",
+      "Invoice Date": "2025-02-26",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Return Initiated",
@@ -681,7 +688,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12387",
       "Order Value": 850,
       "Settlement Value": 850,
-      "Order Date": "2025-02-27",
+      "Invoice Date": "2025-02-27",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Pending Settlement",
@@ -691,7 +698,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12388",
       "Order Value": 500,
       "Settlement Value": 500,
-      "Order Date": "2025-02-28",
+      "Invoice Date": "2025-02-28",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Return Initiated",
@@ -701,7 +708,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12389",
       "Order Value": 750,
       "Settlement Value": 750,
-      "Order Date": "2025-03-01",
+      "Invoice Date": "2025-03-01",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Pending Settlement",
@@ -711,7 +718,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12390",
       "Order Value": 650,
       "Settlement Value": 650,
-      "Order Date": "2025-03-02",
+      "Invoice Date": "2025-03-02",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Return Initiated",
@@ -721,7 +728,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12391",
       "Order Value": 900,
       "Settlement Value": 900,
-      "Order Date": "2025-03-03",
+      "Invoice Date": "2025-03-03",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Pending Settlement",
@@ -731,7 +738,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12392",
       "Order Value": 550,
       "Settlement Value": 550,
-      "Order Date": "2025-03-04",
+      "Invoice Date": "2025-03-04",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Return Initiated",
@@ -741,7 +748,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12393",
       "Order Value": 800,
       "Settlement Value": 800,
-      "Order Date": "2025-03-05",
+      "Invoice Date": "2025-03-05",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Pending Settlement",
@@ -751,7 +758,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12394",
       "Order Value": 700,
       "Settlement Value": 700,
-      "Order Date": "2025-03-06",
+      "Invoice Date": "2025-03-06",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Return Initiated",
@@ -761,7 +768,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12395",
       "Order Value": 600,
       "Settlement Value": 600,
-      "Order Date": "2025-03-07",
+      "Invoice Date": "2025-03-07",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Pending Settlement",
@@ -771,7 +778,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12396",
       "Order Value": 850,
       "Settlement Value": 850,
-      "Order Date": "2025-03-08",
+      "Invoice Date": "2025-03-08",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Return Initiated",
@@ -781,7 +788,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12397",
       "Order Value": 500,
       "Settlement Value": 500,
-      "Order Date": "2025-03-09",
+      "Invoice Date": "2025-03-09",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Pending Settlement",
@@ -791,7 +798,7 @@ const mockTransactionData: TransactionData = {
       "Order Item ID": "FK12398",
       "Order Value": 750,
       "Settlement Value": 750,
-      "Order Date": "2025-03-10",
+      "Invoice Date": "2025-03-10",
       "Settlement Date": "",
       "Difference": 0,
       "Remark": "Return Initiated",
@@ -816,10 +823,7 @@ const TransactionDetailsPopup: React.FC<{
   // Access the preserved original API response data
   const originalData = (transaction as any)?.originalData || {};
   
-  // Debug logging to see what data we have
-  console.log('Transaction for popup:', transaction);
-  console.log('Original API data:', originalData);
-  console.log('Available fields in originalData:', Object.keys(originalData));
+  // Debug logging removed
   
   // Get values from the actual API response structure
   const orderValue = transaction["Order Value"] || 0;
@@ -846,40 +850,7 @@ const TransactionDetailsPopup: React.FC<{
   const difference = parseFloat(originalData.diff || 0);
   const status = transaction["Remark"] || "Nan";
   
-  // Debug logging for individual field values
-  console.log('Field values extracted:');
-  console.log('- Collection Received:', {
-    settlement_value: calculationInputs.settlement_value,
-    final: collectionReceived
-  });
-  console.log('- Marketplace Fee:', {
-    marketplace_fee: calculationInputs.marketplace_fee,
-    final: marketplaceFee
-  });
-  console.log('- Taxes:', {
-    taxes: calculationInputs.taxes,
-    final: taxes
-  });
-  console.log('- Total Offer Amount:', {
-    total_offer_amount: calculationInputs.total_offer_amount,
-    final: totalOfferAmount
-  });
-  console.log('- Seller Share Offer:', {
-    seller_share_offer: calculationInputs.seller_share_offer,
-    final: sellerShareOffer
-  });
-  console.log('- TDS Deducted:', {
-    tds: context.tds,
-    final: tdsDeducted
-  });
-  console.log('- TCS Deducted:', {
-    tcs: context.tcs,
-    final: tcsDeducted
-  });
-  console.log('- Difference:', {
-    diff: originalData.diff,
-    final: difference
-  });
+  // Debug logging removed
 
   // Calculate smart positioning
   const getPopupPosition = () => {
@@ -1210,11 +1181,8 @@ const TransactionDetailsPopup: React.FC<{
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('Info icon clicked!');
-                  console.log('Current formulaAnchorEl:', formulaAnchorEl);
-                  console.log('Setting new anchor:', e.currentTarget);
+                  
                   setFormulaAnchorEl(e.currentTarget);
-                  console.log('After setting - formulaAnchorEl:', e.currentTarget);
                 }}
                 sx={{
                   p: 0,
@@ -1243,7 +1211,7 @@ const TransactionDetailsPopup: React.FC<{
             </Typography>
             <Typography variant="body2" sx={{ 
               fontWeight: 600, 
-              color: status === 'Matched' ? '#059669' : '#dc2626',
+              color: status === 'Settlement Matched' ? '#059669' : '#dc2626',
               fontSize: '0.75rem'
             }}>
               {status}
@@ -1256,7 +1224,6 @@ const TransactionDetailsPopup: React.FC<{
           open={Boolean(formulaAnchorEl)}
           anchorEl={formulaAnchorEl}
           onClose={() => {
-            console.log('Closing formula popover');
             setFormulaAnchorEl(null);
           }}
           anchorOrigin={{
@@ -1286,15 +1253,425 @@ const TransactionDetailsPopup: React.FC<{
   );
 };
 
+// Breakups Modal Component
+const BreakupsModal: React.FC<{ 
+  open: boolean;
+  onClose: () => void;
+  breakups: any; // This is now the full row
+  orderId: string;
+  anchorEl: HTMLElement | null;
+}> = ({ open, onClose, breakups, orderId, anchorEl }) => {
+  if (!open || !breakups || !anchorEl) return null;
+
+  // Extract the breakups object from metadata
+  // The metadata.breakups is directly on the row object
+  const breakupsObj = (breakups as any)?.metadata?.breakups;
+  if (!breakupsObj) return null;
+
+  // Convert snake_case keys to readable format: remove underscores and capitalize first letter
+  const formatKey = (key: string) => {
+    return key.split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  // Format currency value
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
+  // Extract main values from the row
+  // The row object has the data directly at the top level
+  const orderValue = (breakups as any)?.order_value || 0;
+  const settlementValue = (breakups as any)?.settlement_amount || 0;
+  const diff = (breakups as any)?.diff || 0;
+
+  // Get entries from breakups object
+  const breakupsData = Object.entries(breakupsObj).map(([key, value]) => ({
+    label: formatKey(key),
+    value: Number(value) || 0
+  }));
+
+  // Calculate smart positioning similar to TransactionDetailsPopup
+  const getPopupPosition = () => {
+    const rect = anchorEl.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const popupHeight = 400; // Height for breakups popup
+    const popupWidth = 400;
+    const offset = 12;
+
+    // Calculate vertical position with better viewport awareness
+    let top: number;
+    let animationDirection: 'up' | 'down' = 'down';
+    let maxHeight: number | undefined;
+    
+    // Check available space above and below
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    
+    if (spaceBelow >= popupHeight + offset) {
+      // Enough space below - show below
+      top = rect.bottom + offset;
+      animationDirection = 'down';
+    } else if (spaceAbove >= popupHeight + offset) {
+      // Enough space above - show above
+      top = rect.top - popupHeight - offset;
+      animationDirection = 'up';
+    } else {
+      // Not enough space either way - find optimal position
+      if (spaceBelow > spaceAbove) {
+        // More space below - position at bottom with scroll
+        top = Math.max(offset, viewportHeight - popupHeight - offset);
+        maxHeight = popupHeight;
+        animationDirection = 'down';
+      } else {
+        // More space above - position at top with scroll
+        top = offset;
+        maxHeight = popupHeight;
+        animationDirection = 'up';
+      }
+    }
+
+    // Ensure minimum height for scrollable content
+    if (maxHeight && maxHeight < 300) {
+      maxHeight = 300;
+    }
+
+    // Calculate horizontal position
+    let left: number;
+    if (rect.left + popupWidth <= viewportWidth) {
+      // Enough space to the right - align with left edge
+      left = rect.left;
+    } else {
+      // Not enough space - align with right edge
+      left = Math.max(offset, viewportWidth - popupWidth - offset);
+    }
+
+    // Final validation: ensure popup is always within viewport bounds
+    if (top < offset) {
+      top = offset;
+      maxHeight = Math.min(popupHeight, viewportHeight - offset * 2);
+    }
+    if (top + (maxHeight || popupHeight) > viewportHeight - offset) {
+      top = Math.max(offset, viewportHeight - (maxHeight || popupHeight) - offset);
+    }
+
+    // Ensure horizontal position is also within viewport
+    if (left < offset) {
+      left = offset;
+    }
+    if (left + popupWidth > viewportWidth - offset) {
+      left = viewportWidth - popupWidth - offset;
+    }
+
+    return { top, left, animationDirection, maxHeight };
+  };
+
+  const position = getPopupPosition();
+
+  return (
+    <>
+      {/* Backdrop */}
+      <Box
+        onClick={onClose}
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.3)',
+          zIndex: 1399,
+          animation: 'fadeIn 0.2s ease-out',
+          '@keyframes fadeIn': {
+            '0%': {
+              opacity: 0,
+            },
+            '100%': {
+              opacity: 1,
+            },
+          },
+        }}
+      />
+      
+      {/* Popup */}
+      <Box
+        onClick={(e) => e.stopPropagation()}
+        sx={{
+          position: 'fixed',
+          top: position.top,
+          left: position.left,
+          width: '400px',
+          maxHeight: position.maxHeight ? `${position.maxHeight}px` : 'auto',
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '12px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          zIndex: 1400,
+          animation: position.animationDirection === 'down' 
+            ? 'fadeInScaleDown 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+            : 'fadeInScaleUp 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          '@keyframes fadeInScaleDown': {
+            '0%': {
+              opacity: 0,
+              transform: 'scale(0.95) translateY(-10px)',
+            },
+            '100%': {
+              opacity: 1,
+              transform: 'scale(1) translateY(0)',
+            },
+          },
+          '@keyframes fadeInScaleUp': {
+            '0%': {
+              opacity: 0,
+              transform: 'scale(0.95) translateY(10px)',
+            },
+            '100%': {
+              opacity: 1,
+              transform: 'scale(1) translateY(0)',
+            },
+          },
+        }}
+      >
+        {/* Header */}
+        <Box
+          sx={{
+            p: 2,
+            borderBottom: '1px solid #e5e7eb',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#111827' }}>
+              Transaction Breakups
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+              Order ID: {orderId}
+            </Typography>
+          </Box>
+          <IconButton
+            onClick={onClose}
+            size="small"
+            sx={{
+              p: 0.5,
+              '&:hover': {
+                background: '#f3f4f6',
+              },
+            }}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Box>
+
+        {/* Content */}
+        <Box sx={{ p: 2, maxHeight: position.maxHeight ? `${position.maxHeight - 80}px` : '300px', overflowY: 'auto' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {/* Order Value */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                p: 1.5,
+                background: '#f0f9ff',
+                borderRadius: '6px',
+                border: '1px solid #bae6fd',
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 600,
+                  color: '#0c4a6e',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Order Value
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 700,
+                  color: '#0c4a6e',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {formatCurrency(orderValue)}
+              </Typography>
+            </Box>
+
+            {/* Breakups */}
+            {breakupsData.map((item, index) => (
+              <Box
+                key={index}
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  p: 1.5,
+                  pl: 3,
+                  background: '#f9fafb',
+                  borderRadius: '6px',
+                  border: '1px solid #e5e7eb',
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 500,
+                    color: '#374151',
+                    fontSize: '0.75rem',
+                  }}
+                >
+                  {item.label}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 600,
+                    color: '#111827',
+                    fontSize: '0.75rem',
+                  }}
+                >
+                  {formatCurrency(item.value)}
+                </Typography>
+              </Box>
+            ))}
+
+            {/* Divider */}
+            <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
+
+            {/* Settlement Value (Negative) */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                p: 1.5,
+                pl: 3,
+                background: '#fef2f2',
+                borderRadius: '6px',
+                border: '1px solid #fecaca',
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 500,
+                  color: '#991b1b',
+                  fontSize: '0.75rem',
+                }}
+              >
+                Settlement Value
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 600,
+                  color: '#991b1b',
+                  fontSize: '0.75rem',
+                }}
+              >
+                {formatCurrency(-settlementValue)}
+              </Typography>
+            </Box>
+
+            {/* Divider */}
+            <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
+
+            {/* Difference */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                p: 1.5,
+                background: diff === 0 ? '#f0fdf4' : '#fef2f2',
+                borderRadius: '6px',
+                border: diff === 0 ? '1px solid #86efac' : '1px solid #fca5a5',
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 700,
+                  color: diff === 0 ? '#166534' : '#991b1b',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Difference
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 800,
+                  color: diff === 0 ? '#166534' : '#991b1b',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {formatCurrency(diff)}
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    </>
+  );
+};
+
 interface TransactionSheetProps {
   onBack: () => void;
   open?: boolean;
   transaction?: any;
   statsData?: MarketplaceReconciliationResponse | null;
   initialTab?: number;
+  dateRange?: { start: string; end: string };
+  initialPlatforms?: ('flipkart' | 'd2c')[];
+  initialFilters?: { [key: string]: any };
 }
 
-const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0 }) => {
+// Complete mapping of UI columns to API parameters
+const COLUMN_TO_API_PARAM_MAP: Record<string, {
+  apiParam: string;
+  type: 'string' | 'number' | 'date' | 'enum';
+  supportedPlatforms?: ('flipkart' | 'd2c' | 'all')[];
+  usesInSuffix?: boolean; // For CSV filters like status_in
+}> = {
+  // Common filters (both platforms)
+  'Order ID': { apiParam: 'order_id', type: 'string' }, // Special: chips input
+  'Status': { apiParam: 'status_in', type: 'enum', usesInSuffix: true },
+  'Order Date': { apiParam: 'order_date', type: 'date' }, // → order_date_from/to
+  'Settlement Date': { apiParam: 'settlement_date', type: 'date' },
+  'Order Value': { apiParam: 'order_value', type: 'number', supportedPlatforms: ['flipkart'] },
+  'Settlement Value': { apiParam: 'settlement_value', type: 'number' },
+  'Difference': { apiParam: 'diff', type: 'number' },
+  
+  // D2C-specific CSV filters (with _in suffix support)
+  'Settlement Provider': { apiParam: 'settlement_provider_in', type: 'enum', supportedPlatforms: ['d2c'] },
+  'Recon Status': { apiParam: 'recon_status_in', type: 'enum', supportedPlatforms: ['d2c'] },
+  'Shipping Courier': { apiParam: 'shipping_courier_in', type: 'enum', supportedPlatforms: ['d2c'] },
+  'Mismatch Reason': { apiParam: 'mismatch_reason_in', type: 'enum', supportedPlatforms: ['d2c'] },
+};
+
+// Mapping of sortable UI columns to backend sort_by values
+const COLUMN_TO_SORT_BY_MAP: Record<string, string> = {
+  'Order Date': 'order_date',
+  'Invoice Date': 'invoice_date',
+  'Settlement Date': 'settlement_date',
+  'Order Value': 'order_value',
+  'Settlement Value': 'settlement_value',
+  'Difference': 'diff',
+};
+
+const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0, dateRange: propDateRange, initialPlatforms, initialFilters: propsInitialFilters }) => {
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -1306,29 +1683,108 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     return initialTab;
   };
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateRange, setDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
+  // Use date range from props if provided, otherwise use empty state
+  const [dateRange, setDateRange] = useState<{start: string, end: string}>(
+    propDateRange || { start: '', end: '' }
+  );
   // Column filters can be string (contains), number range {min,max}, date range {from,to}, or enum string[]
-  const [columnFilters, setColumnFilters] = useState<{ [key: string]: any }>({});
+  const [columnFilters, setColumnFilters] = useState<{ [key: string]: any }>(propsInitialFilters || {});
   // Pending filters that haven't been applied yet
-  const [pendingColumnFilters, setPendingColumnFilters] = useState<{ [key: string]: any }>({});
+  const [pendingColumnFilters, setPendingColumnFilters] = useState<{ [key: string]: any }>(propsInitialFilters || {});
   const [pendingDateRange, setPendingDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
+  // Header date range state - for the date selector in the header next to platform selector
+  const [headerDateRange, setHeaderDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
+  const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
+  // Platform filter state - now supports multi-select
+  const availablePlatforms = ['flipkart', 'd2c'] as const;
+  type Platform = typeof availablePlatforms[number];
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(initialPlatforms || ['flipkart']); // Default: flipkart only
+  const [pendingSelectedPlatforms, setPendingSelectedPlatforms] = useState<Platform[]>(initialPlatforms || ['flipkart']); // Pending platforms before apply
+  // Order ID chips state
+  const [orderIdChips, setOrderIdChips] = useState<string[]>([]);
+  // Order ID search in header
+  const [orderIdSearch, setOrderIdSearch] = useState<string>('');
+  // Order ID search bar visibility
+  const [showOrderIdSearch, setShowOrderIdSearch] = useState(false);
   const [filteredData, setFilteredData] = useState<TransactionRow[]>([]);
   const [allTransactionData, setAllTransactionData] = useState<TransactionRow[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(100);
   const [loading, setLoading] = useState(false);
+  const [isSorting, setIsSorting] = useState(false);
   const [paginationLoading, setPaginationLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(getInitialTab() === 0 ? 0 : getInitialTab() === 1 ? 1 : 0);
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = getInitialTab();
+    return tab === 1 ? 1 : 0; // 0 = Settled, 1 = Unsettled
+  });
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionRow | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [breakupsModalOpen, setBreakupsModalOpen] = useState(false);
+  const [selectedBreakups, setSelectedBreakups] = useState<any>(null);
+  const [breakupsAnchorEl, setBreakupsAnchorEl] = useState<HTMLElement | null>(null);
+  const [breakupsOrderId, setBreakupsOrderId] = useState<string>('');
   const [totalCount, setTotalCount] = useState(0);
+  // Separate total counts for settled and unsettled tabs
+  const [settledTotalCount, setSettledTotalCount] = useState<number | null>(null);
+  const [unsettledTotalCount, setUnsettledTotalCount] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HTMLElement | null>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [tabCounts, setTabCounts] = useState<{ settled: number | null; unsettled: number | null }>({ settled: null, unsettled: null });
   const [metadata, setMetadata] = useState<TransactionMetadata | null>(null);
+  
+  // New state for total transactions API
+  const [totalTransactionsData, setTotalTransactionsData] = useState<TotalTransactionsResponse | null>(null);
+  const [useNewAPI, setUseNewAPI] = useState(true); // Always use new API
+
+  // Dual API state management for settled and unsettled data
+  const [settledData, setSettledData] = useState<TotalTransactionsResponse | null>(null);
+  const [unsettledData, setUnsettledData] = useState<TotalTransactionsResponse | null>(null);
+  const [dualApiLoading, setDualApiLoading] = useState(false);
+  const [hasInitialLoad, setHasInitialLoad] = useState(false);
+  const isFetchingRef = React.useRef(false);
+
+  // Get current data based on which API is being used
+  const getCurrentData = (): any[] => {
+    // Use dual API data if available (either can be null when filtering)
+    if (settledData !== null || unsettledData !== null) {
+      const currentData = activeTab === 0 ? settledData : unsettledData;
+      // Handle case where currentData is null (e.g., only settled statuses selected and on unsettled tab)
+      if (!currentData) {
+        return [];
+      }
+      return currentData.data || [];
+    }
+    
+    // Fallback to legacy single API data
+    if (useNewAPI && totalTransactionsData) {
+      // Handle null data case (0 results)
+      return totalTransactionsData.data || [];
+    }
+    return allTransactionData;
+  };
+
+  // Get current columns based on which API is being used
+  const getCurrentColumns = () => {
+    // Use dual API data if available (either can be null when filtering)
+    if (settledData !== null || unsettledData !== null) {
+      const currentData = activeTab === 0 ? settledData : unsettledData;
+      // Handle case where currentData is null (e.g., only settled statuses selected and on unsettled tab)
+      if (!currentData) {
+        return [];
+      }
+      return currentData.columns?.map(col => col.title) || [];
+    }
+    
+    // Fallback to legacy single API data
+    if (useNewAPI && totalTransactionsData) {
+      // Handle null columns case - only return actual API columns, not breakup fields
+      return totalTransactionsData.columns?.map(col => col.title) || [];
+    }
+    return visibleColumns;
+  };
 
 
   // Rely on MUI Menu's built-in outside click handling
@@ -1341,9 +1797,22 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
   };
 
+  // Helper function to generate random date for demo purposes
+  const generateRandomDate = () => {
+    // Generate random dates between Jan 2025 and Feb 2025
+    const startDate = new Date('2025-01-01');
+    const endDate = new Date('2025-02-28');
+    const randomTime = startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime());
+    const randomDate = new Date(randomTime);
+    return randomDate.toISOString().split('T')[0]; // Return in YYYY-MM-DD format
+  };
+
   // Helper function to format date in "17th March, 2025" format
   const formatDateWithOrdinal = (dateString: string) => {
-    if (!dateString) return '';
+    // If no date provided, generate a random one for demo
+    if (!dateString || dateString === 'null' || dateString === 'undefined') {
+      dateString = generateRandomDate();
+    }
     
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return dateString; // Return original if invalid date
@@ -1371,41 +1840,136 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     return formatDateWithOrdinal(dateString);
   };
 
-  // Column metadata for rendering filter UIs
-  const COLUMN_META: Record<string, { type: 'string' | 'number' | 'date' | 'enum' }> = {
-    'Order ID': { type: 'string' },
-    'Order Value': { type: 'number' },
-    'Settlement Value': { type: 'number' },
-    'Order Date': { type: 'date' },
-    'Settlement Date': { type: 'date' },
-    'Difference': { type: 'number' },
-    'Status': { type: 'enum' },
-    'Reason': { type: 'string' },
-    'Action': { type: 'string' },
+  // Get dynamic column metadata from API response
+  const getColumnMeta = (): Record<string, { type: 'string' | 'number' | 'date' | 'enum' }> => {
+    const meta: Record<string, { type: 'string' | 'number' | 'date' | 'enum' }> = {};
+    
+    // Use dual API data if available (either can be null when filtering)
+    if (settledData !== null || unsettledData !== null) {
+      const currentData = activeTab === 0 ? settledData : unsettledData;
+      if (currentData?.columns) {
+        currentData.columns.forEach(col => {
+          // Map API column types to our filter types
+          let filterType: 'string' | 'number' | 'date' | 'enum';
+          switch (col.type) {
+            case 'currency':
+              filterType = 'number';
+              break;
+            case 'date':
+              filterType = 'date';
+              break;
+            case 'enum':
+              filterType = 'enum';
+              break;
+            default:
+              filterType = 'string';
+          }
+          meta[col.title] = { type: filterType };
+        });
+      }
+    } else if (useNewAPI && totalTransactionsData?.columns) {
+      totalTransactionsData.columns.forEach(col => {
+        // Map API column types to our filter types
+        let filterType: 'string' | 'number' | 'date' | 'enum';
+        switch (col.type) {
+          case 'currency':
+            filterType = 'number';
+            break;
+          case 'date':
+            filterType = 'date';
+            break;
+          case 'enum':
+            filterType = 'enum';
+            break;
+          default:
+            filterType = 'string';
+        }
+        meta[col.title] = { type: filterType };
+      });
+    } else {
+      // Fallback to hardcoded metadata for backward compatibility
+      meta['Order ID'] = { type: 'string' };
+      meta['Order Value'] = { type: 'number' };
+      meta['Settlement Value'] = { type: 'number' };
+      meta['Settlement Date'] = { type: 'date' };
+      meta['Difference'] = { type: 'number' };
+      meta['Status'] = { type: 'enum' };
+      meta['Reason'] = { type: 'string' };
+    }
+    
+    // Always add breakup fields for filtering (regardless of API type)
+    meta['Shipping Courier'] = { type: 'enum' };
+    meta['Recon Status'] = { type: 'enum' };
+    meta['Settlement Provider'] = { type: 'enum' };
+    meta['Mismatch Reason'] = { type: 'enum' };
+    
+    // Debug logging removed
+    
+    return meta;
   };
 
+  // Make COLUMN_META reactive to data changes - initialize with breakup fields
+  const [COLUMN_META, setCOLUMN_META] = useState<Record<string, { type: 'string' | 'number' | 'date' | 'enum' }>>({
+    'Shipping Courier': { type: 'enum' },
+    'Recon Status': { type: 'enum' },
+    'Settlement Provider': { type: 'enum' },
+    'Mismatch Reason': { type: 'enum' },
+  });
+
+  // Update COLUMN_META when totalTransactionsData changes
+  useEffect(() => {
+    const newMeta = getColumnMeta();
+    setCOLUMN_META(newMeta);
+    
+  }, [totalTransactionsData, useNewAPI]);
+
+  // Force update COLUMN_META on mount
+  useEffect(() => {
+    const initialMeta = getColumnMeta();
+    setCOLUMN_META(initialMeta);
+  }, []);
+
   // Sorting functions
-  const handleSort = (columnKey: string) => {
-    setSortConfig(prevConfig => {
-      if (prevConfig?.key === columnKey) {
-        if (prevConfig.direction === 'asc') {
-          return { key: columnKey, direction: 'desc' };
-        } else {
-          return null; // Remove sorting
-        }
+  const handleSort = async (columnKey: string) => {
+    // Only allow sorting for supported columns
+    const sortBy = COLUMN_TO_SORT_BY_MAP[columnKey];
+    if (!sortBy) return;
+
+    // Compute next sort state deterministically
+    let nextSort: { key: string; direction: 'asc' | 'desc' } | null;
+    if (sortConfig?.key === columnKey) {
+      if (sortConfig.direction === 'asc') {
+        nextSort = { key: columnKey, direction: 'desc' };
       } else {
-        return { key: columnKey, direction: 'asc' };
+        nextSort = null; // Remove sorting -> backend default applies
       }
-    });
+    } else {
+      nextSort = { key: columnKey, direction: 'asc' };
+    }
+
+    setSortConfig(nextSort);
+
+    // Trigger server-side refetch with sorting (reset to first page)
+    setPage(0);
+    setCurrentPage(1);
+    setIsSorting(true);
+    try {
+      // applySortOverride=true ensures that when nextSort is null (neutral),
+      // we send no sort params instead of falling back to previous state
+      await fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, undefined, nextSort, true);
+    } finally {
+      setIsSorting(false);
+    }
   };
 
   const getSortIcon = (columnKey: string) => {
     if (sortConfig?.key !== columnKey) {
       return <UnfoldMoreIcon fontSize="small" />;
     }
+    // Flipped: show Down arrow for ascending, Up arrow for descending
     return sortConfig.direction === 'asc' 
-      ? <ArrowUpwardIcon fontSize="small" /> 
-      : <ArrowDownwardIcon fontSize="small" />;
+      ? <ArrowDownwardIcon fontSize="small" /> 
+      : <ArrowUpwardIcon fontSize="small" />;
   };
 
   const sortData = (data: TransactionRow[]) => {
@@ -1433,15 +1997,58 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Helpers to get enum options from current data
   const getUniqueValuesForColumn = (columnName: string): string[] => {
-    // For Status, show unique backend statuses plus Sale/Return (event types)
+    // For Status, show unique backend statuses
     if (columnName === 'Status') {
-      // Hardcoded per request
-      return ['excess_received', 'short_received', 'settlement_matched'];
+      return ['more_payment_received', 'less_payment_received', 'settlement_matched'];
     }
 
+    // For breakup fields, extract values from actual data
+    if (columnName === 'Shipping Courier' || columnName === 'Recon Status' || columnName === 'Settlement Provider' || columnName === 'Mismatch Reason') {
+      const values = new Set<string>();
+      const dataToCheck = [
+        ...allTransactionData,
+        ...(useNewAPI && totalTransactionsData?.data ? totalTransactionsData.data : [])
+      ];
+      
+      dataToCheck.forEach(row => {
+        let value: string | undefined;
+        
+        // Check in originalData first (new API structure has these at root level)
+        const originalData = (row as any)?.originalData;
+        
+        switch (columnName) {
+          case 'Shipping Courier':
+            value = (row as any)?.shipping_courier || originalData?.shipping_courier;
+            break;
+          case 'Recon Status':
+            value = (row as any)?.recon_status || originalData?.recon_status;
+            break;
+          case 'Settlement Provider':
+            value = (row as any)?.settlement_provider || originalData?.settlement_provider;
+            break;
+          case 'Mismatch Reason':
+            value = (row as any)?.mismatch_reason || originalData?.mismatch_reason;
+            break;
+        }
+        
+        if (typeof value === 'string' && value.trim()) {
+          values.add(value.trim());
+        }
+      });
+      
+      // If no values found, return empty array
+      return Array.from(values).sort();
+    }
+
+    // For other columns, try to get values from data
     const values = new Set<string>();
-    allTransactionData.forEach(row => {
-      const value = row[columnName as keyof TransactionRow];
+    const dataToCheck = [
+      ...allTransactionData,
+      ...(useNewAPI && totalTransactionsData?.data ? totalTransactionsData.data : [])
+    ];
+    
+    dataToCheck.forEach(row => {
+      const value = (row as any)[columnName];
       if (typeof value === 'string' && value) {
         values.add(value);
       }
@@ -1452,7 +2059,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Helper: chip colors for remark values
   const getRemarkChipColors = (remark: string): { background: string; color: string } => {
     switch (remark) {
-      case 'Matched':
+      case 'Settlement Matched':
         return { background: '#dcfce7', color: '#059669' };
       case 'Excess Amount Received':
         return { background: '#fef3c7', color: '#d97706' };
@@ -1498,7 +2105,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     pageNumber: number = 1, 
     remark?: string, 
     overrideFilters?: { [key: string]: any }, 
-    overrideDateRange?: {start: string, end: string}
+    overrideDateRange?: {start: string, end: string},
+    overridePlatforms?: Platform[]
   ): TransactionQueryParams => {
     const params: TransactionQueryParams = {
       page: pageNumber,
@@ -1508,11 +2116,32 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Set status based on remark or activeTab
     const remarkToUse = remark || (activeTab === 0 ? 'settlement_matched' : 'unsettled');
     if (remarkToUse === 'settlement_matched') {
-      params.status_in = 'settlement_matched';
-      console.log('Setting API parameter: status_in = settlement_matched (for Settled tab)');
+      // For settled tab, use status_in with comma-separated values
+      params.status_in = 'settlement_matched,less_payment_received,more_payment_received';
+      
     } else if (remarkToUse === 'unsettled') {
-      params.status_in = 'unsettled';
-      console.log('Setting API parameter: status_in = unsettled (for Unsettled tab)');
+      // For unsettled tab, use status=unsettled (not status_in)
+      params.status = 'unsettled';
+      
+    }
+
+    // ALWAYS add invoice date range - this is required for all API calls
+    const dateRangeToUse = overrideDateRange || dateRange;
+    if (dateRangeToUse.start && dateRangeToUse.end) {
+      params.order_date_from = dateRangeToUse.start;
+      params.order_date_to = dateRangeToUse.end;
+      
+    } else {
+      console.warn('[buildQueryParams] No date range provided - API call may fail');
+    }
+
+    // ALWAYS add platform parameter as comma-separated list of selected platforms
+    const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
+    if (platformsToUse.length > 0) {
+      params.platform = platformsToUse.join(',');
+      
+    } else {
+      console.warn('[buildQueryParams] No platforms selected - API call may not return data');
     }
 
     // Only add additional parameters if filters are explicitly applied
@@ -1526,53 +2155,59 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       Object.entries(filtersToUse).forEach(([columnKey, filterValue]) => {
         if (!filterValue) return;
 
-        switch (columnKey) {
-          case 'Order ID':
-            if (typeof filterValue === 'string' && filterValue.trim()) {
-              params.order_id = filterValue.trim();
+        const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
+        if (!mapping) return;
+
+        // Check platform compatibility - allow if any selected platform supports it
+        if (mapping.supportedPlatforms) {
+          const isSupported = platformsToUse.some(p => mapping.supportedPlatforms!.includes(p as any));
+          if (!isSupported) {
+            return; // Skip filters not supported by any selected platform
+          }
+        }
+
+        const baseParam = mapping.apiParam;
+
+        switch (mapping.type) {
+          case 'string':
+            if (columnKey === 'Order ID') {
+              // For Order ID, use chips array joined by comma
+              if (orderIdChips.length > 0) {
+                (params as any)[baseParam] = orderIdChips.join(',');
+              }
+            } else if (typeof filterValue === 'string' && filterValue.trim()) {
+              (params as any)[baseParam] = filterValue.trim();
             }
             break;
           
-          case 'Order Date':
-            if (filterValue.from && filterValue.to) {
-              params.order_date_from = filterValue.from;
-              params.order_date_to = filterValue.to;
-            }
-            break;
-          
-          case 'Difference':
-            if (typeof filterValue === 'object') {
+          case 'number':
+            if (typeof filterValue === 'object' && filterValue !== null) {
               if (filterValue.min !== undefined && filterValue.min !== '') {
-                params.diff_min = parseFloat(filterValue.min);
+                (params as any)[`${baseParam}_min`] = parseFloat(filterValue.min);
               }
               if (filterValue.max !== undefined && filterValue.max !== '') {
-                params.diff_max = parseFloat(filterValue.max);
+                (params as any)[`${baseParam}_max`] = parseFloat(filterValue.max);
               }
             }
             break;
-
-          case 'Status':
-            // Status filter can include backend statuses and event types (Sale/Return)
-            if (Array.isArray(filterValue)) {
-              const statuses: string[] = [];
-              const eventTypes: string[] = [];
-              filterValue.forEach((val: string) => {
-                if (val === 'Sale' || val === 'Return') eventTypes.push(val.toLowerCase());
-                else statuses.push(val);
-              });
-              if (statuses.length > 0) params.status_in = statuses.join(',');
-              if (eventTypes.length > 0) (params as any).event_type_in = eventTypes.join(',');
+          
+          case 'date':
+            if (typeof filterValue === 'object' && filterValue !== null) {
+              if (filterValue.from && filterValue.to) {
+                (params as any)[`${baseParam}_from`] = filterValue.from;
+                (params as any)[`${baseParam}_to`] = filterValue.to;
+              }
+            }
+            break;
+          
+          case 'enum':
+            if (Array.isArray(filterValue) && filterValue.length > 0) {
+              // Use the mapped API param which already includes _in suffix if needed
+              (params as any)[baseParam] = filterValue.join(',');
             }
             break;
         }
       });
-
-      // Apply date range filter if set
-      const dateRangeToUse = overrideDateRange || dateRange;
-      if (dateRangeToUse.start && dateRangeToUse.end) {
-        params.order_date_from = dateRangeToUse.start;
-        params.order_date_to = dateRangeToUse.end;
-      }
     }
 
     return params;
@@ -1594,7 +2229,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     
     try {
       const queryParams = buildQueryParams(pageNumber, remark, filters, dateRangeFilter);
-      console.log(`Fetching orders with applied filters:`, queryParams);
+      
       
       // Example query string that would be sent to API:
       // status_in=unsettled&order_date_from=2025-04-01&order_date_to=2025-04-30&diff_min=-500&diff_max=0&sort_by=order_date&sort_order=desc&order_item_id=333981993553920100
@@ -1602,16 +2237,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         .filter(([_, value]) => value !== undefined && value !== null && value !== '')
         .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
         .join('&');
-      console.log(`Query string with applied filters:`, queryString);
       
-      const response = await api.transactions.getTransactions(queryParams as any);
+      
+      const response = await api.transactions.getTotalTransactions(queryParams as any);
       
       if (response.success && response.data) {
         // Debug: Log the API response structure
-        console.log('API Response:', response.data);
+        
         const responseData = response.data as any;
         const transactionData = responseData.transactions || responseData.orders || responseData;
-        console.log('Transactions:', transactionData);
+        
         
         // Handle metadata if available
         if ((response.data as any).meta) {
@@ -1636,11 +2271,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         if (Array.isArray(transactionData)) {
           // If transactionData is directly an array of transactions
           transactionData.forEach((transaction: any, transactionIndex: number) => {
-            console.log(`Transaction ${transactionIndex}:`, transaction);
+            
             if (transaction.order_items) {
               // If it's in the old orders format
               transaction.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
-                console.log(`OrderItem ${itemIndex} in Transaction ${transactionIndex}:`, orderItem);
+                
                 transactionRows.push(transformOrderItemToTransactionRow(orderItem));
               });
             } else {
@@ -1650,7 +2285,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           });
         } else if (transactionData && typeof transactionData === 'object') {
           // If transactionData is an object, check if it has array properties
-          console.log('TransactionData is an object:', transactionData);
+          
           
           // Try to find array properties that might contain the actual data
           const possibleArrays = ['transactions', 'orders', 'data', 'items'];
@@ -1658,13 +2293,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           
           for (const key of possibleArrays) {
             if (Array.isArray(transactionData[key])) {
-              console.log(`Found data array in property: ${key}`);
+              
               transactionData[key].forEach((item: any, index: number) => {
-                console.log(`${key} ${index}:`, item);
+                
                 if (item.order_items) {
                   // If it's in the old orders format
                   item.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
-                    console.log(`OrderItem ${itemIndex} in ${key} ${index}:`, orderItem);
+                    
                     transactionRows.push(transformOrderItemToTransactionRow(orderItem));
                   });
                 } else {
@@ -1711,7 +2346,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   };
 
-  const fetchOrders = async (pageNumber: number = 1, remark?: string) => {
+  const fetchOrders = async (pageNumber: number = 1, remark?: string, overridePlatforms?: Platform[]) => {
     const isInitialLoad = pageNumber === 1 && allTransactionData.length === 0;
     
     if (!isInitialLoad) {
@@ -1720,8 +2355,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setError(null);
     
     try {
-      const queryParams = buildQueryParams(pageNumber, remark);
-      console.log(`Fetching orders with params:`, queryParams);
+      const queryParams = buildQueryParams(pageNumber, remark, undefined, undefined, overridePlatforms);
+      const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
+      
       
       // Example query string that would be sent to API:
       // status_in=unsettled&order_date_from=2025-04-01&order_date_to=2025-04-30&diff_min=-500&diff_max=0&sort_by=order_date&sort_order=desc&order_item_id=333981993553920100
@@ -1729,16 +2365,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         .filter(([_, value]) => value !== undefined && value !== null && value !== '')
         .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
         .join('&');
-      console.log(`Query string:`, queryString);
       
-      const response = await api.transactions.getTransactions(queryParams as any);
+      
+      const response = await api.transactions.getTotalTransactions(queryParams as any);
       
       if (response.success && response.data) {
         // Debug: Log the API response structure
-        console.log('API Response:', response.data);
+        
         const responseData = response.data as any;
         const transactionData = responseData.transactions || responseData.orders || responseData;
-        console.log('Transactions:', transactionData);
+        
         
         // Handle metadata if available
         if ((response.data as any).meta) {
@@ -1763,11 +2399,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         if (Array.isArray(transactionData)) {
           // If transactionData is directly an array of transactions
           transactionData.forEach((transaction: any, transactionIndex: number) => {
-            console.log(`Transaction ${transactionIndex}:`, transaction);
+            
             if (transaction.order_items) {
               // If it's in the old orders format
               transaction.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
-                console.log(`OrderItem ${itemIndex} in Transaction ${transactionIndex}:`, orderItem);
+                
                 transactionRows.push(transformOrderItemToTransactionRow(orderItem));
               });
             } else {
@@ -1777,7 +2413,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           });
         } else if (transactionData && typeof transactionData === 'object') {
           // If transactionData is an object, check if it has array properties
-          console.log('TransactionData is an object:', transactionData);
+          
           
           // Try to find array properties that might contain the actual data
           const possibleArrays = ['transactions', 'orders', 'data', 'items'];
@@ -1785,13 +2421,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           
           for (const key of possibleArrays) {
             if (Array.isArray(transactionData[key])) {
-              console.log(`Found data array in property: ${key}`);
+              
               transactionData[key].forEach((item: any, index: number) => {
-                console.log(`${key} ${index}:`, item);
+                
                 if (item.order_items) {
                   // If it's in the old orders format
                   item.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
-                    console.log(`OrderItem ${itemIndex} in ${key} ${index}:`, orderItem);
+                    
                     transactionRows.push(transformOrderItemToTransactionRow(orderItem));
                   });
                 } else {
@@ -1848,14 +2484,31 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   }, [location.state, navigate]);
 
+  // Handle initialTab prop changes (when opening TransactionSheet with different initialTab)
+  useEffect(() => {
+    if (initialTab !== undefined) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Sync propDateRange with local dateRange state
+  useEffect(() => {
+    if (propDateRange && (propDateRange.start !== dateRange.start || propDateRange.end !== dateRange.end)) {
+      setDateRange(propDateRange);
+      setPendingDateRange(propDateRange);
+      setHeaderDateRange(propDateRange);
+      setPendingHeaderDateRange(propDateRange);
+    }
+  }, [propDateRange]);
+
   // Fetch data on component mount
   useEffect(() => {
-    setLoading(true);
-    // Start with settled transactions (activeTab = 0)
-    fetchOrders(1, 'settlement_matched');
-    // Prefetch counts for all tabs
-    fetchTabCount('settlement_matched');
-    fetchTabCount('unsettled');
+    // Use date range from props if provided, otherwise use default
+    const initialDateRange = propDateRange || { start: '2025-04-01', end: '2025-04-30' };
+    setHeaderDateRange(initialDateRange);
+    setPendingHeaderDateRange(initialDateRange);
+    fetchDualTransactions(1, propsInitialFilters, initialDateRange);
+    setHasInitialLoad(true);
   }, []);
 
   // Apply filters function - called when Apply button is clicked
@@ -1863,23 +2516,39 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Copy pending filters to active filters
     setColumnFilters(pendingColumnFilters);
     setDateRange(pendingDateRange);
+    setSelectedPlatforms(pendingSelectedPlatforms);
     
-    // Trigger API call with pending filters (don't wait for state update)
-    const currentRemark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-    fetchOrdersWithFilters(1, currentRemark, pendingColumnFilters, pendingDateRange);
-    // Also refresh tab counts with pending filters
-    fetchTabCountWithFilters('settlement_matched', pendingColumnFilters, pendingDateRange);
-    fetchTabCountWithFilters('unsettled', pendingColumnFilters, pendingDateRange);
+    // Use dual API with filters and pending platforms
+    fetchDualTransactions(1, pendingColumnFilters, pendingDateRange, pendingSelectedPlatforms);
     
     // Close the filter popover
     closeFilterPopover();
   };
 
+  // Apply platform changes - called when Apply button next to platform selector is clicked
+  const applyPlatformFilter = () => {
+    const platformsCommaSeparated = pendingSelectedPlatforms.join(',');
+    
+    setSelectedPlatforms(pendingSelectedPlatforms);
+    setPage(0);
+    setCurrentPage(1);
+    fetchDualTransactions(1, columnFilters, dateRange, pendingSelectedPlatforms);
+  };
+
+  // Apply header date range changes - called when Apply button next to date selector is clicked
+  const applyHeaderDateRange = () => {
+    
+    setHeaderDateRange(pendingHeaderDateRange);
+    setDateRange(pendingHeaderDateRange);
+    setPage(0);
+    setCurrentPage(1);
+    fetchDualTransactions(1, columnFilters, pendingHeaderDateRange, selectedPlatforms);
+  };
+
   // Only refresh data when rowsPerPage changes (not filters)
   useEffect(() => {
-    if (allTransactionData.length > 0) { // Only refetch if data has been loaded initially
-      const currentRemark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-      fetchOrders(1, currentRemark);
+    if (hasInitialLoad && (settledData || unsettledData)) { // Only refetch if data has been loaded initially
+      fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
     }
   }, [rowsPerPage]);
 
@@ -1916,7 +2585,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const queryParams = buildQueryParams(1, remark, filters, dateRangeFilter);
       queryParams.limit = 1; // Only need metadata, not actual data
       
-      const response = await api.transactions.getTransactions(queryParams as any);
+      const response = await api.transactions.getTotalTransactions(queryParams as any);
       let count = 0;
       
       // Try to get count from metadata first
@@ -1950,7 +2619,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const queryParams = buildQueryParams(1, remark);
       queryParams.limit = 1; // Only need metadata, not actual data
       
-      const response = await api.transactions.getTransactions(queryParams as any);
+      const response = await api.transactions.getTotalTransactions(queryParams as any);
       let count = 0;
       
       // Try to get count from metadata first
@@ -1978,6 +2647,392 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   };
 
+  // Dual API call function - fetches both settled and unsettled data simultaneously
+  const fetchDualTransactions = async (
+    pageNumber: number = 1, 
+    filters?: { [key: string]: any }, 
+    dateRangeFilter?: {start: string, end: string},
+    overridePlatforms?: Platform[],
+    orderIds?: string[],
+    sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
+    applySortOverride?: boolean
+  ) => {
+    
+    
+    // Prevent duplicate calls from React Strict Mode
+    if (isFetchingRef.current) {
+      return;
+    }
+    
+    const isInitialLoad = pageNumber === 1 && !settledData && !unsettledData;
+    
+    // Set the flag to prevent duplicate calls
+    isFetchingRef.current = true;
+    
+    if (!isInitialLoad) {
+      setPaginationLoading(true);
+    }
+    setDualApiLoading(true);
+    setError(null);
+    
+    try {
+      // Build base parameters
+      const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
+      
+      // Create settled API call parameters
+      const settledParams: any = {
+        page: pageNumber,
+        limit: rowsPerPage,
+      };
+      
+      // Convert filters to API parameters
+      if (filters && Object.keys(filters).length > 0) {
+        Object.entries(filters).forEach(([columnKey, filterValue]) => {
+          if (!filterValue) return;
+
+          const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
+          if (!mapping) {
+            // If no mapping, pass through as-is for backward compatibility
+            (settledParams as any)[columnKey] = filterValue;
+            return;
+          }
+
+          // Check platform compatibility
+          if (mapping.supportedPlatforms) {
+            const isSupported = platformsToUse.some(p => mapping.supportedPlatforms!.includes(p as any));
+            if (!isSupported) {
+              return; // Skip filters not supported by any selected platform
+            }
+          }
+
+          const baseParam = mapping.apiParam;
+
+          switch (mapping.type) {
+            case 'string':
+              if (columnKey === 'Order ID') {
+                // For Order ID, use chips array joined by comma
+                const orderIdsToUse = orderIds !== undefined ? orderIds : orderIdChips;
+                if (orderIdsToUse.length > 0) {
+                  settledParams[baseParam] = orderIdsToUse.join(',');
+                }
+              } else if (typeof filterValue === 'string' && filterValue.trim()) {
+                settledParams[baseParam] = filterValue.trim();
+              }
+              break;
+            
+            case 'number':
+              if (typeof filterValue === 'object' && filterValue !== null) {
+                if (filterValue.min !== undefined && filterValue.min !== '') {
+                  settledParams[`${baseParam}_min`] = parseFloat(filterValue.min);
+                }
+                if (filterValue.max !== undefined && filterValue.max !== '') {
+                  settledParams[`${baseParam}_max`] = parseFloat(filterValue.max);
+                }
+              }
+              break;
+            
+            case 'date':
+              if (typeof filterValue === 'object' && filterValue !== null) {
+                if (filterValue.from) {
+                  settledParams[`${baseParam}_from`] = filterValue.from;
+                }
+                if (filterValue.to) {
+                  settledParams[`${baseParam}_to`] = filterValue.to;
+                }
+              }
+              break;
+            
+            case 'enum':
+              if (Array.isArray(filterValue) && filterValue.length > 0) {
+                settledParams[baseParam] = filterValue.join(',');
+              }
+              break;
+          }
+        });
+      }
+      
+      // Add date range parameters with correct keys
+      if (dateRangeFilter?.start && dateRangeFilter?.end) {
+        settledParams.order_date_from = dateRangeFilter.start;
+        settledParams.order_date_to = dateRangeFilter.end;
+      }
+      
+      // Add platform parameter
+      if (platformsToUse.length > 0) {
+        settledParams.platform = platformsToUse.join(',');
+      }
+
+      // Apply sorting if present (use override if explicitly requested to avoid state lag)
+      const sortToUse = applySortOverride ? sortOverride : sortConfig;
+      if (sortToUse && COLUMN_TO_SORT_BY_MAP[sortToUse.key]) {
+        settledParams.sort_by = COLUMN_TO_SORT_BY_MAP[sortToUse.key];
+        settledParams.sort_order = sortToUse.direction;
+      }
+      
+      // Check if user has applied a Status filter
+      const statusFilter = filters?.['Status'];
+      const hasStatusFilter = statusFilter && Array.isArray(statusFilter) && statusFilter.length > 0;
+      
+      // Only set default status_in if no Status filter was applied by the user
+      // The filter conversion loop above may have already added status_in, so check first
+      if (!settledParams.status_in) {
+        // No status_in was set by filter conversion, use default for settled tab
+        settledParams.status_in = 'settlement_matched,less_payment_received,more_payment_received';
+      }
+      
+      // Create unsettled API call parameters
+      const unsettledParams = { ...settledParams };
+      
+      // Handle unsettled tab based on whether user selected specific statuses
+      if (hasStatusFilter && statusFilter.includes('unsettled')) {
+        // User selected unsettled - check if they also selected settled statuses
+        const settledStatuses = statusFilter.filter(s => s !== 'unsettled');
+        if (settledStatuses.length > 0) {
+          // User selected both settled and unsettled - need to handle both tabs
+          // Settled params already has the settled statuses
+          // For unsettled, remove settled statuses and use status='unsettled'
+          delete unsettledParams.status_in;
+          unsettledParams.status = 'unsettled';
+        } else {
+          // Only unsettled selected
+          delete unsettledParams.status_in;
+          unsettledParams.status = 'unsettled';
+        }
+      } else if (hasStatusFilter && !statusFilter.includes('unsettled')) {
+        // User only selected settled statuses - no data for unsettled tab
+        delete unsettledParams.status_in;
+        delete unsettledParams.status;
+      } else {
+        // Default: no status filter, use normal settled/unsettled split
+        delete unsettledParams.status_in;
+        unsettledParams.status = 'unsettled';
+      }
+
+      // Ensure Order ID search is always applied even if not present in column filters
+      const effectiveOrderIds = (orderIds !== undefined ? orderIds : orderIdChips) || [];
+      if (Array.isArray(effectiveOrderIds) && effectiveOrderIds.length > 0) {
+        const orderIdsCsv = effectiveOrderIds.join(',');
+        settledParams.order_id = orderIdsCsv;
+        unsettledParams.order_id = orderIdsCsv;
+      }
+      
+      
+      
+      // Determine if we should make unsettled API call
+      const shouldFetchUnsettled = !hasStatusFilter || (hasStatusFilter && statusFilter.includes('unsettled'));
+      
+      // Make API calls (conditionally include unsettled)
+      const apiCalls: [Promise<any>, Promise<any>] = [
+        api.transactions.getTotalTransactions(settledParams),
+        shouldFetchUnsettled 
+          ? api.transactions.getTotalTransactions(unsettledParams)
+          : Promise.resolve({ success: true, data: null }) // Mock response when not fetching
+      ];
+      
+      const [settledResponse, unsettledResponse] = await Promise.all(apiCalls);
+      
+      // Process settled response
+      if (settledResponse.success) {
+        setSettledData(settledResponse.data);
+        
+      } else {
+        console.error('[fetchDualTransactions] Settled API failed:', settledResponse);
+      }
+      
+      // Process unsettled response (only if we actually fetched it)
+      if (shouldFetchUnsettled && unsettledResponse.success) {
+        setUnsettledData(unsettledResponse.data);
+        
+      } else {
+        console.error('[fetchDualTransactions] Unsettled API failed:', unsettledResponse);
+      }
+      
+      // Store total counts separately for settled and unsettled tabs
+      if (settledResponse.success && settledResponse.data?.pagination) {
+        setSettledTotalCount(settledResponse.data.pagination.total_count);
+      }
+      if (shouldFetchUnsettled && unsettledResponse.success && unsettledResponse.data?.pagination) {
+        setUnsettledTotalCount(unsettledResponse.data.pagination.total_count);
+      } else if (!shouldFetchUnsettled) {
+        // No unsettled data was fetched (user selected only settled statuses)
+        setUnsettledTotalCount(0);
+        setUnsettledData(null);
+      }
+      
+      // Update totalCount based on current active tab
+      if (activeTab === 0 && settledResponse.success && settledResponse.data?.pagination) {
+        setTotalCount(settledResponse.data.pagination.total_count);
+      } else if (activeTab === 1 && shouldFetchUnsettled && unsettledResponse.success && unsettledResponse.data?.pagination) {
+        setTotalCount(unsettledResponse.data.pagination.total_count);
+      }
+      
+      setCurrentPage(pageNumber);
+      
+      // Update tab counts based on the actual data received
+      if (settledResponse.success) {
+        setTabCounts({
+          settled: settledResponse.data?.data?.length || 0,
+          unsettled: (shouldFetchUnsettled && unsettledResponse.success) ? (unsettledResponse.data?.data?.length || 0) : 0,
+        });
+      }
+      
+    } catch (error) {
+      console.error('[fetchDualTransactions] Error:', error);
+      setError('Failed to fetch transaction data');
+    } finally {
+      setDualApiLoading(false);
+      setPaginationLoading(false);
+      isFetchingRef.current = false; // Reset the flag
+    }
+  };
+
+  // Fetch data from new total transactions API
+  const fetchTotalTransactions = async (
+    pageNumber: number = 1, 
+    filters?: { [key: string]: any }, 
+    dateRangeFilter?: {start: string, end: string},
+    overridePlatforms?: Platform[]
+  ) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params: any = {
+        page: pageNumber,
+        limit: rowsPerPage, // Use current rows per page setting
+      };
+      
+      // ALWAYS add platform parameter as comma-separated list
+      const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
+      if (platformsToUse.length > 0) {
+        params.platform = platformsToUse.join(',');
+      } else {
+        console.warn('[fetchTotalTransactions] No platforms selected');
+      }
+      
+      // Apply status based on active tab selection
+      if (activeTab === 0) {
+        // Settled tab - use status_in with comma-separated values
+        params.status_in = 'settlement_matched,less_payment_received,more_payment_received';
+      } else if (activeTab === 1) {
+        // Unsettled tab - use status=unsettled
+        params.status = 'unsettled';
+      }
+      
+      // Apply filters if provided
+      if (filters && Object.keys(filters).some(key => filters[key])) {
+        Object.entries(filters).forEach(([columnKey, filterValue]) => {
+          if (!filterValue) return;
+
+          const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
+          if (!mapping) return;
+
+          // Check platform compatibility - allow if any selected platform supports it
+          if (mapping.supportedPlatforms) {
+            const isSupported = platformsToUse.some(p => mapping.supportedPlatforms!.includes(p as any));
+            if (!isSupported) {
+              return; // Skip filters not supported by any selected platform
+            }
+          }
+
+          const baseParam = mapping.apiParam;
+
+          switch (mapping.type) {
+            case 'string':
+              if (columnKey === 'Order ID') {
+                // For Order ID, use chips array joined by comma
+                if (orderIdChips.length > 0) {
+                  params[baseParam] = orderIdChips.join(',');
+                }
+              } else if (typeof filterValue === 'string' && filterValue.trim()) {
+                params[baseParam] = filterValue.trim();
+              }
+              break;
+            
+            case 'number':
+              if (typeof filterValue === 'object' && filterValue !== null) {
+                if (filterValue.min !== undefined && filterValue.min !== '') {
+                  params[`${baseParam}_min`] = parseFloat(filterValue.min);
+                }
+                if (filterValue.max !== undefined && filterValue.max !== '') {
+                  params[`${baseParam}_max`] = parseFloat(filterValue.max);
+                }
+              }
+              break;
+            
+            case 'date':
+              if (typeof filterValue === 'object' && filterValue !== null) {
+                if (filterValue.from && filterValue.to) {
+                  params[`${baseParam}_from`] = filterValue.from;
+                  params[`${baseParam}_to`] = filterValue.to;
+                }
+              }
+              break;
+            
+            case 'enum':
+              if (Array.isArray(filterValue) && filterValue.length > 0) {
+                // Use the mapped API param which already includes _in suffix if needed
+                params[baseParam] = filterValue.join(',');
+              }
+              break;
+          }
+        });
+      }
+
+      // Apply date range filter if provided
+      if (dateRangeFilter?.start && dateRangeFilter?.end) {
+        params.order_date_from = dateRangeFilter.start;
+        params.order_date_to = dateRangeFilter.end;
+      }
+      
+      
+      
+      // Use custom API call with specific organization ID for this API only
+      const response = await apiService.get<TotalTransactionsResponse>(
+        API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS, 
+        params,
+        {
+          headers: {
+            'X-Org-ID': '6ce6ee73-e1ef-4020-ad74-4ee45e731201',
+            'X-API-Key': 'kapiva-7b485b6a865b2b4a3d728ef2fd4f3'
+          }
+        }
+      );
+      
+      if (response.success && response.data) {
+        
+        setTotalTransactionsData(response.data);
+        setTotalCount(response.data.pagination?.total_count || 0);
+        setCurrentPage(response.data.pagination?.page || 1);
+        
+        // Handle null data case (0 results)
+        const dataArray = response.data.data || [];
+        
+        // Update tab counts based on the data
+        const settledCount = dataArray.filter(row => 
+          row.recon_status === 'settlement_matched' || row.recon_status === 'less_payment_received' || row.recon_status === 'more_payment_received'
+        ).length;
+        const unsettledCount = dataArray.filter(row => 
+          row.recon_status === 'unsettled'
+        ).length;
+        
+        setTabCounts({
+          settled: settledCount,
+          unsettled: unsettledCount
+        });
+        
+        
+      } else {
+        setError('Failed to fetch transactions');
+      }
+    } catch (err: any) {
+      console.error('Error fetching total transactions:', err);
+      setError(err.message || 'Failed to fetch transactions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Handle search
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
@@ -1997,6 +3052,52 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       ...prev,
       [columnKey]: event.target.value,
     }));
+  };
+
+  // Handle Order ID search input change (don't trigger API yet)
+  const handleOrderIdSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setOrderIdSearch(value);
+    // If cleared via typing, immediately clear filter and refetch without order_id
+    if (value.trim() === '') {
+      setOrderIdChips([]);
+      setPage(0);
+      setCurrentPage(1);
+      fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, []);
+    }
+  };
+
+  // Handle Order ID search button click
+  const handleOrderIdSearchClick = () => {
+    const value = orderIdSearch;
+    
+    // Convert comma-separated values to array
+    const orderIds = value.split(',').map(id => id.trim()).filter(id => id.length > 0);
+    setOrderIdChips(orderIds);
+    
+    // Trigger API call
+    setPage(0);
+    setCurrentPage(1);
+    
+    // Build query params with order IDs
+    const newFilters = { ...columnFilters };
+    if (orderIds.length > 0) {
+      fetchDualTransactions(1, newFilters, dateRange, selectedPlatforms, orderIds);
+    } else {
+      fetchDualTransactions(1, newFilters, dateRange, selectedPlatforms);
+    }
+  };
+
+  // Handle Order ID search clear
+  const handleOrderIdSearchClear = () => {
+    setOrderIdSearch('');
+    setOrderIdChips([]);
+    setShowOrderIdSearch(false);
+    
+    // Trigger API call without order IDs
+    setPage(0);
+    setCurrentPage(1);
+    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, []);
   };
 
   // Handle number range filter
@@ -2043,8 +3144,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Open/close popover for a column
   const openFilterPopover = (columnKey: string, target: HTMLElement) => {
-    console.log('openFilterPopover called:', columnKey, target);
-    console.log('Setting state - activeFilterColumn:', columnKey, 'headerFilterAnchor:', !!target);
     
     // Initialize pending filters with current active filters
     setPendingColumnFilters(columnFilters);
@@ -2053,18 +3152,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setActiveFilterColumn(columnKey);
     setHeaderFilterAnchor(target);
     
-    // Debug: Check state after a short delay
-    setTimeout(() => {
-      console.log('State after 50ms:', { 
-        activeFilterColumn: columnKey, 
-        headerFilterAnchor: !!target,
-        shouldRender: Boolean(target) && Boolean(columnKey)
-      });
-    }, 50);
+    
   };
 
   const closeFilterPopover = () => {
-    console.log('closeFilterPopover called');
     setHeaderFilterAnchor(null);
     setActiveFilterColumn(null);
   };
@@ -2081,22 +3172,43 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   };
 
   // Transaction details popup handlers for Status column
-  const handleTransactionDetailsOpen = (event: React.MouseEvent<HTMLElement>, row: TransactionRow) => {
+  const handleTransactionDetailsOpen = (event: React.MouseEvent<HTMLElement>, row: any) => {
     event.preventDefault();
     event.stopPropagation();
     
-    // Debug logging to see what data we're passing to the popup
-    console.log('Opening popup for row:', row);
-    console.log('Row data structure:', Object.keys(row));
-    console.log('Original data in row:', (row as any).originalData);
     
     setSelectedTransaction(row);
     setAnchorEl(event.currentTarget);
   };
 
+  // Breakups modal handler
+  const handleBreakupsOpen = (event: React.MouseEvent<HTMLElement>, row: any) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Extract order ID from the row data
+    const orderId = row.order_id || row['Order ID'] || row['Order Item ID'] || row.order_item_id || 'Unknown';
+    
+    // Get breakups from metadata.breakups
+    let breakups = null;
+    if ((row as any)?.originalData?.metadata?.breakups) {
+      breakups = (row as any).originalData.metadata.breakups;
+    } else if (row.metadata?.breakups) {
+      breakups = row.metadata.breakups;
+    }
+    
+    if (breakups && typeof breakups === 'object' && Object.keys(breakups).length > 0) {
+      // Store the full row so we can access order_value, settlement_value, and diff
+      setSelectedBreakups(row);
+      setBreakupsOrderId(orderId);
+      setBreakupsAnchorEl(event.currentTarget);
+      setBreakupsModalOpen(true);
+    }
+  };
+
   // Filter data based on search, date range, and column filters
   useEffect(() => {
-    if (allTransactionData.length > 0) {
+    if (getCurrentData().length > 0) {
       let filtered = getCurrentData();
     
       // Search filter
@@ -2111,7 +3223,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Date range filter
       if (dateRange.start || dateRange.end) {
         filtered = filtered.filter(row => {
-          const orderDate = new Date(row["Order Date"]);
+          const orderDate = new Date(row["Invoice Date"] || row["invoice_date"]);
           const startDate = dateRange.start ? new Date(dateRange.start) : null;
           const endDate = dateRange.end ? new Date(dateRange.end) : null;
           
@@ -2131,7 +3243,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         const meta = COLUMN_META[columnKey] || { type: 'string' as const };
 
           filtered = filtered.filter(row => {
-          const value = row[columnKey as keyof TransactionRow] as any;
+          const value = (row as any)[columnKey];
             if (value === null || value === undefined) return false;
             
           switch (meta.type) {
@@ -2182,8 +3294,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleChangePage = (event: unknown, newPage: number) => {
     const newPageNumber = newPage + 1; // Convert from 0-based to 1-based
     setPage(newPage);
-    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-    fetchOrders(newPageNumber, remark);
+    
+    // Always use dual API with current filters
+    fetchDualTransactions(newPageNumber, columnFilters, dateRange, selectedPlatforms);
   };
 
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2191,98 +3304,53 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setRowsPerPage(newRowsPerPage);
     setPage(0);
     // Reset to first page when changing rows per page
-    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-    fetchOrders(1, remark);
+    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
   };
 
-  // Export to Excel
-  const handleExport = () => {
-    try {
-      // Prepare data for export
-      const exportData = filteredData.map(row => ({
-        'Order Item ID': row['Order Item ID'],
-        'Order Value': row['Order Value'],
-        'Order Date': row['Order Date'],
-        'Settlement Date': row['Settlement Date'],
-        'Difference': row['Difference'],
-        'Remark': row['Remark'],
-        'Event Type': row['Event Type']
-      }));
-
-      // Convert to CSV format
-      const headers = Object.keys(exportData[0]);
-      const csvContent = [
-        headers.join(','),
-        ...exportData.map(row => 
-          headers.map(header => {
-            const value = row[header as keyof typeof row];
-            // Handle special characters and commas in values
-            if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
-              return `"${value.replace(/"/g, '""')}"`;
-            }
-            return value;
-          }).join(',')
-        )
-      ].join('\n');
-
-      // Create and download file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      
-      link.setAttribute('href', url);
-              link.setAttribute('download', `transaction_sheet_${activeTab === 0 ? 'settled' : 'unsettled'}_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Clean up
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      // You could add a toast notification here if you have a notification system
-    }
-  };
+  
 
   // Clear filters
   const handleClearFilters = () => {
     setSearchTerm('');
     setDateRange({ start: '', end: '' });
     setColumnFilters({});
+    setSelectedPlatforms([...availablePlatforms]); // Reset to all platforms selected
+    setPendingSelectedPlatforms([...availablePlatforms]); // Reset pending platforms too
+    setOrderIdChips([]); // Clear order ID chips
+    setOrderIdSearch(''); // Clear order ID search in header
+    setShowOrderIdSearch(false); // Hide order ID search bar
     setPage(0);
     setCurrentPage(1);
-    const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-    fetchOrders(1, remark);
+    fetchDualTransactions(1, {}, { start: '', end: '' }, [...availablePlatforms], []);
   };
 
   // Handle tab change
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    console.log(`Tab changed from ${activeTab} to ${newValue}`);
     setActiveTab(newValue);
     setPage(0); // Reset to first page when changing tabs
     setCurrentPage(1); // Reset current page
     
-    // Determine the correct remark based on the new tab value
-    const remark = newValue === 0 ? 'settlement_matched' : 'unsettled';
-    console.log(`Fetching data for tab ${newValue} with remark: ${remark}`);
-    fetchOrders(1, remark); // Fetch first page data with correct remark
+    // Update totalCount based on the new active tab
+    if (newValue === 0 && settledTotalCount !== null) {
+      // Settled tab
+      setTotalCount(settledTotalCount);
+    } else if (newValue === 1 && unsettledTotalCount !== null) {
+      // Unsettled tab
+      setTotalCount(unsettledTotalCount);
+    }
+    
+    // No API call needed - just switch the displayed data
+    // The data is already loaded from dual API calls
   };
 
   // Handle transaction row click
-  const handleTransactionClick = (transaction: TransactionRow, event: React.MouseEvent<HTMLElement>) => {
+  const handleTransactionClick = (transaction: any, event: React.MouseEvent<HTMLElement>) => {
     setSelectedTransaction(transaction);
     setAnchorEl(event.currentTarget);
   };
 
 
 
-  // Get current data based on active tab
-  const getCurrentData = () => {
-    // For pagination, we work with the current page data
-    return allTransactionData;
-  };
 
   // Get visible columns
   const getVisibleColumns = () => {
@@ -2290,7 +3358,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       "Order ID",
       "Order Value",
       "Settlement Value",
-      "Order Date",
+      "Invoice Date",
       "Settlement Date",
       "Difference",
       "Status",
@@ -2320,8 +3388,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               border: '1px solid #e5e7eb'
             }}>
               <CardContent sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap:  2}}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, gap: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
                     <IconButton
                       onClick={onBack}
                       size="small"
@@ -2329,6 +3397,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         background: '#1f2937',
                         color: 'white',
                         mt: -2,
+                        flexShrink: 0,
                         '&:hover': {
                           background: '#374151',
                           transform: 'scale(1.05)',
@@ -2344,6 +3413,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       letterSpacing: '-0.02em',
                       py: 0.5,
                       mt: -2,
+                      flexShrink: 0,
                     }}>
                       Transaction Sheet
                     </Typography>
@@ -2353,14 +3423,24 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       value={activeTab} 
                       onChange={handleTabChange}
                       sx={{
+                        minWidth: 'fit-content',
+                        flexShrink: 0,
+                        ml: 1,
+                        '& .MuiTabs-flexContainer': {
+                          gap: 0.5,
+                        },
                         '& .MuiTab-root': {
                           minHeight: 32,
                           fontSize: '0.875rem',
                           fontWeight: 600,
                           textTransform: 'none',
                           color: '#6b7280',
-                          px: 2,
+                          px: 2.5,
                           py: 0.5,
+                          minWidth: 'fit-content',
+                          whiteSpace: 'nowrap',
+                          overflow: 'visible',
+                          textOverflow: 'clip',
                           '&.Mui-selected': {
                             color: '#1f2937',
                             fontWeight: 700,
@@ -2373,27 +3453,35 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         },
                       }}
                     >
-                      <Tab label={`Settled${tabCounts.settled != null ? ` (${tabCounts.settled})` : ''}`} />
-                      <Tab label={`Unsettled${tabCounts.unsettled != null ? ` (${tabCounts.unsettled})` : ''}`} />
+                      <Tab label={`Settled${settledTotalCount !== null ? ` (${settledTotalCount})` : ''}`} />
+                      <Tab label={`Unsettled${unsettledTotalCount !== null ? ` (${unsettledTotalCount})` : ''}`} />
                     </Tabs>
                     
                   
                   </Box>
                   
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 1, 
+                    flexWrap: { xs: 'wrap', md: 'nowrap' },
+                    width: '100%',
+                    maxWidth: '100%',
+                    justifyContent: 'flex-end'
+                  }}>
                     
                     <IconButton
                       onClick={() => {
-                        const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-                        fetchOrders(1, remark);
+                        fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
                       }}
-                      disabled={loading}
+                      disabled={(loading || dualApiLoading) && !isSorting}
                       sx={{
                         color: '#1f2937',
                         '&:hover': {
                           background: '#f9fafb',
                         },
                         transition: 'all 0.3s ease',
+                        flexShrink: 0,
                       }}
                     >
                       <RefreshIcon />
@@ -2403,29 +3491,323 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       variant="outlined"
                       startIcon={<FilterIcon />}
                       onClick={(e) => openFilterPopover('Status', e.currentTarget as any)}
-                      sx={{ textTransform: 'none', borderColor: '#1f2937', color: '#1f2937' }}
+                      sx={{ 
+                        textTransform: 'none', 
+                        borderColor: '#1f2937', 
+                        color: '#1f2937',
+                        flexShrink: 0,
+                        fontSize: '0.75rem',
+                        padding: '6px 12px',
+                        minWidth: 'auto',
+                      }}
                     >
                       Filters
                     </Button>
                     
-                    <Button
-                      variant="outlined"
-                      startIcon={<ExportIcon />}
-                      onClick={handleExport}
-                      sx={{
-                        borderColor: '#1f2937', 
-                        color: '#1f2937',
-                        textTransform: 'none',
-                      }}
-                    >
-                      Export
-                    </Button>
+                    {/* Platform Filter - New Design with Checkboxes */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 0.5,
+                      padding: '6px 8px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      backgroundColor: '#f9fafb',
+                      height: { xs: 'auto', sm: '48px' },
+                      flex: { xs: '1 1 100%', sm: '0 1 auto' },
+                      minWidth: 0,
+                      maxWidth: { xs: '100%', sm: '500px' },
+                      flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                      rowGap: { xs: 0.5, sm: 0 },
+                    }}>
+                      {/* Platform label */}
+                      <Typography variant="body2" sx={{ 
+                        fontWeight: 600, 
+                        color: '#1f2937', 
+                        fontSize: '0.7rem',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}>
+                        Platforms:
+                      </Typography>
+                      
+                      {/* Platform checkboxes */}
+                      <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
+                        {availablePlatforms.map((platform) => (
+                          <Box 
+                            key={platform}
+                            sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center',
+                              cursor: 'pointer',
+                              '&:hover': {
+                                '& .MuiTypography-root': {
+                                  color: '#0ea5e9'
+                                }
+                              }
+                            }}
+                            onClick={() => {
+                              setPendingSelectedPlatforms(prev => 
+                                prev.includes(platform) 
+                                  ? prev.filter(p => p !== platform)
+                                  : [...prev, platform]
+                              );
+                            }}
+                          >
+                            <Checkbox 
+                              checked={pendingSelectedPlatforms.includes(platform)}
+                              size="small"
+                              sx={{ padding: '2px', '& svg': { fontSize: '18px' } }}
+                            />
+                            <Typography variant="body2" sx={{ color: '#374151', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
+                              {platform === 'flipkart' ? 'Flipkart' : 'D2C'}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                      
+                      {/* Divider */}
+                      <Box sx={{ width: '1px', height: '18px', backgroundColor: '#d1d5db', mx: 0.25, flexShrink: 0 }} />
+                      
+                      {/* Select All button */}
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => {
+                          setPendingSelectedPlatforms([...availablePlatforms]);
+                        }}
+                        disabled={pendingSelectedPlatforms.length === availablePlatforms.length}
+                        sx={{
+                          textTransform: 'none',
+                          fontSize: '0.65rem',
+                          padding: '2px 6px',
+                          minWidth: 'auto',
+                          borderColor: '#d1d5db',
+                          color: '#6b7280',
+                          flexShrink: 0,
+                          '&:hover': {
+                            borderColor: '#0ea5e9',
+                            color: '#0ea5e9',
+                            backgroundColor: 'rgba(14, 165, 233, 0.04)',
+                          },
+                          '&:disabled': {
+                            borderColor: '#e5e7eb',
+                            color: '#d1d5db',
+                          }
+                        }}
+                      >
+                        All
+                      </Button>
+                      
+                      {/* Clear All button */}
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => {
+                          setPendingSelectedPlatforms([]);
+                        }}
+                        disabled={pendingSelectedPlatforms.length === 0}
+                        sx={{
+                          textTransform: 'none',
+                          fontSize: '0.65rem',
+                          padding: '2px 6px',
+                          minWidth: 'auto',
+                          borderColor: '#d1d5db',
+                          color: '#6b7280',
+                          flexShrink: 0,
+                          '&:hover': {
+                            borderColor: '#ef4444',
+                            color: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.04)',
+                          },
+                          '&:disabled': {
+                            borderColor: '#e5e7eb',
+                            color: '#d1d5db',
+                          }
+                        }}
+                      >
+                        Clear
+                      </Button>
+                      
+                      {/* Divider */}
+                      <Box sx={{ width: '1px', height: '18px', backgroundColor: '#d1d5db', mx: 0.25, flexShrink: 0 }} />
+                      
+                      {/* Apply Button */}
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={applyPlatformFilter}
+                        disabled={JSON.stringify(pendingSelectedPlatforms.sort()) === JSON.stringify(selectedPlatforms.sort())}
+                        sx={{
+                          textTransform: 'none',
+                          fontSize: '0.7rem',
+                          padding: '3px 10px',
+                          minWidth: 'auto',
+                          backgroundColor: '#1f2937',
+                          flexShrink: 0,
+                          '&:hover': { backgroundColor: '#374151' },
+                          '&:disabled': {
+                            backgroundColor: '#9ca3af',
+                            color: '#ffffff',
+                          },
+                        }}
+                      >
+                        Apply
+                      </Button>
+                    </Box>
+                    
+                    {/* Date Range Selector - New Design */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 0.5,
+                      padding: '6px 8px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      backgroundColor: '#f9fafb',
+                      height: { xs: 'auto', sm: '48px' },
+                      flex: { xs: '1 1 100%', sm: '0 1 auto' },
+                      minWidth: 0,
+                      maxWidth: { xs: '100%', sm: '420px' },
+                      flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                      rowGap: { xs: 0.5, sm: 0 },
+                    }}>
+                      {/* Date label */}
+                      <Typography variant="body2" sx={{ 
+                        fontWeight: 600, 
+                        color: '#1f2937', 
+                        fontSize: '0.7rem',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}>
+                        Date Range:
+                      </Typography>
+                      
+                      {/* Date inputs */}
+                      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flex: '1 1 auto', minWidth: 0 }}>
+                        <TextField
+                          label="From"
+                          type="date"
+                          size="small"
+                          value={pendingHeaderDateRange.start}
+                          onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, start: e.target.value }))}
+                          InputLabelProps={{ shrink: true }}
+                          sx={{ 
+                            flex: '1 1 0',
+                            minWidth: 0,
+                            maxWidth: '110px',
+                            '& .MuiOutlinedInput-root': {
+                              backgroundColor: '#ffffff',
+                              fontSize: '0.7rem',
+                              padding: '4px 8px',
+                            },
+                            '& .MuiInputLabel-root': {
+                              fontSize: '0.7rem',
+                            },
+                            '& input': {
+                              padding: '6px 4px',
+                            }
+                          }}
+                        />
+                        <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.7rem', flexShrink: 0 }}>
+                          to
+                        </Typography>
+                        <TextField
+                          label="To"
+                          type="date"
+                          size="small"
+                          value={pendingHeaderDateRange.end}
+                          onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, end: e.target.value }))}
+                          InputLabelProps={{ shrink: true }}
+                          sx={{ 
+                            flex: '1 1 0',
+                            minWidth: 0,
+                            maxWidth: '110px',
+                            '& .MuiOutlinedInput-root': {
+                              backgroundColor: '#ffffff',
+                              fontSize: '0.7rem',
+                              padding: '4px 8px',
+                            },
+                            '& .MuiInputLabel-root': {
+                              fontSize: '0.7rem',
+                            },
+                            '& input': {
+                              padding: '6px 4px',
+                            }
+                          }}
+                        />
+                      </Box>
+                      
+                      {/* Divider */}
+                      <Box sx={{ width: '1px', height: '18px', backgroundColor: '#d1d5db', mx: 0.25, flexShrink: 0 }} />
+                      
+                      {/* Apply Button */}
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={applyHeaderDateRange}
+                        disabled={
+                          !pendingHeaderDateRange.start || 
+                          !pendingHeaderDateRange.end ||
+                          (pendingHeaderDateRange.start === headerDateRange.start && 
+                           pendingHeaderDateRange.end === headerDateRange.end)
+                        }
+                        sx={{
+                          textTransform: 'none',
+                          fontSize: '0.7rem',
+                          padding: '3px 10px',
+                          minWidth: 'auto',
+                          backgroundColor: '#1f2937',
+                          flexShrink: 0,
+                          '&:hover': { backgroundColor: '#374151' },
+                          '&:disabled': {
+                            backgroundColor: '#9ca3af',
+                            color: '#ffffff',
+                          },
+                        }}
+                      >
+                        Apply
+                      </Button>
+                    </Box>
+                    
                   </Box>
                 </Box>
 
                 {/* Active filter chips row directly under the header row, aligned under back button */}
-                {!!Object.keys(columnFilters).filter(k => columnFilters[k]).length && (
+                {(!!Object.keys(columnFilters).filter(k => columnFilters[k]).length || selectedPlatforms.length < availablePlatforms.length || orderIdChips.length > 0) && (
                   <Box sx={{ml: 6, display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                    {/* Platform filter chips - show if not all platforms are selected */}
+                    {selectedPlatforms.length > 0 && selectedPlatforms.length < availablePlatforms.length && (
+                      <Chip
+                        key="platform-filter"
+                        label={`Platform: ${selectedPlatforms.map(p => p === 'flipkart' ? 'Flipkart' : 'D2C').join(', ')}`}
+                        onDelete={() => {
+                          setSelectedPlatforms([...availablePlatforms]);
+                          setPage(0);
+                          setCurrentPage(1);
+                          fetchDualTransactions(1, columnFilters, dateRange, [...availablePlatforms]);
+                        }}
+                        size="small"
+                        sx={{ bgcolor: '#e0f2fe', color: '#0369a1', fontWeight: 600 }}
+                      />
+                    )}
+                    {/* Order ID chips */}
+                    {orderIdChips.length > 0 && (
+                      <Chip
+                        key="order-ids-filter"
+                        label={`Order IDs: ${orderIdChips.length} selected`}
+                        onDelete={() => {
+                          setOrderIdChips([]);
+                          setOrderIdSearch('');
+                          setShowOrderIdSearch(false);
+                          setPage(0);
+                          setCurrentPage(1);
+                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, []);
+                        }}
+                        size="small"
+                        sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600 }}
+                      />
+                    )}
                     {Object.entries(columnFilters).filter(([_, v]) => !!v).map(([key, val]) => (
                       <Chip
                         key={key}
@@ -2442,8 +3824,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             return p;
                           });
                                                       // Re-apply after deletion
-                            const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-                            fetchOrdersWithFilters(1, remark, next, pendingDateRange);
+                            fetchDualTransactions(1, next, pendingDateRange, selectedPlatforms);
                         }}
                       />
                     ))}
@@ -2460,8 +3841,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               sx={{ mb: 2 }}
               action={
                 <Button color="inherit" size="small" onClick={() => {
-                  const remark = activeTab === 0 ? 'settlement_matched' : 'unsettled';
-                  fetchOrders(1, remark);
+                  fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
                 }}>
                   Retry
                 </Button>
@@ -2472,7 +3852,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           )}
 
           {/* Loading Indicator */}
-          {loading && (
+          {(loading || dualApiLoading) && !isSorting && (
             <LinearProgress 
               sx={{ 
                 mb: 2,
@@ -2487,7 +3867,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           )}
 
           {/* Pagination Loading Indicator */}
-          {paginationLoading && (
+          {paginationLoading && !isSorting && (
             <LinearProgress 
               sx={{ 
                 mb: 2,
@@ -2538,7 +3918,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 }}>
                   <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
                     <TableRow>
-                                              {visibleColumns.map((column, index) => (
+                                              {getCurrentColumns().map((column, index) => (
                           <TableCell
                             key={`header-${column}`}
                           sx={{
@@ -2552,7 +3932,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             position: 'relative',
                           }}
                         >
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                             {/* Column Header */}
                               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
@@ -2571,20 +3951,100 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         background: sortConfig?.key === column ? '#e5e7eb' : 'transparent',
                                         '&:hover': { background: '#f3f4f6' },
                                       }}
+                                      disabled={!COLUMN_TO_SORT_BY_MAP[column]}
                                       aria-label={`Sort ${column}`}
                                     >
                                       {getSortIcon(column)}
                                     </IconButton>
+                                    {/* Magnifying glass button for Order ID search */}
+                                    {column === 'Order ID' && (
+                                      <IconButton 
+                                        size="small" 
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setShowOrderIdSearch(!showOrderIdSearch);
+                                        }}
+                                        sx={{
+                                          ml: 0.5,
+                                          color: showOrderIdSearch ? '#1f2937' : '#6b7280',
+                                          background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
+                                          '&:hover': { background: '#f3f4f6' },
+                                        }}
+                                        aria-label="Toggle search"
+                                      >
+                                        <SearchIcon sx={{ fontSize: '1rem' }} />
+                                      </IconButton>
+                                    )}
                               </Box>
+                              {/* Order ID Search Bar - Expandable */}
+                              {column === 'Order ID' && showOrderIdSearch && (
+                                <Box 
+                                  sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 0.5,
+                                    animation: 'expand 0.3s ease-in-out',
+                                    '@keyframes expand': {
+                                      '0%': { width: '0', opacity: 0 },
+                                      '100%': { width: '280px', opacity: 1 }
+                                    }
+                                  }}
+                                >
+                                  <TextField
+                                    size="small"
+                                    value={orderIdSearch}
+                                    onChange={handleOrderIdSearchChange}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleOrderIdSearchClick();
+                                      }
+                                    }}
+                                    InputProps={{
+                                      endAdornment: (
+                                        <InputAdornment position="end">
+                                          {orderIdSearch?.trim() && (
+                                            <IconButton
+                                              size="small"
+                                              onClick={handleOrderIdSearchClear}
+                                              disabled={(loading || dualApiLoading) && !isSorting}
+                                              sx={{ p: 0.5, mr: 0.25 }}
+                                            >
+                                              <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
+                                            </IconButton>
+                                          )}
+                                          <IconButton
+                                            size="small"
+                                            onClick={handleOrderIdSearchClick}
+                                            disabled={(loading || dualApiLoading) && !isSorting}
+                                            sx={{ p: 0.5 }}
+                                          >
+                                            <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                          </IconButton>
+                                        </InputAdornment>
+                                      ),
+                                    }}
+                                    sx={{
+                                      width: '280px',
+                                      '& .MuiOutlinedInput-root': {
+                                        height: '32px',
+                                        fontSize: '0.75rem',
+                                        background: 'white',
+                                      }
+                                    }}
+                                  />
+                                </Box>
+                              )}
                             </Box>
                           </TableCell>
                         ))}
                       </TableRow>
                   </TableHead>
                   <TableBody>
-                    {loading && allTransactionData.length === 0 ? (
+                    {(loading || dualApiLoading) && !isSorting && getCurrentData().length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={visibleColumns.length} sx={{ textAlign: 'center', py: 6 }}>
+                        <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 6 }}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                             <CircularProgress size={40} sx={{ color: '#1f2937' }} />
                             <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500 }}>
@@ -2593,9 +4053,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           </Box>
                         </TableCell>
                       </TableRow>
-                    ) : paginationLoading ? (
+                    ) : (paginationLoading && !isSorting) ? (
                       <TableRow>
-                        <TableCell colSpan={visibleColumns.length} sx={{ textAlign: 'center', py: 4 }}>
+                        <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                             <CircularProgress size={30} sx={{ color: '#3b82f6' }} />
                             <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>
@@ -2604,18 +4064,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           </Box>
                         </TableCell>
                       </TableRow>
-                    ) : filteredData.length === 0 ? (
+                    ) : getCurrentData().length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={visibleColumns.length} sx={{ textAlign: 'center', py: 4 }}>
+                        <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
                           <Typography variant="body2" sx={{ color: '#6b7280' }}>
-                            No transactions found matching your criteria.
+                            {totalTransactionsData ? 'No transactions found.' : 'No data available.'}
                           </Typography>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredData
+                      getCurrentData()
                         .map((row, rowIndex) => {
-                        const isSelected = (selectedTransaction?.["Order ID"] || selectedTransaction?.["Order Item ID"]) === (row["Order ID"] || row["Order Item ID"]);
+                        const isSelected = (selectedTransaction?.["Order ID"] || selectedTransaction?.["Order Item ID"]) === (row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"]);
                         return (
                           <React.Fragment key={rowIndex}>
                                                           <TableRow 
@@ -2625,27 +4085,109 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   position: 'relative',
                                 }}
                               >
-                        {visibleColumns.map((column, colIndex) => {
-                          const value = (row as any)[column];
+                        {getCurrentColumns().map((column, colIndex) => {
+                          // For new API, we need to map column titles to row keys
+                          let value;
+                          if (settledData !== null || unsettledData !== null) {
+                            // Use dual API data
+                            const currentData = activeTab === 0 ? settledData : unsettledData;
+                            const columnDef = currentData?.columns?.find(col => col.title === column);
+                            if (columnDef) {
+                              value = (row as any)[columnDef.key];
+                              
+                              // Fallback: if the key from column definition doesn't exist, try common alternatives
+                              if ((value === undefined || value === null || value === '') && column === 'Settlement Value') {
+                                // Try both common key names
+                                const fallbackValue = (row as any).settlement_amount || (row as any).settlement_value;
+                                if (fallbackValue !== undefined && fallbackValue !== null) {
+                                  value = fallbackValue;
+                                  
+                                }
+                              }
+                            }
+                          } else if (useNewAPI && totalTransactionsData) {
+                            const columnDef = totalTransactionsData.columns.find(col => col.title === column);
+                            if (columnDef) {
+                              value = (row as any)[columnDef.key];
+                              
+                              // Fallback: if the key from column definition doesn't exist, try common alternatives
+                              if ((value === undefined || value === null || value === '') && column === 'Settlement Value') {
+                                // Try both common key names
+                                const fallbackValue = (row as any).settlement_amount || (row as any).settlement_value;
+                                if (fallbackValue !== undefined && fallbackValue !== null) {
+                                  value = fallbackValue;
+                                  
+                                }
+                              }
+                            }
+                          } else {
+                            value = (row as any)[column];
+                          }
                           
                           // Format value based on type
                           let displayValue = value;
-                          if (column === 'Reason') {
-                            // Default reason to the remark for now
-                            displayValue = (row as any)['Remark'] || value || '-';
-                          } else if (typeof value === 'number') {
-                            if (column === 'Order Value' || column === 'Settlement Value' || column === 'Difference') {
-                              displayValue = formatCurrency(value);
-                            } else {
-                              displayValue = value.toLocaleString('en-IN');
+                          
+                          if (settledData !== null || unsettledData !== null) {
+                            // Use dual API data for formatting
+                            const currentData = activeTab === 0 ? settledData : unsettledData;
+                            const columnDef = currentData?.columns?.find(col => col.title === column);
+                            if (columnDef) {
+                              switch (columnDef.type) {
+                                case 'currency':
+                                  displayValue = formatCurrency(Number(value) || 0);
+                                  break;
+                                case 'date':
+                                  displayValue = formatDate(String(value));
+                                  break;
+                                case 'enum':
+                                  displayValue = String(value || '');
+                                  break;
+                                default:
+                                  displayValue = String(value || '');
+                              }
                             }
-                          } else if (column.includes('Date')) {
-                            displayValue = formatDate(value);
+                          } else if (useNewAPI && totalTransactionsData) {
+                            // Use column type information for formatting
+                            const columnDef = totalTransactionsData.columns.find(col => col.title === column);
+                            if (columnDef) {
+                              switch (columnDef.type) {
+                                case 'currency':
+                                  displayValue = formatCurrency(Number(value) || 0);
+                                  break;
+                                case 'date':
+                                  displayValue = formatDate(String(value));
+                                  break;
+                                case 'enum':
+                                  displayValue = String(value || '');
+                                  break;
+                                default:
+                                  displayValue = String(value || '');
+                              }
+                            }
+                          } else {
+                            // Old API formatting
+                            if (column === 'Reason') {
+                              // Default reason to the remark for now
+                              displayValue = (row as any)['Remark'] || value || '-';
+                            } else if (typeof value === 'number') {
+                              if (column === 'Order Value' || column === 'Settlement Value' || column === 'Difference') {
+                                displayValue = formatCurrency(value);
+                              } else {
+                                displayValue = value.toLocaleString('en-IN');
+                              }
+                            } else if (column.includes('Date')) {
+                              displayValue = formatDate(value || '');
+                            }
+                          }
+                          
+                          // Capitalize platform column
+                          if (column === 'Platform' || column === 'platform') {
+                            displayValue = String(displayValue || '').toUpperCase();
                           }
                           
                           return (
                             <TableCell
-                              key={`${(row["Order ID"] || row["Order Item ID"])}-${column}-${colIndex}`}
+                              key={`${(row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"])}-${column}-${colIndex}`}
                               sx={{
                                 background: '#ffffff',
                                 textAlign: 'center',
@@ -2663,38 +4205,95 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {column === 'Status' ? (
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    {/* Backend Status chip (exact value from API) */}
-                                    {((row as any)?.originalData?.status) && (
-                                    <Chip
-                                        label={(row as any).originalData.status}
-                                      size="small"
-                                      sx={{
-                                          background: '#f3f4f6',
-                                          color: '#111827',
-                                        fontWeight: 600,
-                                        fontSize: '0.75rem',
-                                        height: 24,
-                                        '& .MuiChip-label': { px: 1 },
-                                      }}
-                                    />
-                                    )}
-                                    {/* Event Type chip */}
-                                    <Chip
-                                      label={(row as any)['Event Type']}
-                                      size="small"
-                                      sx={{
-                                        background: (row as any)['Event Type'] === 'Sale' ? '#dcfce7' : '#fee2e2',
-                                        color: (row as any)['Event Type'] === 'Sale' ? '#059669' : '#dc2626',
-                                        fontWeight: 600,
-                                        fontSize: '0.75rem',
-                                        height: 24,
-                                        '& .MuiChip-label': { px: 1 },
-                                      }}
-                                    />
-                                    {/* Transaction details button */}
+                                    {/* Recon Status from row data */}
+                                    {(() => {
+                                      const reconStatus = row.recon_status || (row as any)?.originalData?.recon_status;
+                                      
+                                      if (reconStatus) {
+                                        let displayText = '';
+                                        let backgroundColor = '';
+                                        let textColor = '';
+                                        
+                                        switch (reconStatus) {
+                                          case 'settlement_matched':
+                                            displayText = 'Settlement Matched';
+                                            backgroundColor = '#dcfce7';
+                                            textColor = '#059669';
+                                            break;
+                                          case 'less_payment_received':
+                                            displayText = 'Less Payment Received';
+                                            backgroundColor = '#fef3c7';
+                                            textColor = '#d97706';
+                                            break;
+                                          case 'more_payment_received':
+                                            displayText = 'More Payment Received';
+                                            backgroundColor = '#fef3c7';
+                                            textColor = '#d97706';
+                                            break;
+                                          default:
+                                            displayText = 'Unsettled';
+                                            backgroundColor = '#fee2e2';
+                                            textColor = '#dc2626';
+                                        }
+                                        
+                                        return (
+                                          <Chip
+                                            label={displayText}
+                                            size="small"
+                                            sx={{
+                                              background: backgroundColor,
+                                              color: textColor,
+                                              fontWeight: 600,
+                                              fontSize: '0.75rem',
+                                              height: 24,
+                                              '& .MuiChip-label': { px: 1 },
+                                            }}
+                                          />
+                                        );
+                                      } else {
+                                        // Fallback to showing "Unsettled" if no recon_status
+                                        return (
+                                          <Chip
+                                            label="Unsettled"
+                                            size="small"
+                                            sx={{
+                                              background: '#fee2e2',
+                                              color: '#dc2626',
+                                              fontWeight: 600,
+                                              fontSize: '0.75rem',
+                                              height: 24,
+                                              '& .MuiChip-label': { px: 1 },
+                                            }}
+                                          />
+                                        );
+                                      }
+                                    })()}
+                                    
+                                    {/* Event Type chip based on event_type from API */}
+                                    {(() => {
+                                      const eventType = row.event_type || (row as any)?.originalData?.event_type || 'Sale';
+                                      const isSale = eventType?.toLowerCase() === 'sale';
+                                      
+                                      return (
+                                        <Chip
+                                          label={eventType}
+                                          size="small"
+                                          sx={{
+                                            background: isSale ? '#dcfce7' : '#fee2e2',
+                                            color: isSale ? '#059669' : '#dc2626',
+                                            fontWeight: 600,
+                                            fontSize: '0.75rem',
+                                            height: 24,
+                                            '& .MuiChip-label': { px: 1 },
+                                          }}
+                                        />
+                                      );
+                                    })()}
+                                    
+                                    {/* Breakups details button */}
                                     <IconButton
                                       size="small"
-                                      onClick={(e) => handleTransactionDetailsOpen(e, row)}
+                                      onClick={(e) => handleBreakupsOpen(e, row)}
                                       sx={{
                                         p: 0.5,
                                         minWidth: 20,
@@ -2763,14 +4362,24 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           anchorEl={anchorEl}
         />
 
+        {/* Breakups Modal */}
+        <BreakupsModal
+          open={breakupsModalOpen}
+          onClose={() => {
+            setBreakupsModalOpen(false);
+            setSelectedBreakups(null);
+            setBreakupsAnchorEl(null);
+            setBreakupsOrderId('');
+          }}
+          breakups={selectedBreakups}
+          orderId={breakupsOrderId}
+          anchorEl={breakupsAnchorEl}
+        />
+
         {/* Filter Menu Portal - Rendered outside table container */}
         {(() => {
           const shouldRender = Boolean(headerFilterAnchor) && Boolean(activeFilterColumn);
-          console.log('Portal render check:', { 
-            headerFilterAnchor: !!headerFilterAnchor, 
-            activeFilterColumn, 
-            shouldRender 
-          });
+          
           return shouldRender;
         })() && (
           <Portal>
@@ -2838,16 +4447,36 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 {/* Left: Full column list */}
                 <Box sx={{ width: 240, maxHeight: 320, overflowY: 'auto', borderRight: '1px solid #eee', pr: 1.5, pl: 0.5 }}>
                   <List dense subheader={<ListSubheader disableSticky sx={{ bgcolor: 'transparent', px: 0, fontSize: '0.75rem', color: '#6b7280' }}></ListSubheader>}>
-                    {Object.keys(COLUMN_META).map((col) => (
-                      <ListItemButton
-                        key={col}
-                        selected={activeFilterColumn === col}
-                        onClick={() => setActiveFilterColumn(col)}
-                        sx={{ borderRadius: 0.75, py: 0.75, px: 1 }}
-                      >
-                        <ListItemText primary={col} primaryTypographyProps={{ fontSize: '0.82rem' }} />
-                      </ListItemButton>
-                    ))}
+                    {Object.keys(COLUMN_META)
+                      .filter((col) => {
+                        // Exclude Order ID from filter sidebar
+                        if (col === 'Order ID') return false;
+                        // Filter columns based on selected platform
+                        const mapping = COLUMN_TO_API_PARAM_MAP[col];
+                        if (!mapping) return true; // Show columns without mapping
+                        if (!mapping.supportedPlatforms) return true; // Show columns available on all platforms
+                        // Show if supported by at least one selected platform
+                        return selectedPlatforms.some(p => mapping.supportedPlatforms!.includes(p as any));
+                      })
+                      .map((col) => (
+                        <ListItemButton
+                          key={col}
+                          selected={activeFilterColumn === col}
+                          onClick={() => setActiveFilterColumn(col)}
+                          sx={{ borderRadius: 0.75, py: 0.75, px: 1 }}
+                        >
+                          <ListItemText 
+                            primary={col} 
+                            primaryTypographyProps={{ fontSize: '0.82rem' }}
+                            secondary={
+                              COLUMN_TO_API_PARAM_MAP[col]?.supportedPlatforms 
+                                ? `(${COLUMN_TO_API_PARAM_MAP[col].supportedPlatforms?.join(', ')})` 
+                                : undefined
+                            }
+                            secondaryTypographyProps={{ fontSize: '0.65rem', color: '#9ca3af' }}
+                          />
+                        </ListItemButton>
+                      ))}
                   </List>
                 </Box>
                 {/* Right: Reusable controls */}
@@ -2862,16 +4491,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   handleEnumChange={handleEnumFilterChange}
                   getEnumOptions={getUniqueValuesForColumn}
                   onClear={(col) => clearColumnFilter(col)}
-                  onApply={() => {
-                    // Apply pending column/date filters
-                    setColumnFilters(pendingColumnFilters);
-                    setDateRange(pendingDateRange);
-                    closeFilterPopover();
-                    // Refresh data with applied filters
-                    fetchOrdersWithFilters();
-                    fetchTabCountWithFilters('settlement_matched', pendingColumnFilters, pendingDateRange);
-                    fetchTabCountWithFilters('unsettled', pendingColumnFilters, pendingDateRange);
-                  }}
+                  onApply={applyFilters}
+                  orderIdChips={orderIdChips}
+                  setOrderIdChips={setOrderIdChips}
                 />
             </Box>
             </Box>

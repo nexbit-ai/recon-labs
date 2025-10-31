@@ -1,4 +1,8 @@
+// --------------------
+// DEPRECATED - Only upload is needed for data sources now. This page has been commented out as per new requirements.
+// --------------------
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Box, 
   Typography, 
@@ -21,8 +25,10 @@ import {
   CloudUpload as CloudUploadIcon,
   CheckCircle as CheckCircleIcon,
   Link as LinkIcon,
-  Description as ReportIcon
+  Description as ReportIcon,
+  UploadFile as UploadFileIcon
 } from '@mui/icons-material';
+import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -67,11 +73,11 @@ interface UploadResponse {
 
 const dataSources: DataSource[] = [
   { id: 'shopify', name: 'Shopify', logo: 'https://cdn.worldvectorlogo.com/logos/shopify.svg' },
-  { id: 'amazon', name: 'Amazon', logo: 'https://cdn.worldvectorlogo.com/logos/logo-amazon.svg' },
+  { id: 'amazon', name: 'Amazon', logo: 'https://cdn.worldvectorlogo.com/logos/logo-amazon.svg',  isConnected: true},
   { id: 'flipkart', name: 'Flipkart', logo: 'https://cdn.worldvectorlogo.com/logos/flipkart.svg', isConnected: true },
   { id: 'myntra', name: 'Myntra', logo: 'https://cdn.worldvectorlogo.com/logos/myntra-1.svg' },
   { id: 'nykaa', name: 'Nykaa', logo: 'https://cdn.worldvectorlogo.com/logos/nykaa-1.svg' },
-  { id: 'zoho', name: 'Zoho', logo: 'https://cdn.worldvectorlogo.com/logos/zoho-1.svg'},
+  { id: 'zoho', name: 'Zoho', logo: 'https://cdn.worldvectorlogo.com/logos/zoho-1.svg',  isConnected: true},
   { id: 'payu', name: 'PayU', logo: 'https://cdn.worldvectorlogo.com/logos/payu-1.svg' },
   { id: 'razorpay', name: 'Razorpay', logo: 'https://cdn.worldvectorlogo.com/logos/razorpay.svg' },
   { id: 'tally', name: 'Tally', logo: 'https://cdn.worldvectorlogo.com/logos/tally-solutions.svg' },
@@ -82,6 +88,7 @@ const dataSources: DataSource[] = [
 ];
 
 const ConnectDataSources: React.FC = () => {
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<string[]>([]);
   const [settlementReport, setSettlementReport] = useState<File | null>(null);
   const [salesReport, setSalesReport] = useState<File | null>(null);
@@ -90,6 +97,16 @@ const ConnectDataSources: React.FC = () => {
   const [reportsOpen, setReportsOpen] = useState(false);
   const [reportType, setReportType] = useState<'all' | 'Sales' | 'Settlement' | 'System'>('all');
   const [reportQuery, setReportQuery] = useState('');
+
+  // Per-vendor marketplace uploads state (Amazon, Flipkart)
+  const [marketplaceFiles, setMarketplaceFiles] = useState<Record<string, { sales: File | null; settlement: File | null }>>({
+    amazon: { sales: null, settlement: null },
+    flipkart: { sales: null, settlement: null },
+  });
+  const [marketplaceStatus, setMarketplaceStatus] = useState<Record<string, { state: 'idle' | 'uploading' | 'success' | 'error'; message: string }>>({
+    amazon: { state: 'idle', message: '' },
+    flipkart: { state: 'idle', message: '' },
+  });
 
   const toggleSelect = (id: string) => {
     setSelected((prev) =>
@@ -140,6 +157,46 @@ const ConnectDataSources: React.FC = () => {
     } catch (error) {
       console.error('API call error:', error);
       return null;
+    }
+  };
+
+  const setMarketplaceFile = (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'settlement', file: File | null) => {
+    setMarketplaceFiles((prev) => ({
+      ...prev,
+      [vendorId]: { ...prev[vendorId], [kind]: file },
+    }));
+  };
+
+  const uploadMarketplaceReports = async (vendorId: 'amazon' | 'flipkart') => {
+    const files = marketplaceFiles[vendorId];
+    if (!files?.sales || !files?.settlement) {
+      setMarketplaceStatus((prev) => ({
+        ...prev,
+        [vendorId]: { state: 'error', message: 'Please select both Sales and Settlement files.' },
+      }));
+      return;
+    }
+
+    setMarketplaceStatus((prev) => ({ ...prev, [vendorId]: { state: 'uploading', message: 'Preparing uploads…' } }));
+    try {
+      // Settlement first
+      const settlementUploadData = await getUploadUrl(files.settlement, 'SettleMent');
+      if (!settlementUploadData) throw new Error('Failed to get upload URL for settlement report');
+      const settlementOk = await uploadFileToS3(files.settlement, settlementUploadData.upload_url);
+      if (!settlementOk) throw new Error('Failed to upload settlement report');
+
+      // Sales next
+      const salesUploadData = await getUploadUrl(files.sales, 'Sales');
+      if (!salesUploadData) throw new Error('Failed to get upload URL for sales report');
+      const salesOk = await uploadFileToS3(files.sales, salesUploadData.upload_url);
+      if (!salesOk) throw new Error('Failed to upload sales report');
+
+      setMarketplaceStatus((prev) => ({ ...prev, [vendorId]: { state: 'success', message: 'Files uploaded successfully.' } }));
+    } catch (err: any) {
+      setMarketplaceStatus((prev) => ({
+        ...prev,
+        [vendorId]: { state: 'error', message: err?.message || 'Upload failed. Please try again.' },
+      }));
     }
   };
 
@@ -210,6 +267,67 @@ const ConnectDataSources: React.FC = () => {
           </Typography>
         </Box>
 
+        {/* Upload Documents Button Section */}
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: 3, 
+            mb: 3, 
+            background: '#ffffff',
+            borderRadius: '12px',
+            border: '1px solid #e5e7eb',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+              borderColor: '#111111'
+            }
+          }}
+          onClick={() => navigate('/upload-documents')}
+        >
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Box display="flex" alignItems="center" gap={2}>
+              <Box
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: '12px',
+                  background: '#111111',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <UploadFileIcon sx={{ fontSize: 32, color: '#ffffff' }} />
+              </Box>
+              <Box>
+                <Typography variant="h6" fontWeight={700} color="#1e293b" mb={0.5}>
+                  Upload Settlement Sheets
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Upload and manage your settlement sheets from D2C vendors.
+                </Typography>
+              </Box>
+            </Box>
+            <Button
+              variant="contained"
+              sx={{
+                background: '#111111',
+                color: '#ffffff',
+                fontWeight: 700,
+                px: 3,
+                py: 1.5,
+                '&:hover': {
+                  background: '#333333',
+                }
+              }}
+            >
+              Get Started
+            </Button>
+          </Box>
+        </Paper>
+
         {/* Connected Sources Section */}
         <Paper 
           elevation={0} 
@@ -278,6 +396,105 @@ const ConnectDataSources: React.FC = () => {
                 </Card>
               </Grid>
             ))}
+          </Grid>
+        </Paper>
+
+        {/* Marketplace Uploads: Amazon & Flipkart */}
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: 3, 
+            mb: 3, 
+            background: '#ffffff',
+            borderRadius: '12px',
+            border: '1px solid #e5e7eb'
+          }}
+        >
+          <Box display="flex" alignItems="center" mb={3}>
+            <Typography variant="h6" fontWeight={700} color="#1e293b">
+              Marketplace Uploads
+            </Typography>
+            <Chip label="Amazon & Flipkart" size="small" sx={{ ml: 1 }} />
+          </Box>
+
+          <Grid container spacing={3}>
+            {(['amazon', 'flipkart'] as const).map((vendorId) => {
+              const vendor = dataSources.find((d) => d.id === vendorId);
+              const files = marketplaceFiles[vendorId];
+              const status = marketplaceStatus[vendorId];
+              const canUpload = Boolean(files?.sales && files?.settlement) && status?.state !== 'uploading';
+              return (
+                <Grid item xs={12} md={6} key={vendorId}>
+                  <Paper elevation={0} sx={{ p: 3, border: '1px solid #e5e7eb', borderRadius: '12px' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                      {vendor?.logo && (
+                        <img src={vendor.logo} alt={vendor.name} style={{ width: 28, height: 28, objectFit: 'contain' }} />
+                      )}
+                      <Typography variant="subtitle1" fontWeight={700}>{vendor?.name}</Typography>
+                    </Box>
+
+                    <Grid container spacing={2}>
+                      <Grid item xs={12}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Sales report (XLSX)</Typography>
+                        <input
+                          accept=".xlsx,.xls"
+                          style={{ display: 'none' }}
+                          id={`${vendorId}-sales-upload`}
+                          type="file"
+                          onChange={(e) => setMarketplaceFile(vendorId, 'sales', e.target.files?.[0] || null)}
+                        />
+                        <label htmlFor={`${vendorId}-sales-upload`}>
+                          <Button variant="outlined" component="span" startIcon={<CloudUploadIcon />} sx={{ mr: 1 }}>
+                            {files?.sales ? 'Change file' : 'Choose file'}
+                          </Button>
+                          <Typography variant="caption" color="text.secondary">
+                            {files?.sales ? files.sales.name : 'No file selected'}
+                          </Typography>
+                        </label>
+                      </Grid>
+
+                      <Grid item xs={12}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Settlement report (XLSX)</Typography>
+                        <input
+                          accept=".xlsx,.xls"
+                          style={{ display: 'none' }}
+                          id={`${vendorId}-settlement-upload`}
+                          type="file"
+                          onChange={(e) => setMarketplaceFile(vendorId, 'settlement', e.target.files?.[0] || null)}
+                        />
+                        <label htmlFor={`${vendorId}-settlement-upload`}>
+                          <Button variant="outlined" component="span" startIcon={<CloudUploadIcon />} sx={{ mr: 1 }}>
+                            {files?.settlement ? 'Change file' : 'Choose file'}
+                          </Button>
+                          <Typography variant="caption" color="text.secondary">
+                            {files?.settlement ? files.settlement.name : 'No file selected'}
+                          </Typography>
+                        </label>
+                      </Grid>
+
+                      <Grid item xs={12}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Button
+                            variant="contained"
+                            onClick={() => uploadMarketplaceReports(vendorId)}
+                            disabled={!canUpload}
+                            startIcon={status?.state === 'uploading' ? <CircularProgress size={16} sx={{ color: '#ffffff' }} /> : undefined}
+                            sx={{ background: '#111111', '&:hover': { background: '#333333' } }}
+                          >
+                            {status?.state === 'uploading' ? 'Uploading…' : 'Upload both files'}
+                          </Button>
+                          {status?.state !== 'idle' && (
+                            <Typography variant="caption" color={status.state === 'success' ? '#16a34a' : status.state === 'error' ? '#dc2626' : 'text.secondary'}>
+                              {status.message}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </Paper>
+                </Grid>
+              );
+            })}
           </Grid>
         </Paper>
 

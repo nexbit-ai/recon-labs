@@ -8,7 +8,9 @@ import {
   PaginationParams, 
   FilterParams,
   PaginatedResponse,
-  MarketplaceReconciliationResponse
+  MarketplaceReconciliationResponse,
+  TotalTransactionsResponse,
+  AgeingAnalysisResponse
 } from './types';
 
 // Authentication API
@@ -48,7 +50,7 @@ export const userAPI = {
 export const reconciliationAPI = {
   // Get reconciliation summary
   getSummary: (params?: DateRangeParams) =>
-    apiService.get<MarketplaceReconciliationResponse>(API_CONFIG.ENDPOINTS.FETCH_STATS, params),
+    apiService.get<ReconciliationData>(API_CONFIG.ENDPOINTS.RECONCILIATION_SUMMARY, params),
 
   // Get detailed reconciliation data
   getDetails: (params?: DateRangeParams & PaginationParams & FilterParams) =>
@@ -79,28 +81,26 @@ export const reconciliationAPI = {
 
 // Transactions API
 export const transactionsAPI = {
-  // Get transactions list
-  getTransactions: (params?: DateRangeParams & PaginationParams & FilterParams) =>
-    apiService.get<PaginatedResponse<any>>(API_CONFIG.ENDPOINTS.TRANSACTIONS, params),
+  // Get total transactions list with dynamic columns
+  getTotalTransactions: (params?: PaginationParams & FilterParams) =>
+    apiService.get<TotalTransactionsResponse>(API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS, params),
 
-  // Get single transaction
-  getTransaction: (id: string) =>
-    apiService.get<any>(replaceUrlParams(API_CONFIG.ENDPOINTS.TRANSACTION_DETAILS, { id })),
+  // Get D2C transactions with specific parameters
+  getD2CTransactions: (params?: { page?: number; limit?: number; recon_status?: string; platform?: string; pagination?: boolean }) =>
+    apiService.get<TotalTransactionsResponse>(API_CONFIG.ENDPOINTS.D2C_TRANSACTIONS, params, { useD2CHeaders: true }),
+};
 
-  // Update transaction
-  updateTransaction: (id: string, data: any) =>
-    apiService.put<any>(replaceUrlParams(API_CONFIG.ENDPOINTS.TRANSACTION_UPDATE, { id }), data),
-
-  // Delete transaction
-  deleteTransaction: (id: string) =>
-    apiService.delete(replaceUrlParams(API_CONFIG.ENDPOINTS.TRANSACTION_DELETE, { id })),
-
-  // Bulk operations
-  bulkUpdate: (ids: string[], data: any) =>
-    apiService.post(`${API_CONFIG.ENDPOINTS.TRANSACTIONS}/bulk-update`, { ids, data }),
-
-  bulkDelete: (ids: string[]) =>
-    apiService.post(`${API_CONFIG.ENDPOINTS.TRANSACTIONS}/bulk-delete`, { ids }),
+// Reconciliation manual actions API
+export const manualActionsAPI = {
+  // Trigger manual action for selected orders on a specific platform
+  manualAction: (
+    platform: string,
+    payload: { order_ids: string[]; note: string; manual_override_status?: string }
+  ) =>
+    apiService.post<any>(
+      `${API_CONFIG.ENDPOINTS.RECON_MANUAL_ACTION}?platform=${encodeURIComponent(platform)}`,
+      payload
+    ),
 };
 
 // Orders API
@@ -116,9 +116,19 @@ export const ordersAPI = {
 
 // Stats API
 export const statsAPI = {
-  // Get reconciliation stats
-  getStats: (params?: DateRangeParams) =>
-    apiService.get<MarketplaceReconciliationResponse>(API_CONFIG.ENDPOINTS.FETCH_STATS, params),
+  // Deprecated: removed legacy stats API
+};
+
+// Main Summary API (D2C / Marketplace unified summary)
+export const mainSummaryAPI = {
+  getMainSummary: (params: { start_date: string; end_date: string; date_field: 'invoice_date' | 'settlement_date' | string; platform?: string[]; status?: string }) =>
+    apiService.get<any>('/recon/main-summary', params),
+};
+
+// Ageing Analysis API
+export const ageingAnalysisAPI = {
+  getAgeingAnalysis: (params: { platform?: string; invoice_date_from: string; invoice_date_to: string }) =>
+    apiService.get<any>(API_CONFIG.ENDPOINTS.AGEING_ANALYSIS, params),
 };
 
 // Reports API
@@ -250,8 +260,11 @@ export const api = {
   user: userAPI,
   reconciliation: reconciliationAPI,
   transactions: transactionsAPI,
+  manualActions: manualActionsAPI,
   orders: ordersAPI,
   stats: statsAPI,
+  mainSummary: mainSummaryAPI,
+  ageingAnalysis: ageingAnalysisAPI,
   reports: reportsAPI,
   dataSources: dataSourcesAPI,
   ai: aiAPI,

@@ -32,6 +32,7 @@ import {
   InputLabel,
   Select,
   OutlinedInput,
+  InputAdornment,
   TablePagination,
   Dialog,
   DialogTitle,
@@ -43,7 +44,11 @@ import {
   KeyboardArrowDown as KeyboardArrowDownIcon, 
   StorefrontOutlined as StorefrontIcon,
   FilterList as FilterIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Search as SearchIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
+  UnfoldMore as UnfoldMoreIcon
 } from '@mui/icons-material';
 import { api } from '../services/api';
 import ColumnFilterControls from '../components/ColumnFilterControls';
@@ -51,9 +56,11 @@ import ColumnFilterControls from '../components/ColumnFilterControls';
 // Type definitions for transaction data based on API response
 interface TransactionRow {
   "Order ID": string;
-  "Order Value": number;
+  "Amount": number;
+  "Order Value"?: number; // Kept for compatibility
   "Settlement Value": number;
-  "Order Date": string;
+  "Invoice Date": string;
+  "Order Date"?: string; // Kept for compatibility
   "Settlement Date": string;
   "Difference": number;
   "Remark": string;
@@ -74,10 +81,10 @@ interface GroupedUnreconciledData {
 // API Response metadata types
 interface TransactionMetadata {
   counts: {
-    excess_received: number;
+    more_payment_received: number;
     settlement_matched: number;
     settled: number;
-    short_received: number;
+    less_payment_received: number;
     unsettled: number;
   };
   pagination: {
@@ -112,7 +119,91 @@ interface TransactionQueryParams {
   order_item_id?: string;
   remark?: string;
   pagination?: boolean;
+  // D2C-specific parameters
+  invoice_date_from?: string;
+  invoice_date_to?: string;
+  settlement_date_from?: string;
+  settlement_date_to?: string;
+  reason_in?: string;
+  order_id?: string;
 }
+
+// Generate dummy unreconciled data for demonstration
+const generateDummyUnreconciledData = () => {
+  const reasons = [
+    'customer_add_ons',
+    'shipping_charges',
+    'payment_gateway_fees',
+    'platform_commission',
+    'refund_processing_fee',
+    'late_delivery_penalty',
+    'inventory_mismatch',
+    'promotional_discount',
+    'tax_calculation_error',
+    'currency_conversion_fee'
+  ];
+
+  const statuses = [
+    'less_payment_received',
+    'more_payment_received',
+    'pending_reconciliation'
+  ];
+
+  const dummyData = [];
+  
+  for (let i = 1; i <= 25; i++) {
+    const orderValue = Math.floor(Math.random() * 50000) + 1000; // 1000 to 51000
+    const settlementValue = orderValue + (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2000) + 100; // Add/subtract random amount
+    const difference = settlementValue - orderValue;
+    const reason = reasons[Math.floor(Math.random() * reasons.length)];
+    const status = statuses[Math.floor(Math.random() * statuses.length)];
+    
+    // Generate dates within the last 30 days
+    const orderDate = new Date();
+    orderDate.setDate(orderDate.getDate() - Math.floor(Math.random() * 30));
+    
+    const settlementDate = new Date();
+    settlementDate.setDate(settlementDate.getDate() - Math.floor(Math.random() * 15));
+    
+    dummyData.push({
+      "Order ID": `ORD_${String(10000 + i).padStart(6, '0')}`,
+      "Order Value": orderValue,
+      "Settlement Value": settlementValue,
+      "Order Date": orderDate.toISOString().split('T')[0],
+      "Settlement Date": settlementDate.toISOString().split('T')[0],
+      "Difference": difference,
+      "Remark": difference > 0 ? "Short Amount Received" : "Excess Amount Received",
+      "Event Type": "Sale",
+      // Additional fields for compatibility
+      order_id: `ORD_${String(10000 + i).padStart(6, '0')}`,
+      order_value: orderValue.toString(),
+      settlement_value: settlementValue.toString(),
+      diff: difference.toString(),
+      invoice_date: orderDate.toISOString().split('T')[0],
+      settlement_date: settlementDate.toISOString().split('T')[0],
+      breakups: {
+        mismatch_reason: reason,
+        recon_status: status
+      },
+      reason: reason,
+      status: status,
+      originalData: {
+        order_id: `ORD_${String(10000 + i).padStart(6, '0')}`,
+        order_value: orderValue,
+        settlement_value: settlementValue,
+        diff: difference,
+        invoice_date: orderDate.toISOString().split('T')[0],
+        settlement_date: settlementDate.toISOString().split('T')[0],
+        breakups: {
+          mismatch_reason: reason,
+          recon_status: status
+        }
+      }
+    });
+  }
+  
+  return dummyData;
+};
 
 // Transform API data to TransactionRow format
 const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
@@ -131,6 +222,10 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
     const parsed = parseFloat(cleanedValue);
     return isNaN(parsed) ? 0 : parsed;
   };
+
+  
+
+  
 
   // Extract values from the API structure
   const orderValue = parseNumericValue(orderItem.order_value || orderItem.buyer_invoice_amount);
@@ -169,9 +264,11 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   
   return {
     "Order ID": orderItemId,
-    "Order Value": orderValue,
+    "Amount": orderValue,
+    "Order Value": orderValue, // Kept for compatibility
     "Settlement Value": settlementValue,
-    "Order Date": new Date(orderItem.order_date).toISOString().split('T')[0],
+    "Invoice Date": new Date(orderItem.order_date).toISOString().split('T')[0],
+    "Order Date": new Date(orderItem.order_date).toISOString().split('T')[0], // Kept for compatibility
     "Settlement Date": settlementDate,
     "Difference": difference,
     "Remark": remark,
@@ -187,14 +284,29 @@ const DisputePage: React.FC = () => {
   // State for date filtering
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   const [selectedDateRange, setSelectedDateRange] = useState<'this-month' | 'last-month' | 'this-year' | 'custom'>('custom');
-  const [customStartDate, setCustomStartDate] = useState('2025-03-01');
-  const [customEndDate, setCustomEndDate] = useState('2025-03-31');
+  const [customStartDate, setCustomStartDate] = useState('2025-04-01');
+  const [customEndDate, setCustomEndDate] = useState('2025-04-30');
   const [tempStartDate, setTempStartDate] = useState('');
   const [tempEndDate, setTempEndDate] = useState('');
 
   // Calendar popup state
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
   const calendarPopupRef = useRef<HTMLDivElement>(null);
+  // StrictMode-safe initial-run guards
+  const isInitialRenderRef = useRef(true);
+  const hasFetchedOnInitialRef = useRef(false);
+  
+  // Initialize from URL query params if provided (e.g., from main page navigation)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get('from');
+    const to = params.get('to');
+    if (from && to) {
+      setSelectedDateRange('custom');
+      setCustomStartDate(from);
+      setCustomEndDate(to);
+    }
+  }, []);
   
   // Date range menu state
   const [dateRangeMenuAnchor, setDateRangeMenuAnchor] = useState<HTMLElement | null>(null);
@@ -213,35 +325,54 @@ const DisputePage: React.FC = () => {
   const [mockRows, setMockRows] = useState<Array<{ id: string; orderItemId: string; orderDate: string; difference: number; remark: string; eventType: string; status: 'unreconciled' | 'open' | 'raised'; }>>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMsg, setSnackbarMsg] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [apiLoading, setApiLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Pagination for unreconciled tab
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  // Total count for pagination
+  const [totalCount, setTotalCount] = useState(0);
 
   // Platform selector state for dropdown (multi-select)
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Array<'flipkart' | 'amazon'>>(['flipkart']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Array<'flipkart' | 'amazon' | 'd2c'>>(['d2c']);
+  const [tempSelectedPlatforms, setTempSelectedPlatforms] = useState<Array<'flipkart' | 'amazon' | 'd2c'>>([]);
 
   // Column filter state
   const [columnFilters, setColumnFilters] = useState<Record<string, any>>({});
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HTMLElement | null>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string>('');
 
+  // Order ID search states (match TransactionSheet behavior)
+  const [orderIdChips, setOrderIdChips] = useState<string[]>([]);
+  const [orderIdSearch, setOrderIdSearch] = useState<string>('');
+  const [showOrderIdSearch, setShowOrderIdSearch] = useState<boolean>(false);
+
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
   // Column metadata for filter types
   const COLUMN_META = {
     'Order ID': { type: 'string' },
     'Order Value': { type: 'number' },
-    'Amount': { type: 'number' },
     'Settlement Value': { type: 'number' },
-    'Order Date': { type: 'date' },
+    'Invoice Date': { type: 'date' },
     'Settlement Date': { type: 'date' },
     'Difference': { type: 'number' },
-    'Remark': { type: 'enum' },
     'Reason': { type: 'enum' },
     'Event Type': { type: 'enum' },
     'Status': { type: 'enum' }
+  };
+
+  // Mapping of sortable UI columns to backend sort_by values
+  const COLUMN_TO_SORT_BY_MAP: Record<string, string> = {
+    'Order Value': 'order_value',
+    'Settlement Value': 'settlement_value',
+    'Invoice Date': 'invoice_date',
+    'Settlement Date': 'settlement_date',
+    'Difference': 'diff',
   };
 
   // Format backend reason keys like "customer_add_ons" into human-friendly labels like "Customer Add Ons"
@@ -253,6 +384,12 @@ const DisputePage: React.FC = () => {
       .filter(Boolean)
       .map(part => (part.charAt(0).toUpperCase() + part.slice(1)))
       .join(' ');
+  };
+
+  // Convert formatted reason label back to API format (lowercase with spaces)
+  const formatReasonForAPI = (reason?: string): string => {
+    if (!reason || reason.trim() === '') return '';
+    return reason.toLowerCase();
   };
 
   // Get current date range text for display
@@ -283,14 +420,80 @@ const DisputePage: React.FC = () => {
     setDateRangeMenuAnchor(null);
   };
 
+  // Sorting functions
+  const handleSort = (columnKey: string) => {
+    // Only allow sorting for supported columns
+    const sortBy = COLUMN_TO_SORT_BY_MAP[columnKey];
+    if (!sortBy) return;
+
+    // Compute next sort state deterministically
+    let nextSort: { key: string; direction: 'asc' | 'desc' } | null;
+    if (sortConfig?.key === columnKey) {
+      if (sortConfig.direction === 'asc') {
+        nextSort = { key: columnKey, direction: 'desc' };
+      } else {
+        nextSort = null; // Remove sorting -> backend default applies
+      }
+    } else {
+      nextSort = { key: columnKey, direction: 'asc' };
+    }
+
+    setSortConfig(nextSort);
+
+    // Trigger server-side refetch with sorting (reset to first page)
+    setPage(0);
+    fetchUnreconciledOrders(undefined, nextSort, true);
+  };
+
+  const getSortIcon = (columnKey: string) => {
+    if (sortConfig?.key !== columnKey) {
+      return <UnfoldMoreIcon fontSize="small" />;
+    }
+    // Flipped: show Down arrow for ascending, Up arrow for descending
+    return sortConfig.direction === 'asc' 
+      ? <ArrowDownwardIcon fontSize="small" /> 
+      : <ArrowUpwardIcon fontSize="small" />;
+  };
+
+  // Match Transaction Sheet date display: e.g., "17th March, 2025"
+  const formatDateWithOrdinal = (dateString: string) => {
+    if (!dateString || dateString === 'null' || dateString === 'undefined') return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    const day = date.getDate();
+    const month = date.toLocaleDateString('en-US', { month: 'long' });
+    const year = date.getFullYear();
+    const getOrdinalSuffix = (d: number) => {
+      if (d > 3 && d < 21) return 'th';
+      switch (d % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+      }
+    };
+    return `${day}${getOrdinalSuffix(day)} ${month}, ${year}`;
+  };
+
+  const formatDate = (dateString: string) => formatDateWithOrdinal(dateString);
+
   // Build query parameters for API calls
-  const buildQueryParams = (filtersOverride?: Record<string, any>): TransactionQueryParams => {
+  const buildQueryParams = (
+    filtersOverride?: Record<string, any>,
+    orderIdsCsvOverride?: string
+  ): TransactionQueryParams => {
     const params: TransactionQueryParams = {};
     const f = filtersOverride || columnFilters;
-    // Set status for unreconciled orders (short_received, excess_received)
+    // Set status for unreconciled orders (less_payment_received, more_payment_received)
     if (disputeSubTab === 0) {
-      params.status_in = 'short_received,excess_received';
+      params.status_in = 'less_payment_received,more_payment_received';
       params.pagination = false; // Disable pagination to get all unreconciled orders
+    }
+
+    // Add sorting parameters
+    if (sortConfig && COLUMN_TO_SORT_BY_MAP[sortConfig.key]) {
+      params.sort_by = COLUMN_TO_SORT_BY_MAP[sortConfig.key];
+      params.sort_order = sortConfig.direction;
     }
 
     // Map applied column filters to API params (server-side filtering)
@@ -299,10 +502,15 @@ const DisputePage: React.FC = () => {
       params.status_in = statusFilter.join(',');
     }
 
-    const orderIdFilter = f['Order ID'];
-    if (orderIdFilter && typeof orderIdFilter === 'string' && orderIdFilter.trim() !== '') {
-      // Backend expects order_id here (not order_item_id)
-      (params as any).order_id = orderIdFilter.trim();
+    // Order ID filter → order_id (CSV) with explicit override support to avoid async state timing
+    let orderIdsCsv: string | undefined;
+    if (orderIdsCsvOverride !== undefined) {
+      orderIdsCsv = orderIdsCsvOverride;
+    } else {
+      orderIdsCsv = orderIdChips.length > 0 ? orderIdChips.join(',') : '';
+    }
+    if (orderIdsCsv !== undefined && orderIdsCsv !== '') {
+      (params as any).order_id = orderIdsCsv;
     }
 
     const diffFilter = f['Difference'];
@@ -317,10 +525,11 @@ const DisputePage: React.FC = () => {
       }
     }
 
-    const orderDateFilter = f['Order Date'];
-    if (orderDateFilter && typeof orderDateFilter === 'object') {
-      if (orderDateFilter.from) params.order_date_from = orderDateFilter.from;
-      if (orderDateFilter.to) params.order_date_to = orderDateFilter.to;
+    // Date range filter: align with Transactions page → order_date_from/to
+    const invoiceDateFilter = f['Invoice Date'];
+    if (invoiceDateFilter && typeof invoiceDateFilter === 'object') {
+      if (invoiceDateFilter.from) (params as any).order_date_from = invoiceDateFilter.from;
+      if (invoiceDateFilter.to) (params as any).order_date_to = invoiceDateFilter.to;
     }
 
     // Settlement Date range
@@ -333,17 +542,7 @@ const DisputePage: React.FC = () => {
     // Reason enum → reason_in
     const reasonFilter = f['Reason'];
     if (reasonFilter && Array.isArray(reasonFilter) && reasonFilter.length > 0) {
-      (params as any).reason_in = reasonFilter.join(',');
-    }
-
-    // Remark (string or enums). Prefer remark_in for arrays, else remark
-    const remarkFilter = f['Remark'];
-    if (remarkFilter) {
-      if (Array.isArray(remarkFilter) && remarkFilter.length > 0) {
-        (params as any).remark_in = remarkFilter.join(',');
-      } else if (typeof remarkFilter === 'string' && remarkFilter.trim() !== '') {
-        params.remark = remarkFilter.trim();
-      }
+      (params as any).reason_in = reasonFilter.map(formatReasonForAPI).join(',');
     }
 
     // Event Type enum → event_type_in
@@ -357,14 +556,14 @@ const DisputePage: React.FC = () => {
       const now = new Date();
       const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
       const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
-      params.buyer_invoice_date_from = firstDay.toISOString().split('T')[0];
-      params.buyer_invoice_date_to = lastDay.toISOString().split('T')[0];
+      params.order_date_from = firstDay.toISOString().split('T')[0];
+      params.order_date_to = lastDay.toISOString().split('T')[0];
     } else if (selectedDateRange === 'last-month') {
       const now = new Date();
       const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1));
       const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 0));
-      params.buyer_invoice_date_from = firstDay.toISOString().split('T')[0];
-      params.buyer_invoice_date_to = lastDay.toISOString().split('T')[0];
+      params.order_date_from = firstDay.toISOString().split('T')[0];
+      params.order_date_to = lastDay.toISOString().split('T')[0];
     } else if (selectedDateRange === 'this-year') {
       const now = new Date();
       const currentYear = now.getFullYear();
@@ -374,74 +573,220 @@ const DisputePage: React.FC = () => {
       const lastDay = new Date(Date.UTC(currentYear, 11, 31)); // December 31st (month 11)
       
       // Format dates as YYYY-MM-DD using UTC methods
-      params.buyer_invoice_date_from = firstDay.toISOString().split('T')[0];
-      params.buyer_invoice_date_to = lastDay.toISOString().split('T')[0];
+      params.order_date_from = firstDay.toISOString().split('T')[0];
+      params.order_date_to = lastDay.toISOString().split('T')[0];
       
     } else if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
-      params.buyer_invoice_date_from = customStartDate;
-      params.buyer_invoice_date_to = customEndDate;
+      params.order_date_from = customStartDate;
+      params.order_date_to = customEndDate;
     }
     
     // Ensure we always have default dates if none are set
-    if (!params.buyer_invoice_date_from || !params.buyer_invoice_date_to) {
+    if (!(params as any).order_date_from || !(params as any).order_date_to) {
       const now = new Date();
       const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
       const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
-      params.buyer_invoice_date_from = firstDay.toISOString().split('T')[0];
-      params.buyer_invoice_date_to = lastDay.toISOString().split('T')[0];
+      (params as any).order_date_from = firstDay.toISOString().split('T')[0];
+      (params as any).order_date_to = lastDay.toISOString().split('T')[0];
     }
 
     return params;
   };
 
   // Fetch unreconciled orders from API
-  const fetchUnreconciledOrders = async (filtersOverride?: Record<string, any>) => {
+  const fetchUnreconciledOrders = async (
+    filtersOverride?: Record<string, any>,
+    sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
+    applySortOverride?: boolean,
+    orderIdsCsvOverride?: string
+  ) => {
     if (disputeSubTab !== 0) return; // Only fetch for unreconciled tab
     
     setApiLoading(true);
     setError(null);
     
     try {
-      const queryParams = buildQueryParams(filtersOverride);
-      console.log('Fetching unreconciled orders with params:', queryParams);
-      console.log('Date range:', queryParams.buyer_invoice_date_from, 'to', queryParams.buyer_invoice_date_to);
-      console.log('Selected date range:', selectedDateRange);
-      console.log('Full queryParams object:', JSON.stringify(queryParams, null, 2));
+      // Build query parameters
+      const params = buildQueryParams(filtersOverride, orderIdsCsvOverride);
+
+      // If explicitly applying override: when null, clear sort; when provided, set it
+      if (applySortOverride) {
+        delete (params as any).sort_by;
+        delete (params as any).sort_order;
+        if (sortOverride && COLUMN_TO_SORT_BY_MAP[sortOverride.key]) {
+          params.sort_by = COLUMN_TO_SORT_BY_MAP[sortOverride.key];
+          params.sort_order = sortOverride.direction;
+        }
+      } else if (sortOverride && COLUMN_TO_SORT_BY_MAP[sortOverride.key]) {
+        // Backward compatibility if called without applySortOverride
+        params.sort_by = COLUMN_TO_SORT_BY_MAP[sortOverride.key];
+        params.sort_order = sortOverride.direction;
+      }
       
-      // Use the existing API service for transactions - pass queryParams directly like TransactionSheet does
-      const response = await api.transactions.getTransactions(queryParams as any);
+      // Add the unreconciled status filter
+      params.status_in = 'less_payment_received,more_payment_received';
+      
+      // Call the API
+      const response = await api.transactions.getTotalTransactions(params as any);
       
       if (response.success && response.data) {
-        const responseData = response.data;
-        console.log('API Response:', responseData);
-        console.log('Response data type:', typeof responseData);
-        console.log('Response data keys:', Object.keys(responseData));
+        const responseData = response.data as any;
+        const transactionData = responseData.transactions || responseData.data || [];
         
-        // The data is directly in responseData.data array
-        const transactionData = responseData.data;
+        // Transform API data to TransactionRow format
+        const transformedRows: TransactionRow[] = [];
         
-        console.log('Transaction data to process:', transactionData);
-        console.log('Transaction data length:', transactionData.length);
-        
-        if (Array.isArray(transactionData) && transactionData.length > 0) {
-          setApiRows(transactionData as any);
-        } else {
-          console.error('No valid transaction data found');
-          setError('No transaction data received from API');
+        if (Array.isArray(transactionData)) {
+          transactionData.forEach((transaction: any) => {
+            // Parse numeric values
+            const parseNumeric = (value: any): number => {
+              if (!value) return 0;
+              const cleaned = String(value).replace(/[₹$,\s]/g, '').replace(/[^\d.-]/g, '').trim();
+              return parseFloat(cleaned) || 0;
+            };
+            
+            // Format dates
+            const formatDate = (date: string | Date): string => {
+              if (!date) return '';
+              try {
+                return new Date(date).toISOString().split('T')[0];
+              } catch {
+                return '';
+              }
+            };
+            
+            transformedRows.push({
+              "Order ID": transaction.order_item_id || transaction.order_id || '',
+              "Amount": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount),
+              "Order Value": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount), // Keep for compatibility
+              "Settlement Value": parseNumeric(transaction.settlement_value),
+              "Invoice Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date),
+              "Order Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date), // Keep for compatibility
+              "Settlement Date": formatDate(transaction.settlement_date),
+              "Difference": parseNumeric(transaction.diff || transaction.difference),
+              "Remark": transaction.breakups?.mismatch_reason || transaction.remark || 'Not Available',
+              "Event Type": transaction.event_type || transaction.eventType || 'Sale',
+              originalData: transaction
+            });
+          });
         }
+        
+        setApiRows(transformedRows);
+        
+        // Update pagination from response
+        if (response.data.pagination) {
+          setTotalCount(response.data.pagination.total_count);
+        }
+        
+        console.log('Fetched unreconciled orders from API:', transformedRows.length);
       } else {
-        console.error('API response not successful:', response);
-        setError('Failed to fetch unreconciled orders data');
+        console.error('API returned no data');
+        setApiRows([]);
+        setTotalCount(0);
       }
     } catch (err) {
       console.error('Error fetching unreconciled orders:', err);
-      setError('Failed to load unreconciled orders data. Please try again.');
+      setError('Failed to load dispute data. Please try again.');
+      setApiRows([]);
+      setTotalCount(0);
     } finally {
       setApiLoading(false);
     }
   };
 
-  // Load mock data for other tabs and fetch unreconciled orders on mount
+  // Fetch dispute raised orders from API
+  const fetchDisputeRaisedOrders = async (
+    filtersOverride?: Record<string, any>,
+    sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
+    applySortOverride?: boolean,
+    orderIdsCsvOverride?: string
+  ) => {
+    if (disputeSubTab !== 1) return; // Only fetch for dispute raised tab
+
+    setApiLoading(true);
+    setError(null);
+
+    try {
+      // Build base query parameters (date, filters, ids, sorting, etc.)
+      const params = buildQueryParams(filtersOverride, orderIdsCsvOverride);
+
+      // If explicitly applying override: when null, clear sort; when provided, set it
+      if (applySortOverride) {
+        delete (params as any).sort_by;
+        delete (params as any).sort_order;
+        if (sortOverride && COLUMN_TO_SORT_BY_MAP[sortOverride.key]) {
+          params.sort_by = COLUMN_TO_SORT_BY_MAP[sortOverride.key];
+          params.sort_order = sortOverride.direction;
+        }
+      } else if (sortOverride && COLUMN_TO_SORT_BY_MAP[sortOverride.key]) {
+        params.sort_by = COLUMN_TO_SORT_BY_MAP[sortOverride.key];
+        params.sort_order = sortOverride.direction;
+      }
+
+      // Add manual override status filter for Dispute Raised
+      (params as any).manual_override_status = 'DISPUTED';
+
+      // Call the API
+      const response = await api.transactions.getTotalTransactions(params as any);
+
+      if (response.success && response.data) {
+        const responseData = response.data as any;
+        const transactionData = responseData.transactions || responseData.data || [];
+
+        const transformedRows: TransactionRow[] = [];
+        if (Array.isArray(transactionData)) {
+          transactionData.forEach((transaction: any) => {
+            const parseNumeric = (value: any): number => {
+              if (!value) return 0;
+              const cleaned = String(value).replace(/[₹$,\s]/g, '').replace(/[^\d.-]/g, '').trim();
+              return parseFloat(cleaned) || 0;
+            };
+
+            const formatDate = (date: string | Date): string => {
+              if (!date) return '';
+              try {
+                return new Date(date).toISOString().split('T')[0];
+              } catch {
+                return '';
+              }
+            };
+
+            transformedRows.push({
+              "Order ID": transaction.order_item_id || transaction.order_id || '',
+              "Amount": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount),
+              "Order Value": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount),
+              "Settlement Value": parseNumeric(transaction.settlement_value),
+              "Invoice Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date),
+              "Order Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date),
+              "Settlement Date": formatDate(transaction.settlement_date),
+              "Difference": parseNumeric(transaction.diff || transaction.difference),
+              "Remark": transaction.breakups?.mismatch_reason || transaction.remark || 'Not Available',
+              "Event Type": transaction.event_type || transaction.eventType || 'Sale',
+              originalData: transaction
+            });
+          });
+        }
+
+        setApiRows(transformedRows);
+
+        if (response.data.pagination) {
+          setTotalCount(response.data.pagination.total_count);
+        }
+      } else {
+        setApiRows([]);
+        setTotalCount(0);
+      }
+    } catch (err) {
+      console.error('Error fetching dispute raised orders:', err);
+      setError('Failed to load dispute raised data. Please try again.');
+      setApiRows([]);
+      setTotalCount(0);
+    } finally {
+      setApiLoading(false);
+    }
+  };
+
+  // Load mock data for other tabs on mount
   useEffect(() => {
     if (mockRows.length === 0) {
       const remarks = ['Short Amount Received', 'Excess Amount Received', 'Pending Settlement'];
@@ -461,32 +806,43 @@ const DisputePage: React.FC = () => {
     }
   }, []);
 
-  // Fetch unreconciled orders on component mount
+  // Mark initial render complete (used to avoid StrictMode double-fetch)
   useEffect(() => {
-    if (disputeSubTab === 0) {
-      // On initial load, selectedDateRange is 'custom' with March 2025 defaults,
-      // so buildQueryParams will use buyer_invoice_date_from/to accordingly.
-      fetchUnreconciledOrders();
-    }
+    isInitialRenderRef.current = false;
   }, []);
 
-  // Fetch API data when switching to unreconciled tab
+  // Fetch API data when switching to unreconciled tab or when relevant inputs change
   useEffect(() => {
-    if (disputeSubTab === 0) {
-      fetchUnreconciledOrders();
+    if (disputeSubTab !== 0) return;
+    // On initial render in dev StrictMode this effect runs twice.
+    // Guard so we only fetch once on the true initial render, then allow future changes.
+    if (isInitialRenderRef.current) {
+      if (!hasFetchedOnInitialRef.current) {
+        hasFetchedOnInitialRef.current = true;
+        fetchUnreconciledOrders();
+      }
+      return;
     }
+    fetchUnreconciledOrders();
   }, [disputeSubTab, selectedDateRange, customStartDate, customEndDate]);
 
-  // Get current rows based on active tab
-  const getCurrentRows = () => {
-    if (disputeSubTab === 0) {
-      // For unreconciled tab now return the flat API data directly
-      return apiRows;
+  // Fetch API data when switching to Dispute Raised tab or when relevant inputs change
+  useEffect(() => {
+    if (disputeSubTab !== 1) return;
+    // Guard so we only fetch once on the true initial render, then allow future changes.
+    if (isInitialRenderRef.current) {
+      if (!hasFetchedOnInitialRef.current) {
+        hasFetchedOnInitialRef.current = true;
+        fetchDisputeRaisedOrders();
+      }
+      return;
     }
-    return mockRows.filter(r => {
-      if (disputeSubTab === 1) return r.status === 'open';
-      return r.status === 'raised';
-    });
+    fetchDisputeRaisedOrders();
+  }, [disputeSubTab, selectedDateRange, customStartDate, customEndDate]);
+
+  // Get current rows based on active tab (both tabs use API data now)
+  const getCurrentRows = () => {
+    return apiRows;
   };
 
   const current = getCurrentRows();
@@ -501,10 +857,25 @@ const DisputePage: React.FC = () => {
       
       // Handle both API data and mock data
       if ('Order ID' in row) {
-        // API data (TransactionRow)
+        // API data (TransactionRow) - handle D2C specific fields
         switch (column) {
           case 'Order ID':
             value = (row as any)['Order ID'];
+            break;
+          case 'Invoice Date':
+            value = (row as any).invoice_date;
+            break;
+          case 'Settlement Date':
+            value = (row as any).settlement_date;
+            break;
+          case 'Difference':
+            value = (row as any).diff;
+            break;
+          case 'Reason':
+            value = (row as any).breakups?.mismatch_reason;
+            break;
+          case 'Status':
+            value = (row as any).breakups?.recon_status;
             break;
           default:
             continue;
@@ -524,17 +895,11 @@ const DisputePage: React.FC = () => {
           case 'Settlement Value':
             value = Math.abs((row as any).difference) + 900;
             break;
-          case 'Order Date':
-            value = (row as any).orderDate;
-            break;
           case 'Settlement Date':
             value = '-';
             break;
           case 'Difference':
             value = Math.abs((row as any).difference);
-            break;
-          case 'Remark':
-            value = (row as any).remark;
             break;
           case 'Event Type':
             value = (row as any).eventType;
@@ -597,7 +962,7 @@ const DisputePage: React.FC = () => {
 
   // Selection helpers for visible rows in Unreconciled tab
   const visibleIds: string[] = disputeSubTab === 0
-    ? (paginatedCurrent as any[]).map((r) => r.order_id)
+    ? (paginatedCurrent as any[]).map((r) => r["Order ID"] || r.originalData?.order_item_id || r.originalData?.order_id || r.order_id || '')
     : [];
   const allSelectedInView = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
   const someSelectedInView = visibleIds.some(id => selectedIds.includes(id)) && !allSelectedInView;
@@ -656,9 +1021,36 @@ const DisputePage: React.FC = () => {
     setRaiseDialogOpen(true);
   };
   const closeRaiseDispute = () => setRaiseDialogOpen(false);
-  const sendRaiseDispute = () => {
-    // TODO: Integrate API to send disputes with selectedRaiseGroup
-    setRaiseDialogOpen(false);
+  const sendRaiseDispute = async () => {
+    try {
+      const orderIds = selectedRaiseGroup?.orderIds || [];
+      if (orderIds.length === 0) {
+        setRaiseDialogOpen(false);
+        return;
+      }
+
+      await api.manualActions.manualAction('d2c', {
+        manual_override_status: 'DISPUTED',
+        order_ids: orderIds,
+        note: raiseDescription || '',
+      });
+
+      setSnackbarMsg('Dispute raised successfully');
+      setSnackbarOpen(true);
+
+      setRaiseDialogOpen(false);
+
+      // Refresh current tab data with existing filters
+      if (disputeSubTab === 0) {
+        fetchUnreconciledOrders();
+      } else if (disputeSubTab === 1) {
+        fetchDisputeRaisedOrders();
+      }
+    } catch (error) {
+      console.error('Failed to raise dispute', error);
+      setSnackbarMsg('Failed to raise dispute');
+      setSnackbarOpen(true);
+    }
   };
 
   // Column filter handlers
@@ -709,29 +1101,84 @@ const DisputePage: React.FC = () => {
   };
 
   // Action handlers for unreconciled transactions
-  const handleMarkReconciled = (id: string) => {
-    // For API data, we can't modify the status directly
-    // This would typically call an API to update the status
-    console.log('Marking as reconciled:', id);
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [noteInput, setNoteInput] = useState<string>('');
+  const [pendingOrderIds, setPendingOrderIds] = useState<string[]>([]);
 
-    // Derive metadata from grouped unreconciled data to store a notification for Checklist
+  const openNoteDialog = (orderIds: string[]) => {
+    setPendingOrderIds(orderIds);
+    setNoteInput('');
+    setNoteDialogOpen(true);
+  };
+
+  const closeNoteDialog = () => {
+    setNoteDialogOpen(false);
+    setPendingOrderIds([]);
+    setNoteInput('');
+  };
+
+  const confirmManualAction = async () => {
+    if (pendingOrderIds.length === 0) return;
     try {
-      if (disputeSubTab === 0 && Array.isArray(apiRows)) {
-        const groups = apiRows as any[];
-        const matched = groups.find(g => Array.isArray(g?.orderIds) && g.orderIds.includes(id));
-        if (matched) {
-          pushManualReconNotification(matched.reason || 'Unknown', matched.count || 1, matched.orderIds || [id]);
+      const platform = 'flipkart';
+      await api.manualActions.manualAction(platform, { order_ids: pendingOrderIds, note: noteInput || '' });
+
+      // Optimistically remove reconciled rows
+      setApiRows(prev => {
+        if (Array.isArray(prev)) {
+          const ids = new Set(pendingOrderIds);
+          return prev.filter((row: any) => {
+            const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
+            return !ids.has(orderId);
+          }) as TransactionRow[];
         }
+        return prev;
+      });
+
+      // Push notification for checklist
+      try {
+        // Derive a reason from the first matched row
+        const first = (apiRows as any[]).find(row => {
+          const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
+          return orderId === pendingOrderIds[0];
+        });
+        const reason = first?.originalData?.breakups?.mismatch_reason || first?.["Remark"] || 'Unknown';
+        pushManualReconNotification(reason, pendingOrderIds.length, pendingOrderIds);
+      } catch (e) {
+        console.error('Failed to push notification', e);
       }
-    } catch (err) {
-      console.error('Failed to derive group for manual recon notification', err);
+
+      setSnackbarMsg('Manual action submitted successfully');
+      setSnackbarOpen(true);
+    } catch (error) {
+      console.error('Manual action failed', error);
+      setSnackbarMsg('Failed to submit manual action');
+      setSnackbarOpen(true);
+    } finally {
+      closeNoteDialog();
+      setSelectedIds([]);
     }
   };
 
+  const handleMarkReconciled = (id: string) => {
+    openNoteDialog([id]);
+  };
+
   const handleRaiseDispute = (id: string) => {
-    // For API data, we can't modify the status directly
-    // This would typically call an API to update the status
     console.log('Raising dispute:', id);
+    
+    // Find the transaction data
+    const transaction = (apiRows as any[]).find(row => {
+      const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
+      return orderId === id;
+    });
+    if (transaction) {
+      openRaiseDispute({ 
+        reason: transaction.originalData?.breakups?.mismatch_reason || transaction["Remark"] || 'Unknown', 
+        count: 1, 
+        orderIds: [id] 
+      });
+    }
   };
 
   // Column filter handlers
@@ -784,16 +1231,48 @@ const DisputePage: React.FC = () => {
     fetchUnreconciledOrders();
   };
 
+  // Order ID search handlers (mirror TransactionSheet)
+  const handleOrderIdSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setOrderIdSearch(value);
+    // If cleared, immediately refetch without order_id filter
+    if (value.trim() === '') {
+      setOrderIdChips([]);
+      setPage(0);
+      fetchUnreconciledOrders(undefined, undefined, undefined, '');
+    }
+  };
+
+  const handleOrderIdSearchClick = () => {
+    const value = orderIdSearch;
+    const ids = value.split(',').map(id => id.trim()).filter(id => id.length > 0);
+    setOrderIdChips(ids);
+    // Trigger API call
+    setPage(0);
+    fetchUnreconciledOrders(undefined, undefined, undefined, ids.join(','));
+  };
+
+  const handleOrderIdSearchClear = () => {
+    setOrderIdSearch('');
+    setOrderIdChips([]);
+    setShowOrderIdSearch(false);
+    // Trigger API call without order IDs
+    setPage(0);
+    fetchUnreconciledOrders(undefined, undefined, undefined, '');
+  };
+
   const getUniqueValuesForColumn = (column: string) => {
     const values = new Set<string>();
     // Include values from API rows when in Unreconciled tab
     if (disputeSubTab === 0 && Array.isArray(apiRows)) {
       (apiRows as any[]).forEach(row => {
         if (column === 'Reason') {
-          const v = row.reason || row.Remark;
+          // For D2C, use breakups.mismatch_reason, fallback to reason
+          const v = row.breakups?.mismatch_reason || row.reason || row.Remark;
           if (v) values.add(formatReasonLabel(String(v)));
         } else if (column === 'Status') {
-          const v = row.status;
+          // For D2C, use breakups.recon_status, fallback to status
+          const v = row.breakups?.recon_status || row.status;
           if (v) values.add(String(v));
         }
       });
@@ -802,9 +1281,6 @@ const DisputePage: React.FC = () => {
     mockRows.forEach(row => {
       let value: string | undefined;
       switch (column) {
-        case 'Remark':
-          value = row.remark;
-          break;
         case 'Event Type':
           value = row.eventType;
           break;
@@ -868,6 +1344,22 @@ const DisputePage: React.FC = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               {/* Applied filter summary (left of Filter button) */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', maxWidth: 520 }}>
+                {/* Order ID chips summary (matches TransactionSheet behavior) */}
+                {orderIdChips.length > 0 && (
+                  <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, border: '1px solid #e5e7eb', borderRadius: '9999px', fontSize: '0.75rem', color: '#111827', background: '#e0f2fe' }}>
+                    <span>{`Order IDs: ${orderIdChips.length} selected`}</span>
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        handleOrderIdSearchClear();
+                      }}
+                      sx={{ p: 0.25, color: '#6b7280', '&:hover': { color: '#111827' } }}
+                      aria-label={`Clear Order IDs`}
+                    >
+                      <CloseIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Box>
+                )}
                 {Object.entries(columnFilters).map(([col, val]) => {
                   if (!val || (typeof val === 'string' && !val.trim()) || (Array.isArray(val) && val.length === 0)) return null;
                   let label = '';
@@ -924,13 +1416,13 @@ const DisputePage: React.FC = () => {
                 variant="outlined"
                 endIcon={<KeyboardArrowDownIcon />}
                 startIcon={<StorefrontIcon />}
-                onClick={(e) => setPlatformMenuAnchorEl(e.currentTarget)}
+                onClick={(e) => { setTempSelectedPlatforms(selectedPlatforms); setPlatformMenuAnchorEl(e.currentTarget); }}
                 sx={{
                   borderColor: '#6B7280', color: '#6B7280', textTransform: 'none',
                   minWidth: 'auto', minHeight: 36, px: 1.5, fontSize: '0.7875rem', '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107,114,128,0.04)' }
                 }}
               >
-                {selectedPlatforms.length === 2 ? 'All' : (selectedPlatforms[0] === 'amazon' ? 'Amazon' : 'Flipkart')}
+                {selectedPlatforms.length === 3 ? 'All' : selectedPlatforms.length === 2 ? `${selectedPlatforms[0] === 'flipkart' ? 'Flipkart' : selectedPlatforms[0] === 'amazon' ? 'Amazon' : 'D2C'}, ${selectedPlatforms[1] === 'flipkart' ? 'Flipkart' : selectedPlatforms[1] === 'amazon' ? 'Amazon' : 'D2C'}` : (selectedPlatforms[0] === 'amazon' ? 'Amazon' : selectedPlatforms[0] === 'd2c' ? 'D2C' : 'Flipkart')}
               </Button>
               <Menu
                 anchorEl={platformMenuAnchorEl}
@@ -948,118 +1440,54 @@ const DisputePage: React.FC = () => {
                   }
                 }}
               >
-                  <MenuItem
-                  selected={selectedPlatforms.length === 2}
-                  onClick={() => {
-                    const newSel: Array<'flipkart'|'amazon'> = ['flipkart','amazon'];
-                    setSelectedPlatforms(newSel);
-                    setPlatformMenuAnchorEl(null);
-                    // With All selected, prefer backend flow
-                    fetchUnreconciledOrders();
-                  }}
-                    sx={{
-                    mb: 0.5,
-                    borderRadius: '8px',
-                    '&.Mui-selected': { outline: '2px solid #111', outlineOffset: '-2px', backgroundColor: '#fff' },
-                    '&:hover': { backgroundColor: '#f3f4f6' },
-                    px: 1.25,
-                    py: 1
-                  }}
-                >
-                  All
-                  </MenuItem>
-                <MenuItem
-                  selected={selectedPlatforms.includes('flipkart')}
-                  onClick={() => {
-                    const has = selectedPlatforms.includes('flipkart');
-                    const next = has ? selectedPlatforms.filter(p => p !== 'flipkart') : [...selectedPlatforms, 'flipkart'];
-                    setSelectedPlatforms(next);
-                    // Close menu after toggle
-                    setPlatformMenuAnchorEl(null);
-                    // If flipkart is present (either alone or with amazon), use backend
-                    if (next.includes('flipkart')) {
-                      fetchUnreconciledOrders();
-                    } else {
-                      // Only Amazon left
-                      const demoRows = Array.from({ length: 25 }).map((_, i) => {
-                        const id = `AMZ${100000 + i}`;
-                        const orderValue = (1500 + (i % 7) * 125).toFixed(2);
-                        const diffVal = ((i % 2 === 0 ? 1 : -1) * (50 + (i % 5) * 20)).toFixed(2);
-                        const orderDate = new Date(Date.now() - (i + 1) * 86400000).toISOString().slice(0, 10);
-                        const settlementDate = new Date(Date.now() - (i - 1) * 86400000).toISOString().slice(0, 10);
-                        const reasons = ['commission_mismatch', 'weight_discrepancy_fee', 'return_window_elapsed', 'shipping_overcharge', 'promo_fee_variance'];
-                        const reason = reasons[i % reasons.length];
-                        const status = 'short_received';
-                        return {
-                          order_id: id,
-                          order_date: orderDate,
-                          settlement_date: settlementDate,
-                          diff: diffVal,
-                          context: { buyer_invoice_amount: orderValue },
-                          reason,
-                          status,
-                        } as any;
-                      });
-                      setApiRows(demoRows);
-                      setPage(0);
-                    }
-                  }}
-                sx={{
-                    mb: 0.5,
-                    borderRadius: '8px',
-                    '&.Mui-selected': { outline: '2px solid #111', outlineOffset: '-2px', backgroundColor: '#fff' },
-                    '&:hover': { backgroundColor: '#f3f4f6' },
-                    px: 1.25,
-                    py: 1
-                }}
-              >
-                Flipkart
-                </MenuItem>
-                <MenuItem
-                  selected={selectedPlatforms.includes('amazon')}
-                  onClick={() => {
-                    const has = selectedPlatforms.includes('amazon');
-                    const next = has ? selectedPlatforms.filter(p => p !== 'amazon') : [...selectedPlatforms, 'amazon'];
-                    setSelectedPlatforms(next);
-                    setPlatformMenuAnchorEl(null);
-                    // If amazon is selected alone, show demo; if combined with flipkart, backend
-                    if (next.length === 1 && next.includes('amazon')) {
-                      const demoRows = Array.from({ length: 25 }).map((_, i) => {
-                        const id = `AMZ${100000 + i}`;
-                        const orderValue = (1500 + (i % 7) * 125).toFixed(2);
-                        const diffVal = ((i % 2 === 0 ? 1 : -1) * (50 + (i % 5) * 20)).toFixed(2);
-                        const orderDate = new Date(Date.now() - (i + 1) * 86400000).toISOString().slice(0, 10);
-                        const settlementDate = new Date(Date.now() - (i - 1) * 86400000).toISOString().slice(0, 10);
-                        const reasons = ['commission_mismatch', 'weight_discrepancy_fee', 'return_window_elapsed', 'shipping_overcharge', 'promo_fee_variance'];
-                        const reason = reasons[i % reasons.length];
-                        const status = 'short_received';
-                        return {
-                          order_id: id,
-                          order_date: orderDate,
-                          settlement_date: settlementDate,
-                          diff: diffVal,
-                          context: { buyer_invoice_amount: orderValue },
-                          reason,
-                          status,
-                        } as any;
-                      });
-                      setApiRows(demoRows);
-                      setPage(0);
-                    } else {
-                      fetchUnreconciledOrders();
-                    }
-                  }}
-                  sx={{
-                    mb: 0.25,
-                    borderRadius: '8px',
-                    '&.Mui-selected': { outline: '2px solid #111', outlineOffset: '-2px', backgroundColor: '#fff' },
-                    '&:hover': { backgroundColor: '#f3f4f6' },
-                    px: 1.25,
-                    py: 1
-                  }}
-                >
-                  Amazon
-                </MenuItem>
+                <Box sx={{ p: 1, minWidth: 240 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>Platforms</Typography>
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={() => {
+                        if (tempSelectedPlatforms.length === 3) setTempSelectedPlatforms([]);
+                        else setTempSelectedPlatforms(['flipkart','amazon','d2c']);
+                      }}
+                      sx={{ textTransform: 'none', minWidth: 'auto', px: 1 }}
+                    >
+                      {tempSelectedPlatforms.length === 3 ? 'Clear all' : 'Select all'}
+                    </Button>
+                  </Box>
+                  {(['flipkart','amazon','d2c'] as const).map((p) => (
+                    <MenuItem
+                      key={p}
+                      onClick={() => {
+                        setTempSelectedPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) as any : ([...prev, p] as any));
+                      }}
+                      sx={{ py: 1, px: 1, borderRadius: '8px' }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Checkbox size="small" checked={tempSelectedPlatforms.includes(p)} />
+                        <Box>
+                          <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p === 'flipkart' ? 'Flipkart' : p === 'amazon' ? 'Amazon' : 'D2C'}</Typography>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>{p === 'd2c' ? 'Website / D2C' : 'E-commerce marketplace'}</Typography>
+                        </Box>
+                      </Box>
+                    </MenuItem>
+                  ))}
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1, justifyContent: 'flex-end' }}>
+                    <Button variant="outlined" onClick={() => setPlatformMenuAnchorEl(null)} sx={{ textTransform: 'none', color: '#6b7280', borderColor: '#e5e7eb' }}>Cancel</Button>
+                    <Button
+                      variant="contained"
+                      disabled={tempSelectedPlatforms.length === 0}
+                      onClick={() => {
+                        setSelectedPlatforms(tempSelectedPlatforms);
+                        setPlatformMenuAnchorEl(null);
+                        fetchUnreconciledOrders();
+                      }}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      Apply
+                    </Button>
+                  </Box>
+                </Box>
               </Menu>
               <Button variant="contained" onClick={sendToFlipkart} disabled={selectedIds.length === 0} sx={{ backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' }, textTransform: 'none', fontWeight: 600 }}>
                 Send to Flipkart ({selectedIds.length})
@@ -1118,56 +1546,183 @@ const DisputePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order ID</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Order ID', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Order ID') ? '#1f2937' : '#6b7280', background: isFilterActive('Order ID') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Order ID">
-                            <FilterIcon fontSize="small" />
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowOrderIdSearch(!showOrderIdSearch);
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: showOrderIdSearch ? '#1f2937' : '#6b7280',
+                              background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            aria-label="Toggle search"
+                          >
+                            <SearchIcon sx={{ fontSize: '1rem' }} />
+                          </IconButton>
+                        </Box>
+                        {showOrderIdSearch && (
+                          <Box 
+                            sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              mt: 0.5
+                            }}
+                          >
+                            <TextField
+                              size="small"
+                              value={orderIdSearch}
+                              onChange={handleOrderIdSearchChange}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleOrderIdSearchClick();
+                                }
+                              }}
+                              InputProps={{
+                                endAdornment: (
+                                  <InputAdornment position="end">
+                                    <IconButton
+                                      size="small"
+                                      onClick={handleOrderIdSearchClick}
+                                      sx={{ p: 0.5 }}
+                                    >
+                                      <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                    </IconButton>
+                                  </InputAdornment>
+                                ),
+                              }}
+                              sx={{
+                                width: '280px',
+                                '& .MuiOutlinedInput-root': {
+                                  height: '32px',
+                                  fontSize: '0.75rem',
+                                  background: 'white',
+                                }
+                              }}
+                            />
+                          </Box>
+                        )}
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Value</Typography>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Order Value');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Order Value' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Order Value' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Order Value']}
+                            aria-label="Sort Order Value"
+                          >
+                            {getSortIcon('Order Value')}
                           </IconButton>
                         </Box>
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Amount</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Amount', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Amount') ? '#1f2937' : '#6b7280', background: isFilterActive('Amount') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Amount">
-                            <FilterIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Date</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Order Date', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Order Date') ? '#1f2937' : '#6b7280', background: isFilterActive('Order Date') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Order Date">
-                            <FilterIcon fontSize="small" />
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Invoice Date</Typography>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Invoice Date');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Invoice Date' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Invoice Date' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Invoice Date']}
+                            aria-label="Sort Invoice Date"
+                          >
+                            {getSortIcon('Invoice Date')}
                           </IconButton>
                         </Box>
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Date</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Settlement Date', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Settlement Date') ? '#1f2937' : '#6b7280', background: isFilterActive('Settlement Date') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Settlement Date">
-                            <FilterIcon fontSize="small" />
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Settlement Date');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Settlement Date' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Settlement Date' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Settlement Date']}
+                            aria-label="Sort Settlement Date"
+                          >
+                            {getSortIcon('Settlement Date')}
                           </IconButton>
                         </Box>
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 120, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Difference</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Difference', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Difference') ? '#1f2937' : '#6b7280', background: isFilterActive('Difference') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Difference">
-                            <FilterIcon fontSize="small" />
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Difference');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Difference' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Difference' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Difference']}
+                            aria-label="Sort Difference"
+                          >
+                            {getSortIcon('Difference')}
                           </IconButton>
                         </Box>
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Reason</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Reason', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Reason') ? '#1f2937' : '#6b7280', background: isFilterActive('Reason') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Reason">
-                            <FilterIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Reason</Typography>
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 120, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Status</Typography>
-                          <IconButton size="small" onClick={(e) => openFilterPopover('Status', e.currentTarget)} sx={{ ml: 0.5, color: isFilterActive('Status') ? '#1f2937' : '#6b7280', background: isFilterActive('Status') ? '#e5e7eb' : 'transparent', '&:hover': { background: '#f3f4f6' } }} aria-label="Filter Status">
-                            <FilterIcon fontSize="small" />
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Status');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Status' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Status' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Status']}
+                            aria-label="Sort Status"
+                          >
+                            {getSortIcon('Status')}
                           </IconButton>
                         </Box>
                       </TableCell>
@@ -1223,19 +1778,62 @@ const DisputePage: React.FC = () => {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                openFilterPopover('Order ID', e.currentTarget);
+                                setShowOrderIdSearch(!showOrderIdSearch);
                               }}
                               sx={{
                                 ml: 0.5,
-                                color: isFilterActive('Order ID') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Order ID') ? '#e5e7eb' : 'transparent',
+                                color: showOrderIdSearch ? '#1f2937' : '#6b7280',
+                                background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
                                 '&:hover': { background: '#f3f4f6' },
                               }}
-                              aria-label="Filter Order ID"
+                              aria-label="Toggle search"
                             >
-                              <FilterIcon fontSize="small" />
+                              <SearchIcon sx={{ fontSize: '1rem' }} />
                             </IconButton>
                           </Box>
+                          {showOrderIdSearch && (
+                            <Box 
+                              sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                mt: 0.5
+                              }}
+                            >
+                              <TextField
+                                size="small"
+                                value={orderIdSearch}
+                                onChange={handleOrderIdSearchChange}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleOrderIdSearchClick();
+                                  }
+                                }}
+                                InputProps={{
+                                  endAdornment: (
+                                    <InputAdornment position="end">
+                                      <IconButton
+                                        size="small"
+                                        onClick={handleOrderIdSearchClick}
+                                        sx={{ p: 0.5 }}
+                                      >
+                                        <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                      </IconButton>
+                                    </InputAdornment>
+                                  ),
+                                }}
+                                sx={{
+                                  width: '280px',
+                                  '& .MuiOutlinedInput-root': {
+                                    height: '32px',
+                                    fontSize: '0.75rem',
+                                    background: 'white',
+                                  }
+                                }}
+                              />
+                            </Box>
+                          )}
                         </Box>
                       </TableCell>
                       <TableCell sx={{
@@ -1260,17 +1858,18 @@ const DisputePage: React.FC = () => {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                openFilterPopover('Order Value', e.currentTarget);
+                                handleSort('Order Value');
                               }}
                               sx={{
                                 ml: 0.5,
-                                color: isFilterActive('Order Value') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Order Value') ? '#e5e7eb' : 'transparent',
+                                color: sortConfig?.key === 'Order Value' ? '#1f2937' : '#6b7280',
+                                background: sortConfig?.key === 'Order Value' ? '#e5e7eb' : 'transparent',
                                 '&:hover': { background: '#f3f4f6' },
                               }}
-                              aria-label="Filter Order Value"
+                              disabled={!COLUMN_TO_SORT_BY_MAP['Order Value']}
+                              aria-label="Sort Order Value"
                             >
-                              <FilterIcon fontSize="small" />
+                              {getSortIcon('Order Value')}
                             </IconButton>
                           </Box>
                         </Box>
@@ -1299,17 +1898,18 @@ const DisputePage: React.FC = () => {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                openFilterPopover('Settlement Value', e.currentTarget);
+                                handleSort('Settlement Value');
                               }}
                               sx={{
                                 ml: 0.5,
-                                color: isFilterActive('Settlement Value') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Settlement Value') ? '#e5e7eb' : 'transparent',
+                                color: sortConfig?.key === 'Settlement Value' ? '#1f2937' : '#6b7280',
+                                background: sortConfig?.key === 'Settlement Value' ? '#e5e7eb' : 'transparent',
                                 '&:hover': { background: '#f3f4f6' },
                               }}
-                              aria-label="Filter Settlement Value"
+                              disabled={!COLUMN_TO_SORT_BY_MAP['Settlement Value']}
+                              aria-label="Sort Settlement Value"
                             >
-                              <FilterIcon fontSize="small" />
+                              {getSortIcon('Settlement Value')}
                             </IconButton>
                           </Box>
                         </Box>
@@ -1325,30 +1925,9 @@ const DisputePage: React.FC = () => {
                         position: 'relative',
                         py: 1,
                       }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                              Order Date
-                            </Typography>
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openFilterPopover('Order Date', e.currentTarget);
-                              }}
-                              sx={{
-                                ml: 0.5,
-                                color: isFilterActive('Order Date') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Order Date') ? '#e5e7eb' : 'transparent',
-                                '&:hover': { background: '#f3f4f6' },
-                              }}
-                              aria-label="Filter Order Date"
-                            >
-                              <FilterIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
+                          Order Date
+                        </Typography>
                       </TableCell>
                       <TableCell sx={{
                         fontWeight: 700,
@@ -1371,17 +1950,18 @@ const DisputePage: React.FC = () => {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                openFilterPopover('Settlement Date', e.currentTarget);
+                                handleSort('Settlement Date');
                               }}
                               sx={{
                                 ml: 0.5,
-                                color: isFilterActive('Settlement Date') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Settlement Date') ? '#e5e7eb' : 'transparent',
+                                color: sortConfig?.key === 'Settlement Date' ? '#1f2937' : '#6b7280',
+                                background: sortConfig?.key === 'Settlement Date' ? '#e5e7eb' : 'transparent',
                                 '&:hover': { background: '#f3f4f6' },
                               }}
-                              aria-label="Filter Settlement Date"
+                              disabled={!COLUMN_TO_SORT_BY_MAP['Settlement Date']}
+                              aria-label="Sort Settlement Date"
                             >
-                              <FilterIcon fontSize="small" />
+                              {getSortIcon('Settlement Date')}
                             </IconButton>
                           </Box>
                         </Box>
@@ -1407,17 +1987,18 @@ const DisputePage: React.FC = () => {
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                openFilterPopover('Difference', e.currentTarget);
+                                handleSort('Difference');
                               }}
                               sx={{
                                 ml: 0.5,
-                                color: isFilterActive('Difference') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Difference') ? '#e5e7eb' : 'transparent',
+                                color: sortConfig?.key === 'Difference' ? '#1f2937' : '#6b7280',
+                                background: sortConfig?.key === 'Difference' ? '#e5e7eb' : 'transparent',
                                 '&:hover': { background: '#f3f4f6' },
                               }}
-                              aria-label="Filter Difference"
+                              disabled={!COLUMN_TO_SORT_BY_MAP['Difference']}
+                              aria-label="Sort Difference"
                             >
-                              <FilterIcon fontSize="small" />
+                              {getSortIcon('Difference')}
                             </IconButton>
                           </Box>
                         </Box>
@@ -1433,30 +2014,9 @@ const DisputePage: React.FC = () => {
                         position: 'relative',
                         py: 1,
                       }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                              Remark
-                            </Typography>
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openFilterPopover('Remark', e.currentTarget);
-                              }}
-                              sx={{
-                                ml: 0.5,
-                                color: isFilterActive('Remark') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Remark') ? '#e5e7eb' : 'transparent',
-                                '&:hover': { background: '#f3f4f6' },
-                              }}
-                              aria-label="Filter Remark"
-                            >
-                              <FilterIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
+                          Remark
+                        </Typography>
                       </TableCell>
                       <TableCell sx={{
                         fontWeight: 700,
@@ -1474,23 +2034,6 @@ const DisputePage: React.FC = () => {
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
                               Event Type
                             </Typography>
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openFilterPopover('Event Type', e.currentTarget);
-                              }}
-                              sx={{
-                                ml: 0.5,
-                                color: isFilterActive('Event Type') ? '#1f2937' : '#6b7280',
-                                background: isFilterActive('Event Type') ? '#e5e7eb' : 'transparent',
-                                '&:hover': { background: '#f3f4f6' },
-                              }}
-                              aria-label="Filter Event Type"
-                            >
-                              <FilterIcon fontSize="small" />
-                            </IconButton>
                           </Box>
                         </Box>
                       </TableCell>
@@ -1516,31 +2059,110 @@ const DisputePage: React.FC = () => {
                 {(disputeSubTab === 0 ? paginatedCurrent : current).map((row: any, index: number) => {
                   if (disputeSubTab === 0) {
                     // Flat detailed row for unreconciled orders
+                    const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || '';
+                    const amount = row["Amount"] || row["Order Value"] || 0;
+                    const settlementValue = row["Settlement Value"] || 0;
+                    const invoiceDate = row["Invoice Date"] || row["Order Date"] || '';
+                    const settlementDate = row["Settlement Date"] || '';
+                    const difference = row["Difference"] || 0;
+                    const remark = row["Remark"] || 'Not Available';
+                    const eventType = row["Event Type"] || 'Sale';
+                    // Show reason from mismatch_reason metadata
+                    let reason = (row.originalData?.metadata?.mismatch_reason || '').trim();
+                    if (reason) {
+                      reason = reason.charAt(0).toUpperCase() + reason.slice(1);
+                    } else {
+                      reason = '';
+                    }
+                    const status = row.originalData?.breakups?.recon_status || 'less_payment_received';
+                    
                      return (
                       <TableRow key={`flat-${index}`} sx={{ '&:hover': { background: '#f3f4f6' }, transition: 'all 0.3s ease' }}>
                         <TableCell padding="checkbox">
                              <Checkbox
-                            checked={selectedIds.includes(row.order_id)}
-                            onChange={() => toggleRow(row.order_id)}
+                            checked={selectedIds.includes(orderId)}
+                            onChange={() => toggleRow(orderId)}
                                sx={{
                                  color: '#6b7280',
                               '&.Mui-checked': { color: '#1f2937' },
                                }}
                              />
                     </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>{row.order_id}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{parseFloat(row.context?.buyer_invoice_amount || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.order_date}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.settlement_date}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>₹{parseFloat(row.diff || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>{orderId}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{formatDate(invoiceDate)}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{formatDate(settlementDate)}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>₹{difference.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Chip label={formatReasonLabel(row.reason || 'N/A')} size="small" sx={{ fontWeight: 600, color: '#1f2937', backgroundColor: '#e5e7eb', '& .MuiChip-label': { px: 1 } }} />
+                          <Chip label={reason} size="small" sx={{ fontWeight: 600, color: '#1f2937', backgroundColor: '#e5e7eb', '& .MuiChip-label': { px: 1 } }} />
                            </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{row.status}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                            {(() => {
+                              const reconStatus = (row as any).recon_status || row.originalData?.recon_status || row.originalData?.breakups?.recon_status || status;
+                              let displayText = '';
+                              let backgroundColor = '';
+                              let textColor = '';
+                              switch (reconStatus) {
+                                case 'settlement_matched':
+                                  displayText = 'Settlement Matched';
+                                  backgroundColor = '#dcfce7';
+                                  textColor = '#059669';
+                                  break;
+                                case 'less_payment_received':
+                                  displayText = 'Less Payment Received';
+                                  backgroundColor = '#fef3c7';
+                                  textColor = '#d97706';
+                                  break;
+                                case 'more_payment_received':
+                                  displayText = 'More Payment Received';
+                                  backgroundColor = '#fef3c7';
+                                  textColor = '#d97706';
+                                  break;
+                                default:
+                                  displayText = 'Unsettled';
+                                  backgroundColor = '#fee2e2';
+                                  textColor = '#dc2626';
+                              }
+                              return (
+                                <Chip
+                                  label={displayText}
+                                  size="small"
+                                  sx={{
+                                    background: backgroundColor,
+                                    color: textColor,
+                                    fontWeight: 600,
+                                    fontSize: '0.75rem',
+                                    height: 24,
+                                    '& .MuiChip-label': { px: 1 },
+                                  }}
+                                />
+                              );
+                            })()}
+                            {(() => {
+                              const eventType = (row as any).event_type || row["Event Type"] || row.originalData?.event_type || 'Sale';
+                              const isSale = String(eventType || '').toLowerCase() === 'sale';
+                              return (
+                                <Chip
+                                  label={eventType}
+                                  size="small"
+                                  sx={{
+                                    background: isSale ? '#dcfce7' : '#fee2e2',
+                                    color: isSale ? '#059669' : '#dc2626',
+                                    fontWeight: 600,
+                                    fontSize: '0.75rem',
+                                    height: 24,
+                                    '& .MuiChip-label': { px: 1 },
+                                  }}
+                                />
+                              );
+                            })()}
+                          </Box>
+                        </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                            <Button size="small" variant="outlined" onClick={() => handleMarkReconciled(row.order_id)} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#10b981', color: '#10b981', '&:hover': { borderColor: '#059669', backgroundColor: 'rgba(16, 185, 129, 0.04)' } }}>Mark Reconciled</Button>
-                            <Button size="small" variant="outlined" onClick={() => openRaiseDispute({ reason: row.reason, count: 1, orderIds: [row.order_id] })} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#6b7280', color: '#6b7280', '&:hover': { borderColor: '#4b5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' } }}>Raise Dispute</Button>
+                            <Button size="small" variant="outlined" onClick={() => handleMarkReconciled(orderId)} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#10b981', color: '#10b981', '&:hover': { borderColor: '#059669', backgroundColor: 'rgba(16, 185, 129, 0.04)' } }}>Mark Reconciled</Button>
+                            <Button size="small" variant="outlined" onClick={() => handleRaiseDispute(orderId)} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#6b7280', color: '#6b7280', '&:hover': { borderColor: '#4b5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' } }}>Raise Dispute</Button>
                              </Box>
                            </TableCell>
                   </TableRow>
@@ -1550,7 +2172,7 @@ const DisputePage: React.FC = () => {
                  })}
                 {(disputeSubTab === 0 ? paginatedCurrent : current).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
+                    <TableCell colSpan={9} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -1574,21 +2196,20 @@ const DisputePage: React.FC = () => {
 
       {/* Minimal Raise Dispute Dialog */}
       <Dialog open={raiseDialogOpen} onClose={closeRaiseDispute} PaperProps={{ sx: { borderRadius: 1, minWidth: 420 } }}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Raise dispute to Flipkart</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ color: '#374151', mb: 0.5 }}>Reason: {formatReasonLabel(selectedRaiseGroup?.reason || 'Unknown')}</Typography>
-          <Typography variant="body2" sx={{ color: '#374151', mb: 2 }}>Total orders: {selectedRaiseGroup?.count || 0}</Typography>
-          <TextField
-            label="Description"
-            placeholder="Add a short note for this dispute..."
-            value={raiseDescription}
-            onChange={(e) => setRaiseDescription(e.target.value)}
-            fullWidth
-            multiline
-            minRows={3}
-            size="small"
-          />
-        </DialogContent>
+      <DialogTitle sx={{ fontWeight: 700 }}>Raise dispute to Flipkart</DialogTitle>
+<DialogContent>
+  <Typography variant="body2" sx={{ color: '#374151', mb: 2 }}>Total orders: {selectedRaiseGroup?.count || 0}</Typography>
+  <TextField
+    label="Description"
+    placeholder="Add a short note for this dispute..."
+    value={raiseDescription}
+    onChange={(e) => setRaiseDescription(e.target.value)}
+    fullWidth
+    multiline
+    minRows={3}
+    size="small"
+  />
+</DialogContent>
         <DialogActions sx={{ px: 2, pb: 2 }}>
           <Button variant="text" onClick={closeRaiseDispute} sx={{ color: '#111827' }}>Cancel</Button>
           <Button variant="contained" onClick={sendRaiseDispute} sx={{ boxShadow: 'none' }}>Send</Button>
@@ -1617,10 +2238,7 @@ const DisputePage: React.FC = () => {
                 <Box sx={{ display: 'flex', gap: 1.5 }}>
                   <Button
                     variant="outlined"
-                    onClick={() => {
-                      selectedIds.forEach(id => handleMarkReconciled(id));
-                      setSelectedIds([]);
-                    }}
+                    onClick={() => openNoteDialog(selectedIds)}
                     sx={{
                       fontSize: '0.875rem',
                       py: 0.5,
@@ -1639,8 +2257,27 @@ const DisputePage: React.FC = () => {
                   <Button
                     variant="outlined"
                     onClick={() => {
-                      selectedIds.forEach(id => handleRaiseDispute(id));
-                      setSelectedIds([]);
+                      if (selectedIds.length === 1) {
+                        handleRaiseDispute(selectedIds[0]);
+                      } else if (selectedIds.length > 1) {
+                        const selectedTransactions = (apiRows as any[]).filter(row => {
+                          const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
+                          return selectedIds.includes(orderId);
+                        });
+                        const reasons = selectedTransactions.map(tr => tr?.originalData?.breakups?.mismatch_reason || tr["Remark"] || 'Unknown');
+                        const uniqueReasons = Array.from(new Set(reasons.filter(r => r !== undefined && r !== null)));
+                        let popupReason = '';
+                        if (uniqueReasons.length === 1) {
+                          popupReason = uniqueReasons[0];
+                        } else {
+                          popupReason = 'Multiple reasons';
+                        }
+                        openRaiseDispute({
+                          reason: popupReason,
+                          count: selectedIds.length,
+                          orderIds: selectedIds.slice(),
+                        });
+                      }
                     }}
                     sx={{
                       fontSize: '0.875rem',
@@ -1667,7 +2304,29 @@ const DisputePage: React.FC = () => {
         </Box>
       )}
 
-      <Snackbar open={snackbarOpen} autoHideDuration={2500} onClose={() => setSnackbarOpen(false)} message="Sent selected disputes to Flipkart" />
+      <Snackbar open={snackbarOpen} autoHideDuration={2500} onClose={() => setSnackbarOpen(false)} message={snackbarMsg || 'Done'} />
+
+      {/* Note Dialog for Manual Action */}
+      <Dialog open={noteDialogOpen} onClose={closeNoteDialog} PaperProps={{ sx: { borderRadius: 1, minWidth: 420 } }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Add a note</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: '#374151', mb: 2 }}>Selected orders: {pendingOrderIds.length}</Typography>
+          <TextField
+            label="Note"
+            placeholder="Add a short note..."
+            value={noteInput}
+            onChange={(e) => setNoteInput(e.target.value)}
+            fullWidth
+            multiline
+            minRows={3}
+            size="small"
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button variant="text" onClick={closeNoteDialog} sx={{ color: '#111827' }}>Cancel</Button>
+          <Button variant="contained" onClick={confirmManualAction} sx={{ boxShadow: 'none' }}>Submit</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Column Filter Popover */}
       <Popover
@@ -1691,7 +2350,7 @@ const DisputePage: React.FC = () => {
           {/* Left: Full column list */}
           <Box sx={{ width: 240, maxHeight: 320, overflowY: 'auto', borderRight: '1px solid #eee', pr: 1.5, pl: 0.5 }}>
             <List dense subheader={<ListSubheader disableSticky sx={{ bgcolor: 'transparent', px: 0, fontSize: '0.75rem', color: '#6b7280' }}></ListSubheader>}>
-              {Object.keys(COLUMN_META).map((col) => (
+              {Object.keys(COLUMN_META).filter(col => col !== 'Order ID').map((col) => (
                 <ListItemButton
                   key={col}
                   selected={activeFilterColumn === col}

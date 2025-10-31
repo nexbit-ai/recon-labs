@@ -6,7 +6,7 @@ export const API_CONFIG = {
   
   // API Keys and Organization ID
   API_KEY: import.meta.env.VITE_API_KEY || 'kapiva-7b485b6a865b2b4a3d728ef2fd4f3',
-  ORG_ID: import.meta.env.VITE_ORG_ID || '6ce6ee73-e1ef-4020-ad74-4ee45e731201',
+  ORG_ID: '6ce6ee73-e1ef-4020-ad74-4ee45e731201', // Hardcoded as requested
   
   // API Version
   API_VERSION: 'v1',
@@ -50,18 +50,19 @@ export const API_CONFIG = {
     RECONCILIATION_TRENDS: '/reconciliation/trends',
     RECONCILIATION_EXPORT: '/reconciliation/export',
     RECONCILIATION_UPLOAD: '/recon/upload',
+    RECON_MANUAL_ACTION: '/recon/manual-action',
     
     // Transactions
-    TRANSACTIONS: '/recon/transactions',
-    TRANSACTION_DETAILS: '/recon/transactions/:id',
-    TRANSACTION_UPDATE: '/recon/transactions/:id',
-    TRANSACTION_DELETE: '/recon/transactions/:id',
+    TOTAL_TRANSACTIONS: '/recon/total-transactions',
+    D2C_TRANSACTIONS: '/recon/total-transactions',
+    
+    // Ageing Analysis
+    AGEING_ANALYSIS: '/recon/aging-analysis',
     
     // Orders
     ORDERS: '/recon/orders',
     
-    // Stats
-    FETCH_STATS: '/recon/fetchStats',
+    // Stats (legacy removed)
     
     // Reports
     REPORTS: '/reports',

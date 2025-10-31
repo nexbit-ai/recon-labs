@@ -21,12 +21,11 @@ import RecentActivities from './pages/RecentActivities';
 import MarketplaceReconciliation from './pages/MarketplaceReconciliation';
 import DisputePage from './pages/Dispute';
 import Reports from './pages/Reports';
-import ConnectDataSources from './pages/ConnectDataSources';
+// import ConnectDataSources from './pages/ConnectDataSources'; // Deprecated
+import UploadDocuments from './pages/UploadDocuments';
 import AIWorkflows from './pages/AIWorkflows';
 import Assistant from './pages/Assistant';
 import AIReconciliation from './pages/AIReconciliation';
-import Security from './pages/Security';
-import Pricing from './pages/Pricing';
 import Bookkeeping from './pages/Bookkeeping';
 
 // Components
@@ -429,9 +428,9 @@ function App() {
                 <Layout><MarketplaceReconciliation /></Layout>
               </ProtectedRoute>
             } />
-            <Route path="/connect-data-sources" element={
+            <Route path="/upload-documents" element={
               <ProtectedRoute>
-                <Layout><ConnectDataSources /></Layout>
+                <Layout><UploadDocuments /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/ai-workflows" element={
@@ -447,16 +446,6 @@ function App() {
             <Route path="/ai-reconciliation" element={
               <ProtectedRoute>
                 <Layout><AIReconciliation /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/security" element={
-              <ProtectedRoute>
-                <Layout><Security /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/pricing" element={
-              <ProtectedRoute>
-                <Layout><Pricing /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/bookkeeping" element={

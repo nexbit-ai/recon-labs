@@ -29,7 +29,7 @@ import {
   SettingsOutlined as SettingsIcon,
   AttachMoneyOutlined as AttachMoneyIcon,
   StorageOutlined as StorageIcon,
-  ChatOutlined as ChatIcon,
+  // ChatOutlined as ChatIcon,
   StorefrontOutlined as StorefrontIcon,
   ReceiptOutlined as ReceiptIcon,
   AccountBalanceOutlined as AccountBalanceIcon,
@@ -40,7 +40,7 @@ import {
 import { Badge } from '@mui/material';
 // import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
 // @ts-ignore
-import logo from '../assets/logo.png';
+import logo from '../assets/logo_fresh.jpg';
 // @ts-ignore
 import userPhoto from '../assets/user-photo.jpg';
 
@@ -51,7 +51,7 @@ const menuItems = [
   { text: 'Dispute', icon: <ReportProblemIcon />, path: '/dispute' },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping' },
   { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist' },
-  { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
+  // { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
 ];
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -93,10 +93,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (option === 'Settings') {
       // Navigate to settings page or show settings modal
       console.log('Settings clicked');
-    } else if (option === 'Security') {
-      navigate('/security');
-    } else if (option === 'Pricing') {
-      navigate('/pricing');
     } else if (option === 'Logout') {
       // Start smooth logout with blur overlay
       setIsLoggingOut(true);
@@ -202,13 +198,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         ))}
       </List>
       <Box sx={{ mb: 2 }}>
+        {/* Upload nav button added instead of Data Sources (was here) */}
         <ListItem disablePadding>
-          <ListItemButton 
-            onClick={() => navigate('/connect-data-sources')} 
-            selected={location.pathname === '/connect-data-sources'}
-            sx={{ 
-              borderRadius: 0, 
-              mr: 2, 
+          <ListItemButton
+            onClick={() => navigate('/upload-documents')}
+            selected={location.pathname === '/upload-documents'}
+            sx={{
+              borderRadius: 0,
+              mr: 2,
               my: 0.25,
               '&.Mui-selected': {
                 backgroundColor: theme.palette.primary.main + '15',
@@ -218,22 +215,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               },
             }}
           >
-            <ListItemIcon 
-              sx={{ 
-                color: location.pathname === '/connect-data-sources' ? theme.palette.primary.main : 'inherit',
-                minWidth: 36 
-              }}
-            >
-              <StorageIcon />
+            <ListItemIcon sx={{ minWidth: 36 }}>
+              {/* Use the built-in Upload icon from MUI */}
+              <CompareArrowsIcon />
             </ListItemIcon>
-            <ListItemText 
-              primary="Data Sources" 
-              sx={{
-                color: location.pathname === '/connect-data-sources' ? theme.palette.primary.main : 'inherit',
-              }}
+            <ListItemText
+              primary={<Typography sx={{ fontWeight: 500 }}>Upload</Typography>}
+              sx={{ color: location.pathname === '/upload-documents' ? theme.palette.primary.main : 'inherit' }}
             />
           </ListItemButton>
         </ListItem>
+        {/* Data Sources nav commented out: only upload is now shown to user. */}
         <ListItem disablePadding>
           <ListItemButton onClick={handleSettingsClick} sx={{ borderRadius: 0, mr: 2, my: 0.25 }}>
             <ListItemIcon sx={{ minWidth: 36 }}>
@@ -271,7 +263,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
           <MenuItem onClick={() => handleMenuOption('Settings')}>Settings</MenuItem>
-          <MenuItem onClick={() => handleMenuOption('Security')}>Security</MenuItem>
           <MenuItem onClick={() => handleMenuOption('Logout')}>
             <LogoutIcon sx={{ mr: 1 }} />
             Logout
@@ -365,6 +356,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           minHeight: '100vh',
           backgroundColor: 'background.default',
+          pt: 2,
         }}
       >
         {children}

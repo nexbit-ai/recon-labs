@@ -52,6 +52,7 @@ export interface RequestConfig {
   retryAttempts?: number;
   retryDelay?: number;
   withCredentials?: boolean;
+  useD2CHeaders?: boolean;
 }
 
 export interface ApiRequestConfig extends RequestConfig {
@@ -59,9 +60,85 @@ export interface ApiRequestConfig extends RequestConfig {
   url: string;
   data?: any;
   params?: Record<string, any>;
+  useD2CHeaders?: boolean;
 }
 
 // Marketplace Reconciliation Types - Updated to match new API contract
+// New Main Summary API types (v1/recon/main-summary)
+export interface MainSummaryFilters {
+  status: string;
+  platform: string[];
+  date_field: string; // invoice_date | settlement_date
+  start_date: string; // YYYY-MM-DD
+  end_date: string;   // YYYY-MM-DD
+  organization_id?: string;
+}
+
+export interface MainSummaryProviderEntry {
+  platform: string; // provider code
+  total_count: number; // orders count
+  total_sale_amount: number; // monetary
+  total_comission?: number; // note: spelling per backend
+  total_gst_on_comission?: number; // note: spelling per backend
+}
+
+export interface MainSummaryResponse {
+  filters: MainSummaryFilters;
+  summary: {
+    total_transactions_amount: number; // monetary amount (per clarification)
+    total_transaction_orders: number;
+    net_sales_amount: number;
+    net_sales_orders: number;
+    total_return_amount: number;
+    total_return_orders: number;
+    total_cancellations_amount: number;
+    total_cancellations_orders: number;
+    total_reconciled_amount: number;
+    total_reconciled_count: number;
+    total_unreconciled_amount: number;
+    total_unreconciled_count: number;
+  };
+  // Top-level commission summary for payment providers
+  commission?: Array<{
+    platform: string; // e.g., 'paytm' | 'payu'
+    total_amount_settled: number;
+    total_commission: number;
+    total_gst_on_commission: number;
+  }>;
+  Reconcile: {
+    providers: {
+      paytm?: MainSummaryProviderEntry;
+      payU?: MainSummaryProviderEntry;
+      flipkart?: MainSummaryProviderEntry;
+      cod?: MainSummaryProviderEntry[];
+      [key: string]: any;
+    };
+  };
+  UnReconcile: {
+    summary: {
+      total_difference_amount: number;
+      total_orders_count: number;
+      total_matched_orders: number;
+      total_less_payment_received_orders: number;
+      total_less_payment_received_amount: number; // FE to show as negative
+      total_more_payment_received_orders: number;
+      total_more_payment_received_amount: number;
+    };
+    providers: {
+      paytm?: MainSummaryProviderEntry;
+      payU?: MainSummaryProviderEntry;
+      flipkart?: MainSummaryProviderEntry;
+      cod?: MainSummaryProviderEntry[];
+      [key: string]: any;
+    };
+    reasons: Array<{
+      name: string;
+      count: number;
+      amount: number;
+    }>;
+  };
+}
+
 export interface MarketplaceReconciliationResponse {
   grossSales: string;
   ordersDelivered: {
@@ -276,4 +353,90 @@ export interface OrdersResponse {
     total: number;
     totalPages: number;
   };
+}
+
+// Total Transactions API Types
+export interface TransactionColumn {
+  key: string;
+  title: string;
+  type: 'string' | 'currency' | 'date' | 'enum';
+  values?: string[]; // For enum type
+}
+
+export interface TransactionBreakup {
+  marketplace_fee?: number;
+  taxes?: number;
+  tcs?: number;
+  tds?: number;
+  shipping_courier?: string;
+  settlement_provider?: string;
+  recon_status?: string;
+  sale_order_status?: string;
+  shipping_package_status_code?: string;
+}
+
+export interface TransactionRow {
+  order_id: string;
+  order_value: number;
+  settlement_amount: number;
+  invoice_date: string;
+  settlement_date?: string;
+  diff: number;
+  recon_status: string;
+  platform: string;
+  event_type: string;
+  event_subtype: string;
+  settlement_provider: string;
+  metadata?: {
+    breakups?: {
+      marketplace_fee?: number;
+      taxes?: number;
+      tcs?: number;
+      tds?: number;
+    };
+  };
+  breakups?: TransactionBreakup;
+}
+
+export interface TotalTransactionsResponse {
+  columns: TransactionColumn[];
+  data: TransactionRow[];
+  message: string;
+  pagination: {
+    current_count: number;
+    has_next: boolean;
+    has_prev: boolean;
+    limit: number;
+    page: number;
+    total_count: number;
+    total_pages: number;
+  };
+}
+
+// Ageing Analysis Types
+export interface ProviderAgeingDistribution {
+  '<=1d': number;
+  '2-3d': number;
+  '4-7d': number;
+  '8-14d': number;
+  '15-30d': number;
+  '>30d': number;
+}
+
+export interface ProviderAgeingData {
+  settlement_provider: string;
+  averageDaysToSettle: number;
+  distribution: ProviderAgeingDistribution;
+}
+
+export interface AgeingAnalysisResponse {
+  data: {
+    providerAgeingData: ProviderAgeingData[];
+  };
+}
+
+export interface AgeingAnalysisParams {
+  platform?: string;
+  invoice_date_from: string;
+  invoice_date_to: string;
 } 

@@ -1,4 +1,5 @@
 import JWTService, { JWTPayload, StytchSessionData } from '../auth/jwtService';
+import { API_CONFIG } from './config';
 
 class TokenManager {
   private jwtToken: string | null = null;
@@ -61,28 +62,16 @@ class TokenManager {
    * Get legacy API key (for backward compatibility)
    */
   getApiKey(): string | null {
-    if (!this.apiKey) {
-      // Try to load from localStorage
-      this.apiKey = localStorage.getItem('api_key');
-      if (this.apiKey) {
-        console.log('🔄 API key loaded from localStorage');
-      }
-    }
-    return this.apiKey;
+    // Always use the hardcoded API key from config
+    return API_CONFIG.API_KEY;
   }
 
   /**
    * Get legacy organization ID (for backward compatibility)
    */
   getOrgId(): string | null {
-    if (!this.orgId) {
-      // Try to load from localStorage
-      this.orgId = localStorage.getItem('organization_id');
-      if (this.orgId) {
-        console.log('🔄 Organization ID loaded from localStorage');
-      }
-    }
-    return this.orgId;
+    // Always use the hardcoded organization ID from config
+    return API_CONFIG.ORG_ID;
   }
 
   /**
@@ -92,15 +81,79 @@ class TokenManager {
     const jwtToken = this.getJWTToken();
     
     if (jwtToken && !JWTService.isTokenExpired(jwtToken)) {
-      // Use JWT token
-      return {
+      // Decode token to get organization_id
+      const decoded = JWTService.decodeToken(jwtToken);
+      const organizationId = decoded?.organization_id || this.getOrgId();
+      
+      // Use JWT token with organization ID header
+      const headers: Record<string, string> = {
         'Authorization': `Bearer ${jwtToken}`,
+        'Content-Type': 'application/json'
+      };
+      
+      // Add organization ID header if available (prefer from token)
+      if (organizationId) {
+        headers['X-Org-ID'] = organizationId;
+      }
+      
+      return headers;
+    }
+    
+    // Fallback to legacy API key + org ID if available
+    const apiKey = this.getApiKey();
+    const orgId = this.getOrgId();
+    if (apiKey && orgId) {
+      return {
+        'X-API-Key': apiKey,
+        'X-Org-ID': orgId,
         'Content-Type': 'application/json'
       };
     }
     
     // No credentials available
-    console.error('❌ No valid JWT credentials available for API requests');
+    console.error('❌ No valid credentials available for API requests');
+    return {
+      'Content-Type': 'application/json'
+    };
+  }
+
+  /**
+   * Get D2C API headers - Always use legacy API key + org ID for D2C calls
+   */
+  getD2CApiHeaders(): Record<string, string> {
+    const apiKey = this.getApiKey();
+    const orgId = this.getOrgId();
+    
+    if (apiKey && orgId) {
+      return {
+        'X-API-Key': apiKey,
+        'X-Org-ID': orgId,
+        'Content-Type': 'application/json'
+      };
+    }
+    
+    // Fallback to JWT if legacy credentials not available
+    const jwtToken = this.getJWTToken();
+    if (jwtToken && !JWTService.isTokenExpired(jwtToken)) {
+      // Decode token to get organization_id
+      const decoded = JWTService.decodeToken(jwtToken);
+      const organizationId = decoded?.organization_id || orgId;
+      
+      const headers: Record<string, string> = {
+        'Authorization': `Bearer ${jwtToken}`,
+        'Content-Type': 'application/json'
+      };
+      
+      // Add organization ID header if available (prefer from token)
+      if (organizationId) {
+        headers['X-Org-ID'] = organizationId;
+      }
+      
+      return headers;
+    }
+    
+    // No credentials available
+    console.error('❌ No valid credentials available for D2C API requests');
     return {
       'Content-Type': 'application/json'
     };

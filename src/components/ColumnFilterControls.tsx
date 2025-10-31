@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, FormControl, InputLabel, Select, MenuItem, OutlinedInput, TextField, Button } from '@mui/material';
+import { Box, Typography, TextField, Button, FormGroup, FormControlLabel, Checkbox, Autocomplete, Chip } from '@mui/material';
 
 export interface ColumnMetaMap {
   [column: string]: { type: 'string' | 'number' | 'date' | 'enum' };
@@ -17,6 +17,9 @@ export interface ColumnFilterControlsProps {
   getEnumOptions?: (column: string) => string[];
   onClear: (column: string) => void;
   onApply: () => void;
+  // Order ID chips state and handlers
+  orderIdChips?: string[];
+  setOrderIdChips?: (chips: string[]) => void;
 }
 
 const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
@@ -31,35 +34,20 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
   getEnumOptions,
   onClear,
   onApply,
+  orderIdChips = [],
+  setOrderIdChips,
 }) => {
   const metaType = (columnMeta as any)[activeColumn]?.type || 'string';
   let enumOptions = activeColumn && getEnumOptions ? getEnumOptions(activeColumn) : [];
+  
   // For Transaction Sheet Status specifically, hardcode the three values
   if (activeColumn === 'Status') {
-    enumOptions = ['excess_received', 'short_received', 'settlement_matched'];
+    enumOptions = ['more_payment_received', 'less_payment_received', 'settlement_matched'];
   }
-  if (activeColumn === 'Status') {
-    try { console.log('[ColumnFilterControls] Status options:', enumOptions); } catch {}
-  }
-  const [enumOpen, setEnumOpen] = React.useState(false);
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1, pr: 0 }}>
-      <FormControl size="small" sx={{ mb: 1.5, mt: 0.5, width: '60%' }}>
-      <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Column</Typography>
-        <TextField
-        size="small"
-          value={activeColumn || ''}
-          onChange={(e) => setActiveColumn(String(e.target.value))}
-          sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 32 } }}
-        >
-          {Object.keys(columnMeta).map((col) => (
-            <MenuItem key={col} value={col}>{col}</MenuItem>
-          ))}
-        </TextField>
-      </FormControl>
-
-      {activeColumn && metaType === 'string' && (
+      {activeColumn && metaType === 'string' && activeColumn !== 'Order ID' && (
         <>
           <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Contains</Typography>
           <TextField 
@@ -71,6 +59,53 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
           />
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
             <Button size="small" onClick={() => onClear(activeColumn)}>Clear</Button>
+            <Button size="small" variant="contained" onClick={onApply}>Apply</Button>
+          </Box>
+        </>
+      )}
+
+      {/* Special case for Order ID - chips input */}
+      {activeColumn === 'Order ID' && setOrderIdChips && (
+        <>
+          <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem', mb: 0.5 }}>
+            Order IDs (comma-separated or paste multiple)
+          </Typography>
+          <Autocomplete
+            multiple
+            freeSolo
+            options={[]}
+            value={orderIdChips}
+            onChange={(event, newValue) => {
+              setOrderIdChips(newValue as string[]);
+            }}
+            renderTags={(value, getTagProps) =>
+              value.map((option, index) => (
+                <Chip
+                  variant="outlined"
+                  label={option}
+                  size="small"
+                  {...getTagProps({ index })}
+                />
+              ))
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                size="small"
+                placeholder="Enter Order IDs"
+                sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem' } }}
+              />
+            )}
+            sx={{ width: '100%' }}
+          />
+          <Typography variant="caption" sx={{ color: '#9ca3af', fontSize: '0.65rem', mt: 0.5 }}>
+            Press Enter after each ID or paste comma-separated values
+          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+            <Button size="small" onClick={() => {
+              setOrderIdChips([]);
+              onClear(activeColumn);
+            }}>Clear</Button>
             <Button size="small" variant="contained" onClick={onApply}>Apply</Button>
           </Box>
         </>
@@ -120,44 +155,63 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
         </>
       )}
 
-      {activeColumn && metaType === 'enum' && (
+      {activeColumn && (metaType === 'enum' || ['Shipping Courier', 'Recon Status', 'Settlement Provider'].includes(activeColumn)) && (
         <>
           <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Select values</Typography>
-          <FormControl size="small">
-            <Select
-              multiple
-              open={enumOpen}
-              onOpen={() => {
-                try {
-                  (document.activeElement as HTMLElement | null)?.blur?.();
-                } catch {}
-                setEnumOpen(true);
-              }}
-              onClose={() => setEnumOpen(false)}
-              value={Array.isArray(pendingFilters[activeColumn]) ? pendingFilters[activeColumn] : []}
-              onChange={handleEnumChange(activeColumn)}
-              input={<OutlinedInput />}
-              renderValue={(selected) => (selected as string[]).join(', ')}
-              displayEmpty
-              MenuProps={{
-                disablePortal: false,
-                container: typeof document !== 'undefined' ? document.body : undefined,
-                PaperProps: { sx: { maxHeight: 320, zIndex: 20000 } },
-                keepMounted: true,
-                disableEnforceFocus: true,
-                disableRestoreFocus: true,
-                anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
-                transformOrigin: { vertical: 'top', horizontal: 'left' },
-              }}
-              sx={{ '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 38 } }}
-            >
-              {(getEnumOptions ? enumOptions : []).map((opt) => (
-                <MenuItem key={opt} value={opt}>
-                  {opt}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          
+          <FormGroup sx={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: 1, p: 1 }}>
+            {(() => {
+              const optionsToRender = getEnumOptions ? enumOptions : [];
+              
+              // Get current selected values
+              const selectedValues = Array.isArray(pendingFilters[activeColumn]) ? pendingFilters[activeColumn] : [];
+              
+              return optionsToRender.map((option) => {
+                // Format option label: convert snake_case to Title Case
+                const formatOptionLabel = (str: string): string => {
+                  return str
+                    .split('_')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' ');
+                };
+                
+                return (
+                  <FormControlLabel
+                    key={option}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={selectedValues.includes(option)}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          const newValues = isChecked 
+                            ? [...selectedValues, option]
+                            : selectedValues.filter(val => val !== option);
+                          
+                          // Update pending filters directly
+                          const newPendingFilters = { ...pendingFilters };
+                          newPendingFilters[activeColumn] = newValues;
+                          handleEnumChange(activeColumn)({ target: { value: newValues } });
+                        }}
+                      />
+                    }
+                    label={
+                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        {formatOptionLabel(option)}
+                      </Typography>
+                    }
+                    sx={{ 
+                      '& .MuiFormControlLabel-label': { 
+                        fontSize: '0.8rem',
+                        marginLeft: 0.5
+                      }
+                    }}
+                  />
+                );
+              });
+            })()}
+          </FormGroup>
+          
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
             <Button size="small" onClick={() => onClear(activeColumn)}>Clear</Button>
             <Button size="small" variant="contained" onClick={onApply}>Apply</Button>
