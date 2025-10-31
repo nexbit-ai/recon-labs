@@ -48,6 +48,10 @@ export const userAPI = {
 
 // Marketplace Reconciliation API
 export const reconciliationAPI = {
+  // Get reconciliation summary
+  getSummary: (params?: DateRangeParams) =>
+    apiService.get<ReconciliationData>(API_CONFIG.ENDPOINTS.RECONCILIATION_SUMMARY, params),
+
   // Get detailed reconciliation data
   getDetails: (params?: DateRangeParams & PaginationParams & FilterParams) =>
     apiService.get<PaginatedResponse<any>>(API_CONFIG.ENDPOINTS.RECONCILIATION_DETAILS, params),
@@ -89,8 +93,12 @@ export const transactionsAPI = {
 // Reconciliation manual actions API
 export const manualActionsAPI = {
   // Trigger manual action for selected orders on a specific platform
-  manualAction: (platform: string, payload: { order_ids: string[]; note: string }) =>
-    apiService.post<any>(`${API_CONFIG.ENDPOINTS.RECON_MANUAL_ACTION}?platform=${encodeURIComponent(platform)}`,
+  manualAction: (
+    platform: string,
+    payload: { order_ids: string[]; note: string; manual_override_status?: string }
+  ) =>
+    apiService.post<any>(
+      `${API_CONFIG.ENDPOINTS.RECON_MANUAL_ACTION}?platform=${encodeURIComponent(platform)}`,
       payload
     ),
 };

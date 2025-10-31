@@ -223,6 +223,10 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
     return isNaN(parsed) ? 0 : parsed;
   };
 
+  
+
+  
+
   // Extract values from the API structure
   const orderValue = parseNumericValue(orderItem.order_value || orderItem.buyer_invoice_amount);
   const settlementValue = parseNumericValue(orderItem.settlement_value);
@@ -690,6 +694,98 @@ const DisputePage: React.FC = () => {
     }
   };
 
+  // Fetch dispute raised orders from API
+  const fetchDisputeRaisedOrders = async (
+    filtersOverride?: Record<string, any>,
+    sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
+    applySortOverride?: boolean,
+    orderIdsCsvOverride?: string
+  ) => {
+    if (disputeSubTab !== 1) return; // Only fetch for dispute raised tab
+
+    setApiLoading(true);
+    setError(null);
+
+    try {
+      // Build base query parameters (date, filters, ids, sorting, etc.)
+      const params = buildQueryParams(filtersOverride, orderIdsCsvOverride);
+
+      // If explicitly applying override: when null, clear sort; when provided, set it
+      if (applySortOverride) {
+        delete (params as any).sort_by;
+        delete (params as any).sort_order;
+        if (sortOverride && COLUMN_TO_SORT_BY_MAP[sortOverride.key]) {
+          params.sort_by = COLUMN_TO_SORT_BY_MAP[sortOverride.key];
+          params.sort_order = sortOverride.direction;
+        }
+      } else if (sortOverride && COLUMN_TO_SORT_BY_MAP[sortOverride.key]) {
+        params.sort_by = COLUMN_TO_SORT_BY_MAP[sortOverride.key];
+        params.sort_order = sortOverride.direction;
+      }
+
+      // Add manual override status filter for Dispute Raised
+      (params as any).manual_override_status = 'DISPUTED';
+
+      // Call the API
+      const response = await api.transactions.getTotalTransactions(params as any);
+
+      if (response.success && response.data) {
+        const responseData = response.data as any;
+        const transactionData = responseData.transactions || responseData.data || [];
+
+        const transformedRows: TransactionRow[] = [];
+        if (Array.isArray(transactionData)) {
+          transactionData.forEach((transaction: any) => {
+            const parseNumeric = (value: any): number => {
+              if (!value) return 0;
+              const cleaned = String(value).replace(/[₹$,\s]/g, '').replace(/[^\d.-]/g, '').trim();
+              return parseFloat(cleaned) || 0;
+            };
+
+            const formatDate = (date: string | Date): string => {
+              if (!date) return '';
+              try {
+                return new Date(date).toISOString().split('T')[0];
+              } catch {
+                return '';
+              }
+            };
+
+            transformedRows.push({
+              "Order ID": transaction.order_item_id || transaction.order_id || '',
+              "Amount": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount),
+              "Order Value": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount),
+              "Settlement Value": parseNumeric(transaction.settlement_value),
+              "Invoice Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date),
+              "Order Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date),
+              "Settlement Date": formatDate(transaction.settlement_date),
+              "Difference": parseNumeric(transaction.diff || transaction.difference),
+              "Remark": transaction.breakups?.mismatch_reason || transaction.remark || 'Not Available',
+              "Event Type": transaction.event_type || transaction.eventType || 'Sale',
+              originalData: transaction
+            });
+          });
+        }
+
+        setApiRows(transformedRows);
+
+        if (response.data.pagination) {
+          setTotalCount(response.data.pagination.total_count);
+        }
+      } else {
+        setApiRows([]);
+        setTotalCount(0);
+      }
+    } catch (err) {
+      console.error('Error fetching dispute raised orders:', err);
+      setError('Failed to load dispute raised data. Please try again.');
+      setApiRows([]);
+      setTotalCount(0);
+    } finally {
+      setApiLoading(false);
+    }
+  };
+
   // Load mock data for other tabs on mount
   useEffect(() => {
     if (mockRows.length === 0) {
@@ -730,16 +826,23 @@ const DisputePage: React.FC = () => {
     fetchUnreconciledOrders();
   }, [disputeSubTab, selectedDateRange, customStartDate, customEndDate]);
 
-  // Get current rows based on active tab
-  const getCurrentRows = () => {
-    if (disputeSubTab === 0) {
-      // For unreconciled tab now return the flat API data directly
-      return apiRows;
+  // Fetch API data when switching to Dispute Raised tab or when relevant inputs change
+  useEffect(() => {
+    if (disputeSubTab !== 1) return;
+    // Guard so we only fetch once on the true initial render, then allow future changes.
+    if (isInitialRenderRef.current) {
+      if (!hasFetchedOnInitialRef.current) {
+        hasFetchedOnInitialRef.current = true;
+        fetchDisputeRaisedOrders();
+      }
+      return;
     }
-    return mockRows.filter(r => {
-      if (disputeSubTab === 1) return r.status === 'open';
-      return r.status === 'raised';
-    });
+    fetchDisputeRaisedOrders();
+  }, [disputeSubTab, selectedDateRange, customStartDate, customEndDate]);
+
+  // Get current rows based on active tab (both tabs use API data now)
+  const getCurrentRows = () => {
+    return apiRows;
   };
 
   const current = getCurrentRows();
@@ -918,9 +1021,36 @@ const DisputePage: React.FC = () => {
     setRaiseDialogOpen(true);
   };
   const closeRaiseDispute = () => setRaiseDialogOpen(false);
-  const sendRaiseDispute = () => {
-    // TODO: Integrate API to send disputes with selectedRaiseGroup
-    setRaiseDialogOpen(false);
+  const sendRaiseDispute = async () => {
+    try {
+      const orderIds = selectedRaiseGroup?.orderIds || [];
+      if (orderIds.length === 0) {
+        setRaiseDialogOpen(false);
+        return;
+      }
+
+      await api.manualActions.manualAction('d2c', {
+        manual_override_status: 'DISPUTED',
+        order_ids: orderIds,
+        note: raiseDescription || '',
+      });
+
+      setSnackbarMsg('Dispute raised successfully');
+      setSnackbarOpen(true);
+
+      setRaiseDialogOpen(false);
+
+      // Refresh current tab data with existing filters
+      if (disputeSubTab === 0) {
+        fetchUnreconciledOrders();
+      } else if (disputeSubTab === 1) {
+        fetchDisputeRaisedOrders();
+      }
+    } catch (error) {
+      console.error('Failed to raise dispute', error);
+      setSnackbarMsg('Failed to raise dispute');
+      setSnackbarOpen(true);
+    }
   };
 
   // Column filter handlers

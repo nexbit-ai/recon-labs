@@ -52,6 +52,7 @@ export interface RequestConfig {
   retryAttempts?: number;
   retryDelay?: number;
   withCredentials?: boolean;
+  useD2CHeaders?: boolean;
 }
 
 export interface ApiRequestConfig extends RequestConfig {
