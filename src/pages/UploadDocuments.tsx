@@ -72,6 +72,10 @@ const UploadDocuments: React.FC = () => {
     amazon: { sales: null, settlement: null },
     flipkart: { sales: null, settlement: null },
   });
+  // D2C files (sales and settlement)
+  const [d2cFiles, setD2cFiles] = useState<Record<string, { sales: File | null; settlement: File | null }>>({});
+  // Last Mile Status file
+  const [lastMileStatusFile, setLastMileStatusFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
   const [loadingUploads, setLoadingUploads] = useState(false);
@@ -390,6 +394,145 @@ const UploadDocuments: React.FC = () => {
     }
   };
 
+  // D2C file handlers
+  const setD2cFile = (vendorId: string, kind: 'sales' | 'settlement', file: File | null) => {
+    setD2cFiles((prev) => ({
+      ...prev,
+      [vendorId]: { ...prev[vendorId], [kind]: file },
+    }));
+  };
+
+  const handleD2cUpload = async (vendorId: string, kind: 'sales' | 'settlement') => {
+    const file = d2cFiles[vendorId]?.[kind];
+    if (!file || selectedYear === null || selectedMonth === null) return;
+
+    const key = `${vendorId}_${kind}`;
+    setUploadingVendor(key);
+    setUploadStatus(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('description', `${vendors.find(v => v.id === vendorId)?.name} ${kind} sheet for ${months[selectedMonth]} ${selectedYear}`);
+      formData.append('month', months[selectedMonth]);
+      formData.append('year', selectedYear.toString());
+      formData.append('report_type', key.toLowerCase());
+
+      let customToken: string | null = null;
+      if (session) {
+        try {
+          const customSessionData = {
+            member_id: session.member_id,
+            member_session_id: session.member_session_id,
+            organization_id: API_CONFIG.ORG_ID,
+            organization_slug: session.organization_slug,
+            roles: session.roles,
+          };
+          customToken = await JWTService.generateToken(customSessionData);
+        } catch (error) {
+          console.error('❌ Failed to generate custom token:', error);
+        }
+      }
+
+      const headers: Record<string, string> = {
+        'x-api-key': API_CONFIG.API_KEY,
+        'x-org-id': API_CONFIG.ORG_ID,
+      };
+      if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/v1/recon/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+        throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
+      }
+
+      await response.json();
+      setUploadStatus({ type: 'success', message: `Successfully uploaded ${kind} file for ${vendors.find(v => v.id === vendorId)?.name}` });
+
+      // Clear the file after successful upload
+      setD2cFile(vendorId, kind, null);
+
+      // refresh list
+      if (selectedYear !== null && selectedMonth !== null) {
+        await fetchUploadedDocuments(selectedYear, selectedMonth);
+      }
+    } catch (error) {
+      console.error('❌ Upload error:', error);
+      setUploadStatus({ type: 'error', message: error instanceof Error ? error.message : 'Failed to upload file. Please try again.' });
+    } finally {
+      setUploadingVendor(null);
+    }
+  };
+
+  // Last Mile Status Upload handler
+  const handleLastMileStatusUpload = async () => {
+    if (!lastMileStatusFile || selectedYear === null || selectedMonth === null) return;
+
+    setUploadingVendor('lastmile_status');
+    setUploadStatus(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', lastMileStatusFile);
+      formData.append('description', `Last Mile Status file for ${months[selectedMonth]} ${selectedYear}`);
+      formData.append('month', months[selectedMonth]);
+      formData.append('year', selectedYear.toString());
+      formData.append('report_type', 'lastmile_status');
+
+      let customToken: string | null = null;
+      if (session) {
+        try {
+          const customSessionData = {
+            member_id: session.member_id,
+            member_session_id: session.member_session_id,
+            organization_id: API_CONFIG.ORG_ID,
+            organization_slug: session.organization_slug,
+            roles: session.roles,
+          };
+          customToken = await JWTService.generateToken(customSessionData);
+        } catch (error) {
+          console.error('❌ Failed to generate custom token:', error);
+        }
+      }
+
+      const headers: Record<string, string> = {
+        'x-api-key': API_CONFIG.API_KEY,
+        'x-org-id': API_CONFIG.ORG_ID,
+      };
+      if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/v1/recon/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+        throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
+      }
+
+      await response.json();
+      setUploadStatus({ type: 'success', message: `Successfully uploaded Last Mile Status file` });
+      setLastMileStatusFile(null);
+
+      // refresh list
+      if (selectedYear !== null && selectedMonth !== null) {
+        await fetchUploadedDocuments(selectedYear, selectedMonth);
+      }
+    } catch (error) {
+      console.error('❌ Upload error:', error);
+      setUploadStatus({ type: 'error', message: error instanceof Error ? error.message : 'Failed to upload file. Please try again.' });
+    } finally {
+      setUploadingVendor(null);
+    }
+  };
+
   const isMonthCompleted = (year: number, monthIndex: number) => {
     const monthKey = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
     return completedMonths.includes(monthKey);
@@ -673,18 +816,25 @@ const UploadDocuments: React.FC = () => {
             <Divider sx={{ mb: 3 }} />
             {/* D2C Partners section */}
             <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 700 }} color="primary.main">D2C Partners</Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 800 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 800, mb: 4 }}>
               {vendors.filter(v => v.id !== 'amazon' && v.id !== 'flipkart').map((vendor) => {
-                const isUploading = uploadingVendor === vendor.id;
-                const isUploaded = isVendorUploaded(vendor.id);
-                const uploadedDoc = getUploadedDocument(vendor.id);
+                const isSalesUploaded = isVendorUploaded(vendor.id, 'sales');
+                const isSettlementUploaded = isVendorUploaded(vendor.id, 'settlement');
+                const isUploaded = isSalesUploaded || isSettlementUploaded;
+                const uploadedSalesDoc = getUploadedDocument(vendor.id, 'sales');
+                const uploadedSettlementDoc = getUploadedDocument(vendor.id, 'settlement');
+                const isSalesUploading = uploadingVendor === `${vendor.id}_sales`;
+                const isSettlementUploading = uploadingVendor === `${vendor.id}_settlement`;
+                const salesFile = d2cFiles[vendor.id]?.sales;
+                const settlementFile = d2cFiles[vendor.id]?.settlement;
+
                 return (
                   <Paper
                     key={vendor.id}
                     elevation={0}
-                    sx={{ p: 3, border: isUploaded ? '2px solid #dcfce7' : '2px solid #e5e7eb', borderRadius: '12px', transition: 'all 0.3s ease', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, opacity: isUploading ? 0.6 : 1, background: isUploaded ? '#f0fdf4' : '#ffffff', '&:hover': { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', borderColor: isUploaded ? '#bbf7d0' : '#d1d5db' } }}
+                    sx={{ p: 3, border: isUploaded ? '2px solid #dcfce7' : '2px solid #e5e7eb', borderRadius: '12px', transition: 'all 0.3s ease', background: isUploaded ? '#f0fdf4' : '#ffffff', '&:hover': { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', borderColor: isUploaded ? '#bbf7d0' : '#d1d5db' } }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                       <Box sx={{ width: 48, height: 48, borderRadius: '8px', background: isUploaded ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {isUploaded ? (
                           <CheckCircleIcon sx={{ fontSize: 24, color: '#16a34a' }} />
@@ -699,39 +849,183 @@ const UploadDocuments: React.FC = () => {
                             <Chip label="Uploaded" size="small" sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} />
                           )}
                         </Box>
-                        {isUploaded && uploadedDoc ? (
-                          <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mt: 0.5 }}>{uploadedDoc.filename} • {new Date(uploadedDoc.upload_date).toLocaleDateString()}</Typography>
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">{isUploading ? 'Uploading...' : 'Upload settlement sheet'}</Typography>
+                      </Box>
+                    </Box>
+                    
+                    {/* Sales File Upload */}
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }} color="text.secondary">Sales File</Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <input
+                          accept=".xlsx,.xls,.csv"
+                          style={{ display: 'none' }}
+                          id={`d2c-sales-upload-${vendor.id}`}
+                          type="file"
+                          onChange={(e) => {
+                            setD2cFile(vendor.id, 'sales', e.target.files?.[0] || null);
+                            e.target.value = '';
+                          }}
+                          disabled={isSalesUploading}
+                        />
+                        <label htmlFor={`d2c-sales-upload-${vendor.id}`}>
+                          <Button
+                            variant="outlined"
+                            component="span"
+                            disabled={isSalesUploading}
+                            startIcon={<CloudUploadIcon />}
+                            size="small"
+                            sx={{ minWidth: 120 }}
+                          >
+                            Choose file
+                          </Button>
+                        </label>
+                        <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                          {salesFile?.name || (isSalesUploaded && uploadedSalesDoc ? uploadedSalesDoc.filename : 'No file selected')}
+                        </Typography>
+                        {salesFile && (
+                          <Button
+                            variant="contained"
+                            size="small"
+                            disabled={isSalesUploading}
+                            onClick={() => handleD2cUpload(vendor.id, 'sales')}
+                            startIcon={isSalesUploading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <CloudUploadIcon />}
+                            sx={{ background: '#111111', '&:hover': { background: '#333333' } }}
+                          >
+                            {isSalesUploading ? 'Uploading...' : 'Upload'}
+                          </Button>
                         )}
                       </Box>
                     </Box>
-                    <input
-                      accept=".xlsx,.xls,.csv"
-                      style={{ display: 'none' }}
-                      id={`file-upload-${vendor.id}`}
-                      type="file"
-                      onChange={(e) => {
-                        handleFileUpload(vendor.id, e.target.files?.[0] || null);
-                        e.target.value = '';
-                      }}
-                      disabled={isUploading}
-                    />
-                    <label htmlFor={`file-upload-${vendor.id}`}>
-                      <Button
-                        variant={isUploaded ? 'outlined' : 'contained'}
-                        component="span"
-                        disabled={isUploading}
-                        startIcon={isUploading ? <CircularProgress size={16} sx={{ color: isUploaded ? '#111111' : '#ffffff' }} /> : <CloudUploadIcon />}
-                        sx={{ background: isUploaded ? '#ffffff' : '#111111', color: isUploaded ? '#111111' : '#ffffff', borderColor: isUploaded ? '#e5e7eb' : 'transparent', fontWeight: 600, px: 3, py: 1.2, '&:hover': { background: isUploaded ? '#f8fafc' : '#333333', borderColor: isUploaded ? '#d1d5db' : 'transparent' }, '&:disabled': { background: '#94a3b8', color: '#ffffff' } }}
-                      >
-                        {isUploading ? 'Uploading...' : (isUploaded ? 'Re-upload' : 'Upload File')}
-                      </Button>
-                    </label>
+
+                    {/* Settlement File Upload */}
+                    <Box>
+                      <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }} color="text.secondary">Settlement File</Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <input
+                          accept=".xlsx,.xls,.csv"
+                          style={{ display: 'none' }}
+                          id={`d2c-settlement-upload-${vendor.id}`}
+                          type="file"
+                          onChange={(e) => {
+                            setD2cFile(vendor.id, 'settlement', e.target.files?.[0] || null);
+                            e.target.value = '';
+                          }}
+                          disabled={isSettlementUploading}
+                        />
+                        <label htmlFor={`d2c-settlement-upload-${vendor.id}`}>
+                          <Button
+                            variant="outlined"
+                            component="span"
+                            disabled={isSettlementUploading}
+                            startIcon={<CloudUploadIcon />}
+                            size="small"
+                            sx={{ minWidth: 120 }}
+                          >
+                            Choose file
+                          </Button>
+                        </label>
+                        <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                          {settlementFile?.name || (isSettlementUploaded && uploadedSettlementDoc ? uploadedSettlementDoc.filename : 'No file selected')}
+                        </Typography>
+                        {settlementFile && (
+                          <Button
+                            variant="contained"
+                            size="small"
+                            disabled={isSettlementUploading}
+                            onClick={() => handleD2cUpload(vendor.id, 'settlement')}
+                            startIcon={isSettlementUploading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <CloudUploadIcon />}
+                            sx={{ background: '#111111', '&:hover': { background: '#333333' } }}
+                          >
+                            {isSettlementUploading ? 'Uploading...' : 'Upload'}
+                          </Button>
+                        )}
+                      </Box>
+                    </Box>
                   </Paper>
                 );
               })}
             </Box>
+            
+            <Divider sx={{ mb: 3 }} />
+            {/* Last Mile Status Upload section */}
+            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 700 }} color="primary.main">Last Mile Status Upload</Typography>
+            <Paper
+              elevation={0}
+              sx={{ 
+                p: 3, 
+                border: isVendorUploaded('lastmile_status') ? '2px solid #dcfce7' : '2px solid #e5e7eb', 
+                borderRadius: '12px', 
+                transition: 'all 0.3s ease', 
+                maxWidth: 800,
+                background: isVendorUploaded('lastmile_status') ? '#f0fdf4' : '#ffffff', 
+                '&:hover': { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', borderColor: isVendorUploaded('lastmile_status') ? '#bbf7d0' : '#d1d5db' } 
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                <Box sx={{ width: 48, height: 48, borderRadius: '8px', background: isVendorUploaded('lastmile_status') ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {isVendorUploaded('lastmile_status') ? (
+                    <CheckCircleIcon sx={{ fontSize: 24, color: '#16a34a' }} />
+                  ) : (
+                    <ShippingIcon sx={{ fontSize: 24, color: '#111111' }} />
+                  )}
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="subtitle1" fontWeight={700} color="#111111">Last Mile Status</Typography>
+                    {isVendorUploaded('lastmile_status') && (
+                      <Chip label="Uploaded" size="small" sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} />
+                    )}
+                  </Box>
+                  {isVendorUploaded('lastmile_status') && getUploadedDocument('lastmile_status') ? (
+                    <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mt: 0.5 }}>
+                      {getUploadedDocument('lastmile_status')?.filename} • {new Date(getUploadedDocument('lastmile_status')!.upload_date).toLocaleDateString()}
+                    </Typography>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">
+                      Upload Last Mile Status file
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <input
+                  accept=".xlsx,.xls,.csv"
+                  style={{ display: 'none' }}
+                  id="lastmile-status-upload"
+                  type="file"
+                  onChange={(e) => {
+                    setLastMileStatusFile(e.target.files?.[0] || null);
+                    e.target.value = '';
+                  }}
+                  disabled={uploadingVendor === 'lastmile_status'}
+                />
+                <label htmlFor="lastmile-status-upload">
+                  <Button
+                    variant="outlined"
+                    component="span"
+                    disabled={uploadingVendor === 'lastmile_status'}
+                    startIcon={<CloudUploadIcon />}
+                    sx={{ minWidth: 120 }}
+                  >
+                    Choose file
+                  </Button>
+                </label>
+                <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                  {lastMileStatusFile?.name || 'No file selected'}
+                </Typography>
+                {lastMileStatusFile && (
+                  <Button
+                    variant="contained"
+                    disabled={uploadingVendor === 'lastmile_status'}
+                    onClick={handleLastMileStatusUpload}
+                    startIcon={uploadingVendor === 'lastmile_status' ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <CloudUploadIcon />}
+                    sx={{ background: '#111111', '&:hover': { background: '#333333' }, fontWeight: 600, px: 3, py: 1.2 }}
+                  >
+                    {uploadingVendor === 'lastmile_status' ? 'Uploading...' : 'Upload File'}
+                  </Button>
+                )}
+              </Box>
+            </Paper>
           </Paper>
         )}
       </Box>

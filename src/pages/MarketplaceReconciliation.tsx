@@ -187,7 +187,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
   const [initialTsFilters, setInitialTsFilters] = useState<{ [key: string]: any } | undefined>(undefined);
   const [initialTsTab, setInitialTsTab] = useState<number>(0);
-  const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'd2c' | undefined>(undefined);
+  const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'amazon' | 'd2c' | undefined>(undefined);
   const location = useLocation();
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
@@ -850,7 +850,7 @@ const MarketplaceReconciliation: React.FC = () => {
           start_date: startDate,
           end_date: endDate,
           date_field: dateField === 'invoice' ? 'invoice_date' : 'settlement_date',
-          platform: selectedPlatforms,
+          platform: selectedPlatforms.length > 0 ? selectedPlatforms.join(',') : undefined,
         };
         const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
         // ms is ApiResponse<any>; data is payload
@@ -887,7 +887,7 @@ const MarketplaceReconciliation: React.FC = () => {
           start_date: startDate,
           end_date: endDate,
           date_field: dateField === 'invoice' ? 'invoice_date' : 'settlement_date',
-          platform: selectedPlatforms,
+          platform: selectedPlatforms.length > 0 ? selectedPlatforms.join(',') : undefined,
         };
         const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
         const payload = (ms as any).data as MainSummaryResponse;
@@ -959,7 +959,7 @@ const MarketplaceReconciliation: React.FC = () => {
         start_date: startDate,
         end_date: endDate,
         date_field: dateField === 'invoice' ? 'invoice_date' : 'settlement_date',
-        platform: selectedPlatforms.length > 0 ? selectedPlatforms : ['d2c']
+        platform: selectedPlatforms.length > 0 ? selectedPlatforms.join(',') : 'd2c'
       };
       
       const resp = await apiIndex.mainSummary.getMainSummary(params);
@@ -1239,39 +1239,6 @@ const MarketplaceReconciliation: React.FC = () => {
     return mockReconciliationData;
   };
 
-  // Build Amazon demo data (for Amazon-only and All aggregation)
-  const buildAmazonDemoData = (): MarketplaceReconciliationResponse => {
-    return {
-      grossSales: '28500000',
-      ordersDelivered: { number: 15180, amount: '26800000' } as any,
-      ordersReturned: { number: 520, amount: '700000' } as any,
-      commission: { totalCommission: '0', commissionRate: '0' } as any,
-      settledSales: '0',
-      summaryData: {
-        totalTransaction: { number: 18425, amount: '31250000' } as any,
-        netSalesAsPerSalesReport: { number: 16230, amount: '28500000' } as any,
-        paymentReceivedAsPerSettlementReport: { number: 15080, amount: '26200000' } as any,
-        pendingPaymentFromMarketplace: { number: 1150, amount: '600000' } as any,
-        totalReconciled: { number: 15080, amount: '26200000' } as any,
-        totalUnreconciled: {
-          number: 3345,
-          amount: '600000',
-          lessPaymentReceivedFromFlipkart: { number: 2100, amount: '1450000' } as any,
-          excessPaymentReceivedFromFlipkart: { number: 1245, amount: '850000' } as any,
-        } as any,
-        pendingDeductions: { number: 0, amount: '0' } as any,
-        returnedOrCancelledOrders: { number: 720, amount: '980000' } as any,
-      } as any,
-      totalTDS: '320000',
-      totalTDA: '450000',
-      monthOrdersPayoutReceived: '26200000',
-      monthOrdersAwaitedSettlement: { salesOrders: 0, salesAmount: '0' } as any,
-      unsettledReturns: { returnsOrders: 0, returnAmount: '0' } as any,
-      difference: '0',
-      returnRate: '0',
-      commissionRate: '0',
-    } as any;
-  };
 
   // Helper to convert numeric to API string amount
   const toAmountString = (value: number): string => {
@@ -1372,59 +1339,6 @@ const MarketplaceReconciliation: React.FC = () => {
     } as any;
   };
 
-  // Apply demo data for Amazon selection
-  const applyAmazonDemoData = () => {
-    try {
-      const demo: MarketplaceReconciliationResponse = JSON.parse(JSON.stringify(reconciliationData));
-
-      // High-level sales numbers
-      (demo as any).grossSales = '28500000';
-      (demo as any).totalTDA = '450000';
-      (demo as any).totalTDS = '320000';
-
-      // Summary data
-      demo.summaryData.totalTransaction = { number: 18425, amount: '31250000' } as any;
-      demo.summaryData.netSalesAsPerSalesReport = { number: 16230, amount: '28500000' } as any;
-      demo.summaryData.paymentReceivedAsPerSettlementReport = { number: 15080, amount: '26200000' } as any;
-      demo.summaryData.pendingPaymentFromMarketplace = { number: 1150, amount: '600000' } as any;
-      demo.summaryData.totalReconciled = { number: 15080, amount: '26200000' } as any;
-      demo.summaryData.totalUnreconciled = {
-        number: 3345,
-        amount: '600000',
-        lessPaymentReceivedFromFlipkart: { number: 2100, amount: '1450000' },
-        excessPaymentReceivedFromFlipkart: { number: 1245, amount: '850000' },
-      } as any;
-      demo.summaryData.returnedOrCancelledOrders = { number: 720, amount: '980000' } as any;
-
-      // Orders delivered/returned (if present on the shape)
-      (demo as any).ordersDelivered = { number: 15180, amount: '26800000' };
-      (demo as any).ordersReturned = { number: 520, amount: '700000' };
-
-      setReconciliationData(demo);
-
-      // Demo unreconciled reasons (AI insight)
-      setUnreconciledReasons([
-        { reason: 'Commission mismatch', count: 132 },
-        { reason: 'Weight discrepancy fee', count: 97 },
-        { reason: 'Return not received in time', count: 74 },
-        { reason: 'Shipping overcharge', count: 58 },
-        { reason: 'Promotional fee variance', count: 41 },
-      ]);
-
-      // Demo sales overview
-      setSalesOverview({
-        netRevenue: { value: '26200000', label: 'Net Revenue' },
-        grossRevenue: { value: '28500000', label: 'Gross Revenue' },
-        returns: { value: '980000', label: 'Returns' },
-        monthData: [
-          { month: 'February 2025', gross: '25500000', net: '23200000', returns: '600000' },
-          { month: 'March 2025', gross: '28500000', net: '26200000', returns: '980000' },
-        ],
-      });
-    } catch (e) {
-      // no-op
-    }
-  };
 
   // Fetch sales overview data from backend
   const fetchSalesOverview = async () => {
@@ -1972,7 +1886,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   {selectedPlatforms.length === availablePlatforms.length
                     ? 'All'
                     : (selectedPlatforms.length > 0 
-                        ? (availablePlatforms.find(p => p.value === selectedPlatforms[0])?.label || 'Select Platforms')
+                        ? selectedPlatforms.map(p => availablePlatforms.find(ap => ap.value === p)?.label).filter(Boolean).join(', ')
                         : 'Select Platforms')
                   }
                 </Button>
@@ -2037,61 +1951,46 @@ const MarketplaceReconciliation: React.FC = () => {
                           const next = tempSelectedPlatforms;
                           setSelectedPlatforms(next);
                           try {
-                            let data: MarketplaceReconciliationResponse | null = null;
-                            if (next.includes('flipkart' as Platform)) {
-                              data = await fetchFlipkartDataForCurrentRange();
-                            }
-                            if (next.includes('amazon' as Platform)) {
-                              const amazonDemo = buildAmazonDemoData();
-                              data = data ? mergeReconciliationData(data, amazonDemo) : amazonDemo;
-                            }
-                            if (next.includes('d2c' as Platform)) {
-                              const d2cDemo = buildD2CDemoData();
-                              data = data ? mergeReconciliationData(data, d2cDemo) : d2cDemo;
-                            }
-                            if (data) setReconciliationData(data);
-
-                            // Also fetch unified summary from main-summary using selected platforms
-                            try {
-                              let startDate = customStartDate;
-                              let endDate = customEndDate;
-                              const today = new Date();
-                              const fmt = (d: Date) => d.toISOString().split('T')[0];
-                              if (selectedDateRange !== 'custom') {
-                                if (selectedDateRange === 'today') {
-                                  startDate = fmt(today);
-                                  endDate = fmt(today);
-                                } else if (selectedDateRange === 'this-week') {
-                                  const startOfWeek = new Date(today);
-                                  startOfWeek.setDate(today.getDate() - today.getDay());
-                                  const endOfWeek = new Date(startOfWeek);
-                                  endOfWeek.setDate(startOfWeek.getDate() + 6);
-                                  startDate = fmt(startOfWeek);
-                                  endDate = fmt(endOfWeek);
-                                } else if (selectedDateRange === 'this-month') {
-                                  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                                  startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
-                                  endDate = fmt(endOfMonth);
-                                } else if (selectedDateRange === 'this-year') {
-                                  startDate = `${today.getFullYear()}-01-01`;
-                                  endDate = `${today.getFullYear()}-12-31`;
-                                }
+                            // Fetch unified summary from main-summary using selected platforms
+                            let startDate = customStartDate;
+                            let endDate = customEndDate;
+                            const today = new Date();
+                            const fmt = (d: Date) => d.toISOString().split('T')[0];
+                            if (selectedDateRange !== 'custom') {
+                              if (selectedDateRange === 'today') {
+                                startDate = fmt(today);
+                                endDate = fmt(today);
+                              } else if (selectedDateRange === 'this-week') {
+                                const startOfWeek = new Date(today);
+                                startOfWeek.setDate(today.getDate() - today.getDay());
+                                const endOfWeek = new Date(startOfWeek);
+                                endOfWeek.setDate(startOfWeek.getDate() + 6);
+                                startDate = fmt(startOfWeek);
+                                endDate = fmt(endOfWeek);
+                              } else if (selectedDateRange === 'this-month') {
+                                const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                                startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+                                endDate = fmt(endOfMonth);
+                              } else if (selectedDateRange === 'this-year') {
+                                startDate = `${today.getFullYear()}-01-01`;
+                                endDate = `${today.getFullYear()}-12-31`;
                               }
-
-                              const mainSummaryParams = {
-                                start_date: startDate,
-                                end_date: endDate,
-                                platform: next,
-                              } as any;
-                              const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
-                              const payload = (ms as any).data as MainSummaryResponse;
-                              setMainSummary(payload);
-                              if (payload?.UnReconcile?.reasons?.length) {
-                                setUnreconciledReasons(payload.UnReconcile.reasons.map((r: any) => ({ reason: r.name, count: r.count })));
-                              }
-                            } catch (e) {
-                              console.warn('main-summary fetch failed', e);
                             }
+
+                            const mainSummaryParams = {
+                              start_date: startDate,
+                              end_date: endDate,
+                              date_field: dateField === 'invoice' ? 'invoice_date' : 'settlement_date',
+                              platform: next.length > 0 ? next.join(',') : undefined,
+                            } as any;
+                            const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
+                            const payload = (ms as any).data as MainSummaryResponse;
+                            setMainSummary(payload);
+                            if (payload?.UnReconcile?.reasons?.length) {
+                              setUnreconciledReasons(payload.UnReconcile.reasons.map((r: any) => ({ reason: r.name, count: r.count })));
+                            }
+                          } catch (e) {
+                            console.warn('main-summary fetch failed', e);
                           } finally {
                             setPlatformMenuAnchorEl(null);
                           }
@@ -3187,10 +3086,12 @@ const MarketplaceReconciliation: React.FC = () => {
                                                   const providerName = provider.name.toLowerCase();
                                                   const providerKey = provider.key.toLowerCase();
                                                   
-                                                  let platform: 'flipkart' | 'd2c' = 'flipkart'; // Default to flipkart
+                                                  let platform: 'flipkart' | 'amazon' | 'd2c' = 'flipkart'; // Default to flipkart
                                                   
                                                   if (providerKey === 'flipkart' || providerName.includes('flipkart')) {
                                                     platform = 'flipkart';
+                                                  } else if (providerKey === 'amazon' || providerName.includes('amazon')) {
+                                                    platform = 'amazon';
                                                   } else if (providerKey === 'd2c' || providerName.includes('d2c') || providerName.includes('direct')) {
                                                     platform = 'd2c';
                                                   }
