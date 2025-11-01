@@ -1642,7 +1642,7 @@ interface TransactionSheetProps {
 const COLUMN_TO_API_PARAM_MAP: Record<string, {
   apiParam: string;
   type: 'string' | 'number' | 'date' | 'enum';
-  supportedPlatforms?: ('flipkart' | 'd2c' | 'all')[];
+  supportedPlatforms?: ('flipkart' | 'amazon' | 'd2c' | 'all')[];
   usesInSuffix?: boolean; // For CSV filters like status_in
 }> = {
   // Common filters (both platforms)
@@ -1696,7 +1696,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [headerDateRange, setHeaderDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
   const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
   // Platform filter state - now supports multi-select
-  const availablePlatforms = ['flipkart', 'd2c'] as const;
+  const availablePlatforms = ['flipkart', 'amazon', 'd2c'] as const;
   type Platform = typeof availablePlatforms[number];
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(initialPlatforms || ['flipkart']); // Default: flipkart only
   const [pendingSelectedPlatforms, setPendingSelectedPlatforms] = useState<Platform[]>(initialPlatforms || ['flipkart']); // Pending platforms before apply
@@ -3560,7 +3560,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               sx={{ padding: '2px', '& svg': { fontSize: '18px' } }}
                             />
                             <Typography variant="body2" sx={{ color: '#374151', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
-                              {platform === 'flipkart' ? 'Flipkart' : 'D2C'}
+                              {platform === 'flipkart' ? 'Flipkart' : platform === 'amazon' ? 'Amazon' : 'D2C'}
                             </Typography>
                           </Box>
                         ))}
@@ -3780,7 +3780,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     {selectedPlatforms.length > 0 && selectedPlatforms.length < availablePlatforms.length && (
                       <Chip
                         key="platform-filter"
-                        label={`Platform: ${selectedPlatforms.map(p => p === 'flipkart' ? 'Flipkart' : 'D2C').join(', ')}`}
+                        label={`Platform: ${selectedPlatforms.map(p => p === 'flipkart' ? 'Flipkart' : p === 'amazon' ? 'Amazon' : 'D2C').join(', ')}`}
                         onDelete={() => {
                           setSelectedPlatforms([...availablePlatforms]);
                           setPage(0);
