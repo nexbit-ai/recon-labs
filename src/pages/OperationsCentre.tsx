@@ -291,6 +291,10 @@ const OperationsCentrePage: React.FC = () => {
   const [customEndDate, setCustomEndDate] = useState('2025-04-30');
   const [tempStartDate, setTempStartDate] = useState('');
   const [tempEndDate, setTempEndDate] = useState('');
+  
+  // Header date range state - for the date selector displayed at the top
+  const [headerDateRange, setHeaderDateRange] = useState<{start: string, end: string}>({ start: '2025-04-01', end: '2025-04-30' });
+  const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{start: string, end: string}>({ start: '2025-04-01', end: '2025-04-30' });
 
   // Calendar popup state
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
@@ -342,6 +346,14 @@ const OperationsCentrePage: React.FC = () => {
       setSelectedDateRange('custom');
       setCustomStartDate(from);
       setCustomEndDate(to);
+      // Initialize header date range display
+      setHeaderDateRange({ start: from, end: to });
+      setPendingHeaderDateRange({ start: from, end: to });
+    } else {
+      // If no URL params, initialize with customStartDate/customEndDate
+      const initialDateRange = { start: customStartDate, end: customEndDate };
+      setHeaderDateRange(initialDateRange);
+      setPendingHeaderDateRange(initialDateRange);
     }
     
     // Also update platform from URL params if present (use first if multiple)
@@ -502,6 +514,18 @@ const OperationsCentrePage: React.FC = () => {
       }
     }
     setDateRangeMenuAnchor(null);
+  };
+
+  // Apply header date range changes - called when Apply button next to date selector is clicked
+  const applyHeaderDateRange = () => {
+    if (!pendingHeaderDateRange.start || !pendingHeaderDateRange.end) return;
+    setHeaderDateRange(pendingHeaderDateRange);
+    setCustomStartDate(pendingHeaderDateRange.start);
+    setCustomEndDate(pendingHeaderDateRange.end);
+    setSelectedDateRange('custom');
+    // Reset to first page and fetch data with new date range
+    setPage(0);
+    fetchAllTabsData();
   };
 
   // Sorting functions
@@ -1977,6 +2001,129 @@ const OperationsCentrePage: React.FC = () => {
                 })}
               </Box>
               
+              {/* Date Range Selector - Next to Filter button */}
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                gap: 0.5,
+                padding: '4px 8px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                backgroundColor: '#f9fafb',
+                flexShrink: 0,
+              }}>
+                {/* Date label */}
+                <Typography variant="body2" sx={{ 
+                  fontWeight: 600, 
+                  color: '#1f2937', 
+                  fontSize: '0.7rem',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}>
+                  Date Range:
+                </Typography>
+                
+                {/* Date inputs */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  gap: 0.5, 
+                  alignItems: 'center',
+                  flexShrink: 0,
+                }}>
+                  <TextField
+                    label="From"
+                    type="date"
+                    size="small"
+                    value={pendingHeaderDateRange.start}
+                    onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, start: e.target.value }))}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ 
+                      width: '110px',
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: '#ffffff',
+                        fontSize: '0.7rem',
+                        padding: '4px 8px',
+                      },
+                      '& .MuiInputLabel-root': {
+                        fontSize: '0.7rem',
+                      },
+                      '& input': {
+                        padding: '6px 4px',
+                        fontSize: '0.7rem'
+                      }
+                    }}
+                  />
+                  <Typography variant="body2" sx={{ 
+                    color: '#6b7280', 
+                    fontSize: '0.7rem',
+                    flexShrink: 0,
+                  }}>
+                    to
+                  </Typography>
+                  <TextField
+                    label="To"
+                    type="date"
+                    size="small"
+                    value={pendingHeaderDateRange.end}
+                    onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, end: e.target.value }))}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ 
+                      width: '110px',
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: '#ffffff',
+                        fontSize: '0.7rem',
+                        padding: '4px 8px',
+                      },
+                      '& .MuiInputLabel-root': {
+                        fontSize: '0.7rem',
+                      },
+                      '& input': {
+                        padding: '6px 4px',
+                        fontSize: '0.7rem'
+                      }
+                    }}
+                  />
+                </Box>
+                
+                {/* Divider */}
+                <Box sx={{ 
+                  width: '1px', 
+                  height: '18px', 
+                  backgroundColor: '#d1d5db', 
+                  mx: 0.25, 
+                  flexShrink: 0 
+                }} />
+                
+                {/* Apply Button */}
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={applyHeaderDateRange}
+                  disabled={
+                    !pendingHeaderDateRange.start || 
+                    !pendingHeaderDateRange.end ||
+                    (pendingHeaderDateRange.start === headerDateRange.start && 
+                     pendingHeaderDateRange.end === headerDateRange.end)
+                  }
+                  sx={{
+                    textTransform: 'none',
+                    fontSize: '0.7rem',
+                    padding: '3px 10px',
+                    minWidth: 'auto',
+                    backgroundColor: '#1f2937',
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap',
+                    '&:hover': { backgroundColor: '#374151' },
+                    '&:disabled': {
+                      backgroundColor: '#9ca3af',
+                      color: '#ffffff',
+                    },
+                  }}
+                >
+                  Apply
+                </Button>
+              </Box>
+
               {/* New Filter button matching reconciliation behavior */}
               <Button
                 variant="outlined"

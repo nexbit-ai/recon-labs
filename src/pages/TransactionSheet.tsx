@@ -28,6 +28,9 @@ import {
   MenuItem,
   SelectChangeEvent,
   Checkbox,
+  RadioGroup,
+  Radio,
+  FormControlLabel,
   OutlinedInput,
   Popover,
   Menu,
@@ -1639,7 +1642,7 @@ interface TransactionSheetProps {
   statsData?: MarketplaceReconciliationResponse | null;
   initialTab?: number;
   dateRange?: { start: string; end: string };
-  initialPlatforms?: ('flipkart' | 'd2c')[];
+  initialPlatforms?: ('flipkart' | 'd2c' | 'amazon')[];
   initialFilters?: { [key: string]: any };
 }
 
@@ -1703,11 +1706,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Header date range state - for the date selector in the header next to platform selector
   const [headerDateRange, setHeaderDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
   const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
-  // Platform filter state - now supports multi-select
+  // Platform filter state - single selection only
   const availablePlatforms = ['flipkart', 'amazon', 'd2c'] as const;
   type Platform = typeof availablePlatforms[number];
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(initialPlatforms || ['flipkart']); // Default: flipkart only
-  const [pendingSelectedPlatforms, setPendingSelectedPlatforms] = useState<Platform[]>(initialPlatforms || ['flipkart']); // Pending platforms before apply
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Default: flipkart only
+  const [pendingSelectedPlatform, setPendingSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Pending platform before apply
   // Order ID chips state
   const [orderIdChips, setOrderIdChips] = useState<string[]>([]);
   // Order ID search in header
@@ -1965,7 +1968,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     try {
       // applySortOverride=true ensures that when nextSort is null (neutral),
       // we send no sort params instead of falling back to previous state
-      await fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, undefined, nextSort, true);
+      await fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform, undefined, nextSort, true);
     } finally {
       setIsSorting(false);
     }
@@ -2120,7 +2123,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     remark?: string, 
     overrideFilters?: { [key: string]: any }, 
     overrideDateRange?: {start: string, end: string},
-    overridePlatforms?: Platform[]
+    overridePlatform?: Platform
   ): TransactionQueryParams => {
     const params: TransactionQueryParams = {
       page: pageNumber,
@@ -2149,13 +2152,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       console.warn('[buildQueryParams] No date range provided - API call may fail');
     }
 
-    // ALWAYS add platform parameter as comma-separated list of selected platforms
-    const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
-    if (platformsToUse.length > 0) {
-      params.platform = platformsToUse.join(',');
-      
+    // ALWAYS add platform parameter
+    const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
+    if (platformToUse) {
+      params.platform = platformToUse;
     } else {
-      console.warn('[buildQueryParams] No platforms selected - API call may not return data');
+      console.warn('[buildQueryParams] No platform selected - API call may not return data');
     }
 
     // Only add additional parameters if filters are explicitly applied
@@ -2172,11 +2174,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
         if (!mapping) return;
 
-        // Check platform compatibility - allow if any selected platform supports it
+        // Check platform compatibility
         if (mapping.supportedPlatforms) {
-          const isSupported = platformsToUse.some(p => mapping.supportedPlatforms!.includes(p as any));
+          const isSupported = mapping.supportedPlatforms!.includes(platformToUse as any);
           if (!isSupported) {
-            return; // Skip filters not supported by any selected platform
+            return; // Skip filters not supported by selected platform
           }
         }
 
@@ -2360,7 +2362,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   };
 
-  const fetchOrders = async (pageNumber: number = 1, remark?: string, overridePlatforms?: Platform[]) => {
+  const fetchOrders = async (pageNumber: number = 1, remark?: string, overridePlatform?: Platform) => {
     const isInitialLoad = pageNumber === 1 && allTransactionData.length === 0;
     
     if (!isInitialLoad) {
@@ -2369,8 +2371,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setError(null);
     
     try {
-      const queryParams = buildQueryParams(pageNumber, remark, undefined, undefined, overridePlatforms);
-      const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
+      const queryParams = buildQueryParams(pageNumber, remark, undefined, undefined, overridePlatform);
       
       
       // Example query string that would be sent to API:
@@ -2530,10 +2531,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Copy pending filters to active filters
     setColumnFilters(pendingColumnFilters);
     setDateRange(pendingDateRange);
-    setSelectedPlatforms(pendingSelectedPlatforms);
+    setSelectedPlatform(pendingSelectedPlatform);
     
-    // Use dual API with filters and pending platforms
-    fetchDualTransactions(1, pendingColumnFilters, pendingDateRange, pendingSelectedPlatforms);
+    // Use dual API with filters and pending platform
+    fetchDualTransactions(1, pendingColumnFilters, pendingDateRange, pendingSelectedPlatform);
     
     // Close the filter popover
     closeFilterPopover();
@@ -2541,12 +2542,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Apply platform changes - called when Apply button next to platform selector is clicked
   const applyPlatformFilter = () => {
-    const platformsCommaSeparated = pendingSelectedPlatforms.join(',');
-    
-    setSelectedPlatforms(pendingSelectedPlatforms);
+    setSelectedPlatform(pendingSelectedPlatform);
     setPage(0);
     setCurrentPage(1);
-    fetchDualTransactions(1, columnFilters, dateRange, pendingSelectedPlatforms);
+    fetchDualTransactions(1, columnFilters, dateRange, pendingSelectedPlatform);
   };
 
   // Apply header date range changes - called when Apply button next to date selector is clicked
@@ -2556,13 +2555,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setDateRange(pendingHeaderDateRange);
     setPage(0);
     setCurrentPage(1);
-    fetchDualTransactions(1, columnFilters, pendingHeaderDateRange, selectedPlatforms);
+    fetchDualTransactions(1, columnFilters, pendingHeaderDateRange, selectedPlatform);
   };
 
   // Only refresh data when rowsPerPage changes (not filters)
   useEffect(() => {
     if (hasInitialLoad && (settledData || unsettledData)) { // Only refetch if data has been loaded initially
-      fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
+      fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform);
     }
   }, [rowsPerPage]);
 
@@ -2666,7 +2665,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     pageNumber: number = 1, 
     filters?: { [key: string]: any }, 
     dateRangeFilter?: {start: string, end: string},
-    overridePlatforms?: Platform[],
+    overridePlatform?: Platform,
     orderIds?: string[],
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
     applySortOverride?: boolean
@@ -2691,7 +2690,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     
     try {
       // Build base parameters
-      const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
+      const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
       
       // Create settled API call parameters
       const settledParams: any = {
@@ -2713,9 +2712,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
           // Check platform compatibility
           if (mapping.supportedPlatforms) {
-            const isSupported = platformsToUse.some(p => mapping.supportedPlatforms!.includes(p as any));
+            const isSupported = mapping.supportedPlatforms!.includes(platformToUse as any);
             if (!isSupported) {
-              return; // Skip filters not supported by any selected platform
+              return; // Skip filters not supported by selected platform
             }
           }
 
@@ -2772,8 +2771,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
       
       // Add platform parameter
-      if (platformsToUse.length > 0) {
-        settledParams.platform = platformsToUse.join(',');
+      if (platformToUse) {
+        settledParams.platform = platformToUse;
       }
 
       // Apply sorting if present (use override if explicitly requested to avoid state lag)
@@ -2905,7 +2904,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     pageNumber: number = 1, 
     filters?: { [key: string]: any }, 
     dateRangeFilter?: {start: string, end: string},
-    overridePlatforms?: Platform[]
+    overridePlatform?: Platform
   ) => {
     try {
       setLoading(true);
@@ -2916,12 +2915,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         limit: rowsPerPage, // Use current rows per page setting
       };
       
-      // ALWAYS add platform parameter as comma-separated list
-      const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
-      if (platformsToUse.length > 0) {
-        params.platform = platformsToUse.join(',');
+      // ALWAYS add platform parameter
+      const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
+      if (platformToUse) {
+        params.platform = platformToUse;
       } else {
-        console.warn('[fetchTotalTransactions] No platforms selected');
+        console.warn('[fetchTotalTransactions] No platform selected');
       }
       
       // Apply status based on active tab selection
@@ -2941,11 +2940,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
           if (!mapping) return;
 
-          // Check platform compatibility - allow if any selected platform supports it
+          // Check platform compatibility
           if (mapping.supportedPlatforms) {
-            const isSupported = platformsToUse.some(p => mapping.supportedPlatforms!.includes(p as any));
+            const isSupported = mapping.supportedPlatforms!.includes(platformToUse as any);
             if (!isSupported) {
-              return; // Skip filters not supported by any selected platform
+              return; // Skip filters not supported by selected platform
             }
           }
 
@@ -3077,7 +3076,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       setOrderIdChips([]);
       setPage(0);
       setCurrentPage(1);
-      fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, []);
+      fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform, []);
     }
   };
 
@@ -3096,9 +3095,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Build query params with order IDs
     const newFilters = { ...columnFilters };
     if (orderIds.length > 0) {
-      fetchDualTransactions(1, newFilters, dateRange, selectedPlatforms, orderIds);
+      fetchDualTransactions(1, newFilters, dateRange, selectedPlatform, orderIds);
     } else {
-      fetchDualTransactions(1, newFilters, dateRange, selectedPlatforms);
+      fetchDualTransactions(1, newFilters, dateRange, selectedPlatform);
     }
   };
 
@@ -3111,7 +3110,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Trigger API call without order IDs
     setPage(0);
     setCurrentPage(1);
-    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, []);
+    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform, []);
   };
 
   // Handle number range filter
@@ -3310,7 +3309,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setPage(newPage);
     
     // Always use dual API with current filters
-    fetchDualTransactions(newPageNumber, columnFilters, dateRange, selectedPlatforms);
+    fetchDualTransactions(newPageNumber, columnFilters, dateRange, selectedPlatform);
   };
 
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -3318,7 +3317,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setRowsPerPage(newRowsPerPage);
     setPage(0);
     // Reset to first page when changing rows per page
-    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
+    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform);
   };
 
   
@@ -3328,14 +3327,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setSearchTerm('');
     setDateRange({ start: '', end: '' });
     setColumnFilters({});
-    setSelectedPlatforms([...availablePlatforms]); // Reset to all platforms selected
-    setPendingSelectedPlatforms([...availablePlatforms]); // Reset pending platforms too
+    setSelectedPlatform('flipkart'); // Reset to default platform
+    setPendingSelectedPlatform('flipkart'); // Reset pending platform too
     setOrderIdChips([]); // Clear order ID chips
     setOrderIdSearch(''); // Clear order ID search in header
     setShowOrderIdSearch(false); // Hide order ID search bar
     setPage(0);
     setCurrentPage(1);
-    fetchDualTransactions(1, {}, { start: '', end: '' }, [...availablePlatforms], []);
+    fetchDualTransactions(1, {}, { start: '', end: '' }, 'flipkart', []);
   };
 
   // Handle tab change
@@ -3478,7 +3477,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     }}>
                       <IconButton
                         onClick={() => {
-                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
+                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform);
                         }}
                         disabled={(loading || dualApiLoading) && !isSorting}
                         sx={{
@@ -3540,7 +3539,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         Platforms:
                       </Typography>
                       
-                      {/* Platform checkboxes - Responsive layout */}
+                      {/* Platform radio buttons - Responsive layout */}
                       <Box sx={{ 
                         display: 'flex', 
                         gap: { xs: 0.5, sm: 0.25 },
@@ -3548,41 +3547,50 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         flexWrap: { xs: 'wrap', sm: 'nowrap' },
                         width: { xs: '100%', sm: 'auto' }
                       }}>
-                        {availablePlatforms.map((platform) => (
-                          <Box 
-                            key={platform}
-                            sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center',
-                              cursor: 'pointer',
-                              '&:hover': {
-                                '& .MuiTypography-root': {
-                                  color: '#0ea5e9'
+                        <RadioGroup
+                          value={pendingSelectedPlatform}
+                          onChange={(e) => {
+                            setPendingSelectedPlatform(e.target.value as Platform);
+                          }}
+                          sx={{ 
+                            display: 'flex',
+                            flexDirection: 'row',
+                            gap: { xs: 0.5, sm: 0.25 }
+                          }}
+                        >
+                          {availablePlatforms.map((platform) => (
+                            <Box 
+                              key={platform}
+                              sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center',
+                                cursor: 'pointer',
+                                '&:hover': {
+                                  '& .MuiTypography-root': {
+                                    color: '#0ea5e9'
+                                  }
                                 }
-                              }
-                            }}
-                            onClick={() => {
-                              setPendingSelectedPlatforms(prev => 
-                                prev.includes(platform) 
-                                  ? prev.filter(p => p !== platform)
-                                  : [...prev, platform]
-                              );
-                            }}
-                          >
-                            <Checkbox 
-                              checked={pendingSelectedPlatforms.includes(platform)}
-                              size="small"
-                              sx={{ padding: '2px', '& svg': { fontSize: { xs: '16px', sm: '18px' } } }}
-                            />
-                            <Typography variant="body2" sx={{ 
-                              color: '#374151', 
-                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                              whiteSpace: 'nowrap' 
-                            }}>
-                              {platform === 'flipkart' ? 'Flipkart' : platform === 'amazon' ? 'Amazon' : 'D2C'}
-                            </Typography>
-                          </Box>
-                        ))}
+                              }}
+                              onClick={() => {
+                                setPendingSelectedPlatform(platform);
+                              }}
+                            >
+                              <Radio 
+                                checked={pendingSelectedPlatform === platform}
+                                value={platform}
+                                size="small"
+                                sx={{ padding: '2px', '& svg': { fontSize: { xs: '16px', sm: '18px' } } }}
+                              />
+                              <Typography variant="body2" sx={{ 
+                                color: '#374151', 
+                                fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                                whiteSpace: 'nowrap' 
+                              }}>
+                                {platform === 'flipkart' ? 'Flipkart' : platform === 'amazon' ? 'Amazon' : 'D2C'}
+                              </Typography>
+                            </Box>
+                          ))}
+                        </RadioGroup>
                       </Box>
                       
                       {/* Divider - Hidden on mobile */}
@@ -3604,82 +3612,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         width: { xs: '100%', sm: 'auto' },
                         flexWrap: { xs: 'wrap', sm: 'nowrap' }
                       }}>
-                        {/* Select All button */}
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => {
-                            setPendingSelectedPlatforms([...availablePlatforms]);
-                          }}
-                          disabled={pendingSelectedPlatforms.length === availablePlatforms.length}
-                          sx={{
-                            textTransform: 'none',
-                            fontSize: { xs: '0.6rem', sm: '0.65rem' },
-                            padding: { xs: '3px 5px', sm: '2px 6px' },
-                            minWidth: 'auto',
-                            borderColor: '#d1d5db',
-                            color: '#6b7280',
-                            flexShrink: 0,
-                            '&:hover': {
-                              borderColor: '#0ea5e9',
-                              color: '#0ea5e9',
-                              backgroundColor: 'rgba(14, 165, 233, 0.04)',
-                            },
-                            '&:disabled': {
-                              borderColor: '#e5e7eb',
-                              color: '#d1d5db',
-                            }
-                          }}
-                        >
-                          All
-                        </Button>
-                        
-                        {/* Clear All button */}
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => {
-                            setPendingSelectedPlatforms([]);
-                          }}
-                          disabled={pendingSelectedPlatforms.length === 0}
-                          sx={{
-                            textTransform: 'none',
-                            fontSize: { xs: '0.6rem', sm: '0.65rem' },
-                            padding: { xs: '3px 5px', sm: '2px 6px' },
-                            minWidth: 'auto',
-                            borderColor: '#d1d5db',
-                            color: '#6b7280',
-                            flexShrink: 0,
-                            '&:hover': {
-                              borderColor: '#ef4444',
-                              color: '#ef4444',
-                              backgroundColor: 'rgba(239, 68, 68, 0.04)',
-                            },
-                            '&:disabled': {
-                              borderColor: '#e5e7eb',
-                              color: '#d1d5db',
-                            }
-                          }}
-                        >
-                          Clear
-                        </Button>
-                        
-                        {/* Divider - Hidden on mobile */}
-                        <Box sx={{ 
-                          display: { xs: 'none', sm: 'block' },
-                          width: '1px', 
-                          height: '18px', 
-                          backgroundColor: '#d1d5db', 
-                          mx: 0.25, 
-                          flexShrink: 0 
-                        }} />
-                        
                         {/* Apply Button */}
                         <Button
                           variant="contained"
                           size="small"
                           onClick={applyPlatformFilter}
-                          disabled={JSON.stringify(pendingSelectedPlatforms.sort()) === JSON.stringify(selectedPlatforms.sort())}
+                          disabled={pendingSelectedPlatform === selectedPlatform}
                           sx={{
                             textTransform: 'none',
                             fontSize: { xs: '0.65rem', sm: '0.7rem' },
@@ -3759,7 +3697,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             },
                             '& input': {
                               padding: { xs: '5px 3px', sm: '6px 4px' },
-                              fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                              fontSize: { xs: '0.7rem', sm: '0.7rem' }
                             }
                           }}
                         />
@@ -3792,7 +3730,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             },
                             '& input': {
                               padding: { xs: '5px 3px', sm: '6px 4px' },
-                              fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                              fontSize: { xs: '0.7rem', sm: '0.7rem' }
                             }
                           }}
                         />
@@ -3953,7 +3891,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 </Box>
 
                 {/* Active filter chips row directly under the header row, aligned under back button - Responsive */}
-                {(!!Object.keys(columnFilters).filter(k => columnFilters[k]).length || selectedPlatforms.length < availablePlatforms.length || orderIdChips.length > 0) && (
+                {(!!Object.keys(columnFilters).filter(k => columnFilters[k]).length || orderIdChips.length > 0) && (
                   <Box sx={{
                     ml: { xs: 0, sm: 6 },
                     mt: { xs: 1, sm: 0 },
@@ -3961,21 +3899,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     gap: { xs: 0.5, sm: 0.75 },
                     flexWrap: 'wrap'
                   }}>
-                    {/* Platform filter chips - show if not all platforms are selected */}
-                    {selectedPlatforms.length > 0 && selectedPlatforms.length < availablePlatforms.length && (
-                      <Chip
-                        key="platform-filter"
-                        label={`Platform: ${selectedPlatforms.map(p => p === 'flipkart' ? 'Flipkart' : p === 'amazon' ? 'Amazon' : 'D2C').join(', ')}`}
-                        onDelete={() => {
-                          setSelectedPlatforms([...availablePlatforms]);
-                          setPage(0);
-                          setCurrentPage(1);
-                          fetchDualTransactions(1, columnFilters, dateRange, [...availablePlatforms]);
-                        }}
-                        size="small"
-                        sx={{ bgcolor: '#e0f2fe', color: '#0369a1', fontWeight: 600 }}
-                      />
-                    )}
                     {/* Order ID chips */}
                     {orderIdChips.length > 0 && (
                       <Chip
@@ -3987,7 +3910,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           setShowOrderIdSearch(false);
                           setPage(0);
                           setCurrentPage(1);
-                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, []);
+                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform, []);
                         }}
                         size="small"
                         sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600 }}
@@ -4009,7 +3932,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             return p;
                           });
                                                       // Re-apply after deletion
-                            fetchDualTransactions(1, next, pendingDateRange, selectedPlatforms);
+                            fetchDualTransactions(1, next, pendingDateRange, selectedPlatform);
                         }}
                       />
                     ))}
@@ -4026,7 +3949,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               sx={{ mb: 2 }}
               action={
                 <Button color="inherit" size="small" onClick={() => {
-                  fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
+                  fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform);
                 }}>
                   Retry
                 </Button>
@@ -4652,7 +4575,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         if (!mapping) return true; // Show columns without mapping
                         if (!mapping.supportedPlatforms) return true; // Show columns available on all platforms
                         // Show if supported by at least one selected platform
-                        return selectedPlatforms.some(p => mapping.supportedPlatforms!.includes(p as any));
+                        return mapping.supportedPlatforms!.includes(selectedPlatform as any);
                       })
                       .map((col) => (
                         <ListItemButton
