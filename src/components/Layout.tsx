@@ -37,7 +37,6 @@ import {
   LogoutOutlined as LogoutIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
 } from '@mui/icons-material';
-import { Badge } from '@mui/material';
 // import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
 // @ts-ignore
 import logo from '../assets/logo_fresh.jpg';
@@ -47,10 +46,10 @@ import userPhoto from '../assets/user-photo.jpg';
 const drawerWidth = 240;
 
 const menuItems = [
-  { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation' },
-  { text: 'Operations Centre', icon: <ReportProblemIcon />, path: '/operations-centre' },
-  { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping' },
-  { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist' },
+  { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation', upcoming: false },
+  { text: 'Operations Centre', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
+  { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping', upcoming: true },
+  { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist', upcoming: true },
   // { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
 ];
 
@@ -64,17 +63,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   
   const [settingsAnchorEl, setSettingsAnchorEl] = React.useState<null | HTMLElement>(null);
-  const [sidebarNudge, setSidebarNudge] = React.useState<number>(() => {
-    try { return parseInt(localStorage.getItem('recon_nudge_count') || '0', 10) || 0; } catch { return 0; }
-  });
-
-  React.useEffect(() => {
-    const handler = () => {
-      try { setSidebarNudge(parseInt(localStorage.getItem('recon_nudge_count') || '0', 10) || 0); } catch { setSidebarNudge(0); }
-    };
-    window.addEventListener('recon_nudge_updated', handler as EventListener);
-    return () => window.removeEventListener('recon_nudge_updated', handler as EventListener);
-  }, []);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -134,6 +122,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <ListItem key={item.text} disablePadding>
             <ListItemButton
               onClick={() => {
+                // Prevent navigation for upcoming features
+                if (item.upcoming) {
+                  return;
+                }
                 // For Operations Centre, include platforms from localStorage
                 if (item.path === '/operations-centre') {
                   try {
@@ -153,22 +145,36 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   navigate(item.path);
                 }
               }}
-              selected={location.pathname === item.path}
+              selected={location.pathname === item.path && !item.upcoming}
+              disabled={item.upcoming}
               sx={{
                 borderRadius: 0,
                 mr: 2,
                 my: 0.25,
+                opacity: item.upcoming ? 0.5 : 1,
+                cursor: item.upcoming ? 'not-allowed' : 'pointer',
+                '&.Mui-disabled': {
+                  opacity: 0.5,
+                  cursor: 'not-allowed',
+                },
                 '&.Mui-selected': {
                   backgroundColor: theme.palette.primary.main + '15',
                   '&:hover': {
                     backgroundColor: theme.palette.primary.main + '25',
                   },
                 },
+                '&:hover': {
+                  backgroundColor: item.upcoming ? 'transparent' : undefined,
+                },
               }}
             >
               <ListItemIcon
                 sx={{
-                  color: location.pathname === item.path ? theme.palette.primary.main : 'inherit',
+                  color: item.upcoming 
+                    ? 'text.disabled' 
+                    : location.pathname === item.path 
+                      ? theme.palette.primary.main 
+                      : 'inherit',
                   minWidth: 30,
                   '& .MuiSvgIcon-root': {
                     fontSize: 18, // force smaller px size
@@ -178,38 +184,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 {item.icon}
               </ListItemIcon>
               <ListItemText
-                primary={
-                  item.text === 'Checklist' ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Box component="span">Checklist</Box>
-                      <Box sx={{ ml: 1 }}>
-                        <Badge
-                          badgeContent={sidebarNudge}
-                          overlap="rectangular"
-                          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-                          sx={{
-                            '& .MuiBadge-badge': {
-                              fontSize: 12,
-                              height: 24,
-                              minWidth: 24,
-                              bgcolor: '#111',
-                              color: '#fff',
-                              borderRadius: 0.2,
-                              top: 10,
-                              right: 6,
-                            },
-                          }}
-                        >
-                          <Box sx={{ width: 24, height: 24 }} />
-                        </Badge>
-                      </Box>
-                    </Box>
-                  ) : (
-                    item.text
-                  )
-                }
+                primary={item.text}
                 sx={{
-                  color: location.pathname === item.path ? theme.palette.primary.main : 'inherit',
+                  color: item.upcoming 
+                    ? 'text.disabled' 
+                    : location.pathname === item.path 
+                      ? theme.palette.primary.main 
+                      : 'inherit',
                 }}
               />
             </ListItemButton>
