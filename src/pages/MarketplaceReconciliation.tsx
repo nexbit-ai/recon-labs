@@ -456,6 +456,8 @@ const MarketplaceReconciliation: React.FC = () => {
         total_amount_settled: number;
         total_commission: number;
         total_gst_on_commission: number;
+        total_tds_amount?: number;
+        total_tcs_amount?: number;
       }> | undefined;
       if (commissionArray && commissionArray.length > 0) {
         rows.push(['', '', '']);
@@ -464,7 +466,8 @@ const MarketplaceReconciliation: React.FC = () => {
           const name = item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1);
           rows.push(['Commission & Charges', `${name} - Total Amount Settled`, String(safeNum(item.total_amount_settled))]);
           rows.push(['Commission & Charges', `${name} - Commission`, String(safeNum(item.total_commission))]);
-          rows.push(['Commission & Charges', `${name} - GST on Commission`, String(safeNum(item.total_gst_on_commission))]);
+          const totalTdsTcs = (item.total_tds_amount || 0) + (item.total_tcs_amount || 0);
+          rows.push(['Commission & Charges', `${name} - TDS and TCS`, String(safeNum(Math.abs(totalTdsTcs)))]);
         });
       }
 
@@ -3838,6 +3841,8 @@ const MarketplaceReconciliation: React.FC = () => {
                 total_amount_settled: number;
                 total_commission: number;
                 total_gst_on_commission: number;
+                total_tds_amount?: number;
+                total_tcs_amount?: number;
               }> | undefined;
               if (!commissionArray || commissionArray.length === 0) return null;
 
@@ -3873,7 +3878,7 @@ const MarketplaceReconciliation: React.FC = () => {
 
               // Calculate totals dynamically from all providers (use absolute values for display)
               const totalCommissionCharges = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_commission || 0), 0));
-              const totalGstOnCommission = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_gst_on_commission || 0), 0));
+              const totalTdsAndTcs = Math.abs(commissionArray.reduce((sum, item) => sum + ((item.total_tds_amount || 0) + (item.total_tcs_amount || 0)), 0));
 
               return (
                 <>
@@ -3981,8 +3986,8 @@ const MarketplaceReconciliation: React.FC = () => {
                           <Typography variant="h5" sx={{ mt: 1, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
                         </Box>
                         <Box sx={{ p: 4, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center' }}>
-                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total GST on Commission</Typography>
-                          <Typography variant="h5" sx={{ mt: 1, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalGstOnCommission)}</Typography>
+                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TDS and TCS</Typography>
+                          <Typography variant="h5" sx={{ mt: 1, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTdsAndTcs)}</Typography>
                         </Box>
                       </Box>
                     </Grid>
@@ -4012,9 +4017,9 @@ const MarketplaceReconciliation: React.FC = () => {
                               </Typography>
                             </Box>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                              <Typography variant="body2" sx={{ color: '#374151' }}>GST</Typography>
+                              <Typography variant="body2" sx={{ color: '#374151' }}>TDS & TCS</Typography>
                               <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                                {formatCurrency(Math.abs(item.total_gst_on_commission))}
+                                {formatCurrency(Math.abs((item.total_tds_amount || 0) + (item.total_tcs_amount || 0)))}
                               </Typography>
                             </Box>
                           </Box>
