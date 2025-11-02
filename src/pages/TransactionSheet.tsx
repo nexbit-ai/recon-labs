@@ -43,6 +43,8 @@ import {
   ListItemText,
   ListSubheader,
   Autocomplete,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import ColumnFilterControls from '../components/ColumnFilterControls';
 import { api } from '../services/api';
@@ -1677,6 +1679,8 @@ const COLUMN_TO_SORT_BY_MAP: Record<string, string> = {
 const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0, dateRange: propDateRange, initialPlatforms, initialFilters: propsInitialFilters }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
   
   // Get initialTab from navigation state or props
   const getInitialTab = () => {
@@ -3389,152 +3393,209 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               borderRadius: '12px',
               border: '1px solid #e5e7eb'
             }}>
-              <CardContent sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, gap: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
-                    <IconButton
-                      onClick={onBack}
-                      size="small"
-                      sx={{
-                        background: '#1f2937',
-                        color: 'white',
-                        mt: -2,
-                        flexShrink: 0,
-                        '&:hover': {
-                          background: '#374151',
-                          transform: 'scale(1.05)',
-                        },
-                        transition: 'all 0.3s ease',
-                      }}
-                    >
-                      <ArrowBackIcon fontSize="small" />
-                    </IconButton>
-                    <Typography variant="h5" sx={{ 
-                      fontWeight: 700, 
-                      color: '#111827',
-                      letterSpacing: '-0.02em',
-                      py: 0.5,
-                      mt: -2,
-                      flexShrink: 0,
-                    }}>
-                      Transaction Sheet
-                    </Typography>
-                    
-                    {/* Transaction Tabs - Inline */}
-                    <Tabs 
-                      value={activeTab} 
-                      onChange={handleTabChange}
-                      sx={{
-                        minWidth: 'fit-content',
-                        flexShrink: 0,
-                        ml: 1,
-                        '& .MuiTabs-flexContainer': {
-                          gap: 0.5,
-                        },
-                        '& .MuiTab-root': {
-                          minHeight: 32,
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          textTransform: 'none',
-                          color: '#6b7280',
-                          px: 2.5,
-                          py: 0.5,
-                          minWidth: 'fit-content',
-                          whiteSpace: 'nowrap',
-                          overflow: 'visible',
-                          textOverflow: 'clip',
-                          '&.Mui-selected': {
-                            color: '#1f2937',
-                            fontWeight: 700,
-                          },
-                        },
-                        '& .MuiTabs-indicator': {
-                          height: 2,
-                          borderRadius: '2px 2px 0 0',
-                          background: '#1f2937',
-                        },
-                      }}
-                    >
-                      <Tab label={`Settled${settledTotalCount !== null ? ` (${settledTotalCount})` : ''}`} />
-                      <Tab label={`Unsettled${unsettledTotalCount !== null ? ` (${unsettledTotalCount})` : ''}`} />
-                    </Tabs>
-                    
-                  
-                  </Box>
-                  
+              <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                {/* Main Header Row - Responsive Layout */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: { xs: 'column', md: 'row' },
+                  alignItems: { xs: 'flex-start', md: 'center' },
+                  justifyContent: 'space-between',
+                  mb: 1, 
+                  gap: { xs: 1.5, md: 2 },
+                  width: '100%'
+                }}>
+                  {/* Left Section: Back Button, Title, and Tabs */}
                   <Box sx={{ 
                     display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 1, 
-                    flexWrap: { xs: 'wrap', md: 'nowrap' },
-                    width: '100%',
-                    maxWidth: '100%',
-                    justifyContent: 'flex-end'
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    gap: { xs: 1, sm: 2 },
+                    flex: { xs: '1 1 auto', md: '0 1 auto' },
+                    minWidth: 0,
+                    width: { xs: '100%', md: 'auto' }
                   }}>
-                    
-                    <IconButton
-                      onClick={() => {
-                        fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
-                      }}
-                      disabled={(loading || dualApiLoading) && !isSorting}
-                      sx={{
-                        color: '#1f2937',
-                        '&:hover': {
-                          background: '#f9fafb',
-                        },
-                        transition: 'all 0.3s ease',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <RefreshIcon />
-                    </IconButton>
-                    
-                    <Button
-                      variant="outlined"
-                      startIcon={<FilterIcon />}
-                      onClick={(e) => openFilterPopover('Status', e.currentTarget as any)}
-                      sx={{ 
-                        textTransform: 'none', 
-                        borderColor: '#1f2937', 
-                        color: '#1f2937',
-                        flexShrink: 0,
-                        fontSize: '0.75rem',
-                        padding: '6px 12px',
-                        minWidth: 'auto',
-                      }}
-                    >
-                      Filters
-                    </Button>
-                    
-                    {/* Platform Filter - New Design with Checkboxes */}
+                    {/* Back Button and Title Row */}
                     <Box sx={{ 
                       display: 'flex', 
                       alignItems: 'center', 
-                      gap: 0.5,
-                      padding: '6px 8px',
+                      gap: { xs: 1, sm: 2 },
+                      flexShrink: 0,
+                      width: { xs: '100%', sm: 'auto' }
+                    }}>
+                      <IconButton
+                        onClick={onBack}
+                        size="small"
+                        sx={{
+                          background: '#1f2937',
+                          color: 'white',
+                          flexShrink: 0,
+                          '&:hover': {
+                            background: '#374151',
+                            transform: 'scale(1.05)',
+                          },
+                          transition: 'all 0.3s ease',
+                        }}
+                      >
+                        <ArrowBackIcon fontSize="small" />
+                      </IconButton>
+                      <Typography 
+                        variant="h5" 
+                        sx={{ 
+                          fontWeight: 700, 
+                          color: '#111827',
+                          letterSpacing: '-0.02em',
+                          py: 0.5,
+                          fontSize: { xs: '1.1rem', sm: '1.25rem', md: '1.5rem' },
+                          flexShrink: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: { xs: 'nowrap', sm: 'normal' },
+                        }}
+                      >
+                        Transaction Sheet
+                      </Typography>
+                    </Box>
+                    
+                    {/* Transaction Tabs - Responsive */}
+                    <Box sx={{ 
+                      width: { xs: '100%', sm: 'auto' },
+                      overflowX: { xs: 'auto', sm: 'visible' },
+                      '&::-webkit-scrollbar': {
+                        display: 'none'
+                      },
+                      scrollbarWidth: 'none'
+                    }}>
+                      <Tabs 
+                        value={activeTab} 
+                        onChange={handleTabChange}
+                        sx={{
+                          minWidth: 'fit-content',
+                          flexShrink: 0,
+                          '& .MuiTabs-flexContainer': {
+                            gap: 0.5,
+                          },
+                          '& .MuiTab-root': {
+                            minHeight: { xs: 36, sm: 32 },
+                            fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            color: '#6b7280',
+                            px: { xs: 1.5, sm: 2.5 },
+                            py: 0.5,
+                            minWidth: 'fit-content',
+                            whiteSpace: 'nowrap',
+                            overflow: 'visible',
+                            textOverflow: 'clip',
+                            '&.Mui-selected': {
+                              color: '#1f2937',
+                              fontWeight: 700,
+                            },
+                          },
+                          '& .MuiTabs-indicator': {
+                            height: 2,
+                            borderRadius: '2px 2px 0 0',
+                            background: '#1f2937',
+                          },
+                        }}
+                      >
+                        <Tab label={`Settled${settledTotalCount !== null ? ` (${settledTotalCount})` : ''}`} />
+                        <Tab label={`Unsettled${unsettledTotalCount !== null ? ` (${unsettledTotalCount})` : ''}`} />
+                      </Tabs>
+                    </Box>
+                  </Box>
+                  
+                  {/* Right Section: Filters, Platform Selector, Date Range - Responsive */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: { xs: 1, sm: 1 },
+                    flex: { xs: '1 1 auto', md: '0 1 auto' },
+                    width: { xs: '100%', md: 'auto' },
+                    justifyContent: { xs: 'flex-start', md: 'flex-end' }
+                  }}>
+                    
+                    {/* Action Buttons Row */}
+                    <Box sx={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: { xs: 0.75, sm: 1 },
+                      flexShrink: 0,
+                      width: { xs: '100%', sm: 'auto' },
+                      justifyContent: { xs: 'flex-start', sm: 'flex-end' }
+                    }}>
+                      <IconButton
+                        onClick={() => {
+                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
+                        }}
+                        disabled={(loading || dualApiLoading) && !isSorting}
+                        sx={{
+                          color: '#1f2937',
+                          '&:hover': {
+                            background: '#f9fafb',
+                          },
+                          transition: 'all 0.3s ease',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <RefreshIcon fontSize={isSmallScreen ? 'small' : 'medium'} />
+                      </IconButton>
+                      
+                      <Button
+                        variant="outlined"
+                        startIcon={<FilterIcon fontSize={isSmallScreen ? 'small' : 'medium'} />}
+                        onClick={(e) => openFilterPopover('Status', e.currentTarget as any)}
+                        sx={{ 
+                          textTransform: 'none', 
+                          borderColor: '#1f2937', 
+                          color: '#1f2937',
+                          flexShrink: 0,
+                          fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                          padding: { xs: '4px 8px', sm: '6px 12px' },
+                          minWidth: 'auto',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Filters
+                      </Button>
+                    </Box>
+                    
+                    {/* Platform Filter - Fully Responsive */}
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: { xs: 'flex-start', sm: 'center' },
+                      flexDirection: { xs: 'column', sm: 'row' },
+                      gap: { xs: 0.75, sm: 0.5 },
+                      padding: { xs: '8px', sm: '6px 8px' },
                       border: '1px solid #e5e7eb',
                       borderRadius: '8px',
                       backgroundColor: '#f9fafb',
-                      height: { xs: 'auto', sm: '48px' },
-                      flex: { xs: '1 1 100%', sm: '0 1 auto' },
+                      width: { xs: '100%', sm: 'auto' },
                       minWidth: 0,
-                      maxWidth: { xs: '100%', sm: '500px' },
+                      maxWidth: { xs: '100%', sm: '500px', lg: '600px' },
                       flexWrap: { xs: 'wrap', sm: 'nowrap' },
-                      rowGap: { xs: 0.5, sm: 0 },
+                      rowGap: { xs: 0.75, sm: 0 },
                     }}>
                       {/* Platform label */}
                       <Typography variant="body2" sx={{ 
                         fontWeight: 600, 
                         color: '#1f2937', 
-                        fontSize: '0.7rem',
+                        fontSize: { xs: '0.65rem', sm: '0.7rem' },
                         whiteSpace: 'nowrap',
                         flexShrink: 0,
+                        width: { xs: '100%', sm: 'auto' }
                       }}>
                         Platforms:
                       </Typography>
                       
-                      {/* Platform checkboxes */}
-                      <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
+                      {/* Platform checkboxes - Responsive layout */}
+                      <Box sx={{ 
+                        display: 'flex', 
+                        gap: { xs: 0.5, sm: 0.25 },
+                        flexShrink: 0,
+                        flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                        width: { xs: '100%', sm: 'auto' }
+                      }}>
                         {availablePlatforms.map((platform) => (
                           <Box 
                             key={platform}
@@ -3559,134 +3620,172 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             <Checkbox 
                               checked={pendingSelectedPlatforms.includes(platform)}
                               size="small"
-                              sx={{ padding: '2px', '& svg': { fontSize: '18px' } }}
+                              sx={{ padding: '2px', '& svg': { fontSize: { xs: '16px', sm: '18px' } } }}
                             />
-                            <Typography variant="body2" sx={{ color: '#374151', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
+                            <Typography variant="body2" sx={{ 
+                              color: '#374151', 
+                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                              whiteSpace: 'nowrap' 
+                            }}>
                               {platform === 'flipkart' ? 'Flipkart' : platform === 'amazon' ? 'Amazon' : 'D2C'}
                             </Typography>
                           </Box>
                         ))}
                       </Box>
                       
-                      {/* Divider */}
-                      <Box sx={{ width: '1px', height: '18px', backgroundColor: '#d1d5db', mx: 0.25, flexShrink: 0 }} />
+                      {/* Divider - Hidden on mobile */}
+                      <Box sx={{ 
+                        display: { xs: 'none', sm: 'block' },
+                        width: '1px', 
+                        height: '18px', 
+                        backgroundColor: '#d1d5db', 
+                        mx: 0.25, 
+                        flexShrink: 0 
+                      }} />
                       
-                      {/* Select All button */}
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => {
-                          setPendingSelectedPlatforms([...availablePlatforms]);
-                        }}
-                        disabled={pendingSelectedPlatforms.length === availablePlatforms.length}
-                        sx={{
-                          textTransform: 'none',
-                          fontSize: '0.65rem',
-                          padding: '2px 6px',
-                          minWidth: 'auto',
-                          borderColor: '#d1d5db',
-                          color: '#6b7280',
-                          flexShrink: 0,
-                          '&:hover': {
-                            borderColor: '#0ea5e9',
-                            color: '#0ea5e9',
-                            backgroundColor: 'rgba(14, 165, 233, 0.04)',
-                          },
-                          '&:disabled': {
-                            borderColor: '#e5e7eb',
-                            color: '#d1d5db',
-                          }
-                        }}
-                      >
-                        All
-                      </Button>
-                      
-                      {/* Clear All button */}
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => {
-                          setPendingSelectedPlatforms([]);
-                        }}
-                        disabled={pendingSelectedPlatforms.length === 0}
-                        sx={{
-                          textTransform: 'none',
-                          fontSize: '0.65rem',
-                          padding: '2px 6px',
-                          minWidth: 'auto',
-                          borderColor: '#d1d5db',
-                          color: '#6b7280',
-                          flexShrink: 0,
-                          '&:hover': {
-                            borderColor: '#ef4444',
-                            color: '#ef4444',
-                            backgroundColor: 'rgba(239, 68, 68, 0.04)',
-                          },
-                          '&:disabled': {
-                            borderColor: '#e5e7eb',
-                            color: '#d1d5db',
-                          }
-                        }}
-                      >
-                        Clear
-                      </Button>
-                      
-                      {/* Divider */}
-                      <Box sx={{ width: '1px', height: '18px', backgroundColor: '#d1d5db', mx: 0.25, flexShrink: 0 }} />
-                      
-                      {/* Apply Button */}
-                      <Button
-                        variant="contained"
-                        size="small"
-                        onClick={applyPlatformFilter}
-                        disabled={JSON.stringify(pendingSelectedPlatforms.sort()) === JSON.stringify(selectedPlatforms.sort())}
-                        sx={{
-                          textTransform: 'none',
-                          fontSize: '0.7rem',
-                          padding: '3px 10px',
-                          minWidth: 'auto',
-                          backgroundColor: '#1f2937',
-                          flexShrink: 0,
-                          '&:hover': { backgroundColor: '#374151' },
-                          '&:disabled': {
-                            backgroundColor: '#9ca3af',
-                            color: '#ffffff',
-                          },
-                        }}
-                      >
-                        Apply
-                      </Button>
+                      {/* Action buttons container */}
+                      <Box sx={{ 
+                        display: 'flex',
+                        gap: 0.5,
+                        alignItems: 'center',
+                        flexShrink: 0,
+                        width: { xs: '100%', sm: 'auto' },
+                        flexWrap: { xs: 'wrap', sm: 'nowrap' }
+                      }}>
+                        {/* Select All button */}
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => {
+                            setPendingSelectedPlatforms([...availablePlatforms]);
+                          }}
+                          disabled={pendingSelectedPlatforms.length === availablePlatforms.length}
+                          sx={{
+                            textTransform: 'none',
+                            fontSize: { xs: '0.6rem', sm: '0.65rem' },
+                            padding: { xs: '3px 5px', sm: '2px 6px' },
+                            minWidth: 'auto',
+                            borderColor: '#d1d5db',
+                            color: '#6b7280',
+                            flexShrink: 0,
+                            '&:hover': {
+                              borderColor: '#0ea5e9',
+                              color: '#0ea5e9',
+                              backgroundColor: 'rgba(14, 165, 233, 0.04)',
+                            },
+                            '&:disabled': {
+                              borderColor: '#e5e7eb',
+                              color: '#d1d5db',
+                            }
+                          }}
+                        >
+                          All
+                        </Button>
+                        
+                        {/* Clear All button */}
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => {
+                            setPendingSelectedPlatforms([]);
+                          }}
+                          disabled={pendingSelectedPlatforms.length === 0}
+                          sx={{
+                            textTransform: 'none',
+                            fontSize: { xs: '0.6rem', sm: '0.65rem' },
+                            padding: { xs: '3px 5px', sm: '2px 6px' },
+                            minWidth: 'auto',
+                            borderColor: '#d1d5db',
+                            color: '#6b7280',
+                            flexShrink: 0,
+                            '&:hover': {
+                              borderColor: '#ef4444',
+                              color: '#ef4444',
+                              backgroundColor: 'rgba(239, 68, 68, 0.04)',
+                            },
+                            '&:disabled': {
+                              borderColor: '#e5e7eb',
+                              color: '#d1d5db',
+                            }
+                          }}
+                        >
+                          Clear
+                        </Button>
+                        
+                        {/* Divider - Hidden on mobile */}
+                        <Box sx={{ 
+                          display: { xs: 'none', sm: 'block' },
+                          width: '1px', 
+                          height: '18px', 
+                          backgroundColor: '#d1d5db', 
+                          mx: 0.25, 
+                          flexShrink: 0 
+                        }} />
+                        
+                        {/* Apply Button */}
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={applyPlatformFilter}
+                          disabled={JSON.stringify(pendingSelectedPlatforms.sort()) === JSON.stringify(selectedPlatforms.sort())}
+                          sx={{
+                            textTransform: 'none',
+                            fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                            padding: { xs: '4px 8px', sm: '3px 10px' },
+                            minWidth: 'auto',
+                            backgroundColor: '#1f2937',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap',
+                            '&:hover': { backgroundColor: '#374151' },
+                            '&:disabled': {
+                              backgroundColor: '#9ca3af',
+                              color: '#ffffff',
+                            },
+                          }}
+                        >
+                          Apply
+                        </Button>
+                      </Box>
                     </Box>
                     
-                    {/* Date Range Selector - New Design */}
+                    {/* Date Range Selector - Fully Responsive */}
                     <Box sx={{ 
                       display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 0.5,
-                      padding: '6px 8px',
+                      alignItems: { xs: 'flex-start', sm: 'center' },
+                      flexDirection: { xs: 'column', sm: 'row' },
+                      gap: { xs: 0.75, sm: 0.5 },
+                      padding: { xs: '8px', sm: '6px 8px' },
                       border: '1px solid #e5e7eb',
                       borderRadius: '8px',
                       backgroundColor: '#f9fafb',
-                      height: { xs: 'auto', sm: '48px' },
-                      flex: { xs: '1 1 100%', sm: '0 1 auto' },
+                      width: { xs: '100%', sm: 'auto' },
                       minWidth: 0,
-                      maxWidth: { xs: '100%', sm: '420px' },
+                      maxWidth: { xs: '100%', sm: '420px', lg: '480px' },
                       flexWrap: { xs: 'wrap', sm: 'nowrap' },
-                      rowGap: { xs: 0.5, sm: 0 },
+                      rowGap: { xs: 0.75, sm: 0 },
                     }}>
                       {/* Date label */}
                       <Typography variant="body2" sx={{ 
                         fontWeight: 600, 
                         color: '#1f2937', 
-                        fontSize: '0.7rem',
+                        fontSize: { xs: '0.65rem', sm: '0.7rem' },
                         whiteSpace: 'nowrap',
                         flexShrink: 0,
+                        width: { xs: '100%', sm: 'auto' }
                       }}>
                         Date Range:
                       </Typography>
                       
-                      {/* Date inputs */}
-                      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flex: '1 1 auto', minWidth: 0 }}>
+                      {/* Date inputs - Responsive */}
+                      <Box sx={{ 
+                        display: 'flex', 
+                        gap: { xs: 0.75, sm: 0.5 }, 
+                        alignItems: 'center', 
+                        flex: { xs: '1 1 100%', sm: '1 1 auto' },
+                        minWidth: 0,
+                        width: { xs: '100%', sm: 'auto' },
+                        flexWrap: { xs: 'wrap', sm: 'nowrap' }
+                      }}>
                         <TextField
                           label="From"
                           type="date"
@@ -3695,23 +3794,29 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, start: e.target.value }))}
                           InputLabelProps={{ shrink: true }}
                           sx={{ 
-                            flex: '1 1 0',
-                            minWidth: 0,
-                            maxWidth: '110px',
+                            flex: { xs: '1 1 100%', sm: '1 1 0' },
+                            minWidth: { xs: '100%', sm: 0 },
+                            maxWidth: { xs: '100%', sm: '110px' },
                             '& .MuiOutlinedInput-root': {
                               backgroundColor: '#ffffff',
-                              fontSize: '0.7rem',
-                              padding: '4px 8px',
+                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                              padding: { xs: '4px 6px', sm: '4px 8px' },
                             },
                             '& .MuiInputLabel-root': {
-                              fontSize: '0.7rem',
+                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
                             },
                             '& input': {
-                              padding: '6px 4px',
+                              padding: { xs: '5px 3px', sm: '6px 4px' },
+                              fontSize: { xs: '0.75rem', sm: '0.875rem' }
                             }
                           }}
                         />
-                        <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.7rem', flexShrink: 0 }}>
+                        <Typography variant="body2" sx={{ 
+                          color: '#6b7280', 
+                          fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                          flexShrink: 0,
+                          display: { xs: 'none', sm: 'block' }
+                        }}>
                           to
                         </Typography>
                         <TextField
@@ -3722,26 +3827,34 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, end: e.target.value }))}
                           InputLabelProps={{ shrink: true }}
                           sx={{ 
-                            flex: '1 1 0',
-                            minWidth: 0,
-                            maxWidth: '110px',
+                            flex: { xs: '1 1 100%', sm: '1 1 0' },
+                            minWidth: { xs: '100%', sm: 0 },
+                            maxWidth: { xs: '100%', sm: '110px' },
                             '& .MuiOutlinedInput-root': {
                               backgroundColor: '#ffffff',
-                              fontSize: '0.7rem',
-                              padding: '4px 8px',
+                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                              padding: { xs: '4px 6px', sm: '4px 8px' },
                             },
                             '& .MuiInputLabel-root': {
-                              fontSize: '0.7rem',
+                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
                             },
                             '& input': {
-                              padding: '6px 4px',
+                              padding: { xs: '5px 3px', sm: '6px 4px' },
+                              fontSize: { xs: '0.75rem', sm: '0.875rem' }
                             }
                           }}
                         />
                       </Box>
                       
-                      {/* Divider */}
-                      <Box sx={{ width: '1px', height: '18px', backgroundColor: '#d1d5db', mx: 0.25, flexShrink: 0 }} />
+                      {/* Divider - Hidden on mobile */}
+                      <Box sx={{ 
+                        display: { xs: 'none', sm: 'block' },
+                        width: '1px', 
+                        height: '18px', 
+                        backgroundColor: '#d1d5db', 
+                        mx: 0.25, 
+                        flexShrink: 0 
+                      }} />
                       
                       {/* Apply Button */}
                       <Button
@@ -3756,11 +3869,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         }
                         sx={{
                           textTransform: 'none',
-                          fontSize: '0.7rem',
-                          padding: '3px 10px',
+                          fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                          padding: { xs: '4px 8px', sm: '3px 10px' },
                           minWidth: 'auto',
                           backgroundColor: '#1f2937',
                           flexShrink: 0,
+                          whiteSpace: 'nowrap',
+                          width: { xs: '100%', sm: 'auto' },
                           '&:hover': { backgroundColor: '#374151' },
                           '&:disabled': {
                             backgroundColor: '#9ca3af',
@@ -3775,9 +3890,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   </Box>
                 </Box>
 
-                {/* Active filter chips row directly under the header row, aligned under back button */}
+                {/* Active filter chips row directly under the header row, aligned under back button - Responsive */}
                 {(!!Object.keys(columnFilters).filter(k => columnFilters[k]).length || selectedPlatforms.length < availablePlatforms.length || orderIdChips.length > 0) && (
-                  <Box sx={{ml: 6, display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                  <Box sx={{
+                    ml: { xs: 0, sm: 6 },
+                    mt: { xs: 1, sm: 0 },
+                    display: 'flex',
+                    gap: { xs: 0.5, sm: 0.75 },
+                    flexWrap: 'wrap'
+                  }}>
                     {/* Platform filter chips - show if not all platforms are selected */}
                     {selectedPlatforms.length > 0 && selectedPlatforms.length < availablePlatforms.length && (
                       <Chip

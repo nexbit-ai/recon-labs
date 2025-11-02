@@ -70,6 +70,8 @@ const UploadDocuments: React.FC = () => {
   const [d2cFiles, setD2cFiles] = useState<Record<string, { sales: File | null; settlement: File | null }>>({});
   // Last Mile Status file
   const [lastMileStatusFile, setLastMileStatusFile] = useState<File | null>(null);
+  // Unicommerce Sales file
+  const [unicommerceFile, setUnicommerceFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
   const [loadingUploads, setLoadingUploads] = useState(false);
@@ -480,15 +482,16 @@ const UploadDocuments: React.FC = () => {
   };
 
   // Last Mile Status Upload handler
-  const handleLastMileStatusUpload = async () => {
-    if (!lastMileStatusFile || selectedYear === null || selectedMonth === null) return;
+  const handleLastMileStatusUpload = async (fileOverride?: File | null) => {
+    const file = fileOverride || lastMileStatusFile;
+    if (!file || selectedYear === null || selectedMonth === null) return;
 
     setUploadingVendor('lastmile_status');
     setUploadStatus(null);
 
     try {
       const formData = new FormData();
-      formData.append('file', lastMileStatusFile);
+      formData.append('file', file);
       formData.append('description', `Last Mile Status file for ${months[selectedMonth]} ${selectedYear}`);
       formData.append('month', months[selectedMonth]);
       formData.append('year', selectedYear.toString());
@@ -533,6 +536,74 @@ const UploadDocuments: React.FC = () => {
       await response.json();
       setUploadStatus({ type: 'success', message: `Successfully uploaded Last Mile Status file` });
       setLastMileStatusFile(null);
+
+      // refresh list
+      if (selectedYear !== null && selectedMonth !== null) {
+        await fetchUploadedDocuments(selectedYear, selectedMonth);
+      }
+    } catch (error) {
+      console.error('❌ Upload error:', error);
+      setUploadStatus({ type: 'error', message: error instanceof Error ? error.message : 'Failed to upload file. Please try again.' });
+    } finally {
+      setUploadingVendor(null);
+    }
+  };
+
+  // Unicommerce Sales Upload handler
+  const handleUnicommerceUpload = async (fileOverride?: File | null) => {
+    const file = fileOverride || unicommerceFile;
+    if (!file || selectedYear === null || selectedMonth === null) return;
+
+    setUploadingVendor('unicommerce_sales');
+    setUploadStatus(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('description', `Unicommerce sales file for ${months[selectedMonth]} ${selectedYear}`);
+      formData.append('month', months[selectedMonth]);
+      formData.append('year', selectedYear.toString());
+      formData.append('report_type', 'unicommerce_sales');
+
+      let customToken: string | null = null;
+      if (session) {
+        try {
+          const customSessionData = {
+            member_id: session.member_id,
+            member_session_id: session.member_session_id,
+            organization_id: API_CONFIG.ORG_ID,
+            organization_slug: session.organization_slug,
+            roles: session.roles,
+          };
+          customToken = await JWTService.generateToken(customSessionData);
+        } catch (error) {
+          console.error('❌ Failed to generate custom token:', error);
+        }
+      }
+
+      const headers: Record<string, string> = {
+        'x-api-key': API_CONFIG.API_KEY,
+        'x-org-id': API_CONFIG.ORG_ID,
+      };
+      if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/v1/recon/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+        if (response.status === 400) {
+          throw new Error('Please upload the correct file for Unicommerce');
+        }
+        throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
+      }
+
+      await response.json();
+      setUploadStatus({ type: 'success', message: `Successfully uploaded Unicommerce sales file` });
+      setUnicommerceFile(null);
 
       // refresh list
       if (selectedYear !== null && selectedMonth !== null) {
@@ -878,84 +949,155 @@ const UploadDocuments: React.FC = () => {
             
             <Divider sx={{ mb: 3 }} />
             {/* Last Mile Status Upload section */}
-            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 700 }} color="primary.main">Last Mile Status Upload</Typography>
-            <Paper
-              elevation={0}
-              sx={{ 
-                p: 3, 
-                border: isVendorUploaded('lastmile_status') ? '2px solid #dcfce7' : '2px solid #e5e7eb', 
-                borderRadius: '12px', 
-                transition: 'all 0.3s ease', 
-                maxWidth: 800,
-                background: isVendorUploaded('lastmile_status') ? '#f0fdf4' : '#ffffff', 
-                '&:hover': { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', borderColor: isVendorUploaded('lastmile_status') ? '#bbf7d0' : '#d1d5db' } 
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                <Box sx={{ width: 48, height: 48, borderRadius: '8px', background: isVendorUploaded('lastmile_status') ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {isVendorUploaded('lastmile_status') ? (
-                    <CheckCircleIcon sx={{ fontSize: 24, color: '#16a34a' }} />
-                  ) : (
-                    <ShippingIcon sx={{ fontSize: 24, color: '#111111' }} />
-                  )}
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="subtitle1" fontWeight={700} color="#111111">Last Mile Status</Typography>
-                    {isVendorUploaded('lastmile_status') && (
-                      <Chip label="Uploaded" size="small" sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} />
+            <Typography variant="subtitle1" sx={{ mb: 1, mt: 2, fontWeight: 700 }} color="primary.main">Last Mile Status Upload</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 800, mb: 4 }}>
+              <Paper
+                elevation={0}
+                sx={{ 
+                  p: 3, 
+                  border: isVendorUploaded('lastmile_status') ? '2px solid #dcfce7' : '2px solid #e5e7eb', 
+                  borderRadius: '12px', 
+                  transition: 'all 0.3s ease', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  gap: 2, 
+                  opacity: uploadingVendor === 'lastmile_status' ? 0.9 : 1,
+                  background: isVendorUploaded('lastmile_status') ? '#f0fdf4' : '#ffffff', 
+                  '&:hover': { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', borderColor: isVendorUploaded('lastmile_status') ? '#bbf7d0' : '#d1d5db' } 
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                  <Box sx={{ width: 48, height: 48, borderRadius: '8px', background: isVendorUploaded('lastmile_status') ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {isVendorUploaded('lastmile_status') ? (
+                      <CheckCircleIcon sx={{ fontSize: 24, color: '#16a34a' }} />
+                    ) : (
+                      <ShippingIcon sx={{ fontSize: 24, color: '#111111' }} />
                     )}
                   </Box>
-                  {isVendorUploaded('lastmile_status') && getUploadedDocument('lastmile_status') ? (
-                    <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mt: 0.5 }}>
-                      {getUploadedDocument('lastmile_status')?.filename} • {new Date(getUploadedDocument('lastmile_status')!.upload_date).toLocaleDateString()}
-                    </Typography>
-                  ) : (
-                    <Typography variant="caption" color="text.secondary">
-                      Upload Last Mile Status file
-                    </Typography>
-                  )}
+                  <Box sx={{ flex: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="subtitle1" fontWeight={700} color="#111111">Last Mile Status</Typography>
+                      {isVendorUploaded('lastmile_status') && (
+                        <Chip label="Uploaded" size="small" sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} />
+                      )}
+                    </Box>
+                    {isVendorUploaded('lastmile_status') && getUploadedDocument('lastmile_status') ? (
+                      <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mt: 0.5 }}>
+                        {getUploadedDocument('lastmile_status')?.filename} • {new Date(getUploadedDocument('lastmile_status')!.upload_date).toLocaleDateString()}
+                      </Typography>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        Upload Last Mile Status file
+                      </Typography>
+                    )}
+                  </Box>
                 </Box>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <input
                   accept=".xlsx,.xls,.csv"
                   style={{ display: 'none' }}
                   id="lastmile-status-upload"
                   type="file"
-                  onChange={(e) => {
-                    setLastMileStatusFile(e.target.files?.[0] || null);
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0] || null;
+                    if (file) {
+                      setLastMileStatusFile(file);
+                      // Auto-upload when file is selected
+                      handleLastMileStatusUpload(file);
+                    }
                     e.target.value = '';
                   }}
                   disabled={uploadingVendor === 'lastmile_status'}
                 />
                 <label htmlFor="lastmile-status-upload">
                   <Button
-                    variant="outlined"
+                    variant={isVendorUploaded('lastmile_status') ? 'outlined' : 'contained'}
                     component="span"
                     disabled={uploadingVendor === 'lastmile_status'}
-                    startIcon={<CloudUploadIcon />}
-                    sx={{ minWidth: 120 }}
+                    endIcon={uploadingVendor === 'lastmile_status' ? <CircularProgress size={16} sx={{ color: isVendorUploaded('lastmile_status') ? '#111111' : '#fff' }} /> : <ArrowForwardIcon />}
+                    sx={{ background: isVendorUploaded('lastmile_status') ? '#ffffff' : '#111111', color: isVendorUploaded('lastmile_status') ? '#111111' : '#ffffff', borderColor: isVendorUploaded('lastmile_status') ? '#e5e7eb' : 'transparent', fontWeight: 600, px: 3, py: 1.2, '&:hover': { background: isVendorUploaded('lastmile_status') ? '#f8fafc' : '#333333', borderColor: isVendorUploaded('lastmile_status') ? '#d1d5db' : 'transparent' } }}
                   >
-                    Choose file
+                    {uploadingVendor === 'lastmile_status' ? 'Uploading...' : 'Upload file'}
                   </Button>
                 </label>
-                <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
-                  {lastMileStatusFile?.name || 'No file selected'}
-                </Typography>
-                {lastMileStatusFile && (
+              </Paper>
+            </Box>
+            
+            <Divider sx={{ mb: 3 }} />
+            {/* Unicommerce Sales File Upload section */}
+            <Typography variant="subtitle1" sx={{ mb: 1, mt: 2, fontWeight: 700 }} color="primary.main">Sales File</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 800, mb: 4 }}>
+              <Paper
+                elevation={0}
+                sx={{ 
+                  p: 3, 
+                  border: isVendorUploaded('unicommerce', 'sales') ? '2px solid #dcfce7' : '2px solid #e5e7eb', 
+                  borderRadius: '12px', 
+                  transition: 'all 0.3s ease', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  gap: 2, 
+                  opacity: uploadingVendor === 'unicommerce_sales' ? 0.9 : 1,
+                  background: isVendorUploaded('unicommerce', 'sales') ? '#f0fdf4' : '#ffffff', 
+                  '&:hover': { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', borderColor: isVendorUploaded('unicommerce', 'sales') ? '#bbf7d0' : '#d1d5db' } 
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                  <Box sx={{ width: 48, height: 48, borderRadius: '8px', background: isVendorUploaded('unicommerce', 'sales') ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {isVendorUploaded('unicommerce', 'sales') ? (
+                      <CheckCircleIcon sx={{ fontSize: 24, color: '#16a34a' }} />
+                    ) : (
+                      <ShippingIcon sx={{ fontSize: 24, color: '#111111' }} />
+                    )}
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="subtitle1" fontWeight={700} color="#111111">Unicommerce</Typography>
+                      {isVendorUploaded('unicommerce', 'sales') && (
+                        <Chip label="Uploaded" size="small" sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} />
+                      )}
+                    </Box>
+                    {isVendorUploaded('unicommerce', 'sales') && getUploadedDocument('unicommerce', 'sales') ? (
+                      <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mt: 0.5 }}>
+                        {getUploadedDocument('unicommerce', 'sales')?.filename} • {new Date(getUploadedDocument('unicommerce', 'sales')!.upload_date).toLocaleDateString()}
+                      </Typography>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        Upload Unicommerce sales file
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+                <input
+                  accept=".xlsx,.xls,.csv"
+                  style={{ display: 'none' }}
+                  id="unicommerce-sales-upload"
+                  type="file"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0] || null;
+                    if (file) {
+                      setUnicommerceFile(file);
+                      // Auto-upload when file is selected
+                      handleUnicommerceUpload(file);
+                    }
+                    e.target.value = '';
+                  }}
+                  disabled={uploadingVendor === 'unicommerce_sales'}
+                />
+                <label htmlFor="unicommerce-sales-upload">
                   <Button
-                    variant="contained"
-                    disabled={uploadingVendor === 'lastmile_status'}
-                    onClick={handleLastMileStatusUpload}
-                    startIcon={uploadingVendor === 'lastmile_status' ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <CloudUploadIcon />}
-                    sx={{ background: '#111111', '&:hover': { background: '#333333' }, fontWeight: 600, px: 3, py: 1.2 }}
+                    variant={isVendorUploaded('unicommerce', 'sales') ? 'outlined' : 'contained'}
+                    component="span"
+                    disabled={uploadingVendor === 'unicommerce_sales'}
+                    endIcon={uploadingVendor === 'unicommerce_sales' ? <CircularProgress size={16} sx={{ color: isVendorUploaded('unicommerce', 'sales') ? '#111111' : '#fff' }} /> : <ArrowForwardIcon />}
+                    sx={{ background: isVendorUploaded('unicommerce', 'sales') ? '#ffffff' : '#111111', color: isVendorUploaded('unicommerce', 'sales') ? '#111111' : '#ffffff', borderColor: isVendorUploaded('unicommerce', 'sales') ? '#e5e7eb' : 'transparent', fontWeight: 600, px: 3, py: 1.2, '&:hover': { background: isVendorUploaded('unicommerce', 'sales') ? '#f8fafc' : '#333333', borderColor: isVendorUploaded('unicommerce', 'sales') ? '#d1d5db' : 'transparent' } }}
                   >
-                    {uploadingVendor === 'lastmile_status' ? 'Uploading...' : 'Upload File'}
+                    {uploadingVendor === 'unicommerce_sales' ? 'Uploading...' : 'Upload file'}
                   </Button>
-                )}
-              </Box>
-            </Paper>
+                </label>
+              </Paper>
+            </Box>
           </Paper>
         )}
       </Box>
