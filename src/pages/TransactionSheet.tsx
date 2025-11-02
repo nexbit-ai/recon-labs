@@ -28,6 +28,9 @@ import {
   MenuItem,
   SelectChangeEvent,
   Checkbox,
+  RadioGroup,
+  Radio,
+  FormControlLabel,
   OutlinedInput,
   Popover,
   Menu,
@@ -43,6 +46,8 @@ import {
   ListItemText,
   ListSubheader,
   Autocomplete,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import ColumnFilterControls from '../components/ColumnFilterControls';
 import { api } from '../services/api';
@@ -205,7 +210,10 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   
   // Determine settlement date from API response
   let settlementDate = "";
-  if (orderItem.settlement_date && orderItem.settlement_date.trim() !== '') {
+  // If transaction is unsettled, settlement date should be NA (Not Applicable)
+  if (reconStatus === "unsettled") {
+    settlementDate = "NA";
+  } else if (orderItem.settlement_date && orderItem.settlement_date.trim() !== '') {
     try {
       settlementDate = new Date(orderItem.settlement_date).toISOString().split('T')[0];
     } catch (error) {
@@ -1634,7 +1642,7 @@ interface TransactionSheetProps {
   statsData?: MarketplaceReconciliationResponse | null;
   initialTab?: number;
   dateRange?: { start: string; end: string };
-  initialPlatforms?: ('flipkart' | 'd2c')[];
+  initialPlatforms?: ('flipkart' | 'd2c' | 'amazon')[];
   initialFilters?: { [key: string]: any };
 }
 
@@ -1642,15 +1650,16 @@ interface TransactionSheetProps {
 const COLUMN_TO_API_PARAM_MAP: Record<string, {
   apiParam: string;
   type: 'string' | 'number' | 'date' | 'enum';
-  supportedPlatforms?: ('flipkart' | 'd2c' | 'all')[];
+  supportedPlatforms?: ('flipkart' | 'amazon' | 'd2c' | 'all')[];
   usesInSuffix?: boolean; // For CSV filters like status_in
 }> = {
   // Common filters (both platforms)
   'Order ID': { apiParam: 'order_id', type: 'string' }, // Special: chips input
   'Status': { apiParam: 'status_in', type: 'enum', usesInSuffix: true },
+  'Event Type': { apiParam: 'event_type', type: 'enum' },
   'Order Date': { apiParam: 'order_date', type: 'date' }, // → order_date_from/to
   'Settlement Date': { apiParam: 'settlement_date', type: 'date' },
-  'Order Value': { apiParam: 'order_value', type: 'number', supportedPlatforms: ['flipkart'] },
+  'Order Value': { apiParam: 'order_value', type: 'number' },
   'Settlement Value': { apiParam: 'settlement_value', type: 'number' },
   'Difference': { apiParam: 'diff', type: 'number' },
   
@@ -1674,6 +1683,8 @@ const COLUMN_TO_SORT_BY_MAP: Record<string, string> = {
 const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0, dateRange: propDateRange, initialPlatforms, initialFilters: propsInitialFilters }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
   
   // Get initialTab from navigation state or props
   const getInitialTab = () => {
@@ -1695,11 +1706,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Header date range state - for the date selector in the header next to platform selector
   const [headerDateRange, setHeaderDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
   const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
-  // Platform filter state - now supports multi-select
-  const availablePlatforms = ['flipkart', 'd2c'] as const;
+  // Platform filter state - single selection only
+  const availablePlatforms = ['flipkart', 'amazon', 'd2c'] as const;
   type Platform = typeof availablePlatforms[number];
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(initialPlatforms || ['flipkart']); // Default: flipkart only
-  const [pendingSelectedPlatforms, setPendingSelectedPlatforms] = useState<Platform[]>(initialPlatforms || ['flipkart']); // Pending platforms before apply
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Default: flipkart only
+  const [pendingSelectedPlatform, setPendingSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Pending platform before apply
   // Order ID chips state
   const [orderIdChips, setOrderIdChips] = useState<string[]>([]);
   // Order ID search in header
@@ -1894,10 +1905,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       meta['Settlement Date'] = { type: 'date' };
       meta['Difference'] = { type: 'number' };
       meta['Status'] = { type: 'enum' };
-      meta['Reason'] = { type: 'string' };
     }
     
     // Always add breakup fields for filtering (regardless of API type)
+    meta['Event Type'] = { type: 'enum' };
     meta['Shipping Courier'] = { type: 'enum' };
     meta['Recon Status'] = { type: 'enum' };
     meta['Settlement Provider'] = { type: 'enum' };
@@ -1910,6 +1921,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Make COLUMN_META reactive to data changes - initialize with breakup fields
   const [COLUMN_META, setCOLUMN_META] = useState<Record<string, { type: 'string' | 'number' | 'date' | 'enum' }>>({
+    'Event Type': { type: 'enum' },
     'Shipping Courier': { type: 'enum' },
     'Recon Status': { type: 'enum' },
     'Settlement Provider': { type: 'enum' },
@@ -1956,7 +1968,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     try {
       // applySortOverride=true ensures that when nextSort is null (neutral),
       // we send no sort params instead of falling back to previous state
-      await fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, undefined, nextSort, true);
+      await fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform, undefined, nextSort, true);
     } finally {
       setIsSorting(false);
     }
@@ -2000,6 +2012,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // For Status, show unique backend statuses
     if (columnName === 'Status') {
       return ['more_payment_received', 'less_payment_received', 'settlement_matched'];
+    }
+
+    // For Event Type, show available event types
+    if (columnName === 'Event Type') {
+      return ['Sale', 'Return'];
     }
 
     // For breakup fields, extract values from actual data
@@ -2106,7 +2123,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     remark?: string, 
     overrideFilters?: { [key: string]: any }, 
     overrideDateRange?: {start: string, end: string},
-    overridePlatforms?: Platform[]
+    overridePlatform?: Platform
   ): TransactionQueryParams => {
     const params: TransactionQueryParams = {
       page: pageNumber,
@@ -2135,13 +2152,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       console.warn('[buildQueryParams] No date range provided - API call may fail');
     }
 
-    // ALWAYS add platform parameter as comma-separated list of selected platforms
-    const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
-    if (platformsToUse.length > 0) {
-      params.platform = platformsToUse.join(',');
-      
+    // ALWAYS add platform parameter
+    const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
+    if (platformToUse) {
+      params.platform = platformToUse;
     } else {
-      console.warn('[buildQueryParams] No platforms selected - API call may not return data');
+      console.warn('[buildQueryParams] No platform selected - API call may not return data');
     }
 
     // Only add additional parameters if filters are explicitly applied
@@ -2158,11 +2174,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
         if (!mapping) return;
 
-        // Check platform compatibility - allow if any selected platform supports it
+        // Check platform compatibility
         if (mapping.supportedPlatforms) {
-          const isSupported = platformsToUse.some(p => mapping.supportedPlatforms!.includes(p as any));
+          const isSupported = mapping.supportedPlatforms!.includes(platformToUse as any);
           if (!isSupported) {
-            return; // Skip filters not supported by any selected platform
+            return; // Skip filters not supported by selected platform
           }
         }
 
@@ -2346,7 +2362,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   };
 
-  const fetchOrders = async (pageNumber: number = 1, remark?: string, overridePlatforms?: Platform[]) => {
+  const fetchOrders = async (pageNumber: number = 1, remark?: string, overridePlatform?: Platform) => {
     const isInitialLoad = pageNumber === 1 && allTransactionData.length === 0;
     
     if (!isInitialLoad) {
@@ -2355,8 +2371,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setError(null);
     
     try {
-      const queryParams = buildQueryParams(pageNumber, remark, undefined, undefined, overridePlatforms);
-      const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
+      const queryParams = buildQueryParams(pageNumber, remark, undefined, undefined, overridePlatform);
       
       
       // Example query string that would be sent to API:
@@ -2516,10 +2531,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Copy pending filters to active filters
     setColumnFilters(pendingColumnFilters);
     setDateRange(pendingDateRange);
-    setSelectedPlatforms(pendingSelectedPlatforms);
+    setSelectedPlatform(pendingSelectedPlatform);
     
-    // Use dual API with filters and pending platforms
-    fetchDualTransactions(1, pendingColumnFilters, pendingDateRange, pendingSelectedPlatforms);
+    // Use dual API with filters and pending platform
+    fetchDualTransactions(1, pendingColumnFilters, pendingDateRange, pendingSelectedPlatform);
     
     // Close the filter popover
     closeFilterPopover();
@@ -2527,12 +2542,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Apply platform changes - called when Apply button next to platform selector is clicked
   const applyPlatformFilter = () => {
-    const platformsCommaSeparated = pendingSelectedPlatforms.join(',');
-    
-    setSelectedPlatforms(pendingSelectedPlatforms);
+    setSelectedPlatform(pendingSelectedPlatform);
     setPage(0);
     setCurrentPage(1);
-    fetchDualTransactions(1, columnFilters, dateRange, pendingSelectedPlatforms);
+    fetchDualTransactions(1, columnFilters, dateRange, pendingSelectedPlatform);
   };
 
   // Apply header date range changes - called when Apply button next to date selector is clicked
@@ -2542,13 +2555,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setDateRange(pendingHeaderDateRange);
     setPage(0);
     setCurrentPage(1);
-    fetchDualTransactions(1, columnFilters, pendingHeaderDateRange, selectedPlatforms);
+    fetchDualTransactions(1, columnFilters, pendingHeaderDateRange, selectedPlatform);
   };
 
   // Only refresh data when rowsPerPage changes (not filters)
   useEffect(() => {
     if (hasInitialLoad && (settledData || unsettledData)) { // Only refetch if data has been loaded initially
-      fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
+      fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform);
     }
   }, [rowsPerPage]);
 
@@ -2652,7 +2665,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     pageNumber: number = 1, 
     filters?: { [key: string]: any }, 
     dateRangeFilter?: {start: string, end: string},
-    overridePlatforms?: Platform[],
+    overridePlatform?: Platform,
     orderIds?: string[],
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
     applySortOverride?: boolean
@@ -2677,7 +2690,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     
     try {
       // Build base parameters
-      const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
+      const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
       
       // Create settled API call parameters
       const settledParams: any = {
@@ -2699,9 +2712,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
           // Check platform compatibility
           if (mapping.supportedPlatforms) {
-            const isSupported = platformsToUse.some(p => mapping.supportedPlatforms!.includes(p as any));
+            const isSupported = mapping.supportedPlatforms!.includes(platformToUse as any);
             if (!isSupported) {
-              return; // Skip filters not supported by any selected platform
+              return; // Skip filters not supported by selected platform
             }
           }
 
@@ -2758,8 +2771,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
       
       // Add platform parameter
-      if (platformsToUse.length > 0) {
-        settledParams.platform = platformsToUse.join(',');
+      if (platformToUse) {
+        settledParams.platform = platformToUse;
       }
 
       // Apply sorting if present (use override if explicitly requested to avoid state lag)
@@ -2891,7 +2904,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     pageNumber: number = 1, 
     filters?: { [key: string]: any }, 
     dateRangeFilter?: {start: string, end: string},
-    overridePlatforms?: Platform[]
+    overridePlatform?: Platform
   ) => {
     try {
       setLoading(true);
@@ -2902,12 +2915,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         limit: rowsPerPage, // Use current rows per page setting
       };
       
-      // ALWAYS add platform parameter as comma-separated list
-      const platformsToUse = overridePlatforms !== undefined ? overridePlatforms : selectedPlatforms;
-      if (platformsToUse.length > 0) {
-        params.platform = platformsToUse.join(',');
+      // ALWAYS add platform parameter
+      const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
+      if (platformToUse) {
+        params.platform = platformToUse;
       } else {
-        console.warn('[fetchTotalTransactions] No platforms selected');
+        console.warn('[fetchTotalTransactions] No platform selected');
       }
       
       // Apply status based on active tab selection
@@ -2927,11 +2940,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
           if (!mapping) return;
 
-          // Check platform compatibility - allow if any selected platform supports it
+          // Check platform compatibility
           if (mapping.supportedPlatforms) {
-            const isSupported = platformsToUse.some(p => mapping.supportedPlatforms!.includes(p as any));
+            const isSupported = mapping.supportedPlatforms!.includes(platformToUse as any);
             if (!isSupported) {
-              return; // Skip filters not supported by any selected platform
+              return; // Skip filters not supported by selected platform
             }
           }
 
@@ -3063,7 +3076,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       setOrderIdChips([]);
       setPage(0);
       setCurrentPage(1);
-      fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, []);
+      fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform, []);
     }
   };
 
@@ -3082,9 +3095,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Build query params with order IDs
     const newFilters = { ...columnFilters };
     if (orderIds.length > 0) {
-      fetchDualTransactions(1, newFilters, dateRange, selectedPlatforms, orderIds);
+      fetchDualTransactions(1, newFilters, dateRange, selectedPlatform, orderIds);
     } else {
-      fetchDualTransactions(1, newFilters, dateRange, selectedPlatforms);
+      fetchDualTransactions(1, newFilters, dateRange, selectedPlatform);
     }
   };
 
@@ -3097,7 +3110,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Trigger API call without order IDs
     setPage(0);
     setCurrentPage(1);
-    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, []);
+    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform, []);
   };
 
   // Handle number range filter
@@ -3296,7 +3309,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setPage(newPage);
     
     // Always use dual API with current filters
-    fetchDualTransactions(newPageNumber, columnFilters, dateRange, selectedPlatforms);
+    fetchDualTransactions(newPageNumber, columnFilters, dateRange, selectedPlatform);
   };
 
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -3304,7 +3317,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setRowsPerPage(newRowsPerPage);
     setPage(0);
     // Reset to first page when changing rows per page
-    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
+    fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform);
   };
 
   
@@ -3314,14 +3327,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setSearchTerm('');
     setDateRange({ start: '', end: '' });
     setColumnFilters({});
-    setSelectedPlatforms([...availablePlatforms]); // Reset to all platforms selected
-    setPendingSelectedPlatforms([...availablePlatforms]); // Reset pending platforms too
+    setSelectedPlatform('flipkart'); // Reset to default platform
+    setPendingSelectedPlatform('flipkart'); // Reset pending platform too
     setOrderIdChips([]); // Clear order ID chips
     setOrderIdSearch(''); // Clear order ID search in header
     setShowOrderIdSearch(false); // Hide order ID search bar
     setPage(0);
     setCurrentPage(1);
-    fetchDualTransactions(1, {}, { start: '', end: '' }, [...availablePlatforms], []);
+    fetchDualTransactions(1, {}, { start: '', end: '' }, 'flipkart', []);
   };
 
   // Handle tab change
@@ -3387,16 +3400,32 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               borderRadius: '12px',
               border: '1px solid #e5e7eb'
             }}>
-              <CardContent sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, gap: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: '1 1 auto', minWidth: 0 }}>
+              <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+                {/* Main Header Row - Responsive Layout */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: { xs: 'column', md: 'row' },
+                  alignItems: { xs: 'flex-start', md: 'center' },
+                  justifyContent: 'space-between',
+                  mb: 1, 
+                  gap: { xs: 1.5, md: 2 },
+                  width: '100%'
+                }}>
+                  {/* Left Section: Back Button and Title */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: { xs: 1, sm: 2 },
+                    flexShrink: 0,
+                    width: { xs: '100%', sm: 'auto' },
+                    minWidth: 0
+                  }}>
                     <IconButton
                       onClick={onBack}
                       size="small"
                       sx={{
                         background: '#1f2937',
                         color: 'white',
-                        mt: -2,
                         flexShrink: 0,
                         '&:hover': {
                           background: '#374151',
@@ -3407,284 +3436,246 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     >
                       <ArrowBackIcon fontSize="small" />
                     </IconButton>
-                    <Typography variant="h5" sx={{ 
-                      fontWeight: 700, 
-                      color: '#111827',
-                      letterSpacing: '-0.02em',
-                      py: 0.5,
-                      mt: -2,
-                      flexShrink: 0,
-                    }}>
+                    <Typography 
+                      variant="h5" 
+                      sx={{ 
+                        fontWeight: 700, 
+                        color: '#111827',
+                        letterSpacing: '-0.02em',
+                        py: 0.5,
+                        fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' },
+                        flexShrink: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: { xs: 'calc(100vw - 120px)', sm: 'none' }
+                      }}
+                    >
                       Transaction Sheet
                     </Typography>
-                    
-                    {/* Transaction Tabs - Inline */}
-                    <Tabs 
-                      value={activeTab} 
-                      onChange={handleTabChange}
-                      sx={{
-                        minWidth: 'fit-content',
-                        flexShrink: 0,
-                        ml: 1,
-                        '& .MuiTabs-flexContainer': {
-                          gap: 0.5,
-                        },
-                        '& .MuiTab-root': {
-                          minHeight: 32,
-                          fontSize: '0.875rem',
-                          fontWeight: 600,
-                          textTransform: 'none',
-                          color: '#6b7280',
-                          px: 2.5,
-                          py: 0.5,
-                          minWidth: 'fit-content',
-                          whiteSpace: 'nowrap',
-                          overflow: 'visible',
-                          textOverflow: 'clip',
-                          '&.Mui-selected': {
-                            color: '#1f2937',
-                            fontWeight: 700,
-                          },
-                        },
-                        '& .MuiTabs-indicator': {
-                          height: 2,
-                          borderRadius: '2px 2px 0 0',
-                          background: '#1f2937',
-                        },
-                      }}
-                    >
-                      <Tab label={`Settled${settledTotalCount !== null ? ` (${settledTotalCount})` : ''}`} />
-                      <Tab label={`Unsettled${unsettledTotalCount !== null ? ` (${unsettledTotalCount})` : ''}`} />
-                    </Tabs>
-                    
-                  
                   </Box>
                   
+                  {/* Right Section: Filters, Platform Selector, Date Range - Responsive */}
                   <Box sx={{ 
                     display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 1, 
-                    flexWrap: { xs: 'wrap', md: 'nowrap' },
-                    width: '100%',
-                    maxWidth: '100%',
-                    justifyContent: 'flex-end'
+                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: { xs: 1, sm: 1 },
+                    flex: { xs: '1 1 auto', md: '0 1 auto' },
+                    width: { xs: '100%', md: 'auto' },
+                    justifyContent: { xs: 'flex-start', md: 'flex-end' }
                   }}>
                     
-                    <IconButton
-                      onClick={() => {
-                        fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
-                      }}
-                      disabled={(loading || dualApiLoading) && !isSorting}
-                      sx={{
-                        color: '#1f2937',
-                        '&:hover': {
-                          background: '#f9fafb',
-                        },
-                        transition: 'all 0.3s ease',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <RefreshIcon />
-                    </IconButton>
+                    {/* Action Buttons Row */}
+                    <Box sx={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: { xs: 0.75, sm: 1 },
+                      flexShrink: 0,
+                      width: { xs: '100%', sm: 'auto' },
+                      justifyContent: { xs: 'flex-start', sm: 'flex-end' }
+                    }}>
+                      <IconButton
+                        onClick={() => {
+                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform);
+                        }}
+                        disabled={(loading || dualApiLoading) && !isSorting}
+                        sx={{
+                          color: '#1f2937',
+                          '&:hover': {
+                            background: '#f9fafb',
+                          },
+                          transition: 'all 0.3s ease',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <RefreshIcon fontSize={isSmallScreen ? 'small' : 'medium'} />
+                      </IconButton>
+                      
+                      <Button
+                        variant="outlined"
+                        startIcon={<FilterIcon fontSize={isSmallScreen ? 'small' : 'medium'} />}
+                        onClick={(e) => openFilterPopover('Status', e.currentTarget as any)}
+                        sx={{ 
+                          textTransform: 'none', 
+                          borderColor: '#1f2937', 
+                          color: '#1f2937',
+                          flexShrink: 0,
+                          fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                          padding: { xs: '4px 8px', sm: '6px 12px' },
+                          minWidth: 'auto',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Filters
+                      </Button>
+                    </Box>
                     
-                    <Button
-                      variant="outlined"
-                      startIcon={<FilterIcon />}
-                      onClick={(e) => openFilterPopover('Status', e.currentTarget as any)}
-                      sx={{ 
-                        textTransform: 'none', 
-                        borderColor: '#1f2937', 
-                        color: '#1f2937',
-                        flexShrink: 0,
-                        fontSize: '0.75rem',
-                        padding: '6px 12px',
-                        minWidth: 'auto',
-                      }}
-                    >
-                      Filters
-                    </Button>
-                    
-                    {/* Platform Filter - New Design with Checkboxes */}
+                    {/* Platform Filter - Fully Responsive */}
                     <Box sx={{ 
                       display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 0.5,
-                      padding: '6px 8px',
+                      alignItems: { xs: 'flex-start', sm: 'center' },
+                      flexDirection: { xs: 'column', sm: 'row' },
+                      gap: { xs: 0.75, sm: 0.5 },
+                      padding: { xs: '8px', sm: '6px 8px' },
                       border: '1px solid #e5e7eb',
                       borderRadius: '8px',
                       backgroundColor: '#f9fafb',
-                      height: { xs: 'auto', sm: '48px' },
-                      flex: { xs: '1 1 100%', sm: '0 1 auto' },
+                      width: { xs: '100%', sm: 'auto' },
                       minWidth: 0,
-                      maxWidth: { xs: '100%', sm: '500px' },
+                      maxWidth: { xs: '100%', sm: '500px', lg: '600px' },
                       flexWrap: { xs: 'wrap', sm: 'nowrap' },
-                      rowGap: { xs: 0.5, sm: 0 },
+                      rowGap: { xs: 0.75, sm: 0 },
                     }}>
                       {/* Platform label */}
                       <Typography variant="body2" sx={{ 
                         fontWeight: 600, 
                         color: '#1f2937', 
-                        fontSize: '0.7rem',
+                        fontSize: { xs: '0.65rem', sm: '0.7rem' },
                         whiteSpace: 'nowrap',
                         flexShrink: 0,
+                        width: { xs: '100%', sm: 'auto' }
                       }}>
                         Platforms:
                       </Typography>
                       
-                      {/* Platform checkboxes */}
-                      <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
-                        {availablePlatforms.map((platform) => (
-                          <Box 
-                            key={platform}
-                            sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center',
-                              cursor: 'pointer',
-                              '&:hover': {
-                                '& .MuiTypography-root': {
-                                  color: '#0ea5e9'
+                      {/* Platform radio buttons - Responsive layout */}
+                      <Box sx={{ 
+                        display: 'flex', 
+                        gap: { xs: 0.5, sm: 0.25 },
+                        flexShrink: 0,
+                        flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                        width: { xs: '100%', sm: 'auto' }
+                      }}>
+                        <RadioGroup
+                          value={pendingSelectedPlatform}
+                          onChange={(e) => {
+                            setPendingSelectedPlatform(e.target.value as Platform);
+                          }}
+                          sx={{ 
+                            display: 'flex',
+                            flexDirection: 'row',
+                            gap: { xs: 0.5, sm: 0.25 }
+                          }}
+                        >
+                          {availablePlatforms.map((platform) => (
+                            <Box 
+                              key={platform}
+                              sx={{ 
+                                display: 'flex', 
+                                alignItems: 'center',
+                                cursor: 'pointer',
+                                '&:hover': {
+                                  '& .MuiTypography-root': {
+                                    color: '#0ea5e9'
+                                  }
                                 }
-                              }
-                            }}
-                            onClick={() => {
-                              setPendingSelectedPlatforms(prev => 
-                                prev.includes(platform) 
-                                  ? prev.filter(p => p !== platform)
-                                  : [...prev, platform]
-                              );
-                            }}
-                          >
-                            <Checkbox 
-                              checked={pendingSelectedPlatforms.includes(platform)}
-                              size="small"
-                              sx={{ padding: '2px', '& svg': { fontSize: '18px' } }}
-                            />
-                            <Typography variant="body2" sx={{ color: '#374151', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
-                              {platform === 'flipkart' ? 'Flipkart' : 'D2C'}
-                            </Typography>
-                          </Box>
-                        ))}
+                              }}
+                              onClick={() => {
+                                setPendingSelectedPlatform(platform);
+                              }}
+                            >
+                              <Radio 
+                                checked={pendingSelectedPlatform === platform}
+                                value={platform}
+                                size="small"
+                                sx={{ padding: '2px', '& svg': { fontSize: { xs: '16px', sm: '18px' } } }}
+                              />
+                              <Typography variant="body2" sx={{ 
+                                color: '#374151', 
+                                fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                                whiteSpace: 'nowrap' 
+                              }}>
+                                {platform === 'flipkart' ? 'Flipkart' : platform === 'amazon' ? 'Amazon' : 'D2C'}
+                              </Typography>
+                            </Box>
+                          ))}
+                        </RadioGroup>
                       </Box>
                       
-                      {/* Divider */}
-                      <Box sx={{ width: '1px', height: '18px', backgroundColor: '#d1d5db', mx: 0.25, flexShrink: 0 }} />
+                      {/* Divider - Hidden on mobile */}
+                      <Box sx={{ 
+                        display: { xs: 'none', sm: 'block' },
+                        width: '1px', 
+                        height: '18px', 
+                        backgroundColor: '#d1d5db', 
+                        mx: 0.25, 
+                        flexShrink: 0 
+                      }} />
                       
-                      {/* Select All button */}
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => {
-                          setPendingSelectedPlatforms([...availablePlatforms]);
-                        }}
-                        disabled={pendingSelectedPlatforms.length === availablePlatforms.length}
-                        sx={{
-                          textTransform: 'none',
-                          fontSize: '0.65rem',
-                          padding: '2px 6px',
-                          minWidth: 'auto',
-                          borderColor: '#d1d5db',
-                          color: '#6b7280',
-                          flexShrink: 0,
-                          '&:hover': {
-                            borderColor: '#0ea5e9',
-                            color: '#0ea5e9',
-                            backgroundColor: 'rgba(14, 165, 233, 0.04)',
-                          },
-                          '&:disabled': {
-                            borderColor: '#e5e7eb',
-                            color: '#d1d5db',
-                          }
-                        }}
-                      >
-                        All
-                      </Button>
-                      
-                      {/* Clear All button */}
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => {
-                          setPendingSelectedPlatforms([]);
-                        }}
-                        disabled={pendingSelectedPlatforms.length === 0}
-                        sx={{
-                          textTransform: 'none',
-                          fontSize: '0.65rem',
-                          padding: '2px 6px',
-                          minWidth: 'auto',
-                          borderColor: '#d1d5db',
-                          color: '#6b7280',
-                          flexShrink: 0,
-                          '&:hover': {
-                            borderColor: '#ef4444',
-                            color: '#ef4444',
-                            backgroundColor: 'rgba(239, 68, 68, 0.04)',
-                          },
-                          '&:disabled': {
-                            borderColor: '#e5e7eb',
-                            color: '#d1d5db',
-                          }
-                        }}
-                      >
-                        Clear
-                      </Button>
-                      
-                      {/* Divider */}
-                      <Box sx={{ width: '1px', height: '18px', backgroundColor: '#d1d5db', mx: 0.25, flexShrink: 0 }} />
-                      
-                      {/* Apply Button */}
-                      <Button
-                        variant="contained"
-                        size="small"
-                        onClick={applyPlatformFilter}
-                        disabled={JSON.stringify(pendingSelectedPlatforms.sort()) === JSON.stringify(selectedPlatforms.sort())}
-                        sx={{
-                          textTransform: 'none',
-                          fontSize: '0.7rem',
-                          padding: '3px 10px',
-                          minWidth: 'auto',
-                          backgroundColor: '#1f2937',
-                          flexShrink: 0,
-                          '&:hover': { backgroundColor: '#374151' },
-                          '&:disabled': {
-                            backgroundColor: '#9ca3af',
-                            color: '#ffffff',
-                          },
-                        }}
-                      >
-                        Apply
-                      </Button>
+                      {/* Action buttons container */}
+                      <Box sx={{ 
+                        display: 'flex',
+                        gap: 0.5,
+                        alignItems: 'center',
+                        flexShrink: 0,
+                        width: { xs: '100%', sm: 'auto' },
+                        flexWrap: { xs: 'wrap', sm: 'nowrap' }
+                      }}>
+                        {/* Apply Button */}
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={applyPlatformFilter}
+                          disabled={pendingSelectedPlatform === selectedPlatform}
+                          sx={{
+                            textTransform: 'none',
+                            fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                            padding: { xs: '4px 8px', sm: '3px 10px' },
+                            minWidth: 'auto',
+                            backgroundColor: '#1f2937',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap',
+                            '&:hover': { backgroundColor: '#374151' },
+                            '&:disabled': {
+                              backgroundColor: '#9ca3af',
+                              color: '#ffffff',
+                            },
+                          }}
+                        >
+                          Apply
+                        </Button>
+                      </Box>
                     </Box>
                     
-                    {/* Date Range Selector - New Design */}
+                    {/* Date Range Selector - Fully Responsive */}
                     <Box sx={{ 
                       display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 0.5,
-                      padding: '6px 8px',
+                      alignItems: { xs: 'flex-start', sm: 'center' },
+                      flexDirection: { xs: 'column', sm: 'row' },
+                      gap: { xs: 0.75, sm: 0.5 },
+                      padding: { xs: '8px', sm: '6px 8px' },
                       border: '1px solid #e5e7eb',
                       borderRadius: '8px',
                       backgroundColor: '#f9fafb',
-                      height: { xs: 'auto', sm: '48px' },
-                      flex: { xs: '1 1 100%', sm: '0 1 auto' },
+                      width: { xs: '100%', sm: 'auto' },
                       minWidth: 0,
-                      maxWidth: { xs: '100%', sm: '420px' },
+                      maxWidth: { xs: '100%', sm: '420px', lg: '480px' },
                       flexWrap: { xs: 'wrap', sm: 'nowrap' },
-                      rowGap: { xs: 0.5, sm: 0 },
+                      rowGap: { xs: 0.75, sm: 0 },
                     }}>
                       {/* Date label */}
                       <Typography variant="body2" sx={{ 
                         fontWeight: 600, 
                         color: '#1f2937', 
-                        fontSize: '0.7rem',
+                        fontSize: { xs: '0.65rem', sm: '0.7rem' },
                         whiteSpace: 'nowrap',
                         flexShrink: 0,
+                        width: { xs: '100%', sm: 'auto' }
                       }}>
                         Date Range:
                       </Typography>
                       
-                      {/* Date inputs */}
-                      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flex: '1 1 auto', minWidth: 0 }}>
+                      {/* Date inputs - Responsive */}
+                      <Box sx={{ 
+                        display: 'flex', 
+                        gap: { xs: 0.75, sm: 0.5 }, 
+                        alignItems: 'center', 
+                        flex: { xs: '1 1 100%', sm: '1 1 auto' },
+                        minWidth: 0,
+                        width: { xs: '100%', sm: 'auto' },
+                        flexWrap: { xs: 'wrap', sm: 'nowrap' }
+                      }}>
                         <TextField
                           label="From"
                           type="date"
@@ -3693,23 +3684,29 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, start: e.target.value }))}
                           InputLabelProps={{ shrink: true }}
                           sx={{ 
-                            flex: '1 1 0',
-                            minWidth: 0,
-                            maxWidth: '110px',
+                            flex: { xs: '1 1 100%', sm: '1 1 0' },
+                            minWidth: { xs: '100%', sm: 0 },
+                            maxWidth: { xs: '100%', sm: '110px' },
                             '& .MuiOutlinedInput-root': {
                               backgroundColor: '#ffffff',
-                              fontSize: '0.7rem',
-                              padding: '4px 8px',
+                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                              padding: { xs: '4px 6px', sm: '4px 8px' },
                             },
                             '& .MuiInputLabel-root': {
-                              fontSize: '0.7rem',
+                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
                             },
                             '& input': {
-                              padding: '6px 4px',
+                              padding: { xs: '5px 3px', sm: '6px 4px' },
+                              fontSize: { xs: '0.7rem', sm: '0.7rem' }
                             }
                           }}
                         />
-                        <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.7rem', flexShrink: 0 }}>
+                        <Typography variant="body2" sx={{ 
+                          color: '#6b7280', 
+                          fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                          flexShrink: 0,
+                          display: { xs: 'none', sm: 'block' }
+                        }}>
                           to
                         </Typography>
                         <TextField
@@ -3720,26 +3717,34 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, end: e.target.value }))}
                           InputLabelProps={{ shrink: true }}
                           sx={{ 
-                            flex: '1 1 0',
-                            minWidth: 0,
-                            maxWidth: '110px',
+                            flex: { xs: '1 1 100%', sm: '1 1 0' },
+                            minWidth: { xs: '100%', sm: 0 },
+                            maxWidth: { xs: '100%', sm: '110px' },
                             '& .MuiOutlinedInput-root': {
                               backgroundColor: '#ffffff',
-                              fontSize: '0.7rem',
-                              padding: '4px 8px',
+                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                              padding: { xs: '4px 6px', sm: '4px 8px' },
                             },
                             '& .MuiInputLabel-root': {
-                              fontSize: '0.7rem',
+                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
                             },
                             '& input': {
-                              padding: '6px 4px',
+                              padding: { xs: '5px 3px', sm: '6px 4px' },
+                              fontSize: { xs: '0.7rem', sm: '0.7rem' }
                             }
                           }}
                         />
                       </Box>
                       
-                      {/* Divider */}
-                      <Box sx={{ width: '1px', height: '18px', backgroundColor: '#d1d5db', mx: 0.25, flexShrink: 0 }} />
+                      {/* Divider - Hidden on mobile */}
+                      <Box sx={{ 
+                        display: { xs: 'none', sm: 'block' },
+                        width: '1px', 
+                        height: '18px', 
+                        backgroundColor: '#d1d5db', 
+                        mx: 0.25, 
+                        flexShrink: 0 
+                      }} />
                       
                       {/* Apply Button */}
                       <Button
@@ -3754,11 +3759,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         }
                         sx={{
                           textTransform: 'none',
-                          fontSize: '0.7rem',
-                          padding: '3px 10px',
+                          fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                          padding: { xs: '4px 8px', sm: '3px 10px' },
                           minWidth: 'auto',
                           backgroundColor: '#1f2937',
                           flexShrink: 0,
+                          whiteSpace: 'nowrap',
+                          width: { xs: '100%', sm: 'auto' },
                           '&:hover': { backgroundColor: '#374151' },
                           '&:disabled': {
                             backgroundColor: '#9ca3af',
@@ -3773,24 +3780,125 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   </Box>
                 </Box>
 
-                {/* Active filter chips row directly under the header row, aligned under back button */}
-                {(!!Object.keys(columnFilters).filter(k => columnFilters[k]).length || selectedPlatforms.length < availablePlatforms.length || orderIdChips.length > 0) && (
-                  <Box sx={{ml: 6, display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
-                    {/* Platform filter chips - show if not all platforms are selected */}
-                    {selectedPlatforms.length > 0 && selectedPlatforms.length < availablePlatforms.length && (
-                      <Chip
-                        key="platform-filter"
-                        label={`Platform: ${selectedPlatforms.map(p => p === 'flipkart' ? 'Flipkart' : 'D2C').join(', ')}`}
-                        onDelete={() => {
-                          setSelectedPlatforms([...availablePlatforms]);
-                          setPage(0);
-                          setCurrentPage(1);
-                          fetchDualTransactions(1, columnFilters, dateRange, [...availablePlatforms]);
-                        }}
-                        size="small"
-                        sx={{ bgcolor: '#e0f2fe', color: '#0369a1', fontWeight: 600 }}
-                      />
-                    )}
+                {/* Transaction Tabs - Separate Row, Fully Responsive */}
+                <Box sx={{ 
+                  width: '100%',
+                  mt: { xs: 1, sm: 0.5 },
+                  mb: { xs: 1, sm: 0.5 },
+                  overflowX: 'auto',
+                  overflowY: 'hidden',
+                  '&::-webkit-scrollbar': {
+                    display: 'none'
+                  },
+                  scrollbarWidth: 'none',
+                  borderBottom: { xs: 'none', sm: '1px solid #e5e7eb' },
+                  pb: { xs: 0, sm: 0.5 }
+                }}>
+                  <Tabs 
+                    value={activeTab} 
+                    onChange={handleTabChange}
+                    variant={isSmallScreen ? 'scrollable' : 'standard'}
+                    scrollButtons={false}
+                    sx={{
+                      minWidth: 0,
+                      width: '100%',
+                      '& .MuiTabs-flexContainer': {
+                        gap: { xs: 0.5, sm: 1 },
+                        justifyContent: { xs: 'flex-start', sm: 'flex-start' },
+                      },
+                      '& .MuiTab-root': {
+                        minHeight: { xs: 32, sm: 36, md: 40 },
+                        fontSize: { xs: '0.7rem', sm: '0.8rem', md: '0.875rem' },
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        color: '#6b7280',
+                        px: { xs: 1, sm: 1.5, md: 2.5 },
+                        py: { xs: 0.75, sm: 1 },
+                        minWidth: { xs: 'auto', sm: 'fit-content' },
+                        maxWidth: { xs: '45%', sm: 'none' },
+                        whiteSpace: { xs: 'normal', sm: 'nowrap' },
+                        textAlign: { xs: 'center', sm: 'left' },
+                        overflow: 'hidden',
+                        textOverflow: { xs: 'ellipsis', sm: 'clip' },
+                        lineHeight: { xs: 1.2, sm: 1.5 },
+                        '&.Mui-selected': {
+                          color: '#1f2937',
+                          fontWeight: 700,
+                        },
+                      },
+                      '& .MuiTabs-indicator': {
+                        height: 2,
+                        borderRadius: '2px 2px 0 0',
+                        background: '#1f2937',
+                      },
+                    }}
+                  >
+                    <Tab 
+                      label={
+                        <Box sx={{ 
+                          display: 'flex', 
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          alignItems: 'center',
+                          gap: { xs: 0, sm: 0.25 },
+                          width: '100%',
+                          justifyContent: 'center'
+                        }}>
+                          <Box component="span">Settled</Box>
+                          {settledTotalCount !== null && (
+                            <Box 
+                              component="span"
+                              sx={{ 
+                                fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
+                                opacity: 0.8,
+                                fontWeight: 500,
+                                lineHeight: 1
+                              }}
+                            >
+                              ({settledTotalCount.toLocaleString()})
+                            </Box>
+                          )}
+                        </Box>
+                      } 
+                    />
+                    <Tab 
+                      label={
+                        <Box sx={{ 
+                          display: 'flex', 
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          alignItems: 'center',
+                          gap: { xs: 0, sm: 0.25 },
+                          width: '100%',
+                          justifyContent: 'center'
+                        }}>
+                          <Box component="span">Unsettled</Box>
+                          {unsettledTotalCount !== null && (
+                            <Box 
+                              component="span"
+                              sx={{ 
+                                fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
+                                opacity: 0.8,
+                                fontWeight: 500,
+                                lineHeight: 1
+                              }}
+                            >
+                              ({unsettledTotalCount.toLocaleString()})
+                            </Box>
+                          )}
+                        </Box>
+                      } 
+                    />
+                  </Tabs>
+                </Box>
+
+                {/* Active filter chips row directly under the header row, aligned under back button - Responsive */}
+                {(!!Object.keys(columnFilters).filter(k => columnFilters[k]).length || orderIdChips.length > 0) && (
+                  <Box sx={{
+                    ml: { xs: 0, sm: 6 },
+                    mt: { xs: 1, sm: 0 },
+                    display: 'flex',
+                    gap: { xs: 0.5, sm: 0.75 },
+                    flexWrap: 'wrap'
+                  }}>
                     {/* Order ID chips */}
                     {orderIdChips.length > 0 && (
                       <Chip
@@ -3802,7 +3910,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           setShowOrderIdSearch(false);
                           setPage(0);
                           setCurrentPage(1);
-                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms, []);
+                          fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform, []);
                         }}
                         size="small"
                         sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600 }}
@@ -3824,7 +3932,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             return p;
                           });
                                                       // Re-apply after deletion
-                            fetchDualTransactions(1, next, pendingDateRange, selectedPlatforms);
+                            fetchDualTransactions(1, next, pendingDateRange, selectedPlatform);
                         }}
                       />
                     ))}
@@ -3841,7 +3949,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               sx={{ mb: 2 }}
               action={
                 <Button color="inherit" size="small" onClick={() => {
-                  fetchDualTransactions(1, columnFilters, dateRange, selectedPlatforms);
+                  fetchDualTransactions(1, columnFilters, dateRange, selectedPlatform);
                 }}>
                   Retry
                 </Button>
@@ -4124,6 +4232,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             value = (row as any)[column];
                           }
                           
+                          // Override settlement date for unsettled transactions
+                          // If we're on the unsettled tab, settlement date should always be NA
+                          if (activeTab === 1 && column === 'Settlement Date') {
+                            value = 'NA';
+                          }
+                          
                           // Format value based on type
                           let displayValue = value;
                           
@@ -4137,7 +4251,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   displayValue = formatCurrency(Number(value) || 0);
                                   break;
                                 case 'date':
-                                  displayValue = formatDate(String(value));
+                                  // Don't format "NA" as a date
+                                  displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(String(value));
                                   break;
                                 case 'enum':
                                   displayValue = String(value || '');
@@ -4155,7 +4270,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   displayValue = formatCurrency(Number(value) || 0);
                                   break;
                                 case 'date':
-                                  displayValue = formatDate(String(value));
+                                  // Don't format "NA" as a date
+                                  displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(String(value));
                                   break;
                                 case 'enum':
                                   displayValue = String(value || '');
@@ -4176,7 +4292,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 displayValue = value.toLocaleString('en-IN');
                               }
                             } else if (column.includes('Date')) {
-                              displayValue = formatDate(value || '');
+                              // Don't format "NA" as a date
+                              displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(value || '');
                             }
                           }
                           
@@ -4290,22 +4407,24 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       );
                                     })()}
                                     
-                                    {/* Breakups details button */}
-                                    <IconButton
-                                      size="small"
-                                      onClick={(e) => handleBreakupsOpen(e, row)}
-                                      sx={{
-                                        p: 0.5,
-                                        minWidth: 20,
-                                        height: 20,
-                                        '&:hover': {
-                                          background: '#f3f4f6',
-                                          color: '#374151',
-                                        },
-                                      }}
-                                    >
-                                      <InfoOutlined fontSize="small" sx={{ color: '#6b7280' }}/>
-                                    </IconButton>
+                                    {/* Breakups details button - only show for settled tab (activeTab === 0) */}
+                                    {activeTab === 0 && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => handleBreakupsOpen(e, row)}
+                                        sx={{
+                                          p: 0.5,
+                                          minWidth: 20,
+                                          height: 20,
+                                          '&:hover': {
+                                            background: '#f3f4f6',
+                                            color: '#374151',
+                                          },
+                                        }}
+                                      >
+                                        <InfoOutlined fontSize="small" sx={{ color: '#6b7280' }}/>
+                                      </IconButton>
+                                    )}
                                   </Box>
 
                                 ) : (
@@ -4456,7 +4575,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         if (!mapping) return true; // Show columns without mapping
                         if (!mapping.supportedPlatforms) return true; // Show columns available on all platforms
                         // Show if supported by at least one selected platform
-                        return selectedPlatforms.some(p => mapping.supportedPlatforms!.includes(p as any));
+                        return mapping.supportedPlatforms!.includes(selectedPlatform as any);
                       })
                       .map((col) => (
                         <ListItemButton

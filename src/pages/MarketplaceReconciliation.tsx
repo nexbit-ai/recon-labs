@@ -35,6 +35,9 @@ import {
   Tabs,
   Tab,
   Checkbox,
+  RadioGroup,
+  Radio,
+  FormControlLabel,
   Snackbar,
   Select,
   MenuItem,
@@ -187,7 +190,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
   const [initialTsFilters, setInitialTsFilters] = useState<{ [key: string]: any } | undefined>(undefined);
   const [initialTsTab, setInitialTsTab] = useState<number>(0);
-  const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'd2c' | undefined>(undefined);
+  const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'amazon' | 'd2c' | undefined>(undefined);
   const location = useLocation();
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
@@ -349,7 +352,7 @@ const MarketplaceReconciliation: React.FC = () => {
       rows.push(['Context', 'Start Date', startDateText]);
       rows.push(['Context', 'End Date', endDateText]);
       rows.push(['Context', 'Date Field', dateField]);
-      rows.push(['Context', 'Platforms', (selectedPlatforms || []).join(' | ')]);
+      rows.push(['Context', 'Platforms', selectedPlatform || '']);
       rows.push(['Context', 'Main Tab', activeMainTab]);
 
       // High-level summary (what is currently shown on cards)
@@ -453,6 +456,8 @@ const MarketplaceReconciliation: React.FC = () => {
         total_amount_settled: number;
         total_commission: number;
         total_gst_on_commission: number;
+        total_tds_amount?: number;
+        total_tcs_amount?: number;
       }> | undefined;
       if (commissionArray && commissionArray.length > 0) {
         rows.push(['', '', '']);
@@ -461,7 +466,8 @@ const MarketplaceReconciliation: React.FC = () => {
           const name = item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1);
           rows.push(['Commission & Charges', `${name} - Total Amount Settled`, String(safeNum(item.total_amount_settled))]);
           rows.push(['Commission & Charges', `${name} - Commission`, String(safeNum(item.total_commission))]);
-          rows.push(['Commission & Charges', `${name} - GST on Commission`, String(safeNum(item.total_gst_on_commission))]);
+          const totalTdsTcs = (item.total_tds_amount || 0) + (item.total_tcs_amount || 0);
+          rows.push(['Commission & Charges', `${name} - TDS and TCS`, String(safeNum(Math.abs(totalTdsTcs)))]);
         });
       }
 
@@ -850,7 +856,7 @@ const MarketplaceReconciliation: React.FC = () => {
           start_date: startDate,
           end_date: endDate,
           date_field: dateField === 'invoice' ? 'invoice_date' : 'settlement_date',
-          platform: selectedPlatforms,
+          platform: selectedPlatform || undefined,
         };
         const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
         // ms is ApiResponse<any>; data is payload
@@ -887,7 +893,7 @@ const MarketplaceReconciliation: React.FC = () => {
           start_date: startDate,
           end_date: endDate,
           date_field: dateField === 'invoice' ? 'invoice_date' : 'settlement_date',
-          platform: selectedPlatforms,
+          platform: selectedPlatform || undefined,
         };
         const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
         const payload = (ms as any).data as MainSummaryResponse;
@@ -959,7 +965,7 @@ const MarketplaceReconciliation: React.FC = () => {
         start_date: startDate,
         end_date: endDate,
         date_field: dateField === 'invoice' ? 'invoice_date' : 'settlement_date',
-        platform: selectedPlatforms.length > 0 ? selectedPlatforms : ['d2c']
+        platform: selectedPlatform || 'd2c'
       };
       
       const resp = await apiIndex.mainSummary.getMainSummary(params);
@@ -1028,7 +1034,7 @@ const MarketplaceReconciliation: React.FC = () => {
       }
       
       // Determine platform parameter
-      const platformParam = selectedPlatforms.length > 0 ? selectedPlatforms.join(',') : undefined;
+      const platformParam = selectedPlatform || undefined;
       
       const params = {
         platform: platformParam,
@@ -1052,10 +1058,37 @@ const MarketplaceReconciliation: React.FC = () => {
     }
   };
   
-  // Platform selector state
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['flipkart']);
+  // Platform selector state - load from localStorage if available
+  const loadPlatformFromStorage = (): Platform => {
+    try {
+      const stored = localStorage.getItem('recon_selected_platforms');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Handle both old array format and new single value format
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed[0] as Platform;
+        } else if (typeof parsed === 'string' && ['flipkart', 'amazon', 'd2c'].includes(parsed)) {
+          return parsed as Platform;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load platform from localStorage:', e);
+    }
+    return 'flipkart'; // default
+  };
+
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(loadPlatformFromStorage());
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [tempSelectedPlatforms, setTempSelectedPlatforms] = useState<Platform[]>([]);
+  const [tempSelectedPlatform, setTempSelectedPlatform] = useState<Platform | null>(null);
+
+  // Persist platform to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('recon_selected_platforms', JSON.stringify(selectedPlatform));
+    } catch (e) {
+      console.warn('Failed to save platform to localStorage:', e);
+    }
+  }, [selectedPlatform]);
   
   // Available platforms
   const availablePlatforms = [
@@ -1239,39 +1272,6 @@ const MarketplaceReconciliation: React.FC = () => {
     return mockReconciliationData;
   };
 
-  // Build Amazon demo data (for Amazon-only and All aggregation)
-  const buildAmazonDemoData = (): MarketplaceReconciliationResponse => {
-    return {
-      grossSales: '28500000',
-      ordersDelivered: { number: 15180, amount: '26800000' } as any,
-      ordersReturned: { number: 520, amount: '700000' } as any,
-      commission: { totalCommission: '0', commissionRate: '0' } as any,
-      settledSales: '0',
-      summaryData: {
-        totalTransaction: { number: 18425, amount: '31250000' } as any,
-        netSalesAsPerSalesReport: { number: 16230, amount: '28500000' } as any,
-        paymentReceivedAsPerSettlementReport: { number: 15080, amount: '26200000' } as any,
-        pendingPaymentFromMarketplace: { number: 1150, amount: '600000' } as any,
-        totalReconciled: { number: 15080, amount: '26200000' } as any,
-        totalUnreconciled: {
-          number: 3345,
-          amount: '600000',
-          lessPaymentReceivedFromFlipkart: { number: 2100, amount: '1450000' } as any,
-          excessPaymentReceivedFromFlipkart: { number: 1245, amount: '850000' } as any,
-        } as any,
-        pendingDeductions: { number: 0, amount: '0' } as any,
-        returnedOrCancelledOrders: { number: 720, amount: '980000' } as any,
-      } as any,
-      totalTDS: '320000',
-      totalTDA: '450000',
-      monthOrdersPayoutReceived: '26200000',
-      monthOrdersAwaitedSettlement: { salesOrders: 0, salesAmount: '0' } as any,
-      unsettledReturns: { returnsOrders: 0, returnAmount: '0' } as any,
-      difference: '0',
-      returnRate: '0',
-      commissionRate: '0',
-    } as any;
-  };
 
   // Helper to convert numeric to API string amount
   const toAmountString = (value: number): string => {
@@ -1372,59 +1372,6 @@ const MarketplaceReconciliation: React.FC = () => {
     } as any;
   };
 
-  // Apply demo data for Amazon selection
-  const applyAmazonDemoData = () => {
-    try {
-      const demo: MarketplaceReconciliationResponse = JSON.parse(JSON.stringify(reconciliationData));
-
-      // High-level sales numbers
-      (demo as any).grossSales = '28500000';
-      (demo as any).totalTDA = '450000';
-      (demo as any).totalTDS = '320000';
-
-      // Summary data
-      demo.summaryData.totalTransaction = { number: 18425, amount: '31250000' } as any;
-      demo.summaryData.netSalesAsPerSalesReport = { number: 16230, amount: '28500000' } as any;
-      demo.summaryData.paymentReceivedAsPerSettlementReport = { number: 15080, amount: '26200000' } as any;
-      demo.summaryData.pendingPaymentFromMarketplace = { number: 1150, amount: '600000' } as any;
-      demo.summaryData.totalReconciled = { number: 15080, amount: '26200000' } as any;
-      demo.summaryData.totalUnreconciled = {
-        number: 3345,
-        amount: '600000',
-        lessPaymentReceivedFromFlipkart: { number: 2100, amount: '1450000' },
-        excessPaymentReceivedFromFlipkart: { number: 1245, amount: '850000' },
-      } as any;
-      demo.summaryData.returnedOrCancelledOrders = { number: 720, amount: '980000' } as any;
-
-      // Orders delivered/returned (if present on the shape)
-      (demo as any).ordersDelivered = { number: 15180, amount: '26800000' };
-      (demo as any).ordersReturned = { number: 520, amount: '700000' };
-
-      setReconciliationData(demo);
-
-      // Demo unreconciled reasons (AI insight)
-      setUnreconciledReasons([
-        { reason: 'Commission mismatch', count: 132 },
-        { reason: 'Weight discrepancy fee', count: 97 },
-        { reason: 'Return not received in time', count: 74 },
-        { reason: 'Shipping overcharge', count: 58 },
-        { reason: 'Promotional fee variance', count: 41 },
-      ]);
-
-      // Demo sales overview
-      setSalesOverview({
-        netRevenue: { value: '26200000', label: 'Net Revenue' },
-        grossRevenue: { value: '28500000', label: 'Gross Revenue' },
-        returns: { value: '980000', label: 'Returns' },
-        monthData: [
-          { month: 'February 2025', gross: '25500000', net: '23200000', returns: '600000' },
-          { month: 'March 2025', gross: '28500000', net: '26200000', returns: '980000' },
-        ],
-      });
-    } catch (e) {
-      // no-op
-    }
-  };
 
   // Fetch sales overview data from backend
   const fetchSalesOverview = async () => {
@@ -1619,7 +1566,7 @@ const MarketplaceReconciliation: React.FC = () => {
     if (selectedDateRange !== 'custom' || (customStartDate && customEndDate)) {
       fetchAgeingAnalysis();
     }
-  }, [selectedDateRange, customStartDate, customEndDate, dateField, selectedPlatforms]);
+  }, [selectedDateRange, customStartDate, customEndDate, dateField, selectedPlatform]);
 
   // Load sales overview data
   useEffect(() => {
@@ -1954,7 +1901,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   variant="outlined"
                   endIcon={<KeyboardArrowDownIcon />}
                   startIcon={<StorefrontIcon />}
-                  onClick={(event) => { setTempSelectedPlatforms(selectedPlatforms); setPlatformMenuAnchorEl(event.currentTarget); }}
+                  onClick={(event) => { setTempSelectedPlatform(selectedPlatform); setPlatformMenuAnchorEl(event.currentTarget); }}
                   sx={{
                     borderColor: '#6B7280',
                     color: '#6B7280',
@@ -1969,12 +1916,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     },
                   }}
                 >
-                  {selectedPlatforms.length === availablePlatforms.length
-                    ? 'All'
-                    : (selectedPlatforms.length > 0 
-                        ? (availablePlatforms.find(p => p.value === selectedPlatforms[0])?.label || 'Select Platforms')
-                        : 'Select Platforms')
-                  }
+                  {availablePlatforms.find(ap => ap.value === selectedPlatform)?.label || 'Select Platform'}
                 </Button>
                 <Menu
                   anchorEl={platformMenuAnchorEl}
@@ -1990,108 +1932,82 @@ const MarketplaceReconciliation: React.FC = () => {
                     }
                   }}
                 >
-                  <Box sx={{ px: 1, py: 0.5 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>Platforms</Typography>
-                      <Button
-                        size="small"
-                        variant="text"
-                        onClick={() => {
-                          if (tempSelectedPlatforms.length === availablePlatforms.length) {
-                            setTempSelectedPlatforms([]);
-                          } else {
-                            setTempSelectedPlatforms(availablePlatforms.map(p => p.value) as Platform[]);
-                          }
-                        }}
-                        sx={{ textTransform: 'none', minWidth: 'auto', px: 1 }}
-                      >
-                        {tempSelectedPlatforms.length === availablePlatforms.length ? 'Clear all' : 'Select all'}
-                      </Button>
-                    </Box>
-                    {availablePlatforms.map((p) => (
-                      <MenuItem
-                        key={p.value}
-                        onClick={() => {
-                          setTempSelectedPlatforms(prev => {
-                            const has = prev.includes(p.value);
-                            return has ? (prev.filter(x => x !== p.value) as Platform[]) : ([...prev, p.value] as Platform[]);
-                          });
-                        }}
-                        sx={{ py: 1, px: 1, borderRadius: '8px' }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Checkbox size="small" checked={tempSelectedPlatforms.includes(p.value)} />
-                          <Box>
-                            <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p.label}</Typography>
-                            <Typography variant="caption" sx={{ color: '#6b7280' }}>{p.value === 'd2c' ? 'Website / D2C' : 'E-commerce marketplace'}</Typography>
+                  <Box sx={{ p: 1, minWidth: 240 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', mb: 1 }}>Select Platform</Typography>
+                    <RadioGroup
+                      value={tempSelectedPlatform || selectedPlatform}
+                      onChange={(e) => {
+                        const newPlatform = e.target.value as Platform;
+                        setTempSelectedPlatform(newPlatform);
+                      }}
+                    >
+                      {availablePlatforms.map((p) => (
+                        <MenuItem
+                          key={p.value}
+                          onClick={() => {
+                            setTempSelectedPlatform(p.value);
+                          }}
+                          sx={{ py: 1, px: 1, borderRadius: '8px' }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Radio size="small" checked={(tempSelectedPlatform || selectedPlatform) === p.value} value={p.value} />
+                            <Box>
+                              <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p.label}</Typography>
+                              <Typography variant="caption" sx={{ color: '#6b7280' }}>{p.value === 'd2c' ? 'Website / D2C' : 'E-commerce marketplace'}</Typography>
+                            </Box>
                           </Box>
-                        </Box>
-                      </MenuItem>
-                    ))}
+                        </MenuItem>
+                      ))}
+                    </RadioGroup>
                     <Box sx={{ display: 'flex', gap: 1, mt: 1, justifyContent: 'flex-end' }}>
                       <Button variant="outlined" onClick={() => setPlatformMenuAnchorEl(null)} sx={{ textTransform: 'none', color: '#6b7280', borderColor: '#e5e7eb' }}>Cancel</Button>
                       <Button
                         variant="contained"
-                        disabled={tempSelectedPlatforms.length === 0}
+                        disabled={!tempSelectedPlatform}
                         onClick={async () => {
-                          const next = tempSelectedPlatforms;
-                          setSelectedPlatforms(next);
+                          const next = tempSelectedPlatform!;
+                          setSelectedPlatform(next);
                           try {
-                            let data: MarketplaceReconciliationResponse | null = null;
-                            if (next.includes('flipkart' as Platform)) {
-                              data = await fetchFlipkartDataForCurrentRange();
-                            }
-                            if (next.includes('amazon' as Platform)) {
-                              const amazonDemo = buildAmazonDemoData();
-                              data = data ? mergeReconciliationData(data, amazonDemo) : amazonDemo;
-                            }
-                            if (next.includes('d2c' as Platform)) {
-                              const d2cDemo = buildD2CDemoData();
-                              data = data ? mergeReconciliationData(data, d2cDemo) : d2cDemo;
-                            }
-                            if (data) setReconciliationData(data);
-
-                            // Also fetch unified summary from main-summary using selected platforms
-                            try {
-                              let startDate = customStartDate;
-                              let endDate = customEndDate;
-                              const today = new Date();
-                              const fmt = (d: Date) => d.toISOString().split('T')[0];
-                              if (selectedDateRange !== 'custom') {
-                                if (selectedDateRange === 'today') {
-                                  startDate = fmt(today);
-                                  endDate = fmt(today);
-                                } else if (selectedDateRange === 'this-week') {
-                                  const startOfWeek = new Date(today);
-                                  startOfWeek.setDate(today.getDate() - today.getDay());
-                                  const endOfWeek = new Date(startOfWeek);
-                                  endOfWeek.setDate(startOfWeek.getDate() + 6);
-                                  startDate = fmt(startOfWeek);
-                                  endDate = fmt(endOfWeek);
-                                } else if (selectedDateRange === 'this-month') {
-                                  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                                  startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
-                                  endDate = fmt(endOfMonth);
-                                } else if (selectedDateRange === 'this-year') {
-                                  startDate = `${today.getFullYear()}-01-01`;
-                                  endDate = `${today.getFullYear()}-12-31`;
-                                }
+                            // Fetch unified summary from main-summary using selected platforms
+                            let startDate = customStartDate;
+                            let endDate = customEndDate;
+                            const today = new Date();
+                            const fmt = (d: Date) => d.toISOString().split('T')[0];
+                            if (selectedDateRange !== 'custom') {
+                              if (selectedDateRange === 'today') {
+                                startDate = fmt(today);
+                                endDate = fmt(today);
+                              } else if (selectedDateRange === 'this-week') {
+                                const startOfWeek = new Date(today);
+                                startOfWeek.setDate(today.getDate() - today.getDay());
+                                const endOfWeek = new Date(startOfWeek);
+                                endOfWeek.setDate(startOfWeek.getDate() + 6);
+                                startDate = fmt(startOfWeek);
+                                endDate = fmt(endOfWeek);
+                              } else if (selectedDateRange === 'this-month') {
+                                const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                                startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+                                endDate = fmt(endOfMonth);
+                              } else if (selectedDateRange === 'this-year') {
+                                startDate = `${today.getFullYear()}-01-01`;
+                                endDate = `${today.getFullYear()}-12-31`;
                               }
-
-                              const mainSummaryParams = {
-                                start_date: startDate,
-                                end_date: endDate,
-                                platform: next,
-                              } as any;
-                              const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
-                              const payload = (ms as any).data as MainSummaryResponse;
-                              setMainSummary(payload);
-                              if (payload?.UnReconcile?.reasons?.length) {
-                                setUnreconciledReasons(payload.UnReconcile.reasons.map((r: any) => ({ reason: r.name, count: r.count })));
-                              }
-                            } catch (e) {
-                              console.warn('main-summary fetch failed', e);
                             }
+
+                            const mainSummaryParams = {
+                              start_date: startDate,
+                              end_date: endDate,
+                              date_field: dateField === 'invoice' ? 'invoice_date' : 'settlement_date',
+                              platform: next || undefined,
+                            } as any;
+                            const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
+                            const payload = (ms as any).data as MainSummaryResponse;
+                            setMainSummary(payload);
+                            if (payload?.UnReconcile?.reasons?.length) {
+                              setUnreconciledReasons(payload.UnReconcile.reasons.map((r: any) => ({ reason: r.name, count: r.count })));
+                            }
+                          } catch (e) {
+                            console.warn('main-summary fetch failed', e);
                           } finally {
                             setPlatformMenuAnchorEl(null);
                           }
@@ -2173,8 +2089,6 @@ const MarketplaceReconciliation: React.FC = () => {
                   {(() => {
                     // Use main-summary as the sole source for the summary math
                     const s = mainSummary?.summary as any;
-                    const totalSalesAmount = Math.abs(Number(s?.total_transactions_amount || 0));
-                    const totalSalesCount = Number(s?.total_transaction_orders || 0);
 
                     const returnsAmount = Math.abs(Number(s?.total_return_amount || 0));
                     const returnsCount = Number(s?.total_return_orders || 0);
@@ -2186,23 +2100,28 @@ const MarketplaceReconciliation: React.FC = () => {
                     const netSalesAmount = Math.abs(Number(s?.net_sales_amount || 0));
                     const netSalesCount = Number(s?.net_sales_orders || 0);
 
+                    // Previous return/cancellations metrics
+                    const prevReturnOrCancelledAmount = Math.abs(Number(s?.prev_return_or_cancelled_amount || 0));
+                    const prevReturnOrCancelledCount = Number(s?.prev_return_or_cancelled_orders || 0);
+
                     const sections = [
                       { type: 'metric', label: 'Net Sales', amount: netSalesAmount, count: netSalesCount },
-                      { type: 'operator', symbol: '=' },
-                      { type: 'metric', label: 'Total Sales', amount: totalSalesAmount, count: totalSalesCount },
-                      { type: 'operator', symbol: '-' },
                       { type: 'metric', label: 'Returns', amount: returnsAmount, count: returnsCount },
-                      { type: 'operator', symbol: '-' },
                       { type: 'metric', label: 'Cancellations', amount: cancellationsAmount, count: cancellationsCount }
                     ];
 
+                    // Add previous return/cancellations metric if values exist
+                    if (prevReturnOrCancelledAmount > 0 || prevReturnOrCancelledCount > 0) {
+                      sections.push(
+                        { type: 'metric', label: 'Previous Return/Cancellations', amount: prevReturnOrCancelledAmount, count: prevReturnOrCancelledCount }
+                      );
+                    }
+
                     return (
                       <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        flexWrap: 'wrap',
-                        gap: 0.5,
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(2, 1fr)',
+                        gap: 3,
                         p: 3
                       }}>
                         {sections.map((section, idx) => (
@@ -2210,51 +2129,36 @@ const MarketplaceReconciliation: React.FC = () => {
                             display: 'flex', 
                             flexDirection: 'column', 
                             alignItems: 'center',
-                            textAlign: 'center',
-                            minWidth: section.type === 'operator' ? '30px' : '120px'
+                            textAlign: 'center'
                           }}>
-                            {section.type === 'metric' ? (
-                              <>
-                                <Typography sx={{ 
-                                  fontSize: '0.75rem', 
-                                  fontWeight: 500, 
-                                  color: '#6b7280',
-                                  letterSpacing: '0.05em',
-                                  textTransform: 'uppercase',
-                                  mb: 0.5
-                                }}>
-                                  {section.label}
-                                </Typography>
-                                <Typography sx={{ 
-                                  fontSize: '1.5rem', 
-                                  fontWeight: 300, 
-                                  color: '#111827',
-                                  fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
-                                  letterSpacing: '-0.02em',
-                                  mb: 0.25
-                                }}>
-                                  ₹{Math.round(Number(section.amount || 0)).toLocaleString('en-IN')}
-                                </Typography>
-                                <Typography sx={{ 
-                                  fontSize: '0.75rem', 
-                                  fontWeight: 300, 
-                                  color: '#9ca3af',
-                                  letterSpacing: '0.025em'
-                                }}>
-                                  {Number(section.count || 0).toLocaleString('en-IN')} orders
-                                </Typography>
-                              </>
-                            ) : (
-                              <Typography sx={{ 
-                                fontSize: '1.75rem', 
-                                fontWeight: 300, 
-                                color: '#6b7280',
-                                fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
-                                lineHeight: 1
-                              }}>
-                                {section.symbol}
-                              </Typography>
-                            )}
+                            <Typography sx={{ 
+                              fontSize: '0.75rem', 
+                              fontWeight: 500, 
+                              color: '#6b7280',
+                              letterSpacing: '0.05em',
+                              textTransform: 'uppercase',
+                              mb: 0.5
+                            }}>
+                              {section.label}
+                            </Typography>
+                            <Typography sx={{ 
+                              fontSize: '1.5rem', 
+                              fontWeight: 300, 
+                              color: '#111827',
+                              fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
+                              letterSpacing: '-0.02em',
+                              mb: 0.25
+                            }}>
+                              ₹{Math.round(Number(section.amount || 0)).toLocaleString('en-IN')}
+                            </Typography>
+                            <Typography sx={{ 
+                              fontSize: '0.75rem', 
+                              fontWeight: 300, 
+                              color: '#9ca3af',
+                              letterSpacing: '0.025em'
+                            }}>
+                              {Number(section.count || 0).toLocaleString('en-IN')} orders
+                            </Typography>
                           </Box>
                         ))}
                       </Box>
@@ -2266,25 +2170,24 @@ const MarketplaceReconciliation: React.FC = () => {
           </Grid>
           {/* Reconciliation Status */}
           <Grid item xs={12} md={5}>
-                          <Card 
-                onClick={() => navigate(`/dispute?from=${effectiveDateRangeForTs.start}&to=${effectiveDateRangeForTs.end}`)}
-                sx={{ 
+            <Card 
+              sx={{ 
                 background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
                 borderRadius: '16px',
                 border: '1px solid #f1f3f4',
                 boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
-                minHeight: 'fit-content',
-                maxHeight: '520px',
+                height: '100%',
                 overflow: 'hidden',
                 transition: 'all 0.3s ease',
-                cursor: 'pointer',
-                '&:hover': {
-                  boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                  transform: 'translateY(-2px)',
-                }
               }}
             >
-              <CardContent sx={{ p: 3 }}>
+              <CardContent sx={{ 
+                p: 3,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center'
+              }}>
                 <Typography variant="h3" sx={{ 
                   fontWeight: 600, 
                   mb: 2, 
@@ -2300,7 +2203,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   display: 'flex', 
                   flexDirection: 'column', 
                   alignItems: 'center',
-                  justifyContent: 'flex-start',
+                  justifyContent: 'center',
                   gap: 2,
                 }}>
                   {/* Gauge Chart */}
@@ -2312,9 +2215,11 @@ const MarketplaceReconciliation: React.FC = () => {
                       background: (() => {
                         const s = mainSummary?.summary as any;
                         const reconciledCount = Number(s?.total_reconciled_count || 0);
+                        const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
+                        const totalReconciledCount = reconciledCount + manuallyReconciledCount;
                         const unreconciledCount = Number(s?.total_unreconciled_count || 0);
-                        const totalCount = reconciledCount + unreconciledCount;
-                        const matchedPct = totalCount === 0 ? 100 : Math.max(0, Math.min(100, (reconciledCount / totalCount) * 100));
+                        const totalCount = totalReconciledCount + unreconciledCount;
+                        const matchedPct = totalCount === 0 ? 100 : Math.max(0, Math.min(100, (totalReconciledCount / totalCount) * 100));
                         const matchedDeg = (matchedPct / 100) * 360;
                         return `conic-gradient(#10b981 0deg, #10b981 ${matchedDeg}deg, #ef4444 ${matchedDeg}deg, #ef4444 360deg)`;
                       })(),
@@ -2339,9 +2244,11 @@ const MarketplaceReconciliation: React.FC = () => {
                           color: (() => {
                             const s = mainSummary?.summary as any;
                             const reconciledCount = Number(s?.total_reconciled_count || 0);
+                            const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
+                            const totalReconciledCount = reconciledCount + manuallyReconciledCount;
                             const unreconciledCount = Number(s?.total_unreconciled_count || 0);
-                            const totalCount = reconciledCount + unreconciledCount;
-                            const pct = totalCount === 0 ? 100 : Math.max(0, (reconciledCount / totalCount) * 100);
+                            const totalCount = totalReconciledCount + unreconciledCount;
+                            const pct = totalCount === 0 ? 100 : Math.max(0, (totalReconciledCount / totalCount) * 100);
                             return getReconciliationColor(pct);
                           })(),
                           fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -2352,9 +2259,11 @@ const MarketplaceReconciliation: React.FC = () => {
                           {(() => {
                             const s = mainSummary?.summary as any;
                             const reconciledCount = Number(s?.total_reconciled_count || 0);
+                            const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
+                            const totalReconciledCount = reconciledCount + manuallyReconciledCount;
                             const unreconciledCount = Number(s?.total_unreconciled_count || 0);
-                            const totalCount = reconciledCount + unreconciledCount;
-                            const pct = totalCount === 0 ? 100 : Math.max(0, (reconciledCount / totalCount) * 100);
+                            const totalCount = totalReconciledCount + unreconciledCount;
+                            const pct = totalCount === 0 ? 100 : Math.max(0, (totalReconciledCount / totalCount) * 100);
                             return `${pct.toFixed(1)}%`;
                           })()}
                         </Typography>
@@ -2362,31 +2271,91 @@ const MarketplaceReconciliation: React.FC = () => {
                     </Box>
                   </Box>
 
-                  {/* Total Unreconciled Transactions Card */}
-                    <Box sx={{
+                  {/* Action Buttons */}
+                  <Box sx={{
                     width: '100%',
-                    p: 2,
-                    textAlign: 'center',
-                    }}>
-                                              <Typography variant="body2" sx={{
-                        color: '#1f2937',
-                          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontWeight: 500,
-                          mb: 1,
-                      fontSize: '0.875rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                        }}>
-                          Total Unreconciled Transactions
+                    display: 'flex',
+                    gap: 1.5,
+                    justifyContent: 'center',
+                  }}>
+                    <Button
+                      variant="text"
+                      onClick={() => {
+                        const platformsParam = selectedPlatform || '';
+                        const urlParams = new URLSearchParams({
+                          from: effectiveDateRangeForTs.start,
+                          to: effectiveDateRangeForTs.end
+                        });
+                        if (platformsParam) {
+                          urlParams.set('platforms', platformsParam);
+                        }
+                        navigate(`/operations-centre?${urlParams.toString()}`);
+                      }}
+                      sx={{
+                        flex: 1,
+                        py: 1.5,
+                        px: 2,
+                        border: '1px solid #e5e7eb',
+                        color: '#374151',
+                        backgroundColor: '#ffffff',
+                        fontWeight: 500,
+                        textTransform: 'none',
+                        borderRadius: '8px',
+                        '&:hover': {
+                          backgroundColor: '#f9fafb',
+                          borderColor: '#d1d5db',
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.125rem', color: '#111827' }}>
+                          {Number(mainSummary?.summary?.total_unreconciled_count || 0).toLocaleString()}
                         </Typography>
-                    <Typography variant="h5" sx={{
-                      color: '#1f2937',
-                        fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                        fontWeight: 700,
-                      letterSpacing: '-0.02em'
-                      }}>
-                      {Number(mainSummary?.summary?.total_unreconciled_count || 0).toLocaleString()}
-                      </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: '#6b7280', fontWeight: 400 }}>
+                          Unreconciled
+                        </Typography>
+                      </Box>
+                    </Button>
+                    
+                    <Button
+                      variant="text"
+                      onClick={() => {
+                        const platformsParam = selectedPlatform || '';
+                        const urlParams = new URLSearchParams({
+                          from: effectiveDateRangeForTs.start,
+                          to: effectiveDateRangeForTs.end,
+                          tab: '1'
+                        });
+                        if (platformsParam) {
+                          urlParams.set('platforms', platformsParam);
+                        }
+                        navigate(`/operations-centre?${urlParams.toString()}`);
+                      }}
+                      sx={{
+                        flex: 1,
+                        py: 1.5,
+                        px: 2,
+                        border: '1px solid #e5e7eb',
+                        color: '#374151',
+                        backgroundColor: '#ffffff',
+                        fontWeight: 500,
+                        textTransform: 'none',
+                        borderRadius: '8px',
+                        '&:hover': {
+                          backgroundColor: '#f9fafb',
+                          borderColor: '#d1d5db',
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.125rem', color: '#111827' }}>
+                          {Number((mainSummary?.summary as any)?.total_manually_reconciled_or_disputed_count || 0).toLocaleString()}
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: '#6b7280', fontWeight: 400 }}>
+                          Manually Reconciled
+                        </Typography>
+                      </Box>
+                    </Button>
                   </Box>
                 </Box>
               </CardContent>
@@ -2475,7 +2444,10 @@ const MarketplaceReconciliation: React.FC = () => {
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={() => navigate(`/dispute?from=${effectiveDateRangeForTs.start}&to=${effectiveDateRangeForTs.end}`)}
+                            onClick={() => {
+                              const platformsParam = selectedPlatform || '';
+                              navigate(`/operations-centre?from=${effectiveDateRangeForTs.start}&to=${effectiveDateRangeForTs.end}${platformsParam ? `&platforms=${platformsParam}` : ''}`);
+                            }}
                             sx={{
                               borderColor: '#6366f1',
                               color: '#6366f1',
@@ -2621,7 +2593,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             // Matched totals from API response (reconciled)
                             const matchedAmount = Number(s?.total_reconciled_amount || 0);
                             const matchedCount = Number(s?.total_reconciled_count || 0);
-                            const percentSettled = expectedSalesAmount === 0 ? 0 : Math.min(100, (matchedAmount / expectedSalesAmount) * 100);
+                            const percentSettled = expectedSalesCount === 0 ? 0 : Math.min(100, (matchedCount / expectedSalesCount) * 100);
 
                             // Keep the existing provider calculation for display purposes
                             const { gateways, cod } = splitGatewaysAndCod(mainSummary?.Reconcile);
@@ -2711,9 +2683,9 @@ const MarketplaceReconciliation: React.FC = () => {
                                     </Typography>
                                   </Box>
                                   <Box sx={{ textAlign: 'right' }}>
-                                    <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>
+                                    {/* <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>
                                       Expected vs Settled
-                                    </Typography>
+                                    </Typography> */}
                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                                         <Typography variant="body1" sx={{ color: '#374151', fontWeight: 600, fontSize: '1.1rem' }}>
@@ -2742,7 +2714,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                 </Box>
 
                                 {/* Settlements by Providers - only for D2C */}
-                                {selectedPlatforms.includes('d2c') && (
+                                {selectedPlatform === 'd2c' && (
                                   <Box sx={{ mt: 4 }}>
                                     <Typography variant="h6" sx={{ 
                                       fontWeight: 600, 
@@ -3187,10 +3159,12 @@ const MarketplaceReconciliation: React.FC = () => {
                                                   const providerName = provider.name.toLowerCase();
                                                   const providerKey = provider.key.toLowerCase();
                                                   
-                                                  let platform: 'flipkart' | 'd2c' = 'flipkart'; // Default to flipkart
+                                                  let platform: 'flipkart' | 'amazon' | 'd2c' = 'flipkart'; // Default to flipkart
                                                   
                                                   if (providerKey === 'flipkart' || providerName.includes('flipkart')) {
                                                     platform = 'flipkart';
+                                                  } else if (providerKey === 'amazon' || providerName.includes('amazon')) {
+                                                    platform = 'amazon';
                                                   } else if (providerKey === 'd2c' || providerName.includes('d2c') || providerName.includes('direct')) {
                                                     platform = 'd2c';
                                                   }
@@ -3312,15 +3286,15 @@ const MarketplaceReconciliation: React.FC = () => {
                           </Typography>
                         </Box>
                         <Box sx={{ textAlign: 'right' }}>
-                          <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>
+                          {/* <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>
                             Unreconciled = Less Payment Received − More Payment Received from Marketplace
-                          </Typography>
+                          </Typography> */}
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                               <Typography variant="body1" sx={{ color: '#b91c1c', fontWeight: 600, fontSize: '1.1rem' }}>
                                 Less Payment Received
                               </Typography>
-                              <Typography variant="h6" sx={{ color: amountColor(lessPaymentAmount), fontWeight: 700, fontSize: '1.2rem' }}>
+                              <Typography variant="h6" sx={{ color: '#111827', fontWeight: 400, fontSize: '1.2rem' }}>
                                 {formatCurrency(Math.abs(lessPaymentAmount))}
                               </Typography>
                             </Box>
@@ -3331,7 +3305,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
                                 More Payment Received
                               </Typography>
-                              <Typography variant="h6" sx={{ color: amountColor(morePaymentAmount), fontWeight: 700, fontSize: '1.2rem' }}>
+                              <Typography variant="h6" sx={{ color: '#111827', fontWeight: 400, fontSize: '1.2rem' }}>
                                 {formatCurrency(morePaymentAmount)}
                               </Typography>
                             </Box>
@@ -3343,7 +3317,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       </Box>
 
                       {/* Conditional Content based on selected platform */}
-                      {selectedPlatforms.includes('d2c') ? (
+                      {selectedPlatform === 'd2c' ? (
                         <>
                           {/* Tabs for By Reasons and By Providers - Only for D2C */}
                           <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
@@ -3867,6 +3841,8 @@ const MarketplaceReconciliation: React.FC = () => {
                 total_amount_settled: number;
                 total_commission: number;
                 total_gst_on_commission: number;
+                total_tds_amount?: number;
+                total_tcs_amount?: number;
               }> | undefined;
               if (!commissionArray || commissionArray.length === 0) return null;
 
@@ -3902,7 +3878,7 @@ const MarketplaceReconciliation: React.FC = () => {
 
               // Calculate totals dynamically from all providers (use absolute values for display)
               const totalCommissionCharges = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_commission || 0), 0));
-              const totalGstOnCommission = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_gst_on_commission || 0), 0));
+              const totalTdsAndTcs = Math.abs(commissionArray.reduce((sum, item) => sum + ((item.total_tds_amount || 0) + (item.total_tcs_amount || 0)), 0));
 
               return (
                 <>
@@ -4010,8 +3986,8 @@ const MarketplaceReconciliation: React.FC = () => {
                           <Typography variant="h5" sx={{ mt: 1, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
                         </Box>
                         <Box sx={{ p: 4, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center' }}>
-                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total GST on Commission</Typography>
-                          <Typography variant="h5" sx={{ mt: 1, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalGstOnCommission)}</Typography>
+                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TDS and TCS</Typography>
+                          <Typography variant="h5" sx={{ mt: 1, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTdsAndTcs)}</Typography>
                         </Box>
                       </Box>
                     </Grid>
@@ -4041,9 +4017,9 @@ const MarketplaceReconciliation: React.FC = () => {
                               </Typography>
                             </Box>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                              <Typography variant="body2" sx={{ color: '#374151' }}>GST</Typography>
+                              <Typography variant="body2" sx={{ color: '#374151' }}>TDS & TCS</Typography>
                               <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                                {formatCurrency(Math.abs(item.total_gst_on_commission))}
+                                {formatCurrency(Math.abs((item.total_tds_amount || 0) + (item.total_tcs_amount || 0)))}
                               </Typography>
                             </Box>
                           </Box>
@@ -4478,7 +4454,7 @@ const MarketplaceReconciliation: React.FC = () => {
             statsData={reconciliationData}
             initialTab={initialTsTab}
             dateRange={effectiveDateRangeForTs}
-            initialPlatforms={selectedProviderPlatform && initialTsTab === 1 ? [selectedProviderPlatform] : undefined}
+            initialPlatforms={selectedPlatform && (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'd2c') ? [selectedPlatform as 'flipkart' | 'amazon' | 'd2c'] : undefined}
             initialFilters={initialTsFilters}
           />
         </Box>

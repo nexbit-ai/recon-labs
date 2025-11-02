@@ -121,7 +121,7 @@ export const statsAPI = {
 
 // Main Summary API (D2C / Marketplace unified summary)
 export const mainSummaryAPI = {
-  getMainSummary: (params: { start_date: string; end_date: string; date_field: 'invoice_date' | 'settlement_date' | string; platform?: string[]; status?: string }) =>
+  getMainSummary: (params: { start_date: string; end_date: string; date_field: 'invoice_date' | 'settlement_date' | string; platform?: string; status?: string }) =>
     apiService.get<any>('/recon/main-summary', params),
 };
 

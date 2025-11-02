@@ -464,7 +464,23 @@ const Checklist: React.FC = () => {
               <ListItem
                 key={n.id}
                 sx={{ px: 0, cursor: 'pointer' }}
-                onClick={() => { setNotifAnchor(null); navigate('/dispute'); }}
+                onClick={() => { 
+                  setNotifAnchor(null);
+                  // Get platforms from localStorage (set by main reconciliation page)
+                  try {
+                    const stored = localStorage.getItem('recon_selected_platforms');
+                    let platformsParam = '';
+                    if (stored) {
+                      const parsed = JSON.parse(stored);
+                      if (Array.isArray(parsed) && parsed.length > 0) {
+                        platformsParam = `?platforms=${parsed.join(',')}`;
+                      }
+                    }
+                    navigate(`/operations-centre${platformsParam}`);
+                  } catch (e) {
+                    navigate('/operations-centre');
+                  }
+                }}
                 secondaryAction={
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                     <Button

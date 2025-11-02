@@ -97,6 +97,8 @@ export interface MainSummaryResponse {
     total_reconciled_count: number;
     total_unreconciled_amount: number;
     total_unreconciled_count: number;
+    prev_return_or_cancelled_orders?: number;
+    prev_return_or_cancelled_amount?: number;
   };
   // Top-level commission summary for payment providers
   commission?: Array<{
