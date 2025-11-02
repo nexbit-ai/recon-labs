@@ -20,6 +20,8 @@ export interface ColumnFilterControlsProps {
   // Order ID chips state and handlers
   orderIdChips?: string[];
   setOrderIdChips?: (chips: string[]) => void;
+  // Optional: Custom Status filter options (if not provided, defaults to all three)
+  statusFilterOptions?: string[];
 }
 
 const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
@@ -36,13 +38,19 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
   onApply,
   orderIdChips = [],
   setOrderIdChips,
+  statusFilterOptions,
 }) => {
   const metaType = (columnMeta as any)[activeColumn]?.type || 'string';
   let enumOptions = activeColumn && getEnumOptions ? getEnumOptions(activeColumn) : [];
   
-  // For Transaction Sheet Status specifically, hardcode the three values
+  // For Status filter: use custom options if provided, otherwise default to all three
   if (activeColumn === 'Status') {
-    enumOptions = ['more_payment_received', 'less_payment_received', 'settlement_matched'];
+    if (statusFilterOptions !== undefined) {
+      enumOptions = statusFilterOptions;
+    } else {
+      // Default for Transaction Sheet: hardcode the three values
+      enumOptions = ['more_payment_received', 'less_payment_received', 'settlement_matched'];
+    }
   }
 
   return (

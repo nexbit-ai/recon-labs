@@ -53,12 +53,6 @@ const months = [
 
 const years = [2024, 2025];
 
-// Hardcoded completed months (format: "YYYY-MM")
-const completedMonths = [
-  '2024-01', '2024-02', '2024-03', '2024-06', '2024-09',
-  '2025-01', '2025-02'
-];
-
 type ViewType = 'years' | 'months' | 'vendors';
 
 const UploadDocuments: React.FC = () => {
@@ -236,6 +230,10 @@ const UploadDocuments: React.FC = () => {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
         console.error('❌ Upload error response:', errorData);
+        if (response.status === 400) {
+          const vendorName = vendors.find(v => v.id === vendorId)?.name || vendorId;
+          throw new Error(`Please upload the correct file for ${vendorName}`);
+        }
         throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
       }
 
@@ -317,6 +315,10 @@ const UploadDocuments: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+        if (response.status === 400) {
+          const vendorName = vendorId === 'amazon' ? 'Amazon' : vendorId === 'flipkart' ? 'Flipkart' : vendorId;
+          throw new Error(`Please upload the correct ${kind} file for ${vendorName}`);
+        }
         throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
       }
 
@@ -378,6 +380,10 @@ const UploadDocuments: React.FC = () => {
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Bulk upload failed' }));
+        if (response.status === 400) {
+          const vendorName = vendorId === 'amazon' ? 'Amazon' : 'Flipkart';
+          throw new Error(`Please upload the correct files for ${vendorName}`);
+        }
         throw new Error(errorData.message || errorData.error || `Bulk upload failed with status ${response.status}`);
       }
       setUploadStatus({ type: 'success', message: `Successfully uploaded both files for ${vendorId}` });
@@ -402,8 +408,8 @@ const UploadDocuments: React.FC = () => {
     }));
   };
 
-  const handleD2cUpload = async (vendorId: string, kind: 'sales' | 'settlement') => {
-    const file = d2cFiles[vendorId]?.[kind];
+  const handleD2cUpload = async (vendorId: string, kind: 'sales' | 'settlement', fileOverride?: File | null) => {
+    const file = fileOverride || d2cFiles[vendorId]?.[kind];
     if (!file || selectedYear === null || selectedMonth === null) return;
 
     const key = `${vendorId}_${kind}`;
@@ -448,6 +454,10 @@ const UploadDocuments: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+        if (response.status === 400) {
+          const vendorName = vendors.find(v => v.id === vendorId)?.name || vendorId;
+          throw new Error(`Please upload the correct file for ${vendorName}`);
+        }
         throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
       }
 
@@ -514,6 +524,9 @@ const UploadDocuments: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+        if (response.status === 400) {
+          throw new Error('Please upload the correct Last Mile Status file');
+        }
         throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
       }
 
@@ -531,11 +544,6 @@ const UploadDocuments: React.FC = () => {
     } finally {
       setUploadingVendor(null);
     }
-  };
-
-  const isMonthCompleted = (year: number, monthIndex: number) => {
-    const monthKey = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
-    return completedMonths.includes(monthKey);
   };
 
   // Check if a vendor already has an uploaded document
@@ -694,7 +702,6 @@ const UploadDocuments: React.FC = () => {
             </Typography>
             <Grid container spacing={2.5}>
               {months.map((month, index) => {
-                const isCompleted = isMonthCompleted(selectedYear, index);
                 return (
                   <Grid item xs={6} sm={4} md={3} key={month}>
                     <Box
@@ -719,17 +726,6 @@ const UploadDocuments: React.FC = () => {
                         }
                       }}
                     >
-                      {isCompleted && (
-                        <Box
-                          sx={{
-                            position: 'absolute',
-                            top: 10,
-                            right: 10
-                          }}
-                        >
-                          <CheckCircleIcon sx={{ fontSize: 20, color: '#22c55e' }} />
-                        </Box>
-                      )}
                       <Typography 
                         variant="h6" 
                         fontWeight={700} 
@@ -815,28 +811,22 @@ const UploadDocuments: React.FC = () => {
             </Box>
             <Divider sx={{ mb: 3 }} />
             {/* D2C Partners section */}
-            <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 700 }} color="primary.main">D2C Partners</Typography>
+            <Typography variant="subtitle1" sx={{ mb: 1, mt: 2, fontWeight: 700 }} color="primary.main">D2C Partners</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 800, mb: 4 }}>
               {vendors.filter(v => v.id !== 'amazon' && v.id !== 'flipkart').map((vendor) => {
-                const isSalesUploaded = isVendorUploaded(vendor.id, 'sales');
                 const isSettlementUploaded = isVendorUploaded(vendor.id, 'settlement');
-                const isUploaded = isSalesUploaded || isSettlementUploaded;
-                const uploadedSalesDoc = getUploadedDocument(vendor.id, 'sales');
                 const uploadedSettlementDoc = getUploadedDocument(vendor.id, 'settlement');
-                const isSalesUploading = uploadingVendor === `${vendor.id}_sales`;
                 const isSettlementUploading = uploadingVendor === `${vendor.id}_settlement`;
-                const salesFile = d2cFiles[vendor.id]?.sales;
-                const settlementFile = d2cFiles[vendor.id]?.settlement;
 
                 return (
                   <Paper
                     key={vendor.id}
                     elevation={0}
-                    sx={{ p: 3, border: isUploaded ? '2px solid #dcfce7' : '2px solid #e5e7eb', borderRadius: '12px', transition: 'all 0.3s ease', background: isUploaded ? '#f0fdf4' : '#ffffff', '&:hover': { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', borderColor: isUploaded ? '#bbf7d0' : '#d1d5db' } }}
+                    sx={{ p: 3, border: isSettlementUploaded ? '2px solid #dcfce7' : '2px solid #e5e7eb', borderRadius: '12px', transition: 'all 0.3s ease', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, opacity: isSettlementUploading ? 0.9 : 1, background: isSettlementUploaded ? '#f0fdf4' : '#ffffff', '&:hover': { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', borderColor: isSettlementUploaded ? '#bbf7d0' : '#d1d5db' } }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                      <Box sx={{ width: 48, height: 48, borderRadius: '8px', background: isUploaded ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {isUploaded ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+                      <Box sx={{ width: 48, height: 48, borderRadius: '8px', background: isSettlementUploaded ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {isSettlementUploaded ? (
                           <CheckCircleIcon sx={{ fontSize: 24, color: '#16a34a' }} />
                         ) : (
                           <ShippingIcon sx={{ fontSize: 24, color: '#111111' }} />
@@ -845,102 +835,42 @@ const UploadDocuments: React.FC = () => {
                       <Box sx={{ flex: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography variant="subtitle1" fontWeight={700} color="#111111">{vendor.name}</Typography>
-                          {isUploaded && (
-                            <Chip label="Uploaded" size="small" sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} />
-                          )}
+                          {isSettlementUploaded && (<Chip label="Uploaded" size="small" sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} />)}
                         </Box>
-                      </Box>
-                    </Box>
-                    
-                    {/* Sales File Upload */}
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }} color="text.secondary">Sales File</Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <input
-                          accept=".xlsx,.xls,.csv"
-                          style={{ display: 'none' }}
-                          id={`d2c-sales-upload-${vendor.id}`}
-                          type="file"
-                          onChange={(e) => {
-                            setD2cFile(vendor.id, 'sales', e.target.files?.[0] || null);
-                            e.target.value = '';
-                          }}
-                          disabled={isSalesUploading}
-                        />
-                        <label htmlFor={`d2c-sales-upload-${vendor.id}`}>
-                          <Button
-                            variant="outlined"
-                            component="span"
-                            disabled={isSalesUploading}
-                            startIcon={<CloudUploadIcon />}
-                            size="small"
-                            sx={{ minWidth: 120 }}
-                          >
-                            Choose file
-                          </Button>
-                        </label>
-                        <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
-                          {salesFile?.name || (isSalesUploaded && uploadedSalesDoc ? uploadedSalesDoc.filename : 'No file selected')}
-                        </Typography>
-                        {salesFile && (
-                          <Button
-                            variant="contained"
-                            size="small"
-                            disabled={isSalesUploading}
-                            onClick={() => handleD2cUpload(vendor.id, 'sales')}
-                            startIcon={isSalesUploading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <CloudUploadIcon />}
-                            sx={{ background: '#111111', '&:hover': { background: '#333333' } }}
-                          >
-                            {isSalesUploading ? 'Uploading...' : 'Upload'}
-                          </Button>
+                        {isSettlementUploaded && uploadedSettlementDoc ? (
+                          <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mt: 0.5 }}>{uploadedSettlementDoc.filename} • {new Date(uploadedSettlementDoc.upload_date).toLocaleDateString()}</Typography>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">Upload settlement sheet</Typography>
                         )}
                       </Box>
                     </Box>
-
-                    {/* Settlement File Upload */}
-                    <Box>
-                      <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }} color="text.secondary">Settlement File</Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <input
-                          accept=".xlsx,.xls,.csv"
-                          style={{ display: 'none' }}
-                          id={`d2c-settlement-upload-${vendor.id}`}
-                          type="file"
-                          onChange={(e) => {
-                            setD2cFile(vendor.id, 'settlement', e.target.files?.[0] || null);
-                            e.target.value = '';
-                          }}
-                          disabled={isSettlementUploading}
-                        />
-                        <label htmlFor={`d2c-settlement-upload-${vendor.id}`}>
-                          <Button
-                            variant="outlined"
-                            component="span"
-                            disabled={isSettlementUploading}
-                            startIcon={<CloudUploadIcon />}
-                            size="small"
-                            sx={{ minWidth: 120 }}
-                          >
-                            Choose file
-                          </Button>
-                        </label>
-                        <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
-                          {settlementFile?.name || (isSettlementUploaded && uploadedSettlementDoc ? uploadedSettlementDoc.filename : 'No file selected')}
-                        </Typography>
-                        {settlementFile && (
-                          <Button
-                            variant="contained"
-                            size="small"
-                            disabled={isSettlementUploading}
-                            onClick={() => handleD2cUpload(vendor.id, 'settlement')}
-                            startIcon={isSettlementUploading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <CloudUploadIcon />}
-                            sx={{ background: '#111111', '&:hover': { background: '#333333' } }}
-                          >
-                            {isSettlementUploading ? 'Uploading...' : 'Upload'}
-                          </Button>
-                        )}
-                      </Box>
-                    </Box>
+                    <input
+                      accept=".xlsx,.xls,.csv"
+                      style={{ display: 'none' }}
+                      id={`d2c-settlement-upload-${vendor.id}`}
+                      type="file"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0] || null;
+                        if (file) {
+                          setD2cFile(vendor.id, 'settlement', file);
+                          // Auto-upload when file is selected
+                          handleD2cUpload(vendor.id, 'settlement', file);
+                        }
+                        e.target.value = '';
+                      }}
+                      disabled={isSettlementUploading}
+                    />
+                    <label htmlFor={`d2c-settlement-upload-${vendor.id}`}>
+                      <Button
+                        variant={isSettlementUploaded ? 'outlined' : 'contained'}
+                        component="span"
+                        disabled={isSettlementUploading}
+                        endIcon={isSettlementUploading ? <CircularProgress size={16} sx={{ color: isSettlementUploaded ? '#111111' : '#fff' }} /> : <ArrowForwardIcon />}
+                        sx={{ background: isSettlementUploaded ? '#ffffff' : '#111111', color: isSettlementUploaded ? '#111111' : '#ffffff', borderColor: isSettlementUploaded ? '#e5e7eb' : 'transparent', fontWeight: 600, px: 3, py: 1.2, '&:hover': { background: isSettlementUploaded ? '#f8fafc' : '#333333', borderColor: isSettlementUploaded ? '#d1d5db' : 'transparent' } }}
+                      >
+                        {isSettlementUploading ? 'Uploading...' : 'Upload file'}
+                      </Button>
+                    </label>
                   </Paper>
                 );
               })}

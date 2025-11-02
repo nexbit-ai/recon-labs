@@ -352,6 +352,15 @@ const OperationsCentrePage: React.FC = () => {
         setSelectedPlatform(platforms[0]); // Use first platform only
       }
     }
+    
+    // Set tab from URL parameter if provided (0: unreconciled, 1: manually reconciled, 2: disputed)
+    const tabParam = params.get('tab');
+    if (tabParam) {
+      const tabIndex = parseInt(tabParam, 10);
+      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 2) {
+        setDisputeSubTab(tabIndex);
+      }
+    }
   }, []);
   
   // Date range menu state
@@ -420,6 +429,25 @@ const OperationsCentrePage: React.FC = () => {
     'Reason': { type: 'enum' },
     'Event Type': { type: 'enum' },
     'Status': { type: 'enum' }
+  };
+
+  // Complete mapping of UI columns to API parameters (similar to TransactionSheet)
+  const COLUMN_TO_API_PARAM_MAP: Record<string, {
+    apiParam: string;
+    type: 'string' | 'number' | 'date' | 'enum';
+    supportedPlatforms?: ('flipkart' | 'amazon' | 'd2c' | 'all')[];
+    usesInSuffix?: boolean; // For CSV filters like status_in
+  }> = {
+    // Common filters (both platforms)
+    'Order ID': { apiParam: 'order_id', type: 'string' }, // Special: chips input
+    'Status': { apiParam: 'status_in', type: 'enum', usesInSuffix: true },
+    'Invoice Date': { apiParam: 'order_date', type: 'date' }, // → order_date_from/to
+    'Settlement Date': { apiParam: 'settlement_date', type: 'date' },
+    'Order Value': { apiParam: 'order_value', type: 'number' },
+    'Settlement Value': { apiParam: 'settlement_value', type: 'number' },
+    'Difference': { apiParam: 'diff', type: 'number' },
+    'Reason': { apiParam: 'reason_in', type: 'enum', usesInSuffix: true },
+    'Event Type': { apiParam: 'event_type_in', type: 'enum', usesInSuffix: true },
   };
 
   // Mapping of sortable UI columns to backend sort_by values
@@ -540,8 +568,10 @@ const OperationsCentrePage: React.FC = () => {
   ): TransactionQueryParams => {
     const params: TransactionQueryParams = {};
     const f = filtersOverride || columnFilters;
+    
     // Set status for unreconciled orders (less_payment_received, more_payment_received)
-    if (disputeSubTab === 0) {
+    // Only set default if no status filter is explicitly applied
+    if (disputeSubTab === 0 && !f['Status']) {
       params.status_in = 'less_payment_received,more_payment_received';
       params.pagination = false; // Disable pagination to get all unreconciled orders
     }
@@ -550,12 +580,6 @@ const OperationsCentrePage: React.FC = () => {
     if (sortConfig && COLUMN_TO_SORT_BY_MAP[sortConfig.key]) {
       params.sort_by = COLUMN_TO_SORT_BY_MAP[sortConfig.key];
       params.sort_order = sortConfig.direction;
-    }
-
-    // Map applied column filters to API params (server-side filtering)
-    const statusFilter = f['Status'];
-    if (statusFilter && Array.isArray(statusFilter) && statusFilter.length > 0) {
-      params.status_in = statusFilter.join(',');
     }
 
     // Order ID filter → order_id (CSV) with explicit override support to avoid async state timing
@@ -569,81 +593,105 @@ const OperationsCentrePage: React.FC = () => {
       (params as any).order_id = orderIdsCsv;
     }
 
-    const diffFilter = f['Difference'];
-    if (diffFilter && typeof diffFilter === 'object') {
-      if (diffFilter.min !== undefined && diffFilter.min !== '') {
-        const v = parseFloat(diffFilter.min);
-        if (!Number.isNaN(v)) params.diff_min = v;
+    // Apply column filters using generic mapping (similar to TransactionSheet)
+    Object.entries(f).forEach(([columnKey, filterValue]) => {
+      if (!filterValue) return;
+
+      // Skip Reason filter - it's handled on frontend only (backend doesn't support it)
+      if (columnKey === 'Reason') return;
+
+      const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
+      if (!mapping) return;
+
+      // Skip Order ID as it's handled separately above
+      if (columnKey === 'Order ID') return;
+
+      const baseParam = mapping.apiParam;
+
+      switch (mapping.type) {
+        case 'string':
+          if (typeof filterValue === 'string' && filterValue.trim()) {
+            (params as any)[baseParam] = filterValue.trim();
+          }
+          break;
+        
+        case 'number':
+          if (typeof filterValue === 'object' && filterValue !== null) {
+            if (filterValue.min !== undefined && filterValue.min !== '') {
+              const v = parseFloat(filterValue.min);
+              if (!Number.isNaN(v)) {
+                (params as any)[`${baseParam}_min`] = v;
+              }
+            }
+            if (filterValue.max !== undefined && filterValue.max !== '') {
+              const v = parseFloat(filterValue.max);
+              if (!Number.isNaN(v)) {
+                (params as any)[`${baseParam}_max`] = v;
+              }
+            }
+          }
+          break;
+        
+        case 'date':
+          if (typeof filterValue === 'object' && filterValue !== null) {
+            if (filterValue.from) {
+              (params as any)[`${baseParam}_from`] = filterValue.from;
+            }
+            if (filterValue.to) {
+              (params as any)[`${baseParam}_to`] = filterValue.to;
+            }
+          }
+          break;
+        
+        case 'enum':
+          if (Array.isArray(filterValue) && filterValue.length > 0) {
+            // For enum filters, join directly
+            (params as any)[baseParam] = filterValue.join(',');
+          }
+          break;
       }
-      if (diffFilter.max !== undefined && diffFilter.max !== '') {
-        const v = parseFloat(diffFilter.max);
-        if (!Number.isNaN(v)) params.diff_max = v;
-      }
-    }
-
-    // Date range filter: align with Transactions page → order_date_from/to
-    const invoiceDateFilter = f['Invoice Date'];
-    if (invoiceDateFilter && typeof invoiceDateFilter === 'object') {
-      if (invoiceDateFilter.from) (params as any).order_date_from = invoiceDateFilter.from;
-      if (invoiceDateFilter.to) (params as any).order_date_to = invoiceDateFilter.to;
-    }
-
-    // Settlement Date range
-    const settlementDateFilter = f['Settlement Date'];
-    if (settlementDateFilter && typeof settlementDateFilter === 'object') {
-      if (settlementDateFilter.from) (params as any).settlement_date_from = settlementDateFilter.from;
-      if (settlementDateFilter.to) (params as any).settlement_date_to = settlementDateFilter.to;
-    }
-
-    // Reason enum → reason_in
-    const reasonFilter = f['Reason'];
-    if (reasonFilter && Array.isArray(reasonFilter) && reasonFilter.length > 0) {
-      (params as any).reason_in = reasonFilter.map(formatReasonForAPI).join(',');
-    }
-
-    // Event Type enum → event_type_in
-    const eventTypeFilter = f['Event Type'];
-    if (eventTypeFilter && Array.isArray(eventTypeFilter) && eventTypeFilter.length > 0) {
-      (params as any).event_type_in = eventTypeFilter.join(',');
-    }
+    });
 
     // Set date range based on selected date range
-    if (selectedDateRange === 'this-month') {
-      const now = new Date();
-      const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
-      const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
-      params.order_date_from = firstDay.toISOString().split('T')[0];
-      params.order_date_to = lastDay.toISOString().split('T')[0];
-    } else if (selectedDateRange === 'last-month') {
-      const now = new Date();
-      const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1));
-      const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 0));
-      params.order_date_from = firstDay.toISOString().split('T')[0];
-      params.order_date_to = lastDay.toISOString().split('T')[0];
-    } else if (selectedDateRange === 'this-year') {
-      const now = new Date();
-      const currentYear = now.getFullYear();
+    // Only set if Invoice Date filter is not explicitly applied (to avoid overriding user's filter)
+    if (!f['Invoice Date'] || !f['Invoice Date'].from || !f['Invoice Date'].to) {
+      if (selectedDateRange === 'this-month') {
+        const now = new Date();
+        const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+        const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
+        params.order_date_from = firstDay.toISOString().split('T')[0];
+        params.order_date_to = lastDay.toISOString().split('T')[0];
+      } else if (selectedDateRange === 'last-month') {
+        const now = new Date();
+        const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1));
+        const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 0));
+        params.order_date_from = firstDay.toISOString().split('T')[0];
+        params.order_date_to = lastDay.toISOString().split('T')[0];
+      } else if (selectedDateRange === 'this-year') {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        
+        // Use UTC dates to avoid timezone issues
+        const firstDay = new Date(Date.UTC(currentYear, 0, 1)); // January 1st (month 0)
+        const lastDay = new Date(Date.UTC(currentYear, 11, 31)); // December 31st (month 11)
+        
+        // Format dates as YYYY-MM-DD using UTC methods
+        params.order_date_from = firstDay.toISOString().split('T')[0];
+        params.order_date_to = lastDay.toISOString().split('T')[0];
+        
+      } else if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
+        params.order_date_from = customStartDate;
+        params.order_date_to = customEndDate;
+      }
       
-      // Use UTC dates to avoid timezone issues
-      const firstDay = new Date(Date.UTC(currentYear, 0, 1)); // January 1st (month 0)
-      const lastDay = new Date(Date.UTC(currentYear, 11, 31)); // December 31st (month 11)
-      
-      // Format dates as YYYY-MM-DD using UTC methods
-      params.order_date_from = firstDay.toISOString().split('T')[0];
-      params.order_date_to = lastDay.toISOString().split('T')[0];
-      
-    } else if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
-      params.order_date_from = customStartDate;
-      params.order_date_to = customEndDate;
-    }
-    
-    // Ensure we always have default dates if none are set
-    if (!(params as any).order_date_from || !(params as any).order_date_to) {
-      const now = new Date();
-      const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
-      const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
-      (params as any).order_date_from = firstDay.toISOString().split('T')[0];
-      (params as any).order_date_to = lastDay.toISOString().split('T')[0];
+      // Ensure we always have default dates if none are set
+      if (!(params as any).order_date_from || !(params as any).order_date_to) {
+        const now = new Date();
+        const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+        const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
+        (params as any).order_date_from = firstDay.toISOString().split('T')[0];
+        (params as any).order_date_to = lastDay.toISOString().split('T')[0];
+      }
     }
 
     // Add platform parameter from selectedPlatform (single platform only)
@@ -734,8 +782,11 @@ const OperationsCentrePage: React.FC = () => {
         params.sort_order = sortOverride.direction;
       }
       
-      // Add the unreconciled status filter
-      params.status_in = 'less_payment_received,more_payment_received';
+      // Add the unreconciled status filter (only if not overridden by user's Status filter)
+      // buildQueryParams already handles this, but we ensure it's set if user hasn't filtered by status
+      if (!params.status_in) {
+        params.status_in = 'less_payment_received,more_payment_received';
+      }
       // Add manual_override_status filter to exclude manually reconciled and disputed orders
       // Pass as string "null" since the API service filters out actual null values
       (params as any).manual_override_status = 'null';
@@ -901,11 +952,6 @@ const OperationsCentrePage: React.FC = () => {
     }
   }, []);
 
-  // Mark initial render complete (used to avoid StrictMode double-fetch)
-  useEffect(() => {
-    isInitialRenderRef.current = false;
-  }, []);
-
   // Fetch all three APIs in parallel whenever filters or other inputs change
   const fetchAllTabsData = async (
     filtersOverride?: Record<string, any>,
@@ -939,9 +985,14 @@ const OperationsCentrePage: React.FC = () => {
       if (!hasFetchedOnInitialRef.current) {
         hasFetchedOnInitialRef.current = true;
         fetchAllTabsData();
+        // Mark initial render complete on next render cycle to allow platform changes to trigger fetches
+        requestAnimationFrame(() => {
+          isInitialRenderRef.current = false;
+        });
       }
       return;
     }
+    // After initial render, always fetch when dependencies change (including platform changes)
     fetchAllTabsData();
   }, [selectedDateRange, customStartDate, customEndDate, selectedPlatform]);
 
@@ -979,7 +1030,24 @@ const OperationsCentrePage: React.FC = () => {
             value = (row as any).diff;
             break;
           case 'Reason':
-            value = (row as any).breakups?.mismatch_reason;
+            // Extract mismatch_reason from originalData with priority:
+            // metadata.mismatch_reason > metadata.breakups.mismatch_reason > breakups.mismatch_reason
+            const originalData = (row as any).originalData;
+            if (originalData) {
+              if (originalData.metadata?.mismatch_reason) {
+                value = originalData.metadata.mismatch_reason;
+              } else if (originalData.metadata?.breakups?.mismatch_reason) {
+                value = originalData.metadata.breakups.mismatch_reason;
+              } else if (originalData.breakups?.mismatch_reason) {
+                value = originalData.breakups.mismatch_reason;
+              } else {
+                value = null;
+              }
+            } else {
+              value = (row as any).breakups?.mismatch_reason || null;
+            }
+            // Normalize value for comparison (trim whitespace)
+            if (value) value = String(value).trim();
             break;
           case 'Status':
             value = (row as any).breakups?.recon_status;
@@ -988,8 +1056,15 @@ const OperationsCentrePage: React.FC = () => {
             continue;
         }
       } else if ('reason' in row) {
-        // Grouped data (unreconciled tab) - skip filtering for now
-        continue;
+        // Grouped data (unreconciled tab) - handle Reason filter
+        if (column === 'Reason') {
+          value = (row as any).reason;
+          // Normalize value for comparison (trim whitespace)
+          if (value) value = String(value).trim();
+        } else {
+          // Skip other filters for grouped data for now
+          continue;
+        }
       } else {
         // Mock data (old structure)
         switch (column) {
@@ -1043,8 +1118,18 @@ const OperationsCentrePage: React.FC = () => {
           }
         }
         if (Array.isArray(filter) && filter.length > 0) {
-          if (!filter.includes(value)) {
-            return false;
+          // For Reason filter, compare normalized values
+          if (column === 'Reason') {
+            const normalizedFilter = filter.map(f => String(f).trim().toLowerCase());
+            const normalizedValue = value ? String(value).trim().toLowerCase() : '';
+            if (!normalizedFilter.includes(normalizedValue)) {
+              return false;
+            }
+          } else {
+            // For other enum filters, use exact match
+            if (!filter.includes(value)) {
+              return false;
+            }
           }
         }
       }
@@ -1390,38 +1475,67 @@ const OperationsCentrePage: React.FC = () => {
 
   const getUniqueValuesForColumn = (column: string) => {
     const values = new Set<string>();
-    // Include values from API rows when in Unreconciled tab
-    if (disputeSubTab === 0 && Array.isArray(unreconciledRows)) {
-      (unreconciledRows as any[]).forEach(row => {
-        if (column === 'Reason') {
-          // For D2C, use breakups.mismatch_reason, fallback to reason
-          const v = row.breakups?.mismatch_reason || row.reason || row.Remark;
-          if (v) values.add(formatReasonLabel(String(v)));
-        } else if (column === 'Status') {
-          // For D2C, use breakups.recon_status, fallback to status
-          const v = row.breakups?.recon_status || row.status;
-          if (v) values.add(String(v));
+    
+    // Helper function to extract mismatch_reason from transaction data
+    const extractMismatchReason = (originalData: any): string | null => {
+      if (!originalData) return null;
+      // Priority: metadata.mismatch_reason > metadata.breakups.mismatch_reason > breakups.mismatch_reason
+      if (originalData.metadata?.mismatch_reason) {
+        return originalData.metadata.mismatch_reason;
+      } else if (originalData.metadata?.breakups?.mismatch_reason) {
+        return originalData.metadata.breakups.mismatch_reason;
+      } else if (originalData.breakups?.mismatch_reason) {
+        return originalData.breakups.mismatch_reason;
+      }
+      return null;
+    };
+    
+    if (column === 'Reason') {
+      // Check all tabs' data to get all unique reasons
+      const allRows = [
+        ...(Array.isArray(unreconciledRows) ? unreconciledRows : []),
+        ...(Array.isArray(manuallyReconciledRows) ? manuallyReconciledRows : []),
+        ...(Array.isArray(disputedRows) ? disputedRows : [])
+      ];
+      
+      allRows.forEach((row: any) => {
+        const originalData = row.originalData;
+        if (originalData) {
+          const mismatchReason = extractMismatchReason(originalData);
+          if (mismatchReason && mismatchReason.trim() !== '') {
+            // Store the raw value (not formatted) so we can match it properly when filtering
+            values.add(mismatchReason.trim());
+          }
         }
       });
-    }
-    // Also include mock rows to support the other tab
-    mockRows.forEach(row => {
-      let value: string | undefined;
-      switch (column) {
-        case 'Event Type':
-          value = row.eventType;
-          break;
-        case 'Status':
-          value = row.status;
-          break;
-        case 'Reason':
-          value = undefined; // mock rows do not have reason
-          break;
-        default:
-          value = undefined;
+    } else {
+      // Include values from API rows when in Unreconciled tab
+      if (disputeSubTab === 0 && Array.isArray(unreconciledRows)) {
+        (unreconciledRows as any[]).forEach(row => {
+          if (column === 'Status') {
+            // For D2C, use breakups.recon_status, fallback to status
+            const v = row.breakups?.recon_status || row.status;
+            if (v) values.add(String(v));
+          }
+        });
       }
-      if (value) values.add(value);
-    });
+      // Also include mock rows to support the other tab
+      mockRows.forEach(row => {
+        let value: string | undefined;
+        switch (column) {
+          case 'Event Type':
+            value = row.eventType;
+            break;
+          case 'Status':
+            value = row.status;
+            break;
+          default:
+            value = undefined;
+        }
+        if (value) values.add(value);
+      });
+    }
+    
     return Array.from(values).sort();
   };
 
@@ -1916,8 +2030,7 @@ const OperationsCentrePage: React.FC = () => {
                       const newPlatform = e.target.value as 'flipkart' | 'amazon' | 'd2c';
                       setSelectedPlatform(newPlatform);
                       setPlatformMenuAnchorEl(null);
-                      // Trigger data fetch for all tabs
-                      fetchAllTabsData();
+                      // Data fetch will be triggered by useEffect watching selectedPlatform
                     }}
                   >
                     {(['flipkart','amazon','d2c'] as const).map((p) => (
@@ -1926,8 +2039,7 @@ const OperationsCentrePage: React.FC = () => {
                         onClick={() => {
                           setSelectedPlatform(p);
                           setPlatformMenuAnchorEl(null);
-                          // Trigger data fetch for all tabs
-                          fetchAllTabsData();
+                          // Data fetch will be triggered by useEffect watching selectedPlatform
                         }}
                         sx={{ py: 1, px: 1, borderRadius: '8px' }}
                       >
@@ -2683,6 +2795,7 @@ const OperationsCentrePage: React.FC = () => {
             onApply={() => {
               applyFilters();
             }}
+            statusFilterOptions={['more_payment_received', 'less_payment_received']}
           />
               </Box>
       </Popover>

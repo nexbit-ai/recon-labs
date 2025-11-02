@@ -2201,12 +2201,8 @@ const MarketplaceReconciliation: React.FC = () => {
           </Grid>
           {/* Reconciliation Status */}
           <Grid item xs={12} md={5}>
-                          <Card 
-                onClick={() => {
-                  const platformsParam = selectedPlatforms.length > 0 ? selectedPlatforms.join(',') : '';
-                  navigate(`/operations-centre?from=${effectiveDateRangeForTs.start}&to=${effectiveDateRangeForTs.end}${platformsParam ? `&platforms=${platformsParam}` : ''}`);
-                }}
-                sx={{ 
+            <Card 
+              sx={{ 
                 background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
                 borderRadius: '16px',
                 border: '1px solid #f1f3f4',
@@ -2214,11 +2210,6 @@ const MarketplaceReconciliation: React.FC = () => {
                 height: '100%',
                 overflow: 'hidden',
                 transition: 'all 0.3s ease',
-                cursor: 'pointer',
-                '&:hover': {
-                  boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                  transform: 'translateY(-2px)',
-                }
               }}
             >
               <CardContent sx={{ 
@@ -2255,9 +2246,11 @@ const MarketplaceReconciliation: React.FC = () => {
                       background: (() => {
                         const s = mainSummary?.summary as any;
                         const reconciledCount = Number(s?.total_reconciled_count || 0);
+                        const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
+                        const totalReconciledCount = reconciledCount + manuallyReconciledCount;
                         const unreconciledCount = Number(s?.total_unreconciled_count || 0);
-                        const totalCount = reconciledCount + unreconciledCount;
-                        const matchedPct = totalCount === 0 ? 100 : Math.max(0, Math.min(100, (reconciledCount / totalCount) * 100));
+                        const totalCount = totalReconciledCount + unreconciledCount;
+                        const matchedPct = totalCount === 0 ? 100 : Math.max(0, Math.min(100, (totalReconciledCount / totalCount) * 100));
                         const matchedDeg = (matchedPct / 100) * 360;
                         return `conic-gradient(#10b981 0deg, #10b981 ${matchedDeg}deg, #ef4444 ${matchedDeg}deg, #ef4444 360deg)`;
                       })(),
@@ -2282,9 +2275,11 @@ const MarketplaceReconciliation: React.FC = () => {
                           color: (() => {
                             const s = mainSummary?.summary as any;
                             const reconciledCount = Number(s?.total_reconciled_count || 0);
+                            const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
+                            const totalReconciledCount = reconciledCount + manuallyReconciledCount;
                             const unreconciledCount = Number(s?.total_unreconciled_count || 0);
-                            const totalCount = reconciledCount + unreconciledCount;
-                            const pct = totalCount === 0 ? 100 : Math.max(0, (reconciledCount / totalCount) * 100);
+                            const totalCount = totalReconciledCount + unreconciledCount;
+                            const pct = totalCount === 0 ? 100 : Math.max(0, (totalReconciledCount / totalCount) * 100);
                             return getReconciliationColor(pct);
                           })(),
                           fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -2295,9 +2290,11 @@ const MarketplaceReconciliation: React.FC = () => {
                           {(() => {
                             const s = mainSummary?.summary as any;
                             const reconciledCount = Number(s?.total_reconciled_count || 0);
+                            const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
+                            const totalReconciledCount = reconciledCount + manuallyReconciledCount;
                             const unreconciledCount = Number(s?.total_unreconciled_count || 0);
-                            const totalCount = reconciledCount + unreconciledCount;
-                            const pct = totalCount === 0 ? 100 : Math.max(0, (reconciledCount / totalCount) * 100);
+                            const totalCount = totalReconciledCount + unreconciledCount;
+                            const pct = totalCount === 0 ? 100 : Math.max(0, (totalReconciledCount / totalCount) * 100);
                             return `${pct.toFixed(1)}%`;
                           })()}
                         </Typography>
@@ -2305,31 +2302,91 @@ const MarketplaceReconciliation: React.FC = () => {
                     </Box>
                   </Box>
 
-                  {/* Total Unreconciled Transactions Card */}
-                    <Box sx={{
+                  {/* Action Buttons */}
+                  <Box sx={{
                     width: '100%',
-                    p: 2,
-                    textAlign: 'center',
-                    }}>
-                                              <Typography variant="body2" sx={{
-                        color: '#1f2937',
-                          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                      fontWeight: 500,
-                          mb: 1,
-                      fontSize: '0.875rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                        }}>
-                          Total Unreconciled Transactions
+                    display: 'flex',
+                    gap: 1.5,
+                    justifyContent: 'center',
+                  }}>
+                    <Button
+                      variant="text"
+                      onClick={() => {
+                        const platformsParam = selectedPlatforms.length > 0 ? selectedPlatforms.join(',') : '';
+                        const urlParams = new URLSearchParams({
+                          from: effectiveDateRangeForTs.start,
+                          to: effectiveDateRangeForTs.end
+                        });
+                        if (platformsParam) {
+                          urlParams.set('platforms', platformsParam);
+                        }
+                        navigate(`/operations-centre?${urlParams.toString()}`);
+                      }}
+                      sx={{
+                        flex: 1,
+                        py: 1.5,
+                        px: 2,
+                        border: '1px solid #e5e7eb',
+                        color: '#374151',
+                        backgroundColor: '#ffffff',
+                        fontWeight: 500,
+                        textTransform: 'none',
+                        borderRadius: '8px',
+                        '&:hover': {
+                          backgroundColor: '#f9fafb',
+                          borderColor: '#d1d5db',
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.125rem', color: '#111827' }}>
+                          {Number(mainSummary?.summary?.total_unreconciled_count || 0).toLocaleString()}
                         </Typography>
-                    <Typography variant="h5" sx={{
-                      color: '#1f2937',
-                        fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                        fontWeight: 700,
-                      letterSpacing: '-0.02em'
-                      }}>
-                      {Number(mainSummary?.summary?.total_unreconciled_count || 0).toLocaleString()}
-                      </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: '#6b7280', fontWeight: 400 }}>
+                          Unreconciled
+                        </Typography>
+                      </Box>
+                    </Button>
+                    
+                    <Button
+                      variant="text"
+                      onClick={() => {
+                        const platformsParam = selectedPlatforms.length > 0 ? selectedPlatforms.join(',') : '';
+                        const urlParams = new URLSearchParams({
+                          from: effectiveDateRangeForTs.start,
+                          to: effectiveDateRangeForTs.end,
+                          tab: '1'
+                        });
+                        if (platformsParam) {
+                          urlParams.set('platforms', platformsParam);
+                        }
+                        navigate(`/operations-centre?${urlParams.toString()}`);
+                      }}
+                      sx={{
+                        flex: 1,
+                        py: 1.5,
+                        px: 2,
+                        border: '1px solid #e5e7eb',
+                        color: '#374151',
+                        backgroundColor: '#ffffff',
+                        fontWeight: 500,
+                        textTransform: 'none',
+                        borderRadius: '8px',
+                        '&:hover': {
+                          backgroundColor: '#f9fafb',
+                          borderColor: '#d1d5db',
+                        }
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.125rem', color: '#111827' }}>
+                          {Number((mainSummary?.summary as any)?.total_manually_reconciled_or_disputed_count || 0).toLocaleString()}
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: '#6b7280', fontWeight: 400 }}>
+                          Manually Reconciled
+                        </Typography>
+                      </Box>
+                    </Button>
                   </Box>
                 </Box>
               </CardContent>
