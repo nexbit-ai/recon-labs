@@ -1653,6 +1653,7 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   // Common filters (both platforms)
   'Order ID': { apiParam: 'order_id', type: 'string' }, // Special: chips input
   'Status': { apiParam: 'status_in', type: 'enum', usesInSuffix: true },
+  'Event Type': { apiParam: 'event_type', type: 'enum' },
   'Order Date': { apiParam: 'order_date', type: 'date' }, // → order_date_from/to
   'Settlement Date': { apiParam: 'settlement_date', type: 'date' },
   'Order Value': { apiParam: 'order_value', type: 'number' },
@@ -1904,6 +1905,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
     
     // Always add breakup fields for filtering (regardless of API type)
+    meta['Event Type'] = { type: 'enum' };
     meta['Shipping Courier'] = { type: 'enum' };
     meta['Recon Status'] = { type: 'enum' };
     meta['Settlement Provider'] = { type: 'enum' };
@@ -1916,6 +1918,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Make COLUMN_META reactive to data changes - initialize with breakup fields
   const [COLUMN_META, setCOLUMN_META] = useState<Record<string, { type: 'string' | 'number' | 'date' | 'enum' }>>({
+    'Event Type': { type: 'enum' },
     'Shipping Courier': { type: 'enum' },
     'Recon Status': { type: 'enum' },
     'Settlement Provider': { type: 'enum' },
@@ -2006,6 +2009,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // For Status, show unique backend statuses
     if (columnName === 'Status') {
       return ['more_payment_received', 'less_payment_received', 'settlement_matched'];
+    }
+
+    // For Event Type, show available event types
+    if (columnName === 'Event Type') {
+      return ['Sale', 'Return'];
     }
 
     // For breakup fields, extract values from actual data
@@ -3404,104 +3412,48 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   gap: { xs: 1.5, md: 2 },
                   width: '100%'
                 }}>
-                  {/* Left Section: Back Button, Title, and Tabs */}
+                  {/* Left Section: Back Button and Title */}
                   <Box sx={{ 
                     display: 'flex', 
-                    flexDirection: { xs: 'column', sm: 'row' },
-                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    alignItems: 'center', 
                     gap: { xs: 1, sm: 2 },
-                    flex: { xs: '1 1 auto', md: '0 1 auto' },
-                    minWidth: 0,
-                    width: { xs: '100%', md: 'auto' }
+                    flexShrink: 0,
+                    width: { xs: '100%', sm: 'auto' },
+                    minWidth: 0
                   }}>
-                    {/* Back Button and Title Row */}
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: { xs: 1, sm: 2 },
-                      flexShrink: 0,
-                      width: { xs: '100%', sm: 'auto' }
-                    }}>
-                      <IconButton
-                        onClick={onBack}
-                        size="small"
-                        sx={{
-                          background: '#1f2937',
-                          color: 'white',
-                          flexShrink: 0,
-                          '&:hover': {
-                            background: '#374151',
-                            transform: 'scale(1.05)',
-                          },
-                          transition: 'all 0.3s ease',
-                        }}
-                      >
-                        <ArrowBackIcon fontSize="small" />
-                      </IconButton>
-                      <Typography 
-                        variant="h5" 
-                        sx={{ 
-                          fontWeight: 700, 
-                          color: '#111827',
-                          letterSpacing: '-0.02em',
-                          py: 0.5,
-                          fontSize: { xs: '1.1rem', sm: '1.25rem', md: '1.5rem' },
-                          flexShrink: 0,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: { xs: 'nowrap', sm: 'normal' },
-                        }}
-                      >
-                        Transaction Sheet
-                      </Typography>
-                    </Box>
-                    
-                    {/* Transaction Tabs - Responsive */}
-                    <Box sx={{ 
-                      width: { xs: '100%', sm: 'auto' },
-                      overflowX: { xs: 'auto', sm: 'visible' },
-                      '&::-webkit-scrollbar': {
-                        display: 'none'
-                      },
-                      scrollbarWidth: 'none'
-                    }}>
-                      <Tabs 
-                        value={activeTab} 
-                        onChange={handleTabChange}
-                        sx={{
-                          minWidth: 'fit-content',
-                          flexShrink: 0,
-                          '& .MuiTabs-flexContainer': {
-                            gap: 0.5,
-                          },
-                          '& .MuiTab-root': {
-                            minHeight: { xs: 36, sm: 32 },
-                            fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                            fontWeight: 600,
-                            textTransform: 'none',
-                            color: '#6b7280',
-                            px: { xs: 1.5, sm: 2.5 },
-                            py: 0.5,
-                            minWidth: 'fit-content',
-                            whiteSpace: 'nowrap',
-                            overflow: 'visible',
-                            textOverflow: 'clip',
-                            '&.Mui-selected': {
-                              color: '#1f2937',
-                              fontWeight: 700,
-                            },
-                          },
-                          '& .MuiTabs-indicator': {
-                            height: 2,
-                            borderRadius: '2px 2px 0 0',
-                            background: '#1f2937',
-                          },
-                        }}
-                      >
-                        <Tab label={`Settled${settledTotalCount !== null ? ` (${settledTotalCount})` : ''}`} />
-                        <Tab label={`Unsettled${unsettledTotalCount !== null ? ` (${unsettledTotalCount})` : ''}`} />
-                      </Tabs>
-                    </Box>
+                    <IconButton
+                      onClick={onBack}
+                      size="small"
+                      sx={{
+                        background: '#1f2937',
+                        color: 'white',
+                        flexShrink: 0,
+                        '&:hover': {
+                          background: '#374151',
+                          transform: 'scale(1.05)',
+                        },
+                        transition: 'all 0.3s ease',
+                      }}
+                    >
+                      <ArrowBackIcon fontSize="small" />
+                    </IconButton>
+                    <Typography 
+                      variant="h5" 
+                      sx={{ 
+                        fontWeight: 700, 
+                        color: '#111827',
+                        letterSpacing: '-0.02em',
+                        py: 0.5,
+                        fontSize: { xs: '1rem', sm: '1.25rem', md: '1.5rem' },
+                        flexShrink: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: { xs: 'calc(100vw - 120px)', sm: 'none' }
+                      }}
+                    >
+                      Transaction Sheet
+                    </Typography>
                   </Box>
                   
                   {/* Right Section: Filters, Platform Selector, Date Range - Responsive */}
@@ -3888,6 +3840,116 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     </Box>
                     
                   </Box>
+                </Box>
+
+                {/* Transaction Tabs - Separate Row, Fully Responsive */}
+                <Box sx={{ 
+                  width: '100%',
+                  mt: { xs: 1, sm: 0.5 },
+                  mb: { xs: 1, sm: 0.5 },
+                  overflowX: 'auto',
+                  overflowY: 'hidden',
+                  '&::-webkit-scrollbar': {
+                    display: 'none'
+                  },
+                  scrollbarWidth: 'none',
+                  borderBottom: { xs: 'none', sm: '1px solid #e5e7eb' },
+                  pb: { xs: 0, sm: 0.5 }
+                }}>
+                  <Tabs 
+                    value={activeTab} 
+                    onChange={handleTabChange}
+                    variant={isSmallScreen ? 'scrollable' : 'standard'}
+                    scrollButtons={false}
+                    sx={{
+                      minWidth: 0,
+                      width: '100%',
+                      '& .MuiTabs-flexContainer': {
+                        gap: { xs: 0.5, sm: 1 },
+                        justifyContent: { xs: 'flex-start', sm: 'flex-start' },
+                      },
+                      '& .MuiTab-root': {
+                        minHeight: { xs: 32, sm: 36, md: 40 },
+                        fontSize: { xs: '0.7rem', sm: '0.8rem', md: '0.875rem' },
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        color: '#6b7280',
+                        px: { xs: 1, sm: 1.5, md: 2.5 },
+                        py: { xs: 0.75, sm: 1 },
+                        minWidth: { xs: 'auto', sm: 'fit-content' },
+                        maxWidth: { xs: '45%', sm: 'none' },
+                        whiteSpace: { xs: 'normal', sm: 'nowrap' },
+                        textAlign: { xs: 'center', sm: 'left' },
+                        overflow: 'hidden',
+                        textOverflow: { xs: 'ellipsis', sm: 'clip' },
+                        lineHeight: { xs: 1.2, sm: 1.5 },
+                        '&.Mui-selected': {
+                          color: '#1f2937',
+                          fontWeight: 700,
+                        },
+                      },
+                      '& .MuiTabs-indicator': {
+                        height: 2,
+                        borderRadius: '2px 2px 0 0',
+                        background: '#1f2937',
+                      },
+                    }}
+                  >
+                    <Tab 
+                      label={
+                        <Box sx={{ 
+                          display: 'flex', 
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          alignItems: 'center',
+                          gap: { xs: 0, sm: 0.25 },
+                          width: '100%',
+                          justifyContent: 'center'
+                        }}>
+                          <Box component="span">Settled</Box>
+                          {settledTotalCount !== null && (
+                            <Box 
+                              component="span"
+                              sx={{ 
+                                fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
+                                opacity: 0.8,
+                                fontWeight: 500,
+                                lineHeight: 1
+                              }}
+                            >
+                              ({settledTotalCount.toLocaleString()})
+                            </Box>
+                          )}
+                        </Box>
+                      } 
+                    />
+                    <Tab 
+                      label={
+                        <Box sx={{ 
+                          display: 'flex', 
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          alignItems: 'center',
+                          gap: { xs: 0, sm: 0.25 },
+                          width: '100%',
+                          justifyContent: 'center'
+                        }}>
+                          <Box component="span">Unsettled</Box>
+                          {unsettledTotalCount !== null && (
+                            <Box 
+                              component="span"
+                              sx={{ 
+                                fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
+                                opacity: 0.8,
+                                fontWeight: 500,
+                                lineHeight: 1
+                              }}
+                            >
+                              ({unsettledTotalCount.toLocaleString()})
+                            </Box>
+                          )}
+                        </Box>
+                      } 
+                    />
+                  </Tabs>
                 </Box>
 
                 {/* Active filter chips row directly under the header row, aligned under back button - Responsive */}

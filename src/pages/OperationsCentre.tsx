@@ -447,7 +447,7 @@ const OperationsCentrePage: React.FC = () => {
     'Settlement Value': { apiParam: 'settlement_value', type: 'number' },
     'Difference': { apiParam: 'diff', type: 'number' },
     'Reason': { apiParam: 'reason_in', type: 'enum', usesInSuffix: true },
-    'Event Type': { apiParam: 'event_type_in', type: 'enum', usesInSuffix: true },
+    'Event Type': { apiParam: 'event_type', type: 'enum' },
   };
 
   // Mapping of sortable UI columns to backend sort_by values
@@ -1475,6 +1475,11 @@ const OperationsCentrePage: React.FC = () => {
 
   const getUniqueValuesForColumn = (column: string) => {
     const values = new Set<string>();
+    
+    // For Event Type, show available event types
+    if (column === 'Event Type') {
+      return ['Sale', 'Return'];
+    }
     
     // Helper function to extract mismatch_reason from transaction data
     const extractMismatchReason = (originalData: any): string | null => {
