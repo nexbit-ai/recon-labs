@@ -1052,10 +1052,34 @@ const MarketplaceReconciliation: React.FC = () => {
     }
   };
   
-  // Platform selector state
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['flipkart']);
+  // Platform selector state - load from localStorage if available
+  const loadPlatformsFromStorage = (): Platform[] => {
+    try {
+      const stored = localStorage.getItem('recon_selected_platforms');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed as Platform[];
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load platforms from localStorage:', e);
+    }
+    return ['flipkart']; // default
+  };
+
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(loadPlatformsFromStorage());
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [tempSelectedPlatforms, setTempSelectedPlatforms] = useState<Platform[]>([]);
+
+  // Persist platforms to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('recon_selected_platforms', JSON.stringify(selectedPlatforms));
+    } catch (e) {
+      console.warn('Failed to save platforms to localStorage:', e);
+    }
+  }, [selectedPlatforms]);
   
   // Available platforms
   const availablePlatforms = [
@@ -2085,6 +2109,10 @@ const MarketplaceReconciliation: React.FC = () => {
                     const netSalesAmount = Math.abs(Number(s?.net_sales_amount || 0));
                     const netSalesCount = Number(s?.net_sales_orders || 0);
 
+                    // Previous return/cancellations metrics
+                    const prevReturnOrCancelledAmount = Math.abs(Number(s?.prev_return_or_cancelled_amount || 0));
+                    const prevReturnOrCancelledCount = Number(s?.prev_return_or_cancelled_orders || 0);
+
                     const sections = [
                       { type: 'metric', label: 'Net Sales', amount: netSalesAmount, count: netSalesCount },
                       { type: 'operator', symbol: '=' },
@@ -2094,6 +2122,13 @@ const MarketplaceReconciliation: React.FC = () => {
                       { type: 'operator', symbol: '-' },
                       { type: 'metric', label: 'Cancellations', amount: cancellationsAmount, count: cancellationsCount }
                     ];
+
+                    // Add previous return/cancellations metric if values exist
+                    if (prevReturnOrCancelledAmount > 0 || prevReturnOrCancelledCount > 0) {
+                      sections.push(
+                        { type: 'metric', label: 'Previous Return/Cancellations', amount: prevReturnOrCancelledAmount, count: prevReturnOrCancelledCount }
+                      );
+                    }
 
                     return (
                       <Box sx={{ 
@@ -2110,7 +2145,8 @@ const MarketplaceReconciliation: React.FC = () => {
                             flexDirection: 'column', 
                             alignItems: 'center',
                             textAlign: 'center',
-                            minWidth: section.type === 'operator' ? '30px' : '120px'
+                            minWidth: section.type === 'operator' ? '30px' : '120px',
+                            mt: section.type === 'metric' && section.label === 'Previous Return/Cancellations' ? 2 : 0
                           }}>
                             {section.type === 'metric' ? (
                               <>
@@ -2166,14 +2202,16 @@ const MarketplaceReconciliation: React.FC = () => {
           {/* Reconciliation Status */}
           <Grid item xs={12} md={5}>
                           <Card 
-                onClick={() => navigate(`/dispute?from=${effectiveDateRangeForTs.start}&to=${effectiveDateRangeForTs.end}`)}
+                onClick={() => {
+                  const platformsParam = selectedPlatforms.length > 0 ? selectedPlatforms.join(',') : '';
+                  navigate(`/operations-centre?from=${effectiveDateRangeForTs.start}&to=${effectiveDateRangeForTs.end}${platformsParam ? `&platforms=${platformsParam}` : ''}`);
+                }}
                 sx={{ 
                 background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
                 borderRadius: '16px',
                 border: '1px solid #f1f3f4',
                 boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
-                minHeight: 'fit-content',
-                maxHeight: '520px',
+                height: '100%',
                 overflow: 'hidden',
                 transition: 'all 0.3s ease',
                 cursor: 'pointer',
@@ -2183,7 +2221,13 @@ const MarketplaceReconciliation: React.FC = () => {
                 }
               }}
             >
-              <CardContent sx={{ p: 3 }}>
+              <CardContent sx={{ 
+                p: 3,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center'
+              }}>
                 <Typography variant="h3" sx={{ 
                   fontWeight: 600, 
                   mb: 2, 
@@ -2199,7 +2243,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   display: 'flex', 
                   flexDirection: 'column', 
                   alignItems: 'center',
-                  justifyContent: 'flex-start',
+                  justifyContent: 'center',
                   gap: 2,
                 }}>
                   {/* Gauge Chart */}
@@ -2374,7 +2418,10 @@ const MarketplaceReconciliation: React.FC = () => {
                           <Button
                             variant="outlined"
                             size="small"
-                            onClick={() => navigate(`/dispute?from=${effectiveDateRangeForTs.start}&to=${effectiveDateRangeForTs.end}`)}
+                            onClick={() => {
+                              const platformsParam = selectedPlatforms.length > 0 ? selectedPlatforms.join(',') : '';
+                              navigate(`/operations-centre?from=${effectiveDateRangeForTs.start}&to=${effectiveDateRangeForTs.end}${platformsParam ? `&platforms=${platformsParam}` : ''}`);
+                            }}
                             sx={{
                               borderColor: '#6366f1',
                               color: '#6366f1',
@@ -4379,7 +4426,7 @@ const MarketplaceReconciliation: React.FC = () => {
             statsData={reconciliationData}
             initialTab={initialTsTab}
             dateRange={effectiveDateRangeForTs}
-            initialPlatforms={selectedProviderPlatform && initialTsTab === 1 ? [selectedProviderPlatform] : undefined}
+            initialPlatforms={selectedPlatforms.length > 0 ? selectedPlatforms : undefined}
             initialFilters={initialTsFilters}
           />
         </Box>

@@ -14,6 +14,8 @@ import {
   Fade,
   Button, 
   Checkbox, 
+  Radio,
+  RadioGroup,
   Snackbar, 
   Typography, 
   Chip, 
@@ -48,7 +50,8 @@ import {
   Search as SearchIcon,
   ArrowUpward as ArrowUpwardIcon,
   ArrowDownward as ArrowDownwardIcon,
-  UnfoldMore as UnfoldMoreIcon
+  UnfoldMore as UnfoldMoreIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
 import { api } from '../services/api';
 import ColumnFilterControls from '../components/ColumnFilterControls';
@@ -278,8 +281,8 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   };
 };
 
-const DisputePage: React.FC = () => {
-  const [disputeSubTab, setDisputeSubTab] = useState<number>(0); // 0: unreconciled, 1: open, 2: raised
+const OperationsCentrePage: React.FC = () => {
+  const [disputeSubTab, setDisputeSubTab] = useState<number>(0); // 0: unreconciled, 1: manually reconciled, 2: disputed
   
   // State for date filtering
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
@@ -296,6 +299,40 @@ const DisputePage: React.FC = () => {
   const isInitialRenderRef = useRef(true);
   const hasFetchedOnInitialRef = useRef(false);
   
+  // Initialize platform from URL or localStorage - single platform only
+  const getInitialPlatform = (): 'flipkart' | 'amazon' | 'd2c' => {
+    const params = new URLSearchParams(window.location.search);
+    const platformsParam = params.get('platforms');
+    if (platformsParam) {
+      const platforms = platformsParam.split(',').filter(p => ['flipkart', 'amazon', 'd2c'].includes(p)) as Array<'flipkart' | 'amazon' | 'd2c'>;
+      if (platforms.length > 0) {
+        // Return only the first platform for single-select
+        return platforms[0];
+      }
+    }
+    // Fallback to localStorage if no URL param
+    try {
+      const stored = localStorage.getItem('recon_selected_platforms');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const validPlatforms = parsed.filter(p => ['flipkart', 'amazon', 'd2c'].includes(p)) as Array<'flipkart' | 'amazon' | 'd2c'>;
+          if (validPlatforms.length > 0) {
+            // Return only the first platform for single-select
+            return validPlatforms[0];
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load platforms from localStorage:', e);
+    }
+    return 'd2c'; // default fallback
+  };
+
+  // Platform selector state for dropdown (single-select) - initialize from URL params
+  const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<'flipkart' | 'amazon' | 'd2c'>(getInitialPlatform());
+
   // Initialize from URL query params if provided (e.g., from main page navigation)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -305,6 +342,15 @@ const DisputePage: React.FC = () => {
       setSelectedDateRange('custom');
       setCustomStartDate(from);
       setCustomEndDate(to);
+    }
+    
+    // Also update platform from URL params if present (use first if multiple)
+    const platformsParam = params.get('platforms');
+    if (platformsParam) {
+      const platforms = platformsParam.split(',').filter(p => ['flipkart', 'amazon', 'd2c'].includes(p)) as Array<'flipkart' | 'amazon' | 'd2c'>;
+      if (platforms.length > 0) {
+        setSelectedPlatform(platforms[0]); // Use first platform only
+      }
     }
   }, []);
   
@@ -320,8 +366,18 @@ const DisputePage: React.FC = () => {
     { value: 'custom', label: 'Custom date range', dates: 'Custom' }
   ];
 
-  // API data state - can be either TransactionRow[] or grouped data for unreconciled tab
-  const [apiRows, setApiRows] = useState<TransactionRow[] | GroupedUnreconciledData[]>([]);
+  // API data state - separate state for each tab
+  const [unreconciledRows, setUnreconciledRows] = useState<TransactionRow[] | GroupedUnreconciledData[]>([]);
+  const [manuallyReconciledRows, setManuallyReconciledRows] = useState<TransactionRow[]>([]);
+  const [disputedRows, setDisputedRows] = useState<TransactionRow[]>([]);
+  
+  // Helper to get current tab's data (for backward compatibility)
+  const getApiRows = () => {
+    if (disputeSubTab === 0) return unreconciledRows;
+    if (disputeSubTab === 1) return manuallyReconciledRows;
+    return disputedRows;
+  };
+  
   const [mockRows, setMockRows] = useState<Array<{ id: string; orderItemId: string; orderDate: string; difference: number; remark: string; eventType: string; status: 'unreconciled' | 'open' | 'raised'; }>>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -332,13 +388,13 @@ const DisputePage: React.FC = () => {
   // Pagination for unreconciled tab
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
-  // Total count for pagination
-  const [totalCount, setTotalCount] = useState(0);
+  // Total counts for each tab from API responses
+  const [unreconciledCount, setUnreconciledCount] = useState(0);
+  const [manuallyReconciledCount, setManuallyReconciledCount] = useState(0);
+  const [disputedCount, setDisputedCount] = useState(0);
+  // Legacy totalCount for backward compatibility
+  const totalCount = unreconciledCount;
 
-  // Platform selector state for dropdown (multi-select)
-  const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Array<'flipkart' | 'amazon' | 'd2c'>>(['d2c']);
-  const [tempSelectedPlatforms, setTempSelectedPlatforms] = useState<Array<'flipkart' | 'amazon' | 'd2c'>>([]);
 
   // Column filter state
   const [columnFilters, setColumnFilters] = useState<Record<string, any>>({});
@@ -414,7 +470,7 @@ const DisputePage: React.FC = () => {
     } else {
       setSelectedDateRange(value as 'this-month' | 'last-month' | 'this-year' | 'custom');
       if (value === 'this-month' || value === 'last-month' || value === 'this-year') {
-        fetchUnreconciledOrders();
+        fetchAllTabsData();
       }
     }
     setDateRangeMenuAnchor(null);
@@ -440,9 +496,9 @@ const DisputePage: React.FC = () => {
 
     setSortConfig(nextSort);
 
-    // Trigger server-side refetch with sorting (reset to first page)
+    // Trigger server-side refetch with sorting (reset to first page) - fetch all tabs
     setPage(0);
-    fetchUnreconciledOrders(undefined, nextSort, true);
+    fetchAllTabsData(undefined, nextSort, true);
   };
 
   const getSortIcon = (columnKey: string) => {
@@ -590,7 +646,67 @@ const DisputePage: React.FC = () => {
       (params as any).order_date_to = lastDay.toISOString().split('T')[0];
     }
 
+    // Add platform parameter from selectedPlatform (single platform only)
+    if (selectedPlatform) {
+      (params as any).platform = selectedPlatform;
+    }
+
     return params;
+  };
+
+  // Transform API response to TransactionRow format
+  const transformTransactionData = (transactionData: any[]): TransactionRow[] => {
+    const transformedRows: TransactionRow[] = [];
+    
+    if (Array.isArray(transactionData)) {
+      transactionData.forEach((transaction: any) => {
+        // Parse numeric values
+        const parseNumeric = (value: any): number => {
+          if (!value) return 0;
+          const cleaned = String(value).replace(/[₹$,\s]/g, '').replace(/[^\d.-]/g, '').trim();
+          return parseFloat(cleaned) || 0;
+        };
+        
+        // Format dates
+        const formatDate = (date: string | Date): string => {
+          if (!date) return '';
+          try {
+            return new Date(date).toISOString().split('T')[0];
+          } catch {
+            return '';
+          }
+        };
+        
+        // For manually reconciled and disputed tabs, use manual_override_note if available
+        // Otherwise, use mismatch_reason from breakups or metadata
+        let remark = 'Not Available';
+        if (transaction.metadata?.manual_override_note) {
+          remark = transaction.metadata.manual_override_note;
+        } else if (transaction.metadata?.breakups?.mismatch_reason) {
+          remark = transaction.metadata.breakups.mismatch_reason;
+        } else if (transaction.breakups?.mismatch_reason) {
+          remark = transaction.breakups.mismatch_reason;
+        } else if (transaction.remark) {
+          remark = transaction.remark;
+        }
+        
+        transformedRows.push({
+          "Order ID": transaction.order_item_id || transaction.order_id || '',
+          "Amount": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount),
+          "Order Value": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount),
+          "Settlement Value": parseNumeric(transaction.settlement_value || transaction.settlement_amount),
+          "Invoice Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date),
+          "Order Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date),
+          "Settlement Date": formatDate(transaction.settlement_date),
+          "Difference": parseNumeric(transaction.diff || transaction.difference),
+          "Remark": remark,
+          "Event Type": transaction.event_type || transaction.eventType || 'Sale',
+          originalData: transaction
+        });
+      });
+    }
+    
+    return transformedRows;
   };
 
   // Fetch unreconciled orders from API
@@ -600,11 +716,6 @@ const DisputePage: React.FC = () => {
     applySortOverride?: boolean,
     orderIdsCsvOverride?: string
   ) => {
-    if (disputeSubTab !== 0) return; // Only fetch for unreconciled tab
-    
-    setApiLoading(true);
-    setError(null);
-    
     try {
       // Build query parameters
       const params = buildQueryParams(filtersOverride, orderIdsCsvOverride);
@@ -625,6 +736,9 @@ const DisputePage: React.FC = () => {
       
       // Add the unreconciled status filter
       params.status_in = 'less_payment_received,more_payment_received';
+      // Add manual_override_status filter to exclude manually reconciled and disputed orders
+      // Pass as string "null" since the API service filters out actual null values
+      (params as any).manual_override_status = 'null';
       
       // Call the API
       const response = await api.transactions.getTotalTransactions(params as any);
@@ -632,80 +746,38 @@ const DisputePage: React.FC = () => {
       if (response.success && response.data) {
         const responseData = response.data as any;
         const transactionData = responseData.transactions || responseData.data || [];
+        const transformedRows = transformTransactionData(transactionData);
         
-        // Transform API data to TransactionRow format
-        const transformedRows: TransactionRow[] = [];
+        setUnreconciledRows(transformedRows);
         
-        if (Array.isArray(transactionData)) {
-          transactionData.forEach((transaction: any) => {
-            // Parse numeric values
-            const parseNumeric = (value: any): number => {
-              if (!value) return 0;
-              const cleaned = String(value).replace(/[₹$,\s]/g, '').replace(/[^\d.-]/g, '').trim();
-              return parseFloat(cleaned) || 0;
-            };
-            
-            // Format dates
-            const formatDate = (date: string | Date): string => {
-              if (!date) return '';
-              try {
-                return new Date(date).toISOString().split('T')[0];
-              } catch {
-                return '';
-              }
-            };
-            
-            transformedRows.push({
-              "Order ID": transaction.order_item_id || transaction.order_id || '',
-              "Amount": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount),
-              "Order Value": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount), // Keep for compatibility
-              "Settlement Value": parseNumeric(transaction.settlement_value),
-              "Invoice Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date),
-              "Order Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date), // Keep for compatibility
-              "Settlement Date": formatDate(transaction.settlement_date),
-              "Difference": parseNumeric(transaction.diff || transaction.difference),
-              "Remark": transaction.breakups?.mismatch_reason || transaction.remark || 'Not Available',
-              "Event Type": transaction.event_type || transaction.eventType || 'Sale',
-              originalData: transaction
-            });
-          });
-        }
-        
-        setApiRows(transformedRows);
-        
-        // Update pagination from response
+        // Update count from response
         if (response.data.pagination) {
-          setTotalCount(response.data.pagination.total_count);
+          setUnreconciledCount(response.data.pagination.current_count || response.data.pagination.total_count || 0);
+        } else {
+          setUnreconciledCount(transformedRows.length);
         }
         
         console.log('Fetched unreconciled orders from API:', transformedRows.length);
       } else {
         console.error('API returned no data');
-        setApiRows([]);
-        setTotalCount(0);
+        setUnreconciledRows([]);
+        setUnreconciledCount(0);
       }
     } catch (err) {
       console.error('Error fetching unreconciled orders:', err);
-      setError('Failed to load dispute data. Please try again.');
-      setApiRows([]);
-      setTotalCount(0);
-    } finally {
-      setApiLoading(false);
+      setError('Failed to load unreconciled data. Please try again.');
+      setUnreconciledRows([]);
+      setUnreconciledCount(0);
     }
   };
 
-  // Fetch dispute raised orders from API
+  // Fetch disputed orders from API
   const fetchDisputeRaisedOrders = async (
     filtersOverride?: Record<string, any>,
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
     applySortOverride?: boolean,
     orderIdsCsvOverride?: string
   ) => {
-    if (disputeSubTab !== 1) return; // Only fetch for dispute raised tab
-
-    setApiLoading(true);
-    setError(null);
-
     try {
       // Build base query parameters (date, filters, ids, sorting, etc.)
       const params = buildQueryParams(filtersOverride, orderIdsCsvOverride);
@@ -723,7 +795,7 @@ const DisputePage: React.FC = () => {
         params.sort_order = sortOverride.direction;
       }
 
-      // Add manual override status filter for Dispute Raised
+      // Add manual override status filter for Disputed
       (params as any).manual_override_status = 'DISPUTED';
 
       // Call the API
@@ -732,57 +804,80 @@ const DisputePage: React.FC = () => {
       if (response.success && response.data) {
         const responseData = response.data as any;
         const transactionData = responseData.transactions || responseData.data || [];
+        const transformedRows = transformTransactionData(transactionData);
 
-        const transformedRows: TransactionRow[] = [];
-        if (Array.isArray(transactionData)) {
-          transactionData.forEach((transaction: any) => {
-            const parseNumeric = (value: any): number => {
-              if (!value) return 0;
-              const cleaned = String(value).replace(/[₹$,\s]/g, '').replace(/[^\d.-]/g, '').trim();
-              return parseFloat(cleaned) || 0;
-            };
-
-            const formatDate = (date: string | Date): string => {
-              if (!date) return '';
-              try {
-                return new Date(date).toISOString().split('T')[0];
-              } catch {
-                return '';
-              }
-            };
-
-            transformedRows.push({
-              "Order ID": transaction.order_item_id || transaction.order_id || '',
-              "Amount": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount),
-              "Order Value": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount),
-              "Settlement Value": parseNumeric(transaction.settlement_value),
-              "Invoice Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date),
-              "Order Date": formatDate(transaction.invoice_date || transaction.order_date || transaction.buyer_invoice_date),
-              "Settlement Date": formatDate(transaction.settlement_date),
-              "Difference": parseNumeric(transaction.diff || transaction.difference),
-              "Remark": transaction.breakups?.mismatch_reason || transaction.remark || 'Not Available',
-              "Event Type": transaction.event_type || transaction.eventType || 'Sale',
-              originalData: transaction
-            });
-          });
-        }
-
-        setApiRows(transformedRows);
-
+        setDisputedRows(transformedRows);
+        
+        // Update count from response
         if (response.data.pagination) {
-          setTotalCount(response.data.pagination.total_count);
+          setDisputedCount(response.data.pagination.current_count || response.data.pagination.total_count || 0);
+        } else {
+          setDisputedCount(transformedRows.length);
         }
       } else {
-        setApiRows([]);
-        setTotalCount(0);
+        setDisputedRows([]);
+        setDisputedCount(0);
       }
     } catch (err) {
-      console.error('Error fetching dispute raised orders:', err);
-      setError('Failed to load dispute raised data. Please try again.');
-      setApiRows([]);
-      setTotalCount(0);
-    } finally {
-      setApiLoading(false);
+      console.error('Error fetching disputed orders:', err);
+      setError('Failed to load disputed data. Please try again.');
+      setDisputedRows([]);
+      setDisputedCount(0);
+    }
+  };
+
+  // Fetch manually reconciled orders from API
+  const fetchManuallyReconciledOrders = async (
+    filtersOverride?: Record<string, any>,
+    sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
+    applySortOverride?: boolean,
+    orderIdsCsvOverride?: string
+  ) => {
+    try {
+      // Build base query parameters (date, filters, ids, sorting, etc.)
+      const params = buildQueryParams(filtersOverride, orderIdsCsvOverride);
+
+      // If explicitly applying override: when null, clear sort; when provided, set it
+      if (applySortOverride) {
+        delete (params as any).sort_by;
+        delete (params as any).sort_order;
+        if (sortOverride && COLUMN_TO_SORT_BY_MAP[sortOverride.key]) {
+          params.sort_by = COLUMN_TO_SORT_BY_MAP[sortOverride.key];
+          params.sort_order = sortOverride.direction;
+        }
+      } else if (sortOverride && COLUMN_TO_SORT_BY_MAP[sortOverride.key]) {
+        params.sort_by = COLUMN_TO_SORT_BY_MAP[sortOverride.key];
+        params.sort_order = sortOverride.direction;
+      }
+
+      // Add manual override status filter for Manually Reconciled
+      (params as any).manual_override_status = 'MANUALLY_RECONCILED';
+
+      // Call the API
+      const response = await api.transactions.getTotalTransactions(params as any);
+
+      if (response.success && response.data) {
+        const responseData = response.data as any;
+        const transactionData = responseData.transactions || responseData.data || [];
+        const transformedRows = transformTransactionData(transactionData);
+
+        setManuallyReconciledRows(transformedRows);
+        
+        // Update count from response
+        if (response.data.pagination) {
+          setManuallyReconciledCount(response.data.pagination.current_count || response.data.pagination.total_count || 0);
+        } else {
+          setManuallyReconciledCount(transformedRows.length);
+        }
+      } else {
+        setManuallyReconciledRows([]);
+        setManuallyReconciledCount(0);
+      }
+    } catch (err) {
+      console.error('Error fetching manually reconciled orders:', err);
+      setError('Failed to load manually reconciled data. Please try again.');
+      setManuallyReconciledRows([]);
+      setManuallyReconciledCount(0);
     }
   };
 
@@ -811,38 +906,50 @@ const DisputePage: React.FC = () => {
     isInitialRenderRef.current = false;
   }, []);
 
-  // Fetch API data when switching to unreconciled tab or when relevant inputs change
+  // Fetch all three APIs in parallel whenever filters or other inputs change
+  const fetchAllTabsData = async (
+    filtersOverride?: Record<string, any>,
+    sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
+    applySortOverride?: boolean,
+    orderIdsCsvOverride?: string
+  ) => {
+    setApiLoading(true);
+    setError(null);
+    
+    try {
+      // Fetch all three APIs in parallel
+      await Promise.all([
+        fetchUnreconciledOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride),
+        fetchManuallyReconciledOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride),
+        fetchDisputeRaisedOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride)
+      ]);
+    } catch (err) {
+      console.error('Error fetching all tabs data:', err);
+      setError('Failed to load some data. Please try again.');
+    } finally {
+      setApiLoading(false);
+    }
+  };
+
+  // Fetch all three APIs whenever filters or other inputs change (NOT when tab changes)
   useEffect(() => {
-    if (disputeSubTab !== 0) return;
     // On initial render in dev StrictMode this effect runs twice.
     // Guard so we only fetch once on the true initial render, then allow future changes.
     if (isInitialRenderRef.current) {
       if (!hasFetchedOnInitialRef.current) {
         hasFetchedOnInitialRef.current = true;
-        fetchUnreconciledOrders();
+        fetchAllTabsData();
       }
       return;
     }
-    fetchUnreconciledOrders();
-  }, [disputeSubTab, selectedDateRange, customStartDate, customEndDate]);
+    fetchAllTabsData();
+  }, [selectedDateRange, customStartDate, customEndDate, selectedPlatform]);
 
-  // Fetch API data when switching to Dispute Raised tab or when relevant inputs change
-  useEffect(() => {
-    if (disputeSubTab !== 1) return;
-    // Guard so we only fetch once on the true initial render, then allow future changes.
-    if (isInitialRenderRef.current) {
-      if (!hasFetchedOnInitialRef.current) {
-        hasFetchedOnInitialRef.current = true;
-        fetchDisputeRaisedOrders();
-      }
-      return;
-    }
-    fetchDisputeRaisedOrders();
-  }, [disputeSubTab, selectedDateRange, customStartDate, customEndDate]);
-
-  // Get current rows based on active tab (both tabs use API data now)
+  // Get current rows based on active tab
   const getCurrentRows = () => {
-    return apiRows;
+    if (disputeSubTab === 0) return unreconciledRows;
+    if (disputeSubTab === 1) return manuallyReconciledRows;
+    return disputedRows;
   };
 
   const current = getCurrentRows();
@@ -946,10 +1053,19 @@ const DisputePage: React.FC = () => {
     return true;
   });
 
-  // Calculate total count for unreconciled orders (flat count)
+  // Calculate total count for unreconciled orders
   const getUnreconciledTotalCount = () => {
-    if (disputeSubTab === 0 && Array.isArray(apiRows)) return filteredCurrent.length;
-    return 0;
+    return unreconciledCount;
+  };
+  
+  // Get count for manually reconciled tab
+  const getManuallyReconciledCount = () => {
+    return manuallyReconciledCount;
+  };
+  
+  // Get count for disputed tab
+  const getDisputedCount = () => {
+    return disputedCount;
   };
 
   const paginatedCurrent = (() => {
@@ -977,23 +1093,25 @@ const DisputePage: React.FC = () => {
   // Debug logging for data flow
   useEffect(() => {
     if (disputeSubTab === 0) {
-      console.log('Current apiRows:', apiRows);
+      const currentTabRows = getApiRows();
+      console.log('Current unreconciledRows:', currentTabRows);
       console.log('Current rows for display:', current);
-      console.log('apiRows length:', apiRows.length);
+      console.log('unreconciledRows length:', Array.isArray(currentTabRows) ? currentTabRows.length : 0);
       console.log('current length:', current.length);
       console.log('Column filters:', columnFilters);
       console.log('Active filter column:', activeFilterColumn);
     }
-  }, [apiRows, disputeSubTab, current, columnFilters, activeFilterColumn]);
+  }, [unreconciledRows, disputeSubTab, current, columnFilters, activeFilterColumn]);
   
-  // Force re-render when apiRows changes
+  // Force re-render when data changes
   const [forceUpdate, setForceUpdate] = useState(0);
   
   useEffect(() => {
-    if (apiRows.length > 0) {
+    const currentTabRows = getApiRows();
+    if (Array.isArray(currentTabRows) && currentTabRows.length > 0) {
       setForceUpdate(prev => prev + 1);
     }
-  }, [apiRows]);
+  }, [unreconciledRows, manuallyReconciledRows, disputedRows]);
   
   // Track which rows are expanded
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -1014,6 +1132,11 @@ const DisputePage: React.FC = () => {
   const [raiseDialogOpen, setRaiseDialogOpen] = useState(false);
   const [selectedRaiseGroup, setSelectedRaiseGroup] = useState<{ reason: string; count: number; orderIds: string[] } | null>(null);
   const [raiseDescription, setRaiseDescription] = useState<string>('');
+  
+  // Transaction history modal state (for manually reconciled and disputed tabs)
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedTransactionRow, setSelectedTransactionRow] = useState<any>(null);
+  const [historyAnchorEl, setHistoryAnchorEl] = useState<HTMLElement | null>(null);
 
   const openRaiseDispute = (group: any) => {
     setSelectedRaiseGroup({ reason: group?.reason || 'Unknown', count: group?.count || 0, orderIds: group?.orderIds || [] });
@@ -1029,7 +1152,7 @@ const DisputePage: React.FC = () => {
         return;
       }
 
-      await api.manualActions.manualAction('d2c', {
+      await api.manualActions.manualAction(selectedPlatform, {
         manual_override_status: 'DISPUTED',
         order_ids: orderIds,
         note: raiseDescription || '',
@@ -1040,12 +1163,8 @@ const DisputePage: React.FC = () => {
 
       setRaiseDialogOpen(false);
 
-      // Refresh current tab data with existing filters
-      if (disputeSubTab === 0) {
-        fetchUnreconciledOrders();
-      } else if (disputeSubTab === 1) {
-        fetchDisputeRaisedOrders();
-      }
+      // Refresh all tabs data with existing filters
+      fetchAllTabsData();
     } catch (error) {
       console.error('Failed to raise dispute', error);
       setSnackbarMsg('Failed to raise dispute');
@@ -1120,13 +1239,16 @@ const DisputePage: React.FC = () => {
   const confirmManualAction = async () => {
     if (pendingOrderIds.length === 0) return;
     try {
-      const platform = 'flipkart';
-      await api.manualActions.manualAction(platform, { order_ids: pendingOrderIds, note: noteInput || '' });
+      await api.manualActions.manualAction(selectedPlatform, { 
+        order_ids: pendingOrderIds, 
+        note: noteInput || '',
+        manual_override_status: 'MANUALLY_RECONCILED'
+      });
 
-      // Optimistically remove reconciled rows
-      setApiRows(prev => {
+      // Optimistically remove reconciled rows from unreconciled tab
+      const ids = new Set(pendingOrderIds);
+      setUnreconciledRows(prev => {
         if (Array.isArray(prev)) {
-          const ids = new Set(pendingOrderIds);
           return prev.filter((row: any) => {
             const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
             return !ids.has(orderId);
@@ -1137,8 +1259,9 @@ const DisputePage: React.FC = () => {
 
       // Push notification for checklist
       try {
-        // Derive a reason from the first matched row
-        const first = (apiRows as any[]).find(row => {
+        // Derive a reason from the first matched row (from unreconciled tab)
+        const currentRows = getApiRows();
+        const first = (currentRows as any[]).find(row => {
           const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
           return orderId === pendingOrderIds[0];
         });
@@ -1150,6 +1273,9 @@ const DisputePage: React.FC = () => {
 
       setSnackbarMsg('Manual action submitted successfully');
       setSnackbarOpen(true);
+      
+      // Refresh all tabs data to ensure consistency
+      fetchAllTabsData();
     } catch (error) {
       console.error('Manual action failed', error);
       setSnackbarMsg('Failed to submit manual action');
@@ -1167,8 +1293,9 @@ const DisputePage: React.FC = () => {
   const handleRaiseDispute = (id: string) => {
     console.log('Raising dispute:', id);
     
-    // Find the transaction data
-    const transaction = (apiRows as any[]).find(row => {
+    // Find the transaction data from current tab's data
+    const currentRows = getApiRows();
+    const transaction = (currentRows as any[]).find(row => {
       const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
       return orderId === id;
     });
@@ -1228,7 +1355,7 @@ const DisputePage: React.FC = () => {
     // Reset to first page and refetch from backend with server-side filters
     setPage(0);
     closeFilterPopover();
-    fetchUnreconciledOrders();
+    fetchAllTabsData();
   };
 
   // Order ID search handlers (mirror TransactionSheet)
@@ -1239,7 +1366,7 @@ const DisputePage: React.FC = () => {
     if (value.trim() === '') {
       setOrderIdChips([]);
       setPage(0);
-      fetchUnreconciledOrders(undefined, undefined, undefined, '');
+      fetchAllTabsData(undefined, undefined, undefined, '');
     }
   };
 
@@ -1249,7 +1376,7 @@ const DisputePage: React.FC = () => {
     setOrderIdChips(ids);
     // Trigger API call
     setPage(0);
-    fetchUnreconciledOrders(undefined, undefined, undefined, ids.join(','));
+    fetchAllTabsData(undefined, undefined, undefined, ids.join(','));
   };
 
   const handleOrderIdSearchClear = () => {
@@ -1258,14 +1385,14 @@ const DisputePage: React.FC = () => {
     setShowOrderIdSearch(false);
     // Trigger API call without order IDs
     setPage(0);
-    fetchUnreconciledOrders(undefined, undefined, undefined, '');
+    fetchAllTabsData(undefined, undefined, undefined, '');
   };
 
   const getUniqueValuesForColumn = (column: string) => {
     const values = new Set<string>();
     // Include values from API rows when in Unreconciled tab
-    if (disputeSubTab === 0 && Array.isArray(apiRows)) {
-      (apiRows as any[]).forEach(row => {
+    if (disputeSubTab === 0 && Array.isArray(unreconciledRows)) {
+      (unreconciledRows as any[]).forEach(row => {
         if (column === 'Reason') {
           // For D2C, use breakups.mismatch_reason, fallback to reason
           const v = row.breakups?.mismatch_reason || row.reason || row.Remark;
@@ -1321,14 +1448,354 @@ const DisputePage: React.FC = () => {
  
   
   const toggleRow = (id: string) => setSelectedIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
-  
-  const sendToFlipkart = () => {
-    if (selectedIds.length === 0) return;
-    setSnackbarOpen(true);
-    // For API data, we can't modify the status directly
-    // This would typically call an API to update the status
-    console.log('Sending to Flipkart:', selectedIds);
-    setSelectedIds([]);
+
+  // Handler to open transaction history modal
+  const handleHistoryOpen = (event: React.MouseEvent<HTMLElement>, row: any) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedTransactionRow(row);
+    setHistoryAnchorEl(event.currentTarget);
+    setHistoryModalOpen(true);
+  };
+
+  // Transaction History Modal Component
+  const TransactionHistoryModal: React.FC = () => {
+    if (!historyModalOpen || !selectedTransactionRow || !historyAnchorEl) return null;
+
+    const originalData = selectedTransactionRow.originalData || {};
+    const metadata = originalData.metadata || {};
+    const breakupsObj = metadata.breakups || {};
+    
+    // Extract values
+    const orderValue = originalData.order_value || 0;
+    const settlementValue = originalData.settlement_amount || 0;
+    const diff = originalData.diff || 0;
+    const mismatchReason = metadata.mismatch_reason || '';
+    const reconStatus = originalData.recon_status || '';
+    const manualOverrideBy = metadata.manual_override_by || '';
+    const orderId = selectedTransactionRow["Order ID"] || originalData.order_id || '';
+
+    // Format currency
+    const formatCurrency = (value: number) => {
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(value);
+    };
+
+    // Format key for breakups
+    const formatKey = (key: string) => {
+      return key.split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    };
+
+    // Get breakups data
+    const breakupsData = Object.entries(breakupsObj).map(([key, value]) => ({
+      label: formatKey(key),
+      value: Number(value) || 0
+    }));
+
+    // Calculate popup position
+    const getPopupPosition = () => {
+      const rect = historyAnchorEl.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      const popupHeight = 500;
+      const popupWidth = 420;
+      const offset = 12;
+
+      let top: number;
+      let animationDirection: 'up' | 'down' = 'down';
+      let maxHeight: number | undefined;
+      
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      
+      if (spaceBelow >= popupHeight + offset) {
+        top = rect.bottom + offset;
+        animationDirection = 'down';
+      } else if (spaceAbove >= popupHeight + offset) {
+        top = rect.top - popupHeight - offset;
+        animationDirection = 'up';
+      } else {
+        if (spaceBelow > spaceAbove) {
+          top = Math.max(offset, viewportHeight - popupHeight - offset);
+          maxHeight = popupHeight;
+          animationDirection = 'down';
+        } else {
+          top = offset;
+          maxHeight = popupHeight;
+          animationDirection = 'up';
+        }
+      }
+
+      if (maxHeight && maxHeight < 400) {
+        maxHeight = 400;
+      }
+
+      let left: number;
+      if (rect.left + popupWidth <= viewportWidth) {
+        left = rect.left;
+      } else {
+        left = Math.max(offset, viewportWidth - popupWidth - offset);
+      }
+
+      if (top < offset) {
+        top = offset;
+        maxHeight = Math.min(popupHeight, viewportHeight - offset * 2);
+      }
+      if (top + (maxHeight || popupHeight) > viewportHeight - offset) {
+        top = Math.max(offset, viewportHeight - (maxHeight || popupHeight) - offset);
+      }
+
+      if (left < offset) {
+        left = offset;
+      }
+      if (left + popupWidth > viewportWidth - offset) {
+        left = viewportWidth - popupWidth - offset;
+      }
+
+      return { top, left, animationDirection, maxHeight };
+    };
+
+    const position = getPopupPosition();
+
+    return (
+      <>
+        {/* Backdrop */}
+        <Box
+          onClick={() => setHistoryModalOpen(false)}
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.3)',
+            zIndex: 1399,
+            animation: 'fadeIn 0.2s ease-out',
+            '@keyframes fadeIn': {
+              '0%': { opacity: 0 },
+              '100%': { opacity: 1 },
+            },
+          }}
+        />
+        
+        {/* Modal */}
+        <Box
+          onClick={(e) => e.stopPropagation()}
+          sx={{
+            position: 'fixed',
+            top: position.top,
+            left: position.left,
+            width: '420px',
+            maxHeight: position.maxHeight ? `${position.maxHeight}px` : 'auto',
+            background: '#ffffff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '12px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            zIndex: 1400,
+            animation: position.animationDirection === 'down' 
+              ? 'fadeInScaleDown 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+              : 'fadeInScaleUp 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            '@keyframes fadeInScaleDown': {
+              '0%': { opacity: 0, transform: 'scale(0.95) translateY(-10px)' },
+              '100%': { opacity: 1, transform: 'scale(1) translateY(0)' },
+            },
+            '@keyframes fadeInScaleUp': {
+              '0%': { opacity: 0, transform: 'scale(0.95) translateY(10px)' },
+              '100%': { opacity: 1, transform: 'scale(1) translateY(0)' },
+            },
+          }}
+        >
+          {/* Header */}
+          <Box
+            sx={{
+              p: 2,
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#111827' }}>
+                Transaction History
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                Order ID: {orderId}
+              </Typography>
+            </Box>
+            <IconButton
+              onClick={() => setHistoryModalOpen(false)}
+              size="small"
+              sx={{
+                p: 0.5,
+                '&:hover': { background: '#f3f4f6' },
+              }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+
+          {/* Content */}
+          <Box sx={{ p: 2, maxHeight: position.maxHeight ? `${position.maxHeight - 80}px` : '420px', overflowY: 'auto' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {/* Manual Override Info */}
+              {manualOverrideBy && (
+                <Box
+                  sx={{
+                    p: 1.5,
+                    background: '#f0f9ff',
+                    borderRadius: '6px',
+                    border: '1px solid #bae6fd',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#0c4a6e', fontSize: '0.75rem', mb: 0.5 }}>
+                    Manually Overridden By
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#0c4a6e', fontSize: '0.875rem' }}>
+                    {manualOverrideBy}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Previous Status */}
+              <Box
+                sx={{
+                  p: 1.5,
+                  background: '#f9fafb',
+                  borderRadius: '6px',
+                  border: '1px solid #e5e7eb',
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.75rem', mb: 1 }}>
+                  Previous Status
+                </Typography>
+                {reconStatus && (
+                  <Box sx={{ mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                      Recon Status:
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#111827', fontSize: '0.875rem', fontWeight: 500 }}>
+                      {reconStatus.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                    </Typography>
+                  </Box>
+                )}
+                {mismatchReason && (
+                  <Box>
+                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                      Mismatch Reason:
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#111827', fontSize: '0.875rem', fontWeight: 500 }}>
+                      {mismatchReason}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Order Value */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  p: 1.5,
+                  background: '#f0f9ff',
+                  borderRadius: '6px',
+                  border: '1px solid #bae6fd',
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#0c4a6e', fontSize: '0.875rem' }}>
+                  Order Value
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#0c4a6e', fontSize: '0.875rem' }}>
+                  {formatCurrency(orderValue)}
+                </Typography>
+              </Box>
+
+              {/* Breakups */}
+              {breakupsData.length > 0 && (
+                <>
+                  {breakupsData.map((item, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        p: 1.5,
+                        pl: 3,
+                        background: '#f9fafb',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb',
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: '#374151', fontSize: '0.75rem' }}>
+                        {item.label}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.75rem' }}>
+                        {formatCurrency(item.value)}
+                      </Typography>
+                    </Box>
+                  ))}
+                  
+                  {/* Divider */}
+                  <Box sx={{ borderTop: '2px solid #e5e7eb' }} />
+                  
+                  {/* Settlement Value */}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      p: 1.5,
+                      pl: 3,
+                      background: '#fef2f2',
+                      borderRadius: '6px',
+                      border: '1px solid #fecaca',
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#991b1b', fontSize: '0.75rem' }}>
+                      Settlement Value
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#991b1b', fontSize: '0.75rem' }}>
+                      {formatCurrency(-settlementValue)}
+                    </Typography>
+                  </Box>
+                  
+                  {/* Divider */}
+                  <Box sx={{ borderTop: '2px solid #e5e7eb' }} />
+                </>
+              )}
+
+              {/* Difference */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  p: 1.5,
+                  background: diff === 0 ? '#f0fdf4' : '#fef2f2',
+                  borderRadius: '6px',
+                  border: diff === 0 ? '1px solid #86efac' : '1px solid #fca5a5',
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 700, color: diff === 0 ? '#166534' : '#991b1b', fontSize: '0.875rem' }}>
+                  Difference
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 800, color: diff === 0 ? '#166534' : '#991b1b', fontSize: '0.875rem' }}>
+                  {formatCurrency(diff)}
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+      </>
+    );
   };
 
   return (
@@ -1338,7 +1805,8 @@ const DisputePage: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Tabs value={disputeSubTab} onChange={(_, v) => setDisputeSubTab(v)} sx={{ '& .MuiTab-root': { textTransform: 'none', minHeight: 32 } }}>
               <Tab label={`Unreconciled Orders (${getUnreconciledTotalCount()})`} />
-              <Tab label="Dispute Raised" />
+              <Tab label={`Manually Reconciled (${getManuallyReconciledCount()})`} />
+              <Tab label={`Disputed (${getDisputedCount()})`} />
             </Tabs>
             {/* Right controls: applied filter chips + filter + platform + send button */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -1378,7 +1846,7 @@ const DisputePage: React.FC = () => {
                           delete next[col];
                           setColumnFilters(next);
                           setPage(0);
-                          fetchUnreconciledOrders(next);
+                          fetchAllTabsData(next);
                         }}
                         sx={{ p: 0.25, color: '#6b7280', '&:hover': { color: '#111827' } }}
                         aria-label={`Clear ${col} filter`}
@@ -1416,13 +1884,13 @@ const DisputePage: React.FC = () => {
                 variant="outlined"
                 endIcon={<KeyboardArrowDownIcon />}
                 startIcon={<StorefrontIcon />}
-                onClick={(e) => { setTempSelectedPlatforms(selectedPlatforms); setPlatformMenuAnchorEl(e.currentTarget); }}
+                onClick={(e) => setPlatformMenuAnchorEl(e.currentTarget)}
                 sx={{
                   borderColor: '#6B7280', color: '#6B7280', textTransform: 'none',
                   minWidth: 'auto', minHeight: 36, px: 1.5, fontSize: '0.7875rem', '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107,114,128,0.04)' }
                 }}
               >
-                {selectedPlatforms.length === 3 ? 'All' : selectedPlatforms.length === 2 ? `${selectedPlatforms[0] === 'flipkart' ? 'Flipkart' : selectedPlatforms[0] === 'amazon' ? 'Amazon' : 'D2C'}, ${selectedPlatforms[1] === 'flipkart' ? 'Flipkart' : selectedPlatforms[1] === 'amazon' ? 'Amazon' : 'D2C'}` : (selectedPlatforms[0] === 'amazon' ? 'Amazon' : selectedPlatforms[0] === 'd2c' ? 'D2C' : 'Flipkart')}
+                {selectedPlatform === 'flipkart' ? 'Flipkart' : selectedPlatform === 'amazon' ? 'Amazon' : 'D2C'}
               </Button>
               <Menu
                 anchorEl={platformMenuAnchorEl}
@@ -1441,57 +1909,40 @@ const DisputePage: React.FC = () => {
                 }}
               >
                 <Box sx={{ p: 1, minWidth: 240 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>Platforms</Typography>
-                    <Button
-                      size="small"
-                      variant="text"
-                      onClick={() => {
-                        if (tempSelectedPlatforms.length === 3) setTempSelectedPlatforms([]);
-                        else setTempSelectedPlatforms(['flipkart','amazon','d2c']);
-                      }}
-                      sx={{ textTransform: 'none', minWidth: 'auto', px: 1 }}
-                    >
-                      {tempSelectedPlatforms.length === 3 ? 'Clear all' : 'Select all'}
-                    </Button>
-                  </Box>
-                  {(['flipkart','amazon','d2c'] as const).map((p) => (
-                    <MenuItem
-                      key={p}
-                      onClick={() => {
-                        setTempSelectedPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) as any : ([...prev, p] as any));
-                      }}
-                      sx={{ py: 1, px: 1, borderRadius: '8px' }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Checkbox size="small" checked={tempSelectedPlatforms.includes(p)} />
-                        <Box>
-                          <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p === 'flipkart' ? 'Flipkart' : p === 'amazon' ? 'Amazon' : 'D2C'}</Typography>
-                          <Typography variant="caption" sx={{ color: '#6b7280' }}>{p === 'd2c' ? 'Website / D2C' : 'E-commerce marketplace'}</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', mb: 1 }}>Select Platform</Typography>
+                  <RadioGroup
+                    value={selectedPlatform}
+                    onChange={(e) => {
+                      const newPlatform = e.target.value as 'flipkart' | 'amazon' | 'd2c';
+                      setSelectedPlatform(newPlatform);
+                      setPlatformMenuAnchorEl(null);
+                      // Trigger data fetch for all tabs
+                      fetchAllTabsData();
+                    }}
+                  >
+                    {(['flipkart','amazon','d2c'] as const).map((p) => (
+                      <MenuItem
+                        key={p}
+                        onClick={() => {
+                          setSelectedPlatform(p);
+                          setPlatformMenuAnchorEl(null);
+                          // Trigger data fetch for all tabs
+                          fetchAllTabsData();
+                        }}
+                        sx={{ py: 1, px: 1, borderRadius: '8px' }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Radio size="small" checked={selectedPlatform === p} value={p} />
+                          <Box>
+                            <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p === 'flipkart' ? 'Flipkart' : p === 'amazon' ? 'Amazon' : 'D2C'}</Typography>
+                            <Typography variant="caption" sx={{ color: '#6b7280' }}>{p === 'd2c' ? 'Website / D2C' : 'E-commerce marketplace'}</Typography>
+                          </Box>
                         </Box>
-                      </Box>
-                    </MenuItem>
-                  ))}
-                  <Box sx={{ display: 'flex', gap: 1, mt: 1, justifyContent: 'flex-end' }}>
-                    <Button variant="outlined" onClick={() => setPlatformMenuAnchorEl(null)} sx={{ textTransform: 'none', color: '#6b7280', borderColor: '#e5e7eb' }}>Cancel</Button>
-                    <Button
-                      variant="contained"
-                      disabled={tempSelectedPlatforms.length === 0}
-                      onClick={() => {
-                        setSelectedPlatforms(tempSelectedPlatforms);
-                        setPlatformMenuAnchorEl(null);
-                        fetchUnreconciledOrders();
-                      }}
-                      sx={{ textTransform: 'none' }}
-                    >
-                      Apply
-                    </Button>
-                  </Box>
+                      </MenuItem>
+                    ))}
+                  </RadioGroup>
                 </Box>
               </Menu>
-              <Button variant="contained" onClick={sendToFlipkart} disabled={selectedIds.length === 0} sx={{ backgroundColor: '#1f2937', '&:hover': { backgroundColor: '#374151' }, textTransform: 'none', fontWeight: 600 }}>
-                Send to Flipkart ({selectedIds.length})
-              </Button>
             </Box>
           </Box>
         </CardContent>
@@ -1529,8 +1980,8 @@ const DisputePage: React.FC = () => {
               <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
                 <TableRow>
                   {disputeSubTab === 0 ? (
-                    // Unreconciled Orders tab - show all detail columns directly
                     <>
+                      {/* Unreconciled Orders tab - show all detail columns directly */}
                       <TableCell padding="checkbox" sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 60, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Checkbox
                           checked={allSelectedInView}
@@ -1729,327 +2180,91 @@ const DisputePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 200, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>Action</TableCell>
                     </>
                   ) : (
-                    // Other tabs - show original columns with checkbox
                     <>
-                      <TableCell 
-                        padding="checkbox" 
-                        sx={{
-                          fontWeight: 700,
-                          color: '#111827',
-                          background: '#f9fafb',
-                          textAlign: 'center',
-                          minWidth: 60,
-                          transition: 'all 0.3s ease',
-                          position: 'relative',
-                          py: 1,
-                        }}
-                      >
-                        <Checkbox
-                          checked={false}
-                          disabled
-                          sx={{
-                            color: '#6b7280',
-                            '&.Mui-checked': {
-                              color: '#1f2937',
-                            },
-                            '&.MuiCheckbox-indeterminate': {
-                              color: '#1f2937',
-                            },
-                          }}
-                        />
+                      {/* Headers for Disputed and Manually Reconciled tabs (no checkbox, no actions) */}
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order ID</Typography>
                       </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 700,
-                        color: '#111827',
-                        background: '#f9fafb',
-                        textAlign: 'center',
-                        minWidth: 160,
-                        transition: 'all 0.3s ease',
-                        position: 'relative',
-                        py: 1,
-                      }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                              Order ID
-                            </Typography>
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setShowOrderIdSearch(!showOrderIdSearch);
-                              }}
-                              sx={{
-                                ml: 0.5,
-                                color: showOrderIdSearch ? '#1f2937' : '#6b7280',
-                                background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
-                                '&:hover': { background: '#f3f4f6' },
-                              }}
-                              aria-label="Toggle search"
-                            >
-                              <SearchIcon sx={{ fontSize: '1rem' }} />
-                            </IconButton>
-                          </Box>
-                          {showOrderIdSearch && (
-                            <Box 
-                              sx={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                mt: 0.5
-                              }}
-                            >
-                              <TextField
-                                size="small"
-                                value={orderIdSearch}
-                                onChange={handleOrderIdSearchChange}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleOrderIdSearchClick();
-                                  }
-                                }}
-                                InputProps={{
-                                  endAdornment: (
-                                    <InputAdornment position="end">
-                                      <IconButton
-                                        size="small"
-                                        onClick={handleOrderIdSearchClick}
-                                        sx={{ p: 0.5 }}
-                                      >
-                                        <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
-                                      </IconButton>
-                                    </InputAdornment>
-                                  ),
-                                }}
-                                sx={{
-                                  width: '280px',
-                                  '& .MuiOutlinedInput-root': {
-                                    height: '32px',
-                                    fontSize: '0.75rem',
-                                    background: 'white',
-                                  }
-                                }}
-                              />
-                            </Box>
-                          )}
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Value</Typography>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Order Value');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Order Value' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Order Value' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Order Value']}
+                            aria-label="Sort Order Value"
+                          >
+                            {getSortIcon('Order Value')}
+                          </IconButton>
                         </Box>
                       </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 700,
-                        color: '#111827',
-                        background: '#f9fafb',
-                        border: '0.5px solid #e5e7eb',
-                        borderRight: 'none',
-                        textAlign: 'center',
-                        minWidth: 140,
-                        transition: 'all 0.3s ease',
-                        position: 'relative',
-                        py: 1,
-                      }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                              Order Value
-                            </Typography>
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleSort('Order Value');
-                              }}
-                              sx={{
-                                ml: 0.5,
-                                color: sortConfig?.key === 'Order Value' ? '#1f2937' : '#6b7280',
-                                background: sortConfig?.key === 'Order Value' ? '#e5e7eb' : 'transparent',
-                                '&:hover': { background: '#f3f4f6' },
-                              }}
-                              disabled={!COLUMN_TO_SORT_BY_MAP['Order Value']}
-                              aria-label="Sort Order Value"
-                            >
-                              {getSortIcon('Order Value')}
-                            </IconButton>
-                          </Box>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Value</Typography>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Settlement Value');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Settlement Value' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Settlement Value' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Settlement Value']}
+                            aria-label="Sort Settlement Value"
+                          >
+                            {getSortIcon('Settlement Value')}
+                          </IconButton>
                         </Box>
                       </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 700,
-                        color: '#111827',
-                        background: '#f9fafb',
-                        border: '0.5px solid #e5e7eb',
-                        borderLeft: 'none',
-                        borderRight: 'none',
-                        borderTop: 'none',
-                        textAlign: 'center',
-                        minWidth: 140,
-                        transition: 'all 0.3s ease',
-                        position: 'relative',
-                        py: 1,
-                      }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                              Settlement Value
-                            </Typography>
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleSort('Settlement Value');
-                              }}
-                              sx={{
-                                ml: 0.5,
-                                color: sortConfig?.key === 'Settlement Value' ? '#1f2937' : '#6b7280',
-                                background: sortConfig?.key === 'Settlement Value' ? '#e5e7eb' : 'transparent',
-                                '&:hover': { background: '#f3f4f6' },
-                              }}
-                              disabled={!COLUMN_TO_SORT_BY_MAP['Settlement Value']}
-                              aria-label="Sort Settlement Value"
-                            >
-                              {getSortIcon('Settlement Value')}
-                            </IconButton>
-                          </Box>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Date</Typography>
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Date</Typography>
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 120, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Difference</Typography>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Difference');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Difference' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Difference' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Difference']}
+                            aria-label="Sort Difference"
+                          >
+                            {getSortIcon('Difference')}
+                          </IconButton>
                         </Box>
                       </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 700,
-                        color: '#111827',
-                        background: '#f9fafb',
-                        border: '0.5px solid #e5e7eb',
-                        textAlign: 'center',
-                        minWidth: 140,
-                        transition: 'all 0.3s ease',
-                        position: 'relative',
-                        py: 1,
-                      }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                          Order Date
-                        </Typography>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Status</Typography>
                       </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 700,
-                        color: '#111827',
-                        background: '#f9fafb',
-                        border: '0.5px solid #e5e7eb',
-                        textAlign: 'center',
-                        minWidth: 140,
-                        transition: 'all 0.3s ease',
-                        position: 'relative',
-                        py: 1,
-                      }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                              Settlement Date
-                            </Typography>
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleSort('Settlement Date');
-                              }}
-                              sx={{
-                                ml: 0.5,
-                                color: sortConfig?.key === 'Settlement Date' ? '#1f2937' : '#6b7280',
-                                background: sortConfig?.key === 'Settlement Date' ? '#e5e7eb' : 'transparent',
-                                '&:hover': { background: '#f3f4f6' },
-                              }}
-                              disabled={!COLUMN_TO_SORT_BY_MAP['Settlement Date']}
-                              aria-label="Sort Settlement Date"
-                            >
-                              {getSortIcon('Settlement Date')}
-                            </IconButton>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 700,
-                        color: '#111827',
-                        background: '#f9fafb',
-                        border: '0.5px solid #e5e7eb',
-                        textAlign: 'center',
-                        minWidth: 120,
-                        transition: 'all 0.3s ease',
-                        position: 'relative',
-                        py: 1,
-                      }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                              Difference
-                            </Typography>
-                            <IconButton 
-                              size="small" 
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleSort('Difference');
-                              }}
-                              sx={{
-                                ml: 0.5,
-                                color: sortConfig?.key === 'Difference' ? '#1f2937' : '#6b7280',
-                                background: sortConfig?.key === 'Difference' ? '#e5e7eb' : 'transparent',
-                                '&:hover': { background: '#f3f4f6' },
-                              }}
-                              disabled={!COLUMN_TO_SORT_BY_MAP['Difference']}
-                              aria-label="Sort Difference"
-                            >
-                              {getSortIcon('Difference')}
-                            </IconButton>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 700,
-                        color: '#111827',
-                        background: '#f9fafb',
-                        border: '0.5px solid #e5e7eb',
-                        textAlign: 'center',
-                        minWidth: 160,
-                        transition: 'all 0.3s ease',
-                        position: 'relative',
-                        py: 1,
-                      }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                          Remark
-                        </Typography>
-                      </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 700,
-                        color: '#111827',
-                        background: '#f9fafb',
-                        border: '0.5px solid #e5e7eb',
-                        textAlign: 'center',
-                        minWidth: 120,
-                        transition: 'all 0.3s ease',
-                        position: 'relative',
-                        py: 1,
-                      }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                              Event Type
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{
-                        fontWeight: 700,
-                        color: '#111827',
-                        background: '#f9fafb',
-                        border: '0.5px solid #e5e7eb',
-                        borderRight: 'none',
-                        textAlign: 'center',
-                        minWidth: 200,
-                        transition: 'all 0.3s ease',
-                        position: 'relative',
-                        py: 1,
-                      }}>
-                        Action
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Remark</Typography>
                       </TableCell>
                     </>
                   )}
@@ -2167,12 +2382,99 @@ const DisputePage: React.FC = () => {
                            </TableCell>
                   </TableRow>
                     );
+                  } else if (disputeSubTab === 1 || disputeSubTab === 2) {
+                    // Flat detailed row for Manually Reconciled or Disputed tabs
+                    const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || '';
+                    const amount = row["Amount"] || row["Order Value"] || 0;
+                    const settlementValue = row["Settlement Value"] || 0;
+                    const invoiceDate = row["Invoice Date"] || row["Order Date"] || '';
+                    const settlementDate = row["Settlement Date"] || '';
+                    const difference = row["Difference"] || 0;
+                    const remark = row["Remark"] || 'Not Available';
+                    const eventType = row["Event Type"] || 'Sale';
+                    const status = row.originalData?.breakups?.recon_status || row.originalData?.status || 'settlement_matched';
+                    
+                    return (
+                      <TableRow key={`flat-${index}`} sx={{ '&:hover': { background: '#f3f4f6' }, transition: 'all 0.3s ease' }}>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <Typography variant="body2" sx={{ color: '#111827', fontWeight: 500 }}>{orderId}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <Typography variant="body2" sx={{ color: '#111827', fontWeight: 500 }}>₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <Typography variant="body2" sx={{ color: '#111827', fontWeight: 500 }}>₹{settlementValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <Typography variant="body2" sx={{ color: '#111827' }}>{invoiceDate}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <Typography variant="body2" sx={{ color: '#111827' }}>{settlementDate || 'N/A'}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <Typography variant="body2" sx={{ color: difference === 0 ? '#059669' : difference > 0 ? '#dc2626' : '#d97706', fontWeight: 600 }}>
+                            ₹{difference.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <Chip
+                              label={disputeSubTab === 1 ? 'Manually Reconciled' : 'Disputed'}
+                              size="small"
+                              sx={{
+                                background: disputeSubTab === 1 ? '#dcfce7' : '#fee2e2',
+                                color: disputeSubTab === 1 ? '#059669' : '#dc2626',
+                                fontWeight: 600,
+                                fontSize: '0.75rem',
+                                height: 24,
+                                '& .MuiChip-label': { px: 1 },
+                              }}
+                            />
+                            {(() => {
+                              const isSale = String(eventType || '').toLowerCase() === 'sale';
+                              return (
+                                <Chip
+                                  label={eventType}
+                                  size="small"
+                                  sx={{
+                                    background: isSale ? '#dcfce7' : '#fee2e2',
+                                    color: isSale ? '#059669' : '#dc2626',
+                                    fontWeight: 600,
+                                    fontSize: '0.75rem',
+                                    height: 24,
+                                    '& .MuiChip-label': { px: 1 },
+                                  }}
+                                />
+                              );
+                            })()}
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleHistoryOpen(e, row)}
+                              sx={{
+                                p: 0.25,
+                                color: '#6b7280',
+                                '&:hover': {
+                                  color: '#111827',
+                                  background: '#f3f4f6',
+                                },
+                              }}
+                              aria-label="View transaction history"
+                            >
+                              <InfoIcon fontSize="small" sx={{ fontSize: '0.875rem' }} />
+                            </IconButton>
+                          </Box>
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>{remark}</Typography>
+                        </TableCell>
+                      </TableRow>
+                    );
                   }
                   return null;
                  })}
                 {(disputeSubTab === 0 ? paginatedCurrent : current).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
+                    <TableCell colSpan={disputeSubTab === 0 ? 9 : 8} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -2215,6 +2517,9 @@ const DisputePage: React.FC = () => {
           <Button variant="contained" onClick={sendRaiseDispute} sx={{ boxShadow: 'none' }}>Send</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Transaction History Modal */}
+      <TransactionHistoryModal />
 
       {/* Bulk Action Buttons */}
       {selectedIds.length > 0 && (
@@ -2260,7 +2565,8 @@ const DisputePage: React.FC = () => {
                       if (selectedIds.length === 1) {
                         handleRaiseDispute(selectedIds[0]);
                       } else if (selectedIds.length > 1) {
-                        const selectedTransactions = (apiRows as any[]).filter(row => {
+                        const currentRows = getApiRows();
+                        const selectedTransactions = (currentRows as any[]).filter(row => {
                           const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || row.order_id || '';
                           return selectedIds.includes(orderId);
                         });
@@ -2456,7 +2762,7 @@ const DisputePage: React.FC = () => {
                     setCustomEndDate(tempEndDate);
                     setSelectedDateRange('custom');
                     setShowCustomDatePicker(false);
-                    fetchUnreconciledOrders();
+                    fetchAllTabsData();
                   }
                 }}
                 disabled={!tempStartDate || !tempEndDate}
@@ -2476,5 +2782,5 @@ const DisputePage: React.FC = () => {
   );
 };
 
-export default DisputePage;
+export default OperationsCentrePage;
 

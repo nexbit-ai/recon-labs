@@ -19,7 +19,7 @@ import Dashboard from './pages/Dashboard';
 import Checklist from './pages/Checklist';
 import RecentActivities from './pages/RecentActivities';
 import MarketplaceReconciliation from './pages/MarketplaceReconciliation';
-import DisputePage from './pages/Dispute';
+import OperationsCentrePage from './pages/OperationsCentre';
 import Reports from './pages/Reports';
 // import ConnectDataSources from './pages/ConnectDataSources'; // Deprecated
 import UploadDocuments from './pages/UploadDocuments';
@@ -413,9 +413,9 @@ function App() {
                 <Layout><MarketplaceReconciliation /></Layout>
               </ProtectedRoute>
             } />
-            <Route path="/dispute" element={
+            <Route path="/operations-centre" element={
               <ProtectedRoute>
-                <Layout><DisputePage /></Layout>
+                <Layout><OperationsCentrePage /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/reports" element={

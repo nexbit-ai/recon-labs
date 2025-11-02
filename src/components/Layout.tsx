@@ -24,7 +24,7 @@ import {
   DashboardOutlined as DashboardIcon,
   ChecklistOutlined as ChecklistIcon,
   EditOutlined as EditIcon,
-  CompareArrowsOutlined as CompareArrowsIcon,
+  CloudUploadOutlined as UploadIcon,
   AssessmentOutlined as AssessmentIcon,
   SettingsOutlined as SettingsIcon,
   AttachMoneyOutlined as AttachMoneyIcon,
@@ -48,7 +48,7 @@ const drawerWidth = 240;
 
 const menuItems = [
   { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation' },
-  { text: 'Dispute', icon: <ReportProblemIcon />, path: '/dispute' },
+  { text: 'Operations Centre', icon: <ReportProblemIcon />, path: '/operations-centre' },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping' },
   { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist' },
   // { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
@@ -133,7 +133,26 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {menuItems.map((item) => (
           <ListItem key={item.text} disablePadding>
             <ListItemButton
-              onClick={() => navigate(item.path)}
+              onClick={() => {
+                // For Operations Centre, include platforms from localStorage
+                if (item.path === '/operations-centre') {
+                  try {
+                    const stored = localStorage.getItem('recon_selected_platforms');
+                    let platformsParam = '';
+                    if (stored) {
+                      const parsed = JSON.parse(stored);
+                      if (Array.isArray(parsed) && parsed.length > 0) {
+                        platformsParam = `?platforms=${parsed.join(',')}`;
+                      }
+                    }
+                    navigate(`${item.path}${platformsParam}`);
+                  } catch (e) {
+                    navigate(item.path);
+                  }
+                } else {
+                  navigate(item.path);
+                }
+              }}
               selected={location.pathname === item.path}
               sx={{
                 borderRadius: 0,
@@ -217,7 +236,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           >
             <ListItemIcon sx={{ minWidth: 36 }}>
               {/* Use the built-in Upload icon from MUI */}
-              <CompareArrowsIcon />
+              <UploadIcon />
             </ListItemIcon>
             <ListItemText
               primary={<Typography sx={{ fontWeight: 500 }}>Upload</Typography>}

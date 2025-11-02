@@ -205,7 +205,10 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   
   // Determine settlement date from API response
   let settlementDate = "";
-  if (orderItem.settlement_date && orderItem.settlement_date.trim() !== '') {
+  // If transaction is unsettled, settlement date should be NA (Not Applicable)
+  if (reconStatus === "unsettled") {
+    settlementDate = "NA";
+  } else if (orderItem.settlement_date && orderItem.settlement_date.trim() !== '') {
     try {
       settlementDate = new Date(orderItem.settlement_date).toISOString().split('T')[0];
     } catch (error) {
@@ -1650,7 +1653,7 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   'Status': { apiParam: 'status_in', type: 'enum', usesInSuffix: true },
   'Order Date': { apiParam: 'order_date', type: 'date' }, // → order_date_from/to
   'Settlement Date': { apiParam: 'settlement_date', type: 'date' },
-  'Order Value': { apiParam: 'order_value', type: 'number', supportedPlatforms: ['flipkart'] },
+  'Order Value': { apiParam: 'order_value', type: 'number' },
   'Settlement Value': { apiParam: 'settlement_value', type: 'number' },
   'Difference': { apiParam: 'diff', type: 'number' },
   
@@ -1894,7 +1897,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       meta['Settlement Date'] = { type: 'date' };
       meta['Difference'] = { type: 'number' };
       meta['Status'] = { type: 'enum' };
-      meta['Reason'] = { type: 'string' };
     }
     
     // Always add breakup fields for filtering (regardless of API type)
@@ -4124,6 +4126,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             value = (row as any)[column];
                           }
                           
+                          // Override settlement date for unsettled transactions
+                          // If we're on the unsettled tab, settlement date should always be NA
+                          if (activeTab === 1 && column === 'Settlement Date') {
+                            value = 'NA';
+                          }
+                          
                           // Format value based on type
                           let displayValue = value;
                           
@@ -4137,7 +4145,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   displayValue = formatCurrency(Number(value) || 0);
                                   break;
                                 case 'date':
-                                  displayValue = formatDate(String(value));
+                                  // Don't format "NA" as a date
+                                  displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(String(value));
                                   break;
                                 case 'enum':
                                   displayValue = String(value || '');
@@ -4155,7 +4164,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   displayValue = formatCurrency(Number(value) || 0);
                                   break;
                                 case 'date':
-                                  displayValue = formatDate(String(value));
+                                  // Don't format "NA" as a date
+                                  displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(String(value));
                                   break;
                                 case 'enum':
                                   displayValue = String(value || '');
@@ -4176,7 +4186,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 displayValue = value.toLocaleString('en-IN');
                               }
                             } else if (column.includes('Date')) {
-                              displayValue = formatDate(value || '');
+                              // Don't format "NA" as a date
+                              displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(value || '');
                             }
                           }
                           
@@ -4290,22 +4301,24 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       );
                                     })()}
                                     
-                                    {/* Breakups details button */}
-                                    <IconButton
-                                      size="small"
-                                      onClick={(e) => handleBreakupsOpen(e, row)}
-                                      sx={{
-                                        p: 0.5,
-                                        minWidth: 20,
-                                        height: 20,
-                                        '&:hover': {
-                                          background: '#f3f4f6',
-                                          color: '#374151',
-                                        },
-                                      }}
-                                    >
-                                      <InfoOutlined fontSize="small" sx={{ color: '#6b7280' }}/>
-                                    </IconButton>
+                                    {/* Breakups details button - only show for settled tab (activeTab === 0) */}
+                                    {activeTab === 0 && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => handleBreakupsOpen(e, row)}
+                                        sx={{
+                                          p: 0.5,
+                                          minWidth: 20,
+                                          height: 20,
+                                          '&:hover': {
+                                            background: '#f3f4f6',
+                                            color: '#374151',
+                                          },
+                                        }}
+                                      >
+                                        <InfoOutlined fontSize="small" sx={{ color: '#6b7280' }}/>
+                                      </IconButton>
+                                    )}
                                   </Box>
 
                                 ) : (
