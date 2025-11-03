@@ -468,8 +468,8 @@ const MarketplaceReconciliation: React.FC = () => {
           const name = item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1);
           rows.push(['Commission & Charges', `${name} - Total Amount Settled`, String(safeNum(item.total_amount_settled))]);
           rows.push(['Commission & Charges', `${name} - Commission`, String(safeNum(item.total_commission))]);
-          const totalTdsTcs = (item.total_tds_amount || 0) + (item.total_tcs_amount || 0);
-          rows.push(['Commission & Charges', `${name} - TDS and TCS`, String(safeNum(Math.abs(totalTdsTcs)))]);
+          rows.push(['Commission & Charges', `${name} - TDS`, String(safeNum(Math.abs(item.total_tds_amount || 0)))]);
+          rows.push(['Commission & Charges', `${name} - TCS`, String(safeNum(Math.abs(item.total_tcs_amount || 0)))]);
         });
       }
 
@@ -3882,7 +3882,7 @@ const MarketplaceReconciliation: React.FC = () => {
               // Commission values are typically negative (charges/deductions), so we use absolute value for display
               const providerData = commissionArray
                 .map((item, idx) => {
-                  const commissionValue = (item.total_commission || 0) + (item.total_gst_on_commission || 0);
+                  const commissionValue = item.total_commission || 0; // Only show commission, not GST on commission
                   return {
                     name: item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1) || `Platform ${idx + 1}`,
                     value: Math.abs(commissionValue), // Use absolute value for display
@@ -3895,7 +3895,8 @@ const MarketplaceReconciliation: React.FC = () => {
 
               // Calculate totals dynamically from all providers (use absolute values for display)
               const totalCommissionCharges = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_commission || 0), 0));
-              const totalTdsAndTcs = Math.abs(commissionArray.reduce((sum, item) => sum + ((item.total_tds_amount || 0) + (item.total_tcs_amount || 0)), 0));
+              const totalTds = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_tds_amount || 0), 0));
+              const totalTcs = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_tcs_amount || 0), 0));
 
               return (
                 <>
@@ -3912,7 +3913,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   <Grid container spacing={3}>
                     {/* Conditional rendering based on provider count */}
                     <Grid item xs={12} md={8}>
-                      <Box sx={{ height: 360 }}>
+                      <Box sx={{ height: 300 }}>
                         {providerData.length === 1 ? (
                           // Single Provider - Show detailed gradient card
                           <Box sx={{
@@ -3930,29 +3931,44 @@ const MarketplaceReconciliation: React.FC = () => {
                               textAlign: 'center',
                               position: 'relative',
                               zIndex: 2,
-                              p: 4
+                              p: 3
                             }}>
-                              <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, color: '#1f2937' }}>
+                              <Typography variant="h4" sx={{ fontWeight: 700, mb: 1.5, color: '#1f2937' }}>
                                 {providerData[0].name}
                               </Typography>
-                              <Typography variant="h3" sx={{ fontWeight: 700, mb: 3, color: providerData[0].color }}>
+                              <Typography variant="h3" sx={{ fontWeight: 700, mb: 2, color: providerData[0].color }}>
                                 {formatCurrency(providerData[0].value)}
                               </Typography>
-                              <Box sx={{ 
-                                display: 'inline-block',
-                                px: 3, 
-                                py: 1.5,
-                                borderRadius: '20px',
-                                background: `${providerData[0].color}15`,
-                                border: `1px solid ${providerData[0].color}`,
-                                color: providerData[0].color,
-                                fontWeight: 600
-                              }}>
-                                {fmtPct(
-                                  providerData[0].value,
-                                  providerData[0].originalData.total_amount_settled || 0
-                                )} of settled amount
-                              </Box>
+                              <Tooltip
+                                title={
+                                  <Box>
+                                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                      <strong>Total Settlement:</strong> {formatCurrency(Math.abs(providerData[0].originalData.total_amount_settled || 0))}
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      <strong>Total Commission:</strong> {formatCurrency(Math.abs(providerData[0].originalData.total_commission || 0))}
+                                    </Typography>
+                                  </Box>
+                                }
+                                arrow
+                              >
+                                <Box sx={{ 
+                                  display: 'inline-block',
+                                  px: 3, 
+                                  py: 1.5,
+                                  borderRadius: '20px',
+                                  background: `${providerData[0].color}15`,
+                                  border: `1px solid ${providerData[0].color}`,
+                                  color: providerData[0].color,
+                                  fontWeight: 600,
+                                  cursor: 'help'
+                                }}>
+                                  {fmtPct(
+                                    providerData[0].value,
+                                    Math.abs(providerData[0].originalData.total_amount_settled || 0) + Math.abs(providerData[0].originalData.total_commission || 0)
+                                  )} of settlement
+                                </Box>
+                              </Tooltip>
                             </Box>
                           </Box>
                         ) : providerData.length > 1 ? (
@@ -3997,14 +4013,18 @@ const MarketplaceReconciliation: React.FC = () => {
                     </Grid>
                     {/* KPI cards (totals) */}
                     <Grid item xs={12} md={4}>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        <Box sx={{ p: 4, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center' }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
+                        <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                           <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Commission Charges</Typography>
-                          <Typography variant="h5" sx={{ mt: 1, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
+                          <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
                         </Box>
-                        <Box sx={{ p: 4, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center' }}>
-                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TDS and TCS</Typography>
-                          <Typography variant="h5" sx={{ mt: 1, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTdsAndTcs)}</Typography>
+                        <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TDS</Typography>
+                          <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTds)}</Typography>
+                        </Box>
+                        <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TCS</Typography>
+                          <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTcs)}</Typography>
                         </Box>
                       </Box>
                     </Grid>
@@ -4020,12 +4040,26 @@ const MarketplaceReconciliation: React.FC = () => {
                               <Typography variant="body2" sx={{ color: '#374151', fontWeight: 700 }}>
                                 {item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1) || 'Unknown Platform'}
                               </Typography>
-                              <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                                {fmtPct(
-                                  Math.abs((item.total_commission || 0) + (item.total_gst_on_commission || 0)),
-                                  item.total_amount_settled || 0
-                                )} of settled
-                              </Typography>
+                              <Tooltip
+                                title={
+                                  <Box>
+                                    <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                      <strong>Total Settlement:</strong> {formatCurrency(Math.abs(item.total_amount_settled || 0))}
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      <strong>Total Commission:</strong> {formatCurrency(Math.abs(item.total_commission || 0))}
+                                    </Typography>
+                                  </Box>
+                                }
+                                arrow
+                              >
+                                <Typography variant="caption" sx={{ color: '#6b7280', cursor: 'help' }}>
+                                  {fmtPct(
+                                    Math.abs(item.total_commission || 0),
+                                    Math.abs(item.total_amount_settled || 0) + Math.abs(item.total_commission || 0)
+                                  )} of settled
+                                </Typography>
+                              </Tooltip>
                             </Box>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
                               <Typography variant="body2" sx={{ color: '#374151' }}>Commission</Typography>
@@ -4034,9 +4068,15 @@ const MarketplaceReconciliation: React.FC = () => {
                               </Typography>
                             </Box>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                              <Typography variant="body2" sx={{ color: '#374151' }}>TDS & TCS</Typography>
+                              <Typography variant="body2" sx={{ color: '#374151' }}>TDS</Typography>
                               <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                                {formatCurrency(Math.abs((item.total_tds_amount || 0) + (item.total_tcs_amount || 0)))}
+                                {formatCurrency(Math.abs(item.total_tds_amount || 0))}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                              <Typography variant="body2" sx={{ color: '#374151' }}>TCS</Typography>
+                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
+                                {formatCurrency(Math.abs(item.total_tcs_amount || 0))}
                               </Typography>
                             </Box>
                           </Box>
