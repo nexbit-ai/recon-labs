@@ -256,6 +256,9 @@ const MarketplaceReconciliation: React.FC = () => {
   const [unreconciledTab, setUnreconciledTab] = useState<number>(0); // 0: by reasons, 1: by providers
   const handleUnreconciledTabChange = (_: any, value: number) => setUnreconciledTab(value);
 
+  // Prevent duplicate main-summary fetches (e.g., React StrictMode double invoke)
+  const lastMainSummaryKeyRef = useRef<string | null>(null);
+
   // Ageing analysis state
   const [ageingData, setAgeingData] = useState<ProviderAgeingData[]>([]);
   const [ageingLoading, setAgeingLoading] = useState(false);
@@ -1561,21 +1564,17 @@ const MarketplaceReconciliation: React.FC = () => {
 
   // Unified data fetch effect: triggers on relevant inputs
   useEffect(() => {
-    if (selectedDateRange === 'custom') {
-      if (customStartDate && customEndDate) {
-        fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
+    const key = `${selectedDateRange}|${customStartDate}|${customEndDate}|${dateField}|${selectedPlatform}`;
+    const shouldFetchMainSummary = lastMainSummaryKeyRef.current !== key;
+    if (shouldFetchMainSummary) {
+      lastMainSummaryKeyRef.current = key;
+      if (selectedDateRange === 'custom') {
+        if (customStartDate && customEndDate) {
+          fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
+        }
+      } else {
+        fetchReconciliationDataByDateRange(selectedDateRange);
       }
-    } else {
-      fetchReconciliationDataByDateRange(selectedDateRange);
-    }
-    // Keep unreconciled reasons in sync
-    if (selectedDateRange === 'custom') {
-      if (customStartDate && customEndDate) {
-        fetchUnreconciledReasonsWithDates(customStartDate, customEndDate);
-      }
-      // For custom with only one date selected, do not fetch
-    } else {
-      fetchUnreconciledReasonsByDateRange(selectedDateRange);
     }
     // Fetch ageing analysis data (only when both dates are set for custom)
     if (selectedDateRange !== 'custom' || (customStartDate && customEndDate)) {
@@ -1981,53 +1980,10 @@ const MarketplaceReconciliation: React.FC = () => {
                       <Button
                         variant="contained"
                         disabled={!tempSelectedPlatform}
-                        onClick={async () => {
+                        onClick={() => {
                           const next = tempSelectedPlatform!;
                           setSelectedPlatform(next);
-                          try {
-                            // Fetch unified summary from main-summary using selected platforms
-                            let startDate = customStartDate;
-                            let endDate = customEndDate;
-                            const today = new Date();
-                            const fmt = (d: Date) => d.toISOString().split('T')[0];
-                            if (selectedDateRange !== 'custom') {
-                              if (selectedDateRange === 'today') {
-                                startDate = fmt(today);
-                                endDate = fmt(today);
-                              } else if (selectedDateRange === 'this-week') {
-                                const startOfWeek = new Date(today);
-                                startOfWeek.setDate(today.getDate() - today.getDay());
-                                const endOfWeek = new Date(startOfWeek);
-                                endOfWeek.setDate(startOfWeek.getDate() + 6);
-                                startDate = fmt(startOfWeek);
-                                endDate = fmt(endOfWeek);
-                              } else if (selectedDateRange === 'this-month') {
-                                const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                                startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
-                                endDate = fmt(endOfMonth);
-                              } else if (selectedDateRange === 'this-year') {
-                                startDate = `${today.getFullYear()}-01-01`;
-                                endDate = `${today.getFullYear()}-12-31`;
-                              }
-                            }
-
-                            const mainSummaryParams = {
-                              start_date: startDate,
-                              end_date: endDate,
-                              date_field: dateField === 'invoice' ? 'invoice_date' : 'settlement_date',
-                              platform: next || undefined,
-                            } as any;
-                            const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
-                            const payload = (ms as any).data as MainSummaryResponse;
-                            setMainSummary(payload);
-                            if (payload?.UnReconcile?.reasons?.length) {
-                              setUnreconciledReasons(payload.UnReconcile.reasons.map((r: any) => ({ reason: r.name, count: r.count })));
-                            }
-                          } catch (e) {
-                            console.warn('main-summary fetch failed', e);
-                          } finally {
-                            setPlatformMenuAnchorEl(null);
-                          }
+                          setPlatformMenuAnchorEl(null);
                         }}
                         sx={{ textTransform: 'none' }}
                       >
