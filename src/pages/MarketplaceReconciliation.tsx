@@ -2822,32 +2822,34 @@ const MarketplaceReconciliation: React.FC = () => {
                                                       );
                                                     })}
                                                   </Box>
-                                                  {/* Minimal View Transactions Button for COD */}
-                                                  <Box sx={{ mt: 2, textAlign: 'right' }}>
-                                                    <Button
-                                                      variant="text"
-                                                      size="small"
-                                                      endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
-                                                      sx={{
-                                                        textTransform: 'none',
-                                                        fontSize: '0.8rem',
-                                                        fontWeight: 500,
-                                                        color: '#2563eb',
-                                                        p: 0,
-                                                        minWidth: 'auto',
-                                                        '&:hover': {
-                                                          backgroundColor: 'transparent',
-                                                          color: '#1d4ed8',
-                                                        }
-                                                      }}
-                                                      onClick={() => {
-                                                        // TODO: Replace with actual link when provided
-                                                        console.log('View Cash on Delivery transactions');
-                                                      }}
-                                                    >
-                                                      View Cash on Delivery transactions
-                                                    </Button>
-                                                  </Box>
+                                                  {/* Minimal View Transactions Button for COD - hidden for D2C */}
+                                                  {false && (
+                                                    <Box sx={{ mt: 2, textAlign: 'right' }}>
+                                                      <Button
+                                                        variant="text"
+                                                        size="small"
+                                                        endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                        sx={{
+                                                          textTransform: 'none',
+                                                          fontSize: '0.8rem',
+                                                          fontWeight: 500,
+                                                          color: '#2563eb',
+                                                          p: 0,
+                                                          minWidth: 'auto',
+                                                          '&:hover': {
+                                                            backgroundColor: 'transparent',
+                                                            color: '#1d4ed8',
+                                                          }
+                                                        }}
+                                                        onClick={() => {
+                                                          // TODO: Replace with actual link when provided
+                                                          console.log('View Cash on Delivery transactions');
+                                                        }}
+                                                      >
+                                                        View Cash on Delivery transactions
+                                                      </Button>
+                                                    </Box>
+                                                  )}
                                                 </Box>
                                               </MuiCollapse>
                                             )}
@@ -2888,32 +2890,40 @@ const MarketplaceReconciliation: React.FC = () => {
                                                       </Box>
                                                     );
                                                   })()}
-                                                  {/* Minimal View Transactions Button */}
-                                                  <Box sx={{ mt: 2, textAlign: 'right' }}>
-                                                    <Button
-                                                      variant="text"
-                                                      size="small"
-                                                      endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
-                                                      sx={{
-                                                        textTransform: 'none',
-                                                        fontSize: '0.8rem',
-                                                        fontWeight: 500,
-                                                        color: '#2563eb',
-                                                        p: 0,
-                                                        minWidth: 'auto',
-                                                        '&:hover': {
-                                                          backgroundColor: 'transparent',
-                                                          color: '#1d4ed8',
-                                                        }
-                                                      }}
-                                                      onClick={() => {
-                                                        // TODO: Replace with actual link when provided
-                                                        console.log(`View ${provider.name} transactions`);
-                                                      }}
-                                                    >
-                                                      View {provider.name} transactions
-                                                    </Button>
-                                                  </Box>
+                                                  {/* Minimal View Transactions Button (hidden for D2C) */}
+                                                  {(() => {
+                                                    const providerName = (provider?.name || '').toLowerCase();
+                                                    const providerKey = (provider?.key || '').toLowerCase();
+                                                    const isD2C = providerKey === 'd2c' || providerName.includes('d2c') || providerName.includes('direct');
+                                                    if (isD2C || selectedPlatform === 'd2c') return null;
+                                                    return (
+                                                      <Box sx={{ mt: 2, textAlign: 'right' }}>
+                                                        <Button
+                                                          variant="text"
+                                                          size="small"
+                                                          endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                          sx={{
+                                                            textTransform: 'none',
+                                                            fontSize: '0.8rem',
+                                                            fontWeight: 500,
+                                                            color: '#2563eb',
+                                                            p: 0,
+                                                            minWidth: 'auto',
+                                                            '&:hover': {
+                                                              backgroundColor: 'transparent',
+                                                              color: '#1d4ed8',
+                                                            }
+                                                          }}
+                                                          onClick={() => {
+                                                            // TODO: Replace with actual link when provided
+                                                            console.log(`View ${provider.name} transactions`);
+                                                          }}
+                                                        >
+                                                          View {provider.name} transactions
+                                                        </Button>
+                                                      </Box>
+                                                    );
+                                                  })()}
                                                 </Box>
                                               </MuiCollapse>
                                             )}
@@ -3106,7 +3116,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                             </Box>
                                           </Box>
                                           {/* Minimal View Transactions Button for Payment Gateways in Unsettled */}
-                                          {provider.key !== 'cod' && (
+                                          {provider.key !== 'cod' && selectedPlatform !== 'd2c' && (
                                             <Box sx={{ mt: 1, textAlign: 'right' }}>
                                               <Button
                                                 variant="text"
@@ -3172,32 +3182,34 @@ const MarketplaceReconciliation: React.FC = () => {
                                                     </Box>
                                                   ))}
                                                 </Box>
-                                                {/* Minimal View Transactions Button for COD in Unsettled */}
-                                                <Box sx={{ mt: 2, textAlign: 'right' }}>
-                                                  <Button
-                                                    variant="text"
-                                                    size="small"
-                                                    endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
-                                                    sx={{
-                                                      textTransform: 'none',
-                                                      fontSize: '0.8rem',
-                                                      fontWeight: 500,
-                                                      color: '#2563eb',
-                                                      p: 0,
-                                                      minWidth: 'auto',
-                                                      '&:hover': {
-                                                        backgroundColor: 'transparent',
-                                                        color: '#1d4ed8',
-                                                      }
-                                                    }}
-                                                    onClick={() => {
-                                                      // TODO: Replace with actual link when provided
-                                                      console.log('View Cash on Delivery unsettled transactions');
-                                                    }}
-                                                  >
-                                                    View Cash on Delivery transactions
-                                                  </Button>
-                                                </Box>
+                                                {/* Minimal View Transactions Button for COD in Unsettled - hidden for D2C */}
+                                                {selectedPlatform !== 'd2c' && (
+                                                  <Box sx={{ mt: 2, textAlign: 'right' }}>
+                                                    <Button
+                                                      variant="text"
+                                                      size="small"
+                                                      endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                      sx={{
+                                                        textTransform: 'none',
+                                                        fontSize: '0.8rem',
+                                                        fontWeight: 500,
+                                                        color: '#2563eb',
+                                                        p: 0,
+                                                        minWidth: 'auto',
+                                                        '&:hover': {
+                                                          backgroundColor: 'transparent',
+                                                          color: '#1d4ed8',
+                                                        }
+                                                      }}
+                                                      onClick={() => {
+                                                        // TODO: Replace with actual link when provided
+                                                        console.log('View Cash on Delivery unsettled transactions');
+                                                      }}
+                                                    >
+                                                      View Cash on Delivery transactions
+                                                    </Button>
+                                                  </Box>
+                                                )}
                                               </Box>
                                             </MuiCollapse>
                                           )}
@@ -3567,32 +3579,34 @@ const MarketplaceReconciliation: React.FC = () => {
                                                           );
                                                         })}
                                                       </Box>
-                                                      {/* Minimal View Transactions Button for COD in Mismatched */}
-                                                      <Box sx={{ mt: 2, textAlign: 'right' }}>
-                                                        <Button
-                                                          variant="text"
-                                                          size="small"
-                                                          endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
-                                                          sx={{
-                                                            textTransform: 'none',
-                                                            fontSize: '0.8rem',
-                                                            fontWeight: 500,
-                                                            color: '#2563eb',
-                                                            p: 0,
-                                                            minWidth: 'auto',
-                                                            '&:hover': {
-                                                              backgroundColor: 'transparent',
-                                                              color: '#1d4ed8',
-                                                            }
-                                                          }}
-                                                          onClick={() => {
-                                                            // TODO: Replace with actual link when provided
-                                                            console.log('View Cash on Delivery mismatched transactions');
-                                                          }}
-                                                        >
-                                                          View Cash on Delivery transactions
-                                                        </Button>
-                                                      </Box>
+                                                      {/* Minimal View Transactions Button for COD in Mismatched - hidden for D2C */}
+                                                      {selectedPlatform !== 'd2c' && (
+                                                        <Box sx={{ mt: 2, textAlign: 'right' }}>
+                                                          <Button
+                                                            variant="text"
+                                                            size="small"
+                                                            endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                            sx={{
+                                                              textTransform: 'none',
+                                                              fontSize: '0.8rem',
+                                                              fontWeight: 500,
+                                                              color: '#2563eb',
+                                                              p: 0,
+                                                              minWidth: 'auto',
+                                                              '&:hover': {
+                                                                backgroundColor: 'transparent',
+                                                                color: '#1d4ed8',
+                                                              }
+                                                            }}
+                                                            onClick={() => {
+                                                              // TODO: Replace with actual link when provided
+                                                              console.log('View Cash on Delivery mismatched transactions');
+                                                            }}
+                                                          >
+                                                            View Cash on Delivery transactions
+                                                          </Button>
+                                                        </Box>
+                                                      )}
                                                     </Box>
                                                   </MuiCollapse>
                                                 )}
@@ -3635,32 +3649,37 @@ const MarketplaceReconciliation: React.FC = () => {
                                                           </Box>
                                                         );
                                                       })()}
-                                                      {/* Minimal View Transactions Button for Gateway in Mismatched */}
-                                                      <Box sx={{ mt: 2, textAlign: 'right' }}>
-                                                        <Button
-                                                          variant="text"
-                                                          size="small"
-                                                          endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
-                                                          sx={{
-                                                            textTransform: 'none',
-                                                            fontSize: '0.8rem',
-                                                            fontWeight: 500,
-                                                            color: '#2563eb',
-                                                            p: 0,
-                                                            minWidth: 'auto',
-                                                            '&:hover': {
-                                                              backgroundColor: 'transparent',
-                                                              color: '#1d4ed8',
-                                                            }
-                                                          }}
-                                                          onClick={() => {
-                                                            // TODO: Replace with actual link when provided
-                                                            console.log(`View ${provider.name} mismatched transactions`);
-                                                          }}
-                                                        >
-                                                          View {provider.name} transactions
-                                                        </Button>
-                                                      </Box>
+                                                      {/* Minimal View Transactions Button for Gateway in Mismatched (hidden for D2C) */}
+                                                      {(() => {
+                                                        if (selectedPlatform === 'd2c') return null;
+                                                        return (
+                                                          <Box sx={{ mt: 2, textAlign: 'right' }}>
+                                                            <Button
+                                                              variant="text"
+                                                              size="small"
+                                                              endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                              sx={{
+                                                                textTransform: 'none',
+                                                                fontSize: '0.8rem',
+                                                                fontWeight: 500,
+                                                                color: '#2563eb',
+                                                                p: 0,
+                                                                minWidth: 'auto',
+                                                                '&:hover': {
+                                                                  backgroundColor: 'transparent',
+                                                                  color: '#1d4ed8',
+                                                                }
+                                                              }}
+                                                              onClick={() => {
+                                                                // TODO: Replace with actual link when provided
+                                                                console.log(`View ${provider.name} mismatched transactions`);
+                                                              }}
+                                                            >
+                                                              View {provider.name} transactions
+                                                            </Button>
+                                                          </Box>
+                                                        );
+                                                      })()}
                                                     </Box>
                                                   </MuiCollapse>
                                                 )}
