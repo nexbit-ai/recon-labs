@@ -3872,6 +3872,7 @@ const MarketplaceReconciliation: React.FC = () => {
               const totalCommissionCharges = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_commission || 0), 0));
               const totalTds = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_tds_amount || 0), 0));
               const totalTcs = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_tcs_amount || 0), 0));
+              const totalGstOnCommission = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_gst_on_commission || 0), 0));
 
               return (
                 <>
@@ -3888,7 +3889,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   <Grid container spacing={3}>
                     {/* Conditional rendering based on provider count */}
                     <Grid item xs={12} md={8}>
-                      <Box sx={{ height: 300 }}>
+                      <Box sx={{ height: { xs: 320, sm: 360, md: 420, lg: 480 } }}>
                         {providerData.length === 1 ? (
                           // Single Provider - Show detailed gradient card
                           <Box sx={{
@@ -3949,13 +3950,13 @@ const MarketplaceReconciliation: React.FC = () => {
                         ) : providerData.length > 1 ? (
                           // Multiple Providers - Show pie chart
                           <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
+                            <PieChart margin={{ top: 12, right: 12, bottom: 56, left: 12 }}>
                               <Pie
                                 data={providerData}
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={122}
-                                outerRadius={140}
+                                innerRadius="78%"
+                                outerRadius="86%"
                                 paddingAngle={1}
                                 cornerRadius={1}
                                 dataKey="value"
@@ -3965,9 +3966,17 @@ const MarketplaceReconciliation: React.FC = () => {
                                 ))}
                               </Pie>
                               <RechartsTooltip formatter={(value: any, name: string) => [formatCurrency(Number(value)), name]} />
-                              <Legend verticalAlign="bottom" height={36} formatter={(value, entry) => (
-                                <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>{value}</span>
-                              )} />
+                              <Legend 
+                                layout="horizontal" 
+                                verticalAlign="bottom" 
+                                align="center" 
+                                iconType="circle"
+                                wrapperStyle={{ paddingTop: 8 }}
+                                height={40}
+                                formatter={(value, entry) => (
+                                  <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>{value}</span>
+                                )} 
+                              />
                             </PieChart>
                           </ResponsiveContainer>
                         ) : (
@@ -3988,20 +3997,33 @@ const MarketplaceReconciliation: React.FC = () => {
                     </Grid>
                     {/* KPI cards (totals) */}
                     <Grid item xs={12} md={4}>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
-                        <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Commission Charges</Typography>
-                          <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
+                      {providerData.length > 1 ? (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
+                          <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Commission</Typography>
+                            <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
+                          </Box>
+                          <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total GST on Commission</Typography>
+                            <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalGstOnCommission)}</Typography>
+                          </Box>
                         </Box>
-                        <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TDS</Typography>
-                          <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTds)}</Typography>
+                      ) : (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
+                          <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Commission</Typography>
+                            <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
+                          </Box>
+                          <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TDS</Typography>
+                            <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTds)}</Typography>
+                          </Box>
+                          <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TCS</Typography>
+                            <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTcs)}</Typography>
+                          </Box>
                         </Box>
-                        <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TCS</Typography>
-                          <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTcs)}</Typography>
-                        </Box>
-                      </Box>
+                      )}
                     </Grid>
                   </Grid>
 
@@ -4012,7 +4034,7 @@ const MarketplaceReconciliation: React.FC = () => {
                         <Grid key={idx} item xs={12} md={providerData.length === 1 ? 12 : 6}>
                           <Box sx={{ p: 3, borderRadius: '14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(229,231,235,0.6)' }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                              <Typography variant="body2" sx={{ color: '#374151', fontWeight: 700 }}>
+                              <Typography variant="subtitle1" sx={{ color: '#374151', fontWeight: 700 }}>
                                 {item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1) || 'Unknown Platform'}
                               </Typography>
                               <Tooltip
@@ -4042,18 +4064,29 @@ const MarketplaceReconciliation: React.FC = () => {
                                 {formatCurrency(Math.abs(item.total_commission))}
                               </Typography>
                             </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                              <Typography variant="body2" sx={{ color: '#374151' }}>TDS</Typography>
-                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                                {formatCurrency(Math.abs(item.total_tds_amount || 0))}
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                              <Typography variant="body2" sx={{ color: '#374151' }}>TCS</Typography>
-                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                                {formatCurrency(Math.abs(item.total_tcs_amount || 0))}
-                              </Typography>
-                            </Box>
+                            {providerData.length > 1 ? (
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                                <Typography variant="body2" sx={{ color: '#374151' }}>GST on Commission</Typography>
+                                <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
+                                  {formatCurrency(Math.abs(item.total_gst_on_commission || 0))}
+                                </Typography>
+                              </Box>
+                            ) : (
+                              <>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                                  <Typography variant="body2" sx={{ color: '#374151' }}>TDS</Typography>
+                                  <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
+                                    {formatCurrency(Math.abs(item.total_tds_amount || 0))}
+                                  </Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                                  <Typography variant="body2" sx={{ color: '#374151' }}>TCS</Typography>
+                                  <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
+                                    {formatCurrency(Math.abs(item.total_tcs_amount || 0))}
+                                  </Typography>
+                                </Box>
+                              </>
+                            )}
                           </Box>
                         </Grid>
                       ))}
