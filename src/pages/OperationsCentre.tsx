@@ -319,12 +319,15 @@ const OperationsCentrePage: React.FC = () => {
       const stored = localStorage.getItem('recon_selected_platforms');
       if (stored) {
         const parsed = JSON.parse(stored);
+        // Handle both array format (old) and single string format (current)
         if (Array.isArray(parsed) && parsed.length > 0) {
           const validPlatforms = parsed.filter(p => ['flipkart', 'amazon', 'd2c'].includes(p)) as Array<'flipkart' | 'amazon' | 'd2c'>;
           if (validPlatforms.length > 0) {
             // Return only the first platform for single-select
             return validPlatforms[0];
           }
+        } else if (typeof parsed === 'string' && ['flipkart', 'amazon', 'd2c'].includes(parsed)) {
+          return parsed as 'flipkart' | 'amazon' | 'd2c';
         }
       }
     } catch (e) {

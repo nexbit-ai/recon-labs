@@ -36,12 +36,11 @@ import {
   ReportProblemOutlined as ReportProblemIcon,
   LogoutOutlined as LogoutIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
+  PersonOutlined as PersonIcon,
 } from '@mui/icons-material';
 // import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
 // @ts-ignore
 import logo from '../assets/logo_fresh.jpg';
-// @ts-ignore
-import userPhoto from '../assets/user-photo.jpg';
 
 const drawerWidth = 240;
 
@@ -133,8 +132,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     let platformsParam = '';
                     if (stored) {
                       const parsed = JSON.parse(stored);
+                      // Handle both array format (old) and single string format (current)
                       if (Array.isArray(parsed) && parsed.length > 0) {
                         platformsParam = `?platforms=${parsed.join(',')}`;
+                      } else if (typeof parsed === 'string' && ['flipkart', 'amazon', 'd2c'].includes(parsed)) {
+                        platformsParam = `?platforms=${parsed}`;
                       }
                     }
                     navigate(`${item.path}${platformsParam}`);
@@ -233,10 +235,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 sx={{ 
                   width: 32, 
                   height: 32,
+                  bgcolor: 'primary.main',
                 }}
-                src={userPhoto}
-                alt="Krishna"
-              />
+              >
+                <PersonIcon sx={{ fontSize: 20 }} />
+              </Avatar>
             </ListItemIcon>
             <ListItemText 
               primary={

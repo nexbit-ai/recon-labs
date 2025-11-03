@@ -2586,9 +2586,9 @@ const MarketplaceReconciliation: React.FC = () => {
                           {(() => {
                             const s = mainSummary?.summary as any;
                             
-                            // Revenue from API summary: net_sales_amount
-                            const expectedSalesAmount = Number(s?.net_sales_amount || 0);
-                            const expectedSalesCount = Number(s?.net_sales_orders || 0);
+                            // Revenue from API summary: total_transactions_amount
+                            const expectedSalesAmount = Number(s?.total_transactions_amount || 0);
+                            const expectedSalesCount = Number(s?.total_transaction_orders || 0);
 
                             // Matched totals from API response (reconciled)
                             const matchedAmount = Number(s?.total_reconciled_amount || 0);
@@ -3306,7 +3306,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                 More Payment Received
                               </Typography>
                               <Typography variant="h6" sx={{ color: '#111827', fontWeight: 400, fontSize: '1.2rem' }}>
-                                {formatCurrency(morePaymentAmount)}
+                                {formatCurrency(Math.abs(morePaymentAmount))}
                               </Typography>
                             </Box>
                             <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>

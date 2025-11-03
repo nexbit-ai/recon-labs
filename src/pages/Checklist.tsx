@@ -472,8 +472,11 @@ const Checklist: React.FC = () => {
                     let platformsParam = '';
                     if (stored) {
                       const parsed = JSON.parse(stored);
+                      // Handle both array format (old) and single string format (current)
                       if (Array.isArray(parsed) && parsed.length > 0) {
                         platformsParam = `?platforms=${parsed.join(',')}`;
+                      } else if (typeof parsed === 'string' && ['flipkart', 'amazon', 'd2c'].includes(parsed)) {
+                        platformsParam = `?platforms=${parsed}`;
                       }
                     }
                     navigate(`/operations-centre${platformsParam}`);
