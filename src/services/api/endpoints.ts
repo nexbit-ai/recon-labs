@@ -131,6 +131,12 @@ export const ageingAnalysisAPI = {
     apiService.get<any>(API_CONFIG.ENDPOINTS.AGEING_ANALYSIS, params),
 };
 
+// Upload List API
+export const uploadListAPI = {
+  getUploadList: (params: { report_type: string }) =>
+    apiService.get<any>('/recon/upload-list', params),
+};
+
 // Reports API
 export const reportsAPI = {
   // Get reports list
@@ -265,6 +271,7 @@ export const api = {
   stats: statsAPI,
   mainSummary: mainSummaryAPI,
   ageingAnalysis: ageingAnalysisAPI,
+  uploadList: uploadListAPI,
   reports: reportsAPI,
   dataSources: dataSourcesAPI,
   ai: aiAPI,

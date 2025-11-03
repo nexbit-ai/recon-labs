@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useStytchMemberSession } from '@stytch/react/b2b';
 import { StytchB2BUIClient } from '@stytch/vanilla-js/b2b';
 import { tokenManager } from '../services/api/tokenManager';
+import { useUser } from '../contexts/UserContext';
 import {
   Box,
   Drawer,
@@ -46,7 +47,7 @@ const drawerWidth = 240;
 
 const menuItems = [
   { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation', upcoming: false },
-  { text: 'Operations Centre', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
+  { text: 'Operations', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping', upcoming: true },
   { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist', upcoming: true },
   // { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
@@ -57,11 +58,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { session } = useStytchMemberSession();
+  const { memberName } = useUser();
   // const { user, logout } = useAuth(); // Authentication disabled
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   
   const [settingsAnchorEl, setSettingsAnchorEl] = React.useState<null | HTMLElement>(null);
+
+  // Capitalize first letter of member name
+  const displayName = memberName 
+    ? memberName.charAt(0).toUpperCase() + memberName.slice(1).toLowerCase()
+    : 'User';
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -125,7 +132,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 if (item.upcoming) {
                   return;
                 }
-                // For Operations Centre, include platforms from localStorage
+                // For Operations, include platforms from localStorage
                 if (item.path === '/operations-centre') {
                   try {
                     const stored = localStorage.getItem('recon_selected_platforms');
@@ -251,7 +258,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   color: 'text.primary',
                   fontSize: '14px'
                 }}>
-                  Hi, User
+                  Hi, {displayName}
                   <KeyboardArrowUpIcon sx={{ fontSize: '16px', color: 'text.primary', fontWeight: 'bold' }} />
                 </Typography>
               } 
@@ -265,7 +272,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
-          <MenuItem onClick={() => handleMenuOption('Settings')}>Settings</MenuItem>
           <MenuItem onClick={() => handleMenuOption('Logout')}>
             <LogoutIcon sx={{ mr: 1 }} />
             Logout

@@ -185,8 +185,10 @@ import { api as apiIndex } from '../services/api';
 import { mockReconciliationData, getSafeReconciliationData, isValidReconciliationData } from '../data/mockReconciliationData';
 import { Platform } from '../data/mockData';
 import { padding } from '@mui/system';
+import { useUser } from '../contexts/UserContext';
 
 const MarketplaceReconciliation: React.FC = () => {
+  const { setMemberName } = useUser();
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
   const [initialTsFilters, setInitialTsFilters] = useState<{ [key: string]: any } | undefined>(undefined);
   const [initialTsTab, setInitialTsTab] = useState<number>(0);
@@ -1057,6 +1059,19 @@ const MarketplaceReconciliation: React.FC = () => {
       setAgeingLoading(false);
     }
   };
+
+  // Fetch upload list to get member name
+  const fetchUploadList = async () => {
+    try {
+      const response = await apiIndex.uploadList.getUploadList({ report_type: 'D2C-DirectUpload' });
+      if (response.success && response.data?.memberName) {
+        setMemberName(response.data.memberName);
+      }
+    } catch (error) {
+      console.error('Error fetching upload list:', error);
+      // Non-fatal - don't set member name if API fails
+    }
+  };
   
   // Platform selector state - load from localStorage if available
   const loadPlatformFromStorage = (): Platform => {
@@ -1566,6 +1581,8 @@ const MarketplaceReconciliation: React.FC = () => {
     if (selectedDateRange !== 'custom' || (customStartDate && customEndDate)) {
       fetchAgeingAnalysis();
     }
+    // Call upload-list API at the same time as main-summary and ageing-analysis
+    fetchUploadList();
   }, [selectedDateRange, customStartDate, customEndDate, dateField, selectedPlatform]);
 
   // Load sales overview data

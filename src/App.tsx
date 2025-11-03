@@ -32,6 +32,7 @@ import Bookkeeping from './pages/Bookkeeping';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import SessionMonitor from './components/SessionMonitor';
+import { UserProvider } from './contexts/UserContext';
 
 const theme = createTheme({
   palette: {
@@ -377,8 +378,9 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <StytchB2BProvider stytch={stytch}>
-        <SessionMonitor />
-        <Router>
+        <UserProvider>
+          <SessionMonitor />
+          <Router>
           <Routes>
             {/* Authentication routes (public) */}
             <Route path="/login" element={<Login />} />
@@ -455,6 +457,7 @@ function App() {
             } />
           </Routes>
         </Router>
+        </UserProvider>
       </StytchB2BProvider>
     </ThemeProvider>
   );
