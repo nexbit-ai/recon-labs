@@ -741,10 +741,11 @@ const MarketplaceReconciliation: React.FC = () => {
   // Helpers for INR formatting and normalization for main summary
   const formatINR = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n || 0);
   const ensureNegative = (n: number) => (n == null ? 0 : -Math.abs(n));
+  const norm = (s: string) => String(s || '').toLowerCase();
 
   const DISPLAY_NAME_MAP: Record<string, string> = {
     paytm: 'Paytm',
-    payU: 'PayU',
+    payu: 'PayU',
     flipkart: 'Flipkart',
     grow_simple: 'Grow Simple',
     shiprocket: 'Shiprocket',
@@ -770,8 +771,8 @@ const MarketplaceReconciliation: React.FC = () => {
     const pushOne = (p: any) => {
       if (!p) return;
       out.push({
-        code: p.platform,
-        displayName: DISPLAY_NAME_MAP[p.platform] || p.platform,
+        code: norm(p.platform),
+        displayName: DISPLAY_NAME_MAP[norm(p.platform)] || p.platform,
         totalCount: Number(p.total_count || 0),
         totalSaleAmount: Number(p.total_sale_amount || 0),
         totalCommission: Number(p.total_comission || 0),
@@ -796,8 +797,8 @@ const MarketplaceReconciliation: React.FC = () => {
     if (!block || !block.providers) return { gateways: [], cod: [] };
     const { providers } = block;
     const mapOne = (p: any): NormalizedProvider => ({
-      code: p.platform,
-      displayName: DISPLAY_NAME_MAP[p.platform] || p.platform,
+      code: norm(p.platform),
+      displayName: DISPLAY_NAME_MAP[norm(p.platform)] || p.platform,
       totalCount: Number(p.total_count || 0),
       totalSaleAmount: Number(p.total_sale_amount || 0),
       totalCommission: Number(p.total_comission || 0),
@@ -1640,6 +1641,18 @@ const MarketplaceReconciliation: React.FC = () => {
     }
     return { start, end };
   })();
+
+  // Persist effective date range for cross-page use (e.g., Operations Centre)
+  useEffect(() => {
+    try {
+      if (effectiveDateRangeForTs.start && effectiveDateRangeForTs.end) {
+        localStorage.setItem('recon_selected_date_from', effectiveDateRangeForTs.start);
+        localStorage.setItem('recon_selected_date_to', effectiveDateRangeForTs.end);
+      }
+    } catch (e) {
+      // ignore storage errors
+    }
+  }, [effectiveDateRangeForTs.start, effectiveDateRangeForTs.end]);
 
   return (
     <Box sx={{ 

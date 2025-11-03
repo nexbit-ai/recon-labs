@@ -479,7 +479,15 @@ const Checklist: React.FC = () => {
                         platformsParam = `?platforms=${parsed}`;
                       }
                     }
-                    navigate(`/operations-centre${platformsParam}`);
+                    // Also include date range if available from localStorage
+                    const from = localStorage.getItem('recon_selected_date_from');
+                    const to = localStorage.getItem('recon_selected_date_to');
+                    let sep = platformsParam ? '&' : '?';
+                    let dateQuery = '';
+                    if (from && to) {
+                      dateQuery = `${sep}from=${from}&to=${to}`;
+                    }
+                    navigate(`/operations-centre${platformsParam}${dateQuery}`);
                   } catch (e) {
                     navigate('/operations-centre');
                   }

@@ -286,15 +286,31 @@ const OperationsCentrePage: React.FC = () => {
   
   // State for date filtering
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
-  const [selectedDateRange, setSelectedDateRange] = useState<'this-month' | 'last-month' | 'this-year' | 'custom'>('custom');
-  const [customStartDate, setCustomStartDate] = useState('2025-04-01');
-  const [customEndDate, setCustomEndDate] = useState('2025-04-30');
+  // Initialize date range synchronously from URL → localStorage → this month to avoid race before first fetch
+  const initialFromTo = (() => {
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get('from');
+    const to = params.get('to');
+    if (from && to) return { start: from, end: to, kind: 'custom' as const };
+    try {
+      const lsFrom = localStorage.getItem('recon_selected_date_from') || '';
+      const lsTo = localStorage.getItem('recon_selected_date_to') || '';
+      if (lsFrom && lsTo) return { start: lsFrom, end: lsTo, kind: 'custom' as const };
+    } catch {}
+    const now = new Date();
+    const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0];
+    const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0)).toISOString().split('T')[0];
+    return { start: firstDay, end: lastDay, kind: 'this-month' as const };
+  })();
+  const [selectedDateRange, setSelectedDateRange] = useState<'this-month' | 'last-month' | 'this-year' | 'custom'>(initialFromTo.kind);
+  const [customStartDate, setCustomStartDate] = useState(initialFromTo.start);
+  const [customEndDate, setCustomEndDate] = useState(initialFromTo.end);
   const [tempStartDate, setTempStartDate] = useState('');
   const [tempEndDate, setTempEndDate] = useState('');
   
   // Header date range state - for the date selector displayed at the top
-  const [headerDateRange, setHeaderDateRange] = useState<{start: string, end: string}>({ start: '2025-04-01', end: '2025-04-30' });
-  const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{start: string, end: string}>({ start: '2025-04-01', end: '2025-04-30' });
+  const [headerDateRange, setHeaderDateRange] = useState<{start: string, end: string}>({ start: initialFromTo.start, end: initialFromTo.end });
+  const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{start: string, end: string}>({ start: initialFromTo.start, end: initialFromTo.end });
 
   // Calendar popup state
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
@@ -340,25 +356,9 @@ const OperationsCentrePage: React.FC = () => {
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<'flipkart' | 'amazon' | 'd2c'>(getInitialPlatform());
 
-  // Initialize from URL query params if provided (e.g., from main page navigation)
+  // Initialize platform and tab from URL query params if provided
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const from = params.get('from');
-    const to = params.get('to');
-    if (from && to) {
-      setSelectedDateRange('custom');
-      setCustomStartDate(from);
-      setCustomEndDate(to);
-      // Initialize header date range display
-      setHeaderDateRange({ start: from, end: to });
-      setPendingHeaderDateRange({ start: from, end: to });
-    } else {
-      // If no URL params, initialize with customStartDate/customEndDate
-      const initialDateRange = { start: customStartDate, end: customEndDate };
-      setHeaderDateRange(initialDateRange);
-      setPendingHeaderDateRange(initialDateRange);
-    }
-    
     // Also update platform from URL params if present (use first if multiple)
     const platformsParam = params.get('platforms');
     if (platformsParam) {
