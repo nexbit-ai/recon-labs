@@ -73,7 +73,8 @@ const Dashboard: React.FC = () => {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="provider" tick={{ fontSize: 12 }} interval={0} height={60} angle={-15} textAnchor="end" />
                   <YAxis unit="%" tick={{ fontSize: 12 }} domain={[0, 100]} />
-                  <RechartsTooltip formatter={(v: any) => [`${v}%`, 'Share']} />
+                  {/** Tooltip rows like "<=1d: 50%" */}
+                  <RechartsTooltip formatter={(v: any, name: string) => [`${Number(v).toFixed(2)}%`, `${name}:`]} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   {AGE_BUCKETS.map((b) => (
                     <Bar key={b} dataKey={b} stackId="a" fill={BUCKET_COLORS[b]} radius={[4, 4, 0, 0]} />
