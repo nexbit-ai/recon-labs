@@ -1730,8 +1730,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Map old tab values: 0 = Matched, 1 = Mismatched, 2 = Unsettled, 3 = All
     // For backward compatibility, if tab is 1 (old unsettled), map to 2 (new unsettled)
     if (tab === 1) return 2; // Old unsettled -> new unsettled
-    // If a valid tab (0,2,3) is provided, use it; otherwise default to 0 (Matched)
-    if (tab === 0 || tab === 2 || tab === 3) return tab;
     return 0; // Default to Matched
   });
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionRow | null>(null);
@@ -2529,8 +2527,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   useEffect(() => {
     if (location.state?.initialTab !== undefined) {
       const newTab = location.state.initialTab;
-      // Backward compatibility: map legacy unsettled (1) to new unsettled (2)
-      setActiveTab(newTab === 1 ? 2 : newTab);
+      setActiveTab(newTab);
       // Clear the state to prevent re-triggering on re-renders
       navigate(location.pathname, { replace: true, state: {} });
     }
@@ -2539,8 +2536,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Handle initialTab prop changes (when opening TransactionSheet with different initialTab)
   useEffect(() => {
     if (initialTab !== undefined) {
-      // Backward compatibility: map legacy unsettled (1) to new unsettled (2)
-      setActiveTab(initialTab === 1 ? 2 : initialTab);
+      setActiveTab(initialTab);
     }
   }, [initialTab]);
 
@@ -2598,7 +2594,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Only refresh data when rowsPerPage changes (not filters)
   useEffect(() => {
-    if (hasInitialLoad && (matchedData || mismatchedData || unsettledData || allData)) { // Only refetch if data has been loaded initially
+    if (hasInitialLoad && (settledData || unsettledData)) { // Only refetch if data has been loaded initially
       fetchQuadTransactions(1, columnFilters, dateRange, selectedPlatform);
     }
   }, [rowsPerPage]);
@@ -2922,6 +2918,58 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       setError('Failed to fetch transaction data');
     } finally {
       setQuadApiLoading(false);
+      setPaginationLoading(false);
+      isFetchingRef.current = false; // Reset the flag
+    }
+  };
+
+  // Fetch data from new total transactions API
+  const fetchTotalTransactions = async (
+    pageNumber: number = 1,
+    filters?: { [key: string]: any },
+        if (settledStatuses.length > 0) {
+          // User selected both settled and unsettled - need to handle both tabs
+          // Settled params already has the settled statuses
+          // For unsettled, remove settled statuses and use status='unsettled'
+          delete unsettledParams.status_in;
+          unsettledParams.status = 'unsettled';
+        } else {
+          // Only unsettled selected
+          delete unsettledParams.status_in;
+          unsettledParams.status = 'unsettled';
+        }
+      } else if (hasStatusFilter && !statusFilter.includes('unsettled')) {
+        // User only selected settled statuses - no data for unsettled tab
+        delete unsettledParams.status_in;
+        delete unsettledParams.status;
+      } else {
+        // Default: no status filter, use normal settled/unsettled split
+        delete unsettledParams.status_in;
+        unsettledParams.status = 'unsettled';
+      }
+
+      // Ensure Order ID search is always applied even if not present in column filters
+      const effectiveOrderIds = (orderIds !== undefined ? orderIds : orderIdChips) || [];
+      if (Array.isArray(effectiveOrderIds) && effectiveOrderIds.length > 0) {
+        const orderIdsCsv = effectiveOrderIds.join(',');
+        settledParams.order_id = orderIdsCsv;
+        unsettledParams.order_id = orderIdsCsv;
+      }
+      
+      
+      
+      // Determine if we should make unsettled API call
+      const shouldFetchUnsettled = !hasStatusFilter || (hasStatusFilter && statusFilter.includes('unsettled'));
+      
+      // Make API calls (conditionally include unsettled)
+      const apiCalls: [Promise<any>, Promise<any>] = [
+        api.transactions.getTotalTransactions(settledParams),
+        shouldFetchUnsettled 
+          ? api.transactions.getTotalTransactions(unsettledParams)
+          : Promise.resolve({ success: true, data: null }) // Mock response when not fetching
+      ];
+      
+      const [settledResponse, unsettledResponse] = await Promise.all(apiCalls);
       setPaginationLoading(false);
       isFetchingRef.current = false; // Reset the flag
     }
@@ -4276,12 +4324,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           <React.Fragment key={rowIndex}>
                                                           <TableRow 
                                 sx={{ 
-                                  borderLeft: `4px solid ${
-                                    activeTab === 0 ? '#10b981' : // Matched - green
-                                    activeTab === 1 ? '#f59e0b' : // Mismatched - orange
-                                    activeTab === 2 ? '#ef4444' : // Unsettled - red
-                                    '#6366f1' // All - indigo
-                                  }`,
+                                  borderLeft: `4px solid ${activeTab === 0 ? '#10b981' : '#ef4444'}`,
                                   background: '#ffffff',
                                   position: 'relative',
                                 }}
@@ -4289,18 +4332,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         {getCurrentColumns().map((column, colIndex) => {
                           // For new API, we need to map column titles to row keys
                           let value;
-                          if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
-                            // Use quad API data
-                            let currentData: TotalTransactionsResponse | null = null;
-                            if (activeTab === 0) {
-                              currentData = matchedData;
-                            } else if (activeTab === 1) {
-                              currentData = mismatchedData;
-                            } else if (activeTab === 2) {
-                              currentData = unsettledData;
-                            } else if (activeTab === 3) {
-                              currentData = allData;
-                            }
+                          if (settledData !== null || unsettledData !== null) {
+                            // Use dual API data
+                            const currentData = activeTab === 0 ? settledData : unsettledData;
                             const columnDef = currentData?.columns?.find(col => col.title === column);
                             if (columnDef) {
                               value = (row as any)[columnDef.key];
@@ -4335,26 +4369,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           }
                           
                           // Override settlement date for unsettled transactions
-                          // If we're on the unsettled tab (tab 2), settlement date should always be NA
-                          if (activeTab === 2 && column === 'Settlement Date') {
+                          // If we're on the unsettled tab, settlement date should always be NA
+                          if (activeTab === 1 && column === 'Settlement Date') {
                             value = 'NA';
                           }
                           
                           // Format value based on type
                           let displayValue = value;
                           
-                          if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
-                            // Use quad API data for formatting
-                            let currentData: TotalTransactionsResponse | null = null;
-                            if (activeTab === 0) {
-                              currentData = matchedData;
-                            } else if (activeTab === 1) {
-                              currentData = mismatchedData;
-                            } else if (activeTab === 2) {
-                              currentData = unsettledData;
-                            } else if (activeTab === 3) {
-                              currentData = allData;
-                            }
+                          if (settledData !== null || unsettledData !== null) {
+                            // Use dual API data for formatting
+                            const currentData = activeTab === 0 ? settledData : unsettledData;
                             const columnDef = currentData?.columns?.find(col => col.title === column);
                             if (columnDef) {
                               switch (columnDef.type) {

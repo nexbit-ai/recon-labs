@@ -78,6 +78,20 @@ const UploadDocuments: React.FC = () => {
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [rightPanelVendor, setRightPanelVendor] = useState<'amazon' | 'flipkart' | null>(null);
 
+  // Map vendor/kind to backend report_type (special-case DTDC settlement)
+  const getReportType = (vendorId: string, kind?: 'sales' | 'settlement'): string => {
+    if (vendorId.toLowerCase() === 'dtdc' && kind === 'settlement') {
+      return 'DTDC';
+    }
+    else if (vendorId.toLowerCase() === 'bluedart' && kind === 'settlement') {
+      return 'bluedart';
+    }
+    else if (vendorId.toLowerCase() === 'shiprocket' && kind === 'settlement') {
+      return 'shiprocket';
+    }
+    return kind ? `${vendorId.toLowerCase()}_${kind}` : vendorId.toLowerCase();
+  };
+
   const handleYearClick = (year: number) => {
     setSelectedYear(year);
     setCurrentView('months');
@@ -185,7 +199,7 @@ const UploadDocuments: React.FC = () => {
       formData.append('description', `${vendors.find(v => v.id === vendorId)?.name} settlement sheet for ${months[selectedMonth]} ${selectedYear}`);
       formData.append('month', months[selectedMonth]);
       formData.append('year', selectedYear.toString());
-      formData.append('report_type', vendorId.toLowerCase());
+      formData.append('report_type', getReportType(vendorId));
 
       // Generate a custom JWT token with the hardcoded organization_id
       let customToken: string | null = null;
@@ -285,7 +299,7 @@ const UploadDocuments: React.FC = () => {
       formData.append('description', `${vendorId} ${kind} sheet for ${months[selectedMonth]} ${selectedYear}`);
       formData.append('month', months[selectedMonth]);
       formData.append('year', selectedYear.toString());
-      formData.append('report_type', key.toLowerCase());
+      formData.append('report_type', getReportType(vendorId, kind));
 
       let customToken: string | null = null;
       if (session) {
@@ -424,7 +438,7 @@ const UploadDocuments: React.FC = () => {
       formData.append('description', `${vendors.find(v => v.id === vendorId)?.name} ${kind} sheet for ${months[selectedMonth]} ${selectedYear}`);
       formData.append('month', months[selectedMonth]);
       formData.append('year', selectedYear.toString());
-      formData.append('report_type', key.toLowerCase());
+      formData.append('report_type', getReportType(vendorId, kind));
 
       let customToken: string | null = null;
       if (session) {
@@ -620,13 +634,21 @@ const UploadDocuments: React.FC = () => {
   // Check if a vendor already has an uploaded document
   const isVendorUploaded = (vendorId: string, kind?: 'sales' | 'settlement'): boolean => {
     const key = kind ? `${vendorId}_${kind}` : vendorId;
-    return uploadedDocuments.some(doc => doc.report_type.toLowerCase() === key.toLowerCase());
+    const expected = getReportType(vendorId, kind);
+    return uploadedDocuments.some(doc => {
+      const rt = doc.report_type.toLowerCase();
+      return rt === key.toLowerCase() || rt === expected.toLowerCase();
+    });
   };
 
   // Get uploaded document for a vendor
   const getUploadedDocument = (vendorId: string, kind?: 'sales' | 'settlement'): UploadedDocument | undefined => {
     const key = kind ? `${vendorId}_${kind}` : vendorId;
-    return uploadedDocuments.find(doc => doc.report_type.toLowerCase() === key.toLowerCase());
+    const expected = getReportType(vendorId, kind);
+    return uploadedDocuments.find(doc => {
+      const rt = doc.report_type.toLowerCase();
+      return rt === key.toLowerCase() || rt === expected.toLowerCase();
+    });
   };
 
   return (
