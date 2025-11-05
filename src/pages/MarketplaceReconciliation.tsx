@@ -2809,9 +2809,9 @@ const MarketplaceReconciliation: React.FC = () => {
                                         {(expectedSalesCount).toLocaleString('en-IN')} Orders
                                       </Typography>
                                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-                                        <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
+                                        {/* <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
                                           Settled&nbsp;<span style={{ marginLeft: 130 }}>{percentSettled.toFixed(1)}%</span>
-                                        </Typography>
+                                        </Typography> */}
                                         {/* <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 700, fontSize: '1.2rem' }}>
                                           {formatCurrency(matchedAmount)}
                                         </Typography> */}

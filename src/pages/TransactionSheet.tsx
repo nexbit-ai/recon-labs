@@ -2306,10 +2306,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           setMetadata(meta);
           
           // Update tab counts from metadata
-          setTabCounts({
-            settled: (meta.counts as any).settlement_matched ?? meta.counts.settled,
+          setTabCounts(prev => ({
+            ...prev,
+            matched: (meta.counts as any).settlement_matched ?? meta.counts.settled,
             unsettled: meta.counts.unsettled,
-          });
+          }));
           
           // Update total count from metadata
           if (meta.pagination) {
@@ -2433,10 +2434,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           setMetadata(meta);
           
           // Update tab counts from metadata
-          setTabCounts({
-            settled: meta.counts.settled,
+          setTabCounts(prev => ({
+            ...prev,
+            matched: meta.counts.settled,
             unsettled: meta.counts.unsettled,
-          });
+          }));
           
           // Update total count from metadata
           if (meta.pagination) {
@@ -3034,7 +3036,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         params,
         {
           headers: {
-            'X-Org-ID': '6ce6ee73-e1ef-4020-ad74-4ee45e731201',
+            'X-Org-ID': '612cd642-c2ce-49da-b535-be35442cecfa',
             'X-API-Key': 'kapiva-7b485b6a865b2b4a3d728ef2fd4f3'
           }
         }
@@ -3057,10 +3059,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           row.recon_status === 'unsettled'
         ).length;
         
-        setTabCounts({
-          settled: settledCount,
+        setTabCounts(prev => ({
+          ...prev,
+          matched: settledCount,
           unsettled: unsettledCount
-        });
+        }));
         
         
       } else {
@@ -4335,8 +4338,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           }
                           
                           // Override settlement date for unsettled transactions
-                          // If we're on the unsettled tab (tab 2), settlement date should always be NA
-                          if (activeTab === 2 && column === 'Settlement Date') {
+                          // Show NA for Settlement Date when the transaction is unsettled (across all tabs)
+                          if (column === 'Settlement Date' && (row as any)?.recon_status === 'unsettled') {
                             value = 'NA';
                           }
                           
