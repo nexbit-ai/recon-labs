@@ -272,10 +272,28 @@ const MarketplaceReconciliation: React.FC = () => {
   const [monthMenuAnchorEl, setMonthMenuAnchorEl] = useState<null | HTMLElement>(null);
   
   // Date range filter state
-  const [selectedDateRange, setSelectedDateRange] = useState('custom');
+  // Initialize from URL → localStorage → fallback to April 2025 default
+  const initialFromTo = (() => {
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get('from');
+    const to = params.get('to');
+    const kindParam = params.get('dateRange');
+    if (from && to) {
+      return { start: from, end: to, kind: kindParam || 'custom' } as const;
+    }
+    try {
+      const lsFrom = localStorage.getItem('recon_selected_date_from') || '';
+      const lsTo = localStorage.getItem('recon_selected_date_to') || '';
+      const lsKind = localStorage.getItem('recon_selected_date_kind') || '';
+      if (lsFrom && lsTo) return { start: lsFrom, end: lsTo, kind: (lsKind || 'custom') } as const;
+    } catch {}
+    // Fallback to current month if desired, but keep April 2025 to match mock defaults
+    return { start: '2025-04-01', end: '2025-04-30', kind: 'custom' } as const;
+  })();
+  const [selectedDateRange, setSelectedDateRange] = useState<string>(initialFromTo.kind);
   const [dateRangeMenuAnchor, setDateRangeMenuAnchor] = useState<null | HTMLElement>(null);
-  const [customStartDate, setCustomStartDate] = useState<string>('2025-04-01');
-  const [customEndDate, setCustomEndDate] = useState<string>('2025-04-30');
+  const [customStartDate, setCustomStartDate] = useState<string>(initialFromTo.start);
+  const [customEndDate, setCustomEndDate] = useState<string>(initialFromTo.end);
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   // Date field filter for transactions-related queries
   const [dateField, setDateField] = useState<'settlement' | 'invoice'>('invoice');
@@ -331,6 +349,25 @@ const MarketplaceReconciliation: React.FC = () => {
     { value: 'this-year', label: 'This year', dates: 'This year' },
     { value: 'custom', label: 'Custom date range', dates: 'Custom' }
   ];
+
+  // Persist date selection to URL and localStorage whenever it changes
+  useEffect(() => {
+    try {
+      if (customStartDate) localStorage.setItem('recon_selected_date_from', customStartDate);
+      if (customEndDate) localStorage.setItem('recon_selected_date_to', customEndDate);
+      if (selectedDateRange) localStorage.setItem('recon_selected_date_kind', selectedDateRange);
+    } catch {}
+    const params = new URLSearchParams(window.location.search);
+    if (customStartDate && customEndDate) {
+      params.set('from', customStartDate);
+      params.set('to', customEndDate);
+    } else {
+      params.delete('from');
+      params.delete('to');
+    }
+    params.set('dateRange', selectedDateRange || 'custom');
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+  }, [selectedDateRange, customStartDate, customEndDate]);
 
   const handleDownloadCSV = () => {
     try {
@@ -2076,13 +2113,17 @@ const MarketplaceReconciliation: React.FC = () => {
                     // Use main-summary as the sole source for the summary math
                     const s = mainSummary?.summary as any;
 
+                    // Gross Sales from API: total transactions amount and orders
+                    const grossSalesAmount = Math.abs(Number(s?.total_transactions_amount || 0));
+                    const grossSalesCount = Number(s?.total_transaction_orders || 0);
+
                     const returnsAmount = Math.abs(Number(s?.total_return_amount || 0));
                     const returnsCount = Number(s?.total_return_orders || 0);
 
                     const cancellationsAmount = Math.abs(Number(s?.total_cancellations_amount || 0));
                     const cancellationsCount = Number(s?.total_cancellations_orders || 0);
 
-                    // Use API-provided net sales values
+                    // API-provided Net Sales values
                     const netSalesAmount = Math.abs(Number(s?.net_sales_amount || 0));
                     const netSalesCount = Number(s?.net_sales_orders || 0);
 
@@ -2090,63 +2131,69 @@ const MarketplaceReconciliation: React.FC = () => {
                     const prevReturnOrCancelledAmount = Math.abs(Number(s?.prev_return_or_cancelled_amount || 0));
                     const prevReturnOrCancelledCount = Number(s?.prev_return_or_cancelled_orders || 0);
 
-                    const sections = [
-                      { type: 'metric', label: 'Net Sales', amount: netSalesAmount, count: netSalesCount },
-                      { type: 'metric', label: 'Returns', amount: returnsAmount, count: returnsCount },
-                      { type: 'metric', label: 'Cancellations', amount: cancellationsAmount, count: cancellationsCount }
-                    ];
+                    const Metric = ({ label, amount, count, onClick }: { label: string; amount: number; count: number; onClick?: () => void }) => (
+                      <Box 
+                        onClick={onClick}
+                        sx={{ 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'center', 
+                          minWidth: 140,
+                          cursor: onClick ? 'pointer' : 'default'
+                        }}
+                      >
+                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25 }}>
+                          {label}
+                        </Typography>
+                        <Typography sx={{ fontSize: '1.5rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                          ₹{Math.round(Number(amount || 0)).toLocaleString('en-IN')}
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
+                          {Number(count || 0).toLocaleString('en-IN')} orders
+                        </Typography>
+                      </Box>
+                    );
 
-                    // Add previous return/cancellations metric if values exist
-                    if (prevReturnOrCancelledAmount > 0 || prevReturnOrCancelledCount > 0) {
-                      sections.push(
-                        { type: 'metric', label: 'Previous Return/Cancellations', amount: prevReturnOrCancelledAmount, count: prevReturnOrCancelledCount }
-                      );
-                    }
+                    const Operator = ({ symbol }: { symbol: string }) => (
+                      <Typography sx={{ fontSize: '1.5rem', fontWeight: 600, color: '#6b7280', mx: 1 }}>
+                        {symbol}
+                      </Typography>
+                    );
 
                     return (
-                      <Box sx={{ 
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(2, 1fr)',
-                        gap: 3,
-                        p: 3
-                      }}>
-                        {sections.map((section, idx) => (
-                          <Box key={idx} sx={{ 
-                            display: 'flex', 
-                            flexDirection: 'column', 
-                            alignItems: 'center',
-                            textAlign: 'center'
-                          }}>
-                            <Typography sx={{ 
-                              fontSize: '0.75rem', 
-                              fontWeight: 500, 
-                              color: '#6b7280',
-                              letterSpacing: '0.05em',
-                              textTransform: 'uppercase',
-                              mb: 0.5
-                            }}>
-                              {section.label}
-                            </Typography>
-                            <Typography sx={{ 
-                              fontSize: '1.5rem', 
-                              fontWeight: 300, 
-                              color: '#111827',
-                              fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
-                              letterSpacing: '-0.02em',
-                              mb: 0.25
-                            }}>
-                              ₹{Math.round(Number(section.amount || 0)).toLocaleString('en-IN')}
-                            </Typography>
-                            <Typography sx={{ 
-                              fontSize: '0.75rem', 
-                              fontWeight: 300, 
-                              color: '#9ca3af',
-                              letterSpacing: '0.025em'
-                            }}>
-                              {Number(section.count || 0).toLocaleString('en-IN')} orders
-                            </Typography>
+                      <Box sx={{ p: 3 }}>
+                        {/* Equation Row: Net Sales = Gross Sales - Returns - Cancellations */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                          <Metric 
+                            label="Net Sales" 
+                            amount={netSalesAmount} 
+                            count={netSalesCount}
+                            onClick={() => {
+                              setInitialTsTab(3); // Open Transaction Sheet with "All" tab
+                              setShowTransactionSheet(true);
+                            }}
+                          />
+                          <Operator symbol="=" />
+                          <Metric label="Gross Sales" amount={grossSalesAmount} count={grossSalesCount} />
+                          <Operator symbol="-" />
+                          <Metric label="Returns" amount={returnsAmount} count={returnsCount} />
+                          <Operator symbol="-" />
+                          <Metric label="Cancellations" amount={cancellationsAmount} count={cancellationsCount} />
+                        </Box>
+
+                        {/* Previous Return/Cancellations below equation */}
+                        {(prevReturnOrCancelledAmount > 0 || prevReturnOrCancelledCount > 0) && (
+                          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                            <Box sx={{ textAlign: 'center' }}>
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25 }}>
+                                Previous Return/Cancellations
+                              </Typography>
+                              <Typography sx={{ fontSize: '1rem', fontWeight: 400, color: '#111827' }}>
+                                ₹{Math.round(prevReturnOrCancelledAmount).toLocaleString('en-IN')} • {Number(prevReturnOrCancelledCount || 0).toLocaleString('en-IN')} orders
+                              </Typography>
+                            </Box>
                           </Box>
-                        ))}
+                        )}
                       </Box>
                     );
                   })()}
@@ -2192,70 +2239,146 @@ const MarketplaceReconciliation: React.FC = () => {
                   justifyContent: 'center',
                   gap: 2,
                 }}>
-                  {/* Gauge Chart */}
-                  <Box sx={{ position: 'relative' }}>
-                    <Box sx={{
-                      width: 140,
-                      height: 140,
-                      borderRadius: '100%',
-                      background: (() => {
-                        const s = mainSummary?.summary as any;
-                        const reconciledCount = Number(s?.total_reconciled_count || 0);
-                        const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
-                        const totalReconciledCount = reconciledCount + manuallyReconciledCount;
-                        const unreconciledCount = Number(s?.total_unreconciled_count || 0);
-                        const totalCount = totalReconciledCount + unreconciledCount;
-                        const matchedPct = totalCount === 0 ? 100 : Math.max(0, Math.min(100, (totalReconciledCount / totalCount) * 100));
-                        const matchedDeg = (matchedPct / 100) * 360;
-                        return `conic-gradient(#10b981 0deg, #10b981 ${matchedDeg}deg, #ef4444 ${matchedDeg}deg, #ef4444 360deg)`;
-                      })(),
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative',
-                    }}>
-                      <Box sx={{
-                        width: 120,
-                        height: 120,
-                        borderRadius: '50%',
-                        background: 'white',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
+                  {/* Gauge Chart with Numerator and Denominator */}
+                  {(() => {
+                    const s = mainSummary?.summary as any;
+                    const reconciledCount = Number(s?.total_reconciled_count || 0);
+                    const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
+                    const totalReconciledCount = reconciledCount + manuallyReconciledCount;
+                    const unreconciledCount = Number(s?.total_unreconciled_count || 0);
+                    const totalCount = totalReconciledCount + unreconciledCount;
+                    const matchedPct = totalCount === 0 ? 100 : Math.max(0, Math.min(100, (totalReconciledCount / totalCount) * 100));
+                    const matchedDeg = (matchedPct / 100) * 360;
+                    const pct = totalCount === 0 ? 100 : Math.max(0, (totalReconciledCount / totalCount) * 100);
+                    
+                    return (
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
                         justifyContent: 'center',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+                        gap: 3,
+                        width: '100%',
                       }}>
-                        <Typography variant="h4" sx={{
-                          fontWeight: 500,
-                          color: (() => {
-                            const s = mainSummary?.summary as any;
-                            const reconciledCount = Number(s?.total_reconciled_count || 0);
-                            const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
-                            const totalReconciledCount = reconciledCount + manuallyReconciledCount;
-                            const unreconciledCount = Number(s?.total_unreconciled_count || 0);
-                            const totalCount = totalReconciledCount + unreconciledCount;
-                            const pct = totalCount === 0 ? 100 : Math.max(0, (totalReconciledCount / totalCount) * 100);
-                            return getReconciliationColor(pct);
-                          })(),
-                          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                          mb: 0.5,
-                          fontSize: '1.5rem',
-                          letterSpacing: '-0.02em'
+                        {/* Numerator on Left */}
+                        <Box sx={{ 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'flex-end',
+                          flex: 1,
+                          pr: 2,
                         }}>
-                          {(() => {
-                            const s = mainSummary?.summary as any;
-                            const reconciledCount = Number(s?.total_reconciled_count || 0);
-                            const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
-                            const totalReconciledCount = reconciledCount + manuallyReconciledCount;
-                            const unreconciledCount = Number(s?.total_unreconciled_count || 0);
-                            const totalCount = totalReconciledCount + unreconciledCount;
-                            const pct = totalCount === 0 ? 100 : Math.max(0, (totalReconciledCount / totalCount) * 100);
-                            return `${pct.toFixed(1)}%`;
-                          })()}
-                        </Typography>
+                          <Typography sx={{ 
+                            fontSize: '0.75rem', 
+                            fontWeight: 500, 
+                            color: '#111827',
+                            letterSpacing: '0.05em',
+                            textTransform: 'uppercase',
+                            mb: 0.5,
+                            textAlign: 'right',
+                          }}>
+                            Matched Transactions
+                          </Typography>
+                          <Typography sx={{ 
+                            fontSize: '1rem', 
+                            fontWeight: 300, 
+                            color: '#111827',
+                            fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
+                            letterSpacing: '-0.02em',
+                            mb: 0.25,
+                            textAlign: 'right',
+                          }}>
+                            {totalReconciledCount.toLocaleString()}
+                          </Typography>
+                          <Typography sx={{ 
+                            fontSize: '0.75rem', 
+                            fontWeight: 300, 
+                            color: '#111827',
+                            letterSpacing: '0.025em',
+                            textAlign: 'right',
+                          }}>
+                          
+                          </Typography>
+                        </Box>
+
+                        {/* Gauge Chart in Center */}
+                        <Box sx={{ position: 'relative', flexShrink: 0 }}>
+                          <Box sx={{
+                            width: 140,
+                            height: 140,
+                            borderRadius: '100%',
+                            background: `conic-gradient(#10b981 0deg, #10b981 ${matchedDeg}deg, #ef4444 ${matchedDeg}deg, #ef4444 360deg)`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            position: 'relative',
+                          }}>
+                            <Box sx={{
+                              width: 120,
+                              height: 120,
+                              borderRadius: '50%',
+                              background: 'white',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+                            }}>
+                              <Typography variant="h4" sx={{
+                                fontWeight: 500,
+                                color: getReconciliationColor(pct),
+                                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                                mb: 0.5,
+                                fontSize: '1.5rem',
+                                letterSpacing: '-0.02em'
+                              }}>
+                                {`${pct.toFixed(1)}%`}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+
+                        {/* Denominator on Right */}
+                        <Box sx={{ 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'flex-start',
+                          flex: 1,
+                          pl: 2,
+                        }}>
+                          <Typography sx={{ 
+                            fontSize: '0.75rem', 
+                            fontWeight: 500, 
+                            color: '#111827',
+                            letterSpacing: '0.05em',
+                            textTransform: 'uppercase',
+                            mb: 0.5,
+                            textAlign: 'left',
+                          }}>
+                            Settled Transactions
+                          </Typography>
+                          <Typography sx={{ 
+                            fontSize: '1rem', 
+                            fontWeight: 300, 
+                            color: '#111827',
+                            fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
+                            letterSpacing: '-0.02em',
+                            mb: 0.25,
+                            textAlign: 'left',
+                          }}>
+                            {totalCount.toLocaleString()}
+                          </Typography>
+                          <Typography sx={{ 
+                            fontSize: '0.75rem', 
+                            fontWeight: 300, 
+                            color: '#111827',
+                            letterSpacing: '0.025em',
+                            textAlign: 'left',
+                          }}>
+                          </Typography>
+                        </Box>
                       </Box>
-                    </Box>
-                  </Box>
+                    );
+                  })()}
 
                   {/* Action Buttons */}
                   <Box sx={{
@@ -2298,7 +2421,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           {Number(mainSummary?.summary?.total_unreconciled_count || 0).toLocaleString()}
                         </Typography>
                         <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: '#6b7280', fontWeight: 400 }}>
-                          Unreconciled
+                          Mismatched
                         </Typography>
                       </Box>
                     </Button>
@@ -2454,7 +2577,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             size="small"
                             onClick={() => {
                               setInitialTsFilters(undefined);
-                              setInitialTsTab(1);
+                              setInitialTsTab(2);
                               setShowTransactionSheet(true);
                             }}
                             sx={{
@@ -2579,7 +2702,8 @@ const MarketplaceReconciliation: React.FC = () => {
                             // Matched totals from API response (reconciled)
                             const matchedAmount = Number(s?.total_reconciled_amount || 0);
                             const matchedCount = Number(s?.total_reconciled_count || 0);
-                            const percentSettled = expectedSalesCount === 0 ? 0 : Math.min(100, (matchedCount / expectedSalesCount) * 100);
+                            const settledCount = Number(s?.total_reconciled_count + s?.total_unreconciled_count || 0);
+                            const percentSettled = expectedSalesCount === 0 ? 0 : Math.min(100, (settledCount / expectedSalesCount) * 100);
 
                             // Keep the existing provider calculation for display purposes
                             const { gateways, cod } = splitGatewaysAndCod(mainSummary?.Reconcile);
@@ -2590,7 +2714,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             const codAmount = sumAmount(cod);
                             const codCount = sumCount(cod);
                             const settledAmount = matchedAmount;
-                            const settledCount = matchedCount;
+                            // const settledCount = matchedCount;
 
                             // Providers list using raw Reconcile values
                             const totalSettledAmount = settledAmount || 0;
@@ -2665,7 +2789,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                       {formatCurrency(settledAmount)}
                                     </Typography>
                                     <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
-                                      {(settledCount).toLocaleString('en-IN')} Orders Matched
+                                      {(matchedCount).toLocaleString('en-IN')} Orders Matched
                                     </Typography>
                                   </Box>
                                   <Box sx={{ textAlign: 'right' }}>
@@ -2675,7 +2799,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                                         <Typography variant="body1" sx={{ color: '#374151', fontWeight: 600, fontSize: '1.1rem' }}>
-                                          Revenue
+                                          Gross Sales
                                         </Typography>
                                         <Typography variant="h6" sx={{ color: '#111827', fontWeight: 700, fontSize: '1.2rem' }}>
                                           {formatCurrency(expectedSalesAmount)}
@@ -2685,9 +2809,9 @@ const MarketplaceReconciliation: React.FC = () => {
                                         {(expectedSalesCount).toLocaleString('en-IN')} Orders
                                       </Typography>
                                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-                                        <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
-                                          Matched&nbsp;<span style={{ marginLeft: 130 }}>{percentSettled.toFixed(1)}%</span>
-                                        </Typography>
+                                        {/* <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
+                                          Settled&nbsp;<span style={{ marginLeft: 130 }}>{percentSettled.toFixed(1)}%</span>
+                                        </Typography> */}
                                         {/* <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 700, fontSize: '1.2rem' }}>
                                           {formatCurrency(matchedAmount)}
                                         </Typography> */}
@@ -3149,7 +3273,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                                 }}
                                                 onClick={() => {
                                                   // Navigate to TransactionSheet with unsettled tab and platform filter
-                                                  setInitialTsTab(1); // Unsettled tab (0 = Settled, 1 = Unsettled)
+                                                  setInitialTsTab(2); // Unsettled tab
                                                   // Determine platform based on provider
                                                   // Provider names like "Flipkart" indicate the platform
                                                   const providerName = provider.name.toLowerCase();
@@ -3215,8 +3339,10 @@ const MarketplaceReconciliation: React.FC = () => {
                                                         }
                                                       }}
                                                       onClick={() => {
-                                                        // TODO: Replace with actual link when provided
-                                                        console.log('View Cash on Delivery unsettled transactions');
+                                                        // Unsettled COD → go to Unsettled tab
+                                                        setInitialTsTab(2);
+                                                        setSelectedProviderPlatform('flipkart'); // default platform; COD partners still belong to marketplace
+                                                        setShowTransactionSheet(true);
                                                       }}
                                                     >
                                                       View Cash on Delivery transactions
@@ -4186,10 +4312,10 @@ const MarketplaceReconciliation: React.FC = () => {
                         </Box>
                         <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 1 }}>
                           {percents.map(({ bucket, value }) => (
-                            <Box key={bucket} sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                            <Box key={bucket} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <Box sx={{ width: 10, height: 10, borderRadius: 2, bgcolor: GREYS[bucket], border: '1px solid #e5e7eb' }} />
+                              <Typography variant="caption" sx={{ color: '#9ca3af', fontWeight: 600 }}>{Math.round(value)}%</Typography>
                               <Typography variant="caption" sx={{ color: '#4b5563' }}>{bucket}</Typography>
-                              <Typography variant="caption" sx={{ color: '#9ca3af', ml: 'auto' }}>{Math.round(value)}%</Typography>
                             </Box>
                           ))}
                         </Box>

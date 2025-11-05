@@ -2351,6 +2351,29 @@ const OperationsCentrePage: React.FC = () => {
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Value</Typography>
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleSort('Settlement Value');
+                            }}
+                            sx={{
+                              ml: 0.5,
+                              color: sortConfig?.key === 'Settlement Value' ? '#1f2937' : '#6b7280',
+                              background: sortConfig?.key === 'Settlement Value' ? '#e5e7eb' : 'transparent',
+                              '&:hover': { background: '#f3f4f6' },
+                            }}
+                            disabled={!COLUMN_TO_SORT_BY_MAP['Settlement Value']}
+                            aria-label="Sort Settlement Value"
+                          >
+                            {getSortIcon('Settlement Value')}
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Invoice Date</Typography>
                           <IconButton 
                             size="small" 
@@ -2572,6 +2595,7 @@ const OperationsCentrePage: React.FC = () => {
                     </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>{orderId}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{settlementValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{formatDate(invoiceDate)}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{formatDate(settlementDate)}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>₹{difference.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>

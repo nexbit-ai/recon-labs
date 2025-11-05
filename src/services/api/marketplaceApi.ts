@@ -55,7 +55,7 @@ class MarketplaceApiService {
   constructor() {
     this.baseUrl = 'http://localhost:8080';
     this.apiKey = 'kapiva-7b485b6a865b2b4a3d728ef2fd4f3';
-    this.orgId = '6ce6ee73-e1ef-4020-ad74-4ee45e731201';
+    this.orgId = '612cd642-c2ce-49da-b535-be35442cecfa';
   }
 
   async getMarketplaceOverview(startDate: string, endDate: string): Promise<MarketplaceOverviewResponse> {

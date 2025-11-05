@@ -6,7 +6,7 @@ export const API_CONFIG = {
   
   // API Keys and Organization ID
   API_KEY: import.meta.env.VITE_API_KEY || 'kapiva-7b485b6a865b2b4a3d728ef2fd4f3',
-  ORG_ID: '6ce6ee73-e1ef-4020-ad74-4ee45e731201', // Hardcoded as requested
+  ORG_ID: '612cd642-c2ce-49da-b535-be35442cecfa', // Hardcoded as requested
   
   // API Version
   API_VERSION: 'v1',
