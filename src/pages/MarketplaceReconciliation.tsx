@@ -225,8 +225,12 @@ const MarketplaceReconciliation: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   
   // Main transactions tab state
-  const [transactionsTab, setTransactionsTab] = useState<number>(0); // 0: reconciled, 1: unreconciled
+  const [transactionsTab, setTransactionsTab] = useState<number>(0); // 0: matched, 1: mismatched (both within Settled)
   const handleTransactionsTabChange = (_: any, value: number) => setTransactionsTab(value);
+  
+  // Settled/Unsettled main tab state
+  const [settledUnsettledTab, setSettledUnsettledTab] = useState<number>(0); // 0: settled, 1: unsettled
+  const handleSettledUnsettledTabChange = (_: any, value: number) => setSettledUnsettledTab(value);
 
   // Underline for first two transaction tabs (Matched + Mismatched)
   const tabsGroupRef = useRef<HTMLDivElement | null>(null);
@@ -1787,6 +1791,27 @@ const MarketplaceReconciliation: React.FC = () => {
                 </Button>
                 <Button
                   variant="outlined"
+                  startIcon={<SyncIcon />}
+                  onClick={() => {
+                    // Placeholder for future API integration
+                    console.log('Sync button clicked');
+                  }}
+                  sx={{
+                    borderColor: '#6B7280',
+                    color: '#6B7280',
+                    textTransform: 'none',
+                    minHeight: 36,
+                    fontSize: '0.7875rem',
+                    '&:hover': {
+                      borderColor: '#4B5563',
+                      backgroundColor: 'rgba(107, 114, 128, 0.04)',
+                    },
+                  }}
+                >
+                  Sync
+                </Button>
+                <Button
+                  variant="outlined"
                   startIcon={<DownloadIcon />}
                   onClick={handleDownloadCSV}
                   sx={{
@@ -2169,7 +2194,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             amount={netSalesAmount} 
                             count={netSalesCount}
                             onClick={() => {
-                              setInitialTsTab(3); // Open Transaction Sheet with "All" tab
+                              setInitialTsTab(4); // Open Transaction Sheet with "Sales Report" tab
                               setShowTransactionSheet(true);
                             }}
                           />
@@ -2517,16 +2542,33 @@ const MarketplaceReconciliation: React.FC = () => {
                   return (
                     <Box>
                       {/* Header with Total Unreconciled */}
-                      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 3 }}>
-                        <Typography variant="h3" sx={{ 
-                          fontWeight: 700, 
-                          color: '#1f2937',
-                          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                          letterSpacing: '-0.025em'
-                        }}>
-                          Transactions Summary
-                        </Typography>
-                        {transactionsTab === 0 && (
+                      {/* TRANSACTIONS SUMMARY SECTION - Start of transactions summary section */}
+                      <Box 
+                        data-section="transactions-summary"
+                        sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 3 }}
+                      >
+                        {/* Tabs for Settled/Unsettled */}
+                        <Tabs
+                          value={settledUnsettledTab}
+                          onChange={handleSettledUnsettledTabChange}
+                          sx={{
+                            borderBottom: 1,
+                            borderColor: 'divider',
+                            '& .MuiTab-root': {
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              fontSize: '1rem',
+                              minHeight: 48,
+                            },
+                            '& .MuiTabs-indicator': {
+                              backgroundColor: settledUnsettledTab === 0 ? '#10b981' : '#ef4444'
+                            }
+                          }}
+                        >
+                          <Tab label="Settled" />
+                          <Tab label="Unsettled" />
+                        </Tabs>
+                        {settledUnsettledTab === 0 && transactionsTab === 0 && (
                           <Button
                             variant="outlined"
                             size="small"
@@ -2549,7 +2591,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             View Matched Transactions
                           </Button>
                         )}
-                        {transactionsTab === 1 && (
+                        {settledUnsettledTab === 0 && transactionsTab === 1 && (
                           <Button
                             variant="outlined"
                             size="small"
@@ -2571,7 +2613,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             View Mismatched Transactions
                           </Button>
                         )}
-                        {transactionsTab === 2 && (
+                        {settledUnsettledTab === 1 && (
                           <Button
                             variant="outlined"
                             size="small"
@@ -2596,22 +2638,30 @@ const MarketplaceReconciliation: React.FC = () => {
                         )}
                       </Box>
 
-                      {/* Settled/Unsettled Switch + Tabs */}
-                      <Box sx={{ mt: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5, mb: transactionsTab === 2 ? 2 : 0 }}>
-                        {/* Two-way switch with external labels */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Typography sx={{ fontWeight: 700, color: transactionsTab !== 2 ? '#065f46' : '#6b7280' }}>
-                            Settled
+                      {/* Switch for Matched/Mismatched (only when Settled is selected) */}
+                      {settledUnsettledTab === 0 && (
+                        <Box 
+                          sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            gap: 2,
+                            mt: 3,
+                            mb: 2
+                          }}
+                        >
+                          <Typography sx={{ fontWeight: 700, color: transactionsTab === 0 ? '#065f46' : '#6b7280' }}>
+                            Matched
                           </Typography>
                           <Box
                             role="switch"
-                            aria-checked={transactionsTab === 2}
+                            aria-checked={transactionsTab === 1}
                             tabIndex={0}
-                            onClick={() => setTransactionsTab(transactionsTab === 2 ? 0 : 2)}
+                            onClick={() => setTransactionsTab(transactionsTab === 0 ? 1 : 0)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
-                                setTransactionsTab(transactionsTab === 2 ? 0 : 2);
+                                setTransactionsTab(transactionsTab === 0 ? 1 : 0);
                               }
                             }}
                             sx={{
@@ -2620,7 +2670,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               height: 32,
                               borderRadius: 9999,
                               cursor: 'pointer',
-                              backgroundColor: transactionsTab === 2 ? '#fee2e2' : '#d1fae5',
+                              backgroundColor: transactionsTab === 1 ? '#fee2e2' : '#d1fae5',
                               transition: 'background-color 150ms ease',
                               boxShadow: 'inset 0 0 0 1px #e5e7eb',
                             }}
@@ -2631,10 +2681,10 @@ const MarketplaceReconciliation: React.FC = () => {
                                 position: 'absolute',
                                 top: 4,
                                 bottom: 4,
-                                left: transactionsTab === 2 ? '50%' : 4,
-                                right: transactionsTab === 2 ? 4 : '50%',
+                                left: transactionsTab === 1 ? '50%' : 4,
+                                right: transactionsTab === 1 ? 4 : '50%',
                                 borderRadius: 9999,
-                                backgroundColor: transactionsTab === 2 ? '#ef4444' : '#10b981',
+                                backgroundColor: transactionsTab === 1 ? '#ef4444' : '#10b981',
                                 opacity: 0.25,
                                 transition: 'all 150ms ease',
                               }}
@@ -2644,7 +2694,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               sx={{
                                 position: 'absolute',
                                 top: 3,
-                                left: transactionsTab === 2 ? 33 : 3,
+                                left: transactionsTab === 1 ? 33 : 3,
                                 width: 26,
                                 height: 26,
                                 borderRadius: '50%',
@@ -2654,42 +2704,14 @@ const MarketplaceReconciliation: React.FC = () => {
                               }}
                             />
                           </Box>
-                          <Typography sx={{ fontWeight: 700, color: transactionsTab === 2 ? '#991b1b' : '#6b7280' }}>
-                            Unsettled
+                          <Typography sx={{ fontWeight: 700, color: transactionsTab === 1 ? '#991b1b' : '#6b7280' }}>
+                            Mismatched
                           </Typography>
                         </Box>
-
-                        {/* Settled sub-tabs (Matched / Mismatched) */}
-                        <Box ref={tabsGroupRef as any} sx={{ position: 'relative', display: transactionsTab !== 2 ? 'inline-block' : 'none' }}>
-                          {/* removed decorative underline under settled tabs */}
-                          {transactionsTab !== 2 && (
-                            <Tabs
-                              value={transactionsTab}
-                              onChange={handleTransactionsTabChange}
-                              sx={{
-                                borderBottom: 1,
-                                borderColor: 'divider',
-                                mb: 1,
-                                '& .MuiTab-root': {
-                                  textTransform: 'none',
-                                  fontWeight: 600,
-                                  fontSize: '1rem',
-                                  minHeight: 48,
-                                },
-                                '& .MuiTabs-indicator': {
-                                  backgroundColor: '#10b981'
-                                }
-                              }}
-                            >
-                              <Tab label="Matched Transactions" />
-                              <Tab label="Mismatched Transactions" />
-                            </Tabs>
-                          )}
-                        </Box>
-                      </Box>
+                      )}
 
                       {/* Tab Content */}
-                        {transactionsTab === 0 && (
+                        {settledUnsettledTab === 0 && transactionsTab === 0 && (
                         <Box>
                           {/* Reconciled Transactions Summary */}
                           {(() => {
@@ -3126,8 +3148,9 @@ const MarketplaceReconciliation: React.FC = () => {
                           })()}
                         </Box>
                       )}
+                      {/* TRANSACTIONS SUMMARY SECTION - End of transactions summary section */}
 
-                      {transactionsTab === 2 && (
+                      {settledUnsettledTab === 1 && (
                         <Box>
                           {(() => {
                             // Use API mainSummary.Unsettled for this section
@@ -3383,7 +3406,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           })()}
                         </Box>
                       )}
-                      {transactionsTab === 1 && (
+                      {settledUnsettledTab === 0 && transactionsTab === 1 && (
                         <Box>
                           {/* Total Unreconciled Summary */}
                           <Box sx={{ 

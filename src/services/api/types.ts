@@ -441,4 +441,31 @@ export interface AgeingAnalysisParams {
   platform?: string;
   invoice_date_from: string;
   invoice_date_to: string;
+}
+
+// Sales Transactions Types
+export interface SalesTransaction {
+  ship_from: string;
+  ship_to: string;
+  invoice_number: string;
+  order_item_id: string;
+  invoice_date: string;
+  gstin: string;
+  hsn: string;
+  marketplace_sku_code: string;
+  gst_rate: number;
+  quantity: number;
+  gmv: number;
+  gross: number;
+  basic: number;
+  igst: number;
+  cgst: number;
+  sgst: number;
+  tax: number;
+}
+
+export interface SalesTransactionsResponse {
+  count: number;
+  platform: string;
+  transactions: SalesTransaction[];
 } 

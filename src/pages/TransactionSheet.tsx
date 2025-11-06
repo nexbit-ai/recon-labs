@@ -53,7 +53,7 @@ import ColumnFilterControls from '../components/ColumnFilterControls';
 import { api } from '../services/api';
 import { apiService } from '../services/api/apiService';
 import { API_CONFIG } from '../services/api/config';
-import { OrdersResponse, OrderItem, MarketplaceReconciliationResponse, TotalTransactionsResponse, TransactionRow as ApiTransactionRow, TransactionColumn } from '../services/api/types';
+import { OrdersResponse, OrderItem, MarketplaceReconciliationResponse, TotalTransactionsResponse, TransactionRow as ApiTransactionRow, TransactionColumn, SalesTransactionsResponse } from '../services/api/types';
 import {
   ArrowBack as ArrowBackIcon,
   Search as SearchIcon,
@@ -1273,8 +1273,16 @@ const BreakupsModal: React.FC<{
 
   // Extract the breakups object from metadata
   // The metadata.breakups is directly on the row object
-  const breakupsObj = (breakups as any)?.metadata?.breakups;
-  if (!breakupsObj) return null;
+  const breakupsObj = (breakups as any)?.originalData?.metadata?.breakups || 
+                      (breakups as any)?.metadata?.breakups || {};
+  
+  // Extract metadata to get shipping_courier (check both originalData.metadata and metadata)
+  const metadata = (breakups as any)?.originalData?.metadata || 
+                   (breakups as any)?.metadata || {};
+  const shippingCourier = metadata?.shipping_courier;
+  
+  // Allow modal to show even if breakups is empty, as long as we have metadata or shipping_courier
+  // This fixes the issue where D2C transactions have empty breakups but should still show the modal
 
   // Convert snake_case keys to readable format: remove underscores and capitalize first letter
   const formatKey = (key: string) => {
@@ -1299,11 +1307,13 @@ const BreakupsModal: React.FC<{
   const settlementValue = (breakups as any)?.settlement_amount || 0;
   const diff = (breakups as any)?.diff || 0;
 
-  // Get entries from breakups object
-  const breakupsData = Object.entries(breakupsObj).map(([key, value]) => ({
-    label: formatKey(key),
-    value: Number(value) || 0
-  }));
+  // Get entries from breakups object (only numeric values)
+  const breakupsData = Object.entries(breakupsObj)
+    .filter(([key, value]) => typeof value === 'number')
+    .map(([key, value]) => ({
+      label: formatKey(key),
+      value: Number(value) || 0
+    }));
 
   // Calculate smart positioning similar to TransactionDetailsPopup
   const getPopupPosition = () => {
@@ -1628,6 +1638,47 @@ const BreakupsModal: React.FC<{
                 {formatCurrency(diff)}
               </Typography>
             </Box>
+
+            {/* Shipping Courier - show if available */}
+            {shippingCourier && (
+              <>
+                {/* Divider */}
+                <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    p: 1.5,
+                    pl: 3,
+                    background: '#f9fafb',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb',
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 500,
+                      color: '#374151',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    Shipping Courier
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 600,
+                      color: '#111827',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    {shippingCourier}
+                  </Typography>
+                </Box>
+              </>
+            )}
           </Box>
         </Box>
       </Box>
@@ -1766,8 +1817,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   const isFetchingRef = React.useRef(false);
 
+  // Sales Report state management
+  const [salesReportData, setSalesReportData] = useState<SalesTransactionsResponse | null>(null);
+  const [salesReportLoading, setSalesReportLoading] = useState(false);
+  const [lastSalesReportDateRange, setLastSalesReportDateRange] = useState<{start: string, end: string} | null>(null);
+
   // Get current data based on which API is being used
   const getCurrentData = (): any[] => {
+    // Sales Report tab (index 4)
+    if (activeTab === 4) {
+      return salesReportData?.transactions || [];
+    }
+    
     // Use quad API data if available (can be null when filtering)
     if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
       let currentData: TotalTransactionsResponse | null = null;
@@ -1797,6 +1858,29 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Get current columns based on which API is being used
   const getCurrentColumns = () => {
+    // Sales Report tab (index 4) - fixed columns
+    if (activeTab === 4) {
+      return [
+        'Order Item ID',
+        'Ship From',
+        'Ship To',
+        'Invoice Number',
+        'Invoice Date',
+        'GSTIN',
+        'HSN',
+        'Marketplace SKU Code',
+        'GST Rate',
+        'Quantity',
+        'GMV',
+        'Gross',
+        'Basic',
+        'IGST',
+        'CGST',
+        'SGST',
+        'Tax'
+      ];
+    }
+    
     // Use quad API data if available (can be null when filtering)
     if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
       let currentData: TotalTransactionsResponse | null = null;
@@ -2542,7 +2626,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   useEffect(() => {
     if (initialTab !== undefined) {
       // Backward compatibility: map legacy unsettled (1) to new unsettled (2)
-      setActiveTab(initialTab === 1 ? 2 : initialTab);
+      const tabToSet = initialTab === 1 ? 2 : initialTab;
+      setActiveTab(tabToSet);
+      
+      // If opening Sales Report tab (index 4), fetch the data
+      if (tabToSet === 4) {
+        fetchSalesTransactions(dateRange, selectedPlatform);
+      }
     }
   }, [initialTab]);
 
@@ -2918,14 +3008,68 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         unsettled: unsettledResponse.success ? (unsettledResponse.data?.data?.length || 0) : null,
         all: allResponse.success ? (allResponse.data?.data?.length || 0) : null,
       });
-      
-    } catch (error) {
-      console.error('[fetchQuadTransactions] Error:', error);
-      setError('Failed to fetch transaction data');
+    } catch (err: any) {
+      console.error('[fetchQuadTransactions] Error:', err);
+      setError(err?.message || 'Failed to fetch transactions');
     } finally {
       setQuadApiLoading(false);
       setPaginationLoading(false);
-      isFetchingRef.current = false; // Reset the flag
+      isFetchingRef.current = false;
+    }
+  };
+
+  // Fetch sales transactions - only called when tab 4 is clicked and date range has changed
+  const fetchSalesTransactions = async (
+    dateRangeFilter?: {start: string, end: string},
+    overridePlatform?: Platform
+  ) => {
+    // Check if date range has changed
+    const currentDateRange = dateRangeFilter || dateRange;
+    const dateRangeChanged = !lastSalesReportDateRange || 
+      lastSalesReportDateRange.start !== currentDateRange.start || 
+      lastSalesReportDateRange.end !== currentDateRange.end;
+
+    // Only fetch if date range has changed or data doesn't exist
+    if (!dateRangeChanged && salesReportData !== null) {
+      return; // Don't refetch if date range hasn't changed
+    }
+
+    // Validate date range
+    if (!currentDateRange.start || !currentDateRange.end) {
+      setError('Please select a date range to view sales report');
+      return;
+    }
+
+    setSalesReportLoading(true);
+    setError(null);
+
+    try {
+      const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
+      
+      const params: any = {
+        platform: platformToUse,
+        order_date_from: currentDateRange.start,
+        order_date_to: currentDateRange.end,
+        limit: 1000
+      };
+
+      const response = await api.transactions.getSalesTransactions(params);
+
+      if (response.success && response.data) {
+        setSalesReportData(response.data);
+        setLastSalesReportDateRange({
+          start: currentDateRange.start,
+          end: currentDateRange.end
+        });
+        setTotalCount(response.data.count || 0);
+      } else {
+        setError('Failed to fetch sales transactions');
+      }
+    } catch (err: any) {
+      console.error('[fetchSalesTransactions] Error:', err);
+      setError(err?.message || 'Failed to fetch sales transactions');
+    } finally {
+      setSalesReportLoading(false);
     }
   };
 
@@ -3241,7 +3385,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       breakups = row.metadata.breakups;
     }
     
-    if (breakups && typeof breakups === 'object' && Object.keys(breakups).length > 0) {
+    // Get metadata to check if shipping_courier exists
+    const metadata = (row as any)?.originalData?.metadata || row.metadata;
+    const hasBreakups = breakups && typeof breakups === 'object' && Object.keys(breakups).length > 0;
+    
+    // Allow opening modal if breakups has data OR if metadata exists (even with empty breakups)
+    // This allows D2C transactions with empty breakups but shipping_courier to show the modal
+    // We always have metadata for transactions, so this ensures the modal can open for all transactions
+    if (hasBreakups || metadata) {
       // Store the full row so we can access order_value, settlement_value, and diff
       setSelectedBreakups(row);
       setBreakupsOrderId(orderId);
@@ -3373,6 +3524,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setActiveTab(newValue);
     setPage(0); // Reset to first page when changing tabs
     setCurrentPage(1); // Reset current page
+    
+    // Sales Report tab (index 4) - fetch data when clicked
+    if (newValue === 4) {
+      fetchSalesTransactions(dateRange, selectedPlatform);
+      return;
+    }
     
     // Update totalCount based on the new active tab
     if (newValue === 0 && matchedTotalCount !== null) {
@@ -3978,6 +4135,33 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         </Box>
                       } 
                     />
+                    <Tab 
+                      label={
+                        <Box sx={{ 
+                          display: 'flex', 
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          alignItems: 'center',
+                          gap: { xs: 0, sm: 0.25 },
+                          width: '100%',
+                          justifyContent: 'center'
+                        }}>
+                          <Box component="span">Sales Report</Box>
+                          {salesReportData !== null && (
+                            <Box 
+                              component="span"
+                              sx={{ 
+                                fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
+                                opacity: 0.8,
+                                fontWeight: 500,
+                                lineHeight: 1
+                              }}
+                            >
+                              ({salesReportData.count.toLocaleString()})
+                            </Box>
+                          )}
+                        </Box>
+                      } 
+                    />
                   </Tabs>
                 </Box>
 
@@ -4051,7 +4235,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           )}
 
           {/* Loading Indicator */}
-          {(loading || quadApiLoading) && !isSorting && (
+          {(loading || quadApiLoading || salesReportLoading) && !isSorting && (
             <LinearProgress 
               sx={{ 
                 mb: 2,
@@ -4137,43 +4321,48 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
                                 {column === 'Status' ? 'Status' : column}
                               </Typography>
-                                    <IconButton 
-                                      size="small" 
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleSort(column);
-                                      }}
-                                      sx={{
-                                        ml: 0.5,
-                                        color: sortConfig?.key === column ? '#1f2937' : '#6b7280',
-                                        background: sortConfig?.key === column ? '#e5e7eb' : 'transparent',
-                                        '&:hover': { background: '#f3f4f6' },
-                                      }}
-                                      disabled={!COLUMN_TO_SORT_BY_MAP[column]}
-                                      aria-label={`Sort ${column}`}
-                                    >
-                                      {getSortIcon(column)}
-                                    </IconButton>
-                                    {/* Magnifying glass button for Order ID search */}
-                                    {column === 'Order ID' && (
-                                      <IconButton 
-                                        size="small" 
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          setShowOrderIdSearch(!showOrderIdSearch);
-                                        }}
-                                        sx={{
-                                          ml: 0.5,
-                                          color: showOrderIdSearch ? '#1f2937' : '#6b7280',
-                                          background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
-                                          '&:hover': { background: '#f3f4f6' },
-                                        }}
-                                        aria-label="Toggle search"
-                                      >
-                                        <SearchIcon sx={{ fontSize: '1rem' }} />
-                                      </IconButton>
+                                    {/* Disable sorting and searching for Sales Report tab */}
+                                    {activeTab !== 4 && (
+                                      <>
+                                        <IconButton 
+                                          size="small" 
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleSort(column);
+                                          }}
+                                          sx={{
+                                            ml: 0.5,
+                                            color: sortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                            background: sortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                            '&:hover': { background: '#f3f4f6' },
+                                          }}
+                                          disabled={!COLUMN_TO_SORT_BY_MAP[column]}
+                                          aria-label={`Sort ${column}`}
+                                        >
+                                          {getSortIcon(column)}
+                                        </IconButton>
+                                        {/* Magnifying glass button for Order ID search */}
+                                        {column === 'Order ID' && (
+                                          <IconButton 
+                                            size="small" 
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              setShowOrderIdSearch(!showOrderIdSearch);
+                                            }}
+                                            sx={{
+                                              ml: 0.5,
+                                              color: showOrderIdSearch ? '#1f2937' : '#6b7280',
+                                              background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
+                                              '&:hover': { background: '#f3f4f6' },
+                                            }}
+                                            aria-label="Toggle search"
+                                          >
+                                            <SearchIcon sx={{ fontSize: '1rem' }} />
+                                          </IconButton>
+                                        )}
+                                      </>
                                     )}
                               </Box>
                               {/* Order ID Search Bar - Expandable */}
@@ -4241,18 +4430,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       </TableRow>
                   </TableHead>
                   <TableBody>
-                    {(loading || quadApiLoading) && !isSorting && getCurrentData().length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 6 }}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                            <CircularProgress size={40} sx={{ color: '#1f2937' }} />
-                            <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500 }}>
-                              Loading transaction data...
-                            </Typography>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ) : (paginationLoading && !isSorting) ? (
+                    {(paginationLoading && !isSorting) ? (
                       <TableRow>
                         <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
@@ -4283,6 +4461,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     activeTab === 0 ? '#10b981' : // Matched - green
                                     activeTab === 1 ? '#f59e0b' : // Mismatched - orange
                                     activeTab === 2 ? '#ef4444' : // Unsettled - red
+                                    activeTab === 4 ? '#8b5cf6' : // Sales Report - purple
                                     '#6366f1' // All - indigo
                                   }`,
                                   background: '#ffffff',
@@ -4292,7 +4471,31 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         {getCurrentColumns().map((column, colIndex) => {
                           // For new API, we need to map column titles to row keys
                           let value;
-                          if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
+                          
+                          // Sales Report tab (index 4) - direct field mapping
+                          if (activeTab === 4) {
+                            const columnToFieldMap: Record<string, string> = {
+                              'Ship From': 'ship_from',
+                              'Ship To': 'ship_to',
+                              'Invoice Number': 'invoice_number',
+                              'Order Item ID': 'order_item_id',
+                              'Invoice Date': 'invoice_date',
+                              'GSTIN': 'gstin',
+                              'HSN': 'hsn',
+                              'Marketplace SKU Code': 'marketplace_sku_code',
+                              'GST Rate': 'gst_rate',
+                              'Quantity': 'quantity',
+                              'GMV': 'gmv',
+                              'Gross': 'gross',
+                              'Basic': 'basic',
+                              'IGST': 'igst',
+                              'CGST': 'cgst',
+                              'SGST': 'sgst',
+                              'Tax': 'tax'
+                            };
+                            const fieldName = columnToFieldMap[column];
+                            value = fieldName ? (row as any)[fieldName] : undefined;
+                          } else if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
                             // Use quad API data
                             let currentData: TotalTransactionsResponse | null = null;
                             if (activeTab === 0) {
@@ -4339,14 +4542,26 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           
                           // Override settlement date for unsettled transactions
                           // Show NA for Settlement Date when the transaction is unsettled (across all tabs)
-                          if (column === 'Settlement Date' && (row as any)?.recon_status === 'unsettled') {
+                          // Also show NA when on the unsettled tab (tab 2) - all transactions there are unsettled
+                          if (column === 'Settlement Date' && ((row as any)?.recon_status === 'unsettled' || activeTab === 2)) {
                             value = 'NA';
                           }
                           
                           // Format value based on type
                           let displayValue = value;
                           
-                          if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
+                          // Sales Report tab formatting
+                          if (activeTab === 4) {
+                            if (column === 'Invoice Date') {
+                              displayValue = value ? formatDate(String(value)) : '';
+                            } else if (['GMV', 'Gross', 'Basic', 'IGST', 'CGST', 'SGST', 'Tax'].includes(column)) {
+                              displayValue = formatCurrency(Number(value) || 0);
+                            } else if (column === 'GST Rate') {
+                              displayValue = value !== undefined && value !== null ? `${value}%` : '';
+                            } else {
+                              displayValue = value !== undefined && value !== null ? String(value) : '';
+                            }
+                          } else if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
                             // Use quad API data for formatting
                             let currentData: TotalTransactionsResponse | null = null;
                             if (activeTab === 0) {
