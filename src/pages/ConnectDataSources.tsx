@@ -99,8 +99,8 @@ const ConnectDataSources: React.FC = () => {
   const [reportQuery, setReportQuery] = useState('');
 
   // Per-vendor marketplace uploads state (Amazon, Flipkart)
-  const [marketplaceFiles, setMarketplaceFiles] = useState<Record<string, { sales: File | null; settlement: File | null }>>({
-    amazon: { sales: null, settlement: null },
+  const [marketplaceFiles, setMarketplaceFiles] = useState<Record<string, { sales: File | null; sales_b2b?: File | null; settlement: File | null }>>({
+    amazon: { sales: null, sales_b2b: null, settlement: null },
     flipkart: { sales: null, settlement: null },
   });
   const [marketplaceStatus, setMarketplaceStatus] = useState<Record<string, { state: 'idle' | 'uploading' | 'success' | 'error'; message: string }>>({
@@ -160,7 +160,7 @@ const ConnectDataSources: React.FC = () => {
     }
   };
 
-  const setMarketplaceFile = (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'settlement', file: File | null) => {
+  const setMarketplaceFile = (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'sales_b2b' | 'settlement', file: File | null) => {
     setMarketplaceFiles((prev) => ({
       ...prev,
       [vendorId]: { ...prev[vendorId], [kind]: file },
@@ -169,12 +169,24 @@ const ConnectDataSources: React.FC = () => {
 
   const uploadMarketplaceReports = async (vendorId: 'amazon' | 'flipkart') => {
     const files = marketplaceFiles[vendorId];
-    if (!files?.sales || !files?.settlement) {
-      setMarketplaceStatus((prev) => ({
-        ...prev,
-        [vendorId]: { state: 'error', message: 'Please select both Sales and Settlement files.' },
-      }));
-      return;
+    if (vendorId === 'amazon') {
+      // Amazon requires B2C sales, B2B sales, and settlement
+      if (!files?.sales || !files?.sales_b2b || !files?.settlement) {
+        setMarketplaceStatus((prev) => ({
+          ...prev,
+          [vendorId]: { state: 'error', message: 'Please select B2C Sales, B2B Sales, and Settlement files.' },
+        }));
+        return;
+      }
+    } else {
+      // Flipkart requires sales and settlement
+      if (!files?.sales || !files?.settlement) {
+        setMarketplaceStatus((prev) => ({
+          ...prev,
+          [vendorId]: { state: 'error', message: 'Please select both Sales and Settlement files.' },
+        }));
+        return;
+      }
     }
 
     setMarketplaceStatus((prev) => ({ ...prev, [vendorId]: { state: 'uploading', message: 'Preparing uploads…' } }));
@@ -185,11 +197,27 @@ const ConnectDataSources: React.FC = () => {
       const settlementOk = await uploadFileToS3(files.settlement, settlementUploadData.upload_url);
       if (!settlementOk) throw new Error('Failed to upload settlement report');
 
-      // Sales next
+      // B2C Sales next
       const salesUploadData = await getUploadUrl(files.sales, 'Sales');
       if (!salesUploadData) throw new Error('Failed to get upload URL for sales report');
       const salesOk = await uploadFileToS3(files.sales, salesUploadData.upload_url);
       if (!salesOk) throw new Error('Failed to upload sales report');
+
+      // B2B Sales for Amazon only
+      if (vendorId === 'amazon' && files.sales_b2b) {
+        const b2bSalesUploadDataResponse = await reconciliationAPI.uploadFile({
+          file_name: files.sales_b2b.name,
+          file_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          file_size: files.sales_b2b.size,
+          description: '',
+          report_type: 'amazon_sales_b2b',
+        });
+        if (!b2bSalesUploadDataResponse?.data) throw new Error('Failed to get upload URL for B2B sales report');
+        const b2bSalesUploadData = b2bSalesUploadDataResponse.data as UploadResponse;
+        if (!b2bSalesUploadData.upload_url) throw new Error('Failed to get upload URL for B2B sales report');
+        const b2bSalesOk = await uploadFileToS3(files.sales_b2b, b2bSalesUploadData.upload_url);
+        if (!b2bSalesOk) throw new Error('Failed to upload B2B sales report');
+      }
 
       setMarketplaceStatus((prev) => ({ ...prev, [vendorId]: { state: 'success', message: 'Files uploaded successfully.' } }));
     } catch (err: any) {
@@ -422,7 +450,9 @@ const ConnectDataSources: React.FC = () => {
               const vendor = dataSources.find((d) => d.id === vendorId);
               const files = marketplaceFiles[vendorId];
               const status = marketplaceStatus[vendorId];
-              const canUpload = Boolean(files?.sales && files?.settlement) && status?.state !== 'uploading';
+              const canUpload = vendorId === 'amazon' 
+                ? Boolean(files?.sales && files?.sales_b2b && files?.settlement) && status?.state !== 'uploading'
+                : Boolean(files?.sales && files?.settlement) && status?.state !== 'uploading';
               return (
                 <Grid item xs={12} md={6} key={vendorId}>
                   <Paper elevation={0} sx={{ p: 3, border: '1px solid #e5e7eb', borderRadius: '12px' }}>
@@ -435,7 +465,7 @@ const ConnectDataSources: React.FC = () => {
 
                     <Grid container spacing={2}>
                       <Grid item xs={12}>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Sales report (XLSX)</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>B2C Sales report (XLSX)</Typography>
                         <input
                           accept=".xlsx,.xls"
                           style={{ display: 'none' }}
@@ -452,6 +482,27 @@ const ConnectDataSources: React.FC = () => {
                           </Typography>
                         </label>
                       </Grid>
+
+                      {vendorId === 'amazon' && (
+                        <Grid item xs={12}>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>B2B Sales report (XLSX)</Typography>
+                          <input
+                            accept=".xlsx,.xls"
+                            style={{ display: 'none' }}
+                            id={`${vendorId}-sales-b2b-upload`}
+                            type="file"
+                            onChange={(e) => setMarketplaceFile(vendorId, 'sales_b2b', e.target.files?.[0] || null)}
+                          />
+                          <label htmlFor={`${vendorId}-sales-b2b-upload`}>
+                            <Button variant="outlined" component="span" startIcon={<CloudUploadIcon />} sx={{ mr: 1 }}>
+                              {files?.sales_b2b ? 'Change file' : 'Choose file'}
+                            </Button>
+                            <Typography variant="caption" color="text.secondary">
+                              {files?.sales_b2b ? files.sales_b2b.name : 'No file selected'}
+                            </Typography>
+                          </label>
+                        </Grid>
+                      )}
 
                       <Grid item xs={12}>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Settlement report (XLSX)</Typography>
@@ -481,7 +532,7 @@ const ConnectDataSources: React.FC = () => {
                             startIcon={status?.state === 'uploading' ? <CircularProgress size={16} sx={{ color: '#ffffff' }} /> : undefined}
                             sx={{ background: '#111111', '&:hover': { background: '#333333' } }}
                           >
-                            {status?.state === 'uploading' ? 'Uploading…' : 'Upload both files'}
+                            {status?.state === 'uploading' ? 'Uploading…' : vendorId === 'amazon' ? 'Upload all files' : 'Upload both files'}
                           </Button>
                           {status?.state !== 'idle' && (
                             <Typography variant="caption" color={status.state === 'success' ? '#16a34a' : status.state === 'error' ? '#dc2626' : 'text.secondary'}>

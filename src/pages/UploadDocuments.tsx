@@ -64,8 +64,8 @@ const UploadDocuments: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [uploadingVendor, setUploadingVendor] = useState<string | null>(null);
   // Marketplace files (per kind)
-  const [marketplaceFiles, setMarketplaceFiles] = useState<Record<string, { sales: File | null; settlement: File | null }>>({
-    amazon: { sales: null, settlement: null },
+  const [marketplaceFiles, setMarketplaceFiles] = useState<Record<string, { sales: File | null; sales_b2b?: File | null; settlement: File | null }>>({
+    amazon: { sales: null, sales_b2b: null, settlement: null },
     flipkart: { sales: null, settlement: null },
   });
   // D2C files (sales and settlement)
@@ -83,10 +83,13 @@ const UploadDocuments: React.FC = () => {
   // Map vendor/kind to backend report_type
   // Marketplace (amazon/flipkart): use format {vendorid}_{kind}
   // All others: just use vendor name in lowercase
-  const getReportType = (vendorId: string, kind?: 'sales' | 'settlement'): string => {
+  const getReportType = (vendorId: string, kind?: 'sales' | 'sales_b2b' | 'settlement'): string => {
     const vendorIdLower = vendorId.toLowerCase();
     // Marketplace vendors use format: {vendorid}_{kind}
     if (vendorIdLower === 'amazon' || vendorIdLower === 'flipkart') {
+      if (kind === 'sales_b2b') {
+        return 'amazon_sales_b2b';
+      }
       return kind ? `${vendorIdLower}_${kind}` : vendorIdLower;
     }
     // All other vendors: just return vendor name in lowercase
@@ -279,14 +282,14 @@ const UploadDocuments: React.FC = () => {
   };
 
   // Marketplace uploads (Amazon/Flipkart) with separate Sales and Settlement
-  const setMarketplaceFile = (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'settlement', file: File | null) => {
+  const setMarketplaceFile = (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'sales_b2b' | 'settlement', file: File | null) => {
     setMarketplaceFiles((prev) => ({
       ...prev,
       [vendorId]: { ...prev[vendorId], [kind]: file },
     }));
   };
 
-  const handleMarketplaceUpload = async (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'settlement') => {
+  const handleMarketplaceUpload = async (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'sales_b2b' | 'settlement') => {
     const file = marketplaceFiles[vendorId]?.[kind];
     if (!file || selectedYear === null || selectedMonth === null) return;
 
@@ -356,19 +359,35 @@ const UploadDocuments: React.FC = () => {
 
   const handleMarketplaceBulkUpload = async (vendorId: 'amazon' | 'flipkart') => {
     const salesFile = marketplaceFiles[vendorId]?.sales;
+    const salesB2bFile = vendorId === 'amazon' ? marketplaceFiles[vendorId]?.sales_b2b : null;
     const settlementFile = marketplaceFiles[vendorId]?.settlement;
-    if (!salesFile || !settlementFile || selectedYear === null || selectedMonth === null) return;
+    if (vendorId === 'amazon') {
+      if (!salesFile || !salesB2bFile || !settlementFile || selectedYear === null || selectedMonth === null) return;
+    } else {
+      if (!salesFile || !settlementFile || selectedYear === null || selectedMonth === null) return;
+    }
     setUploadingVendor(`${vendorId}_bulk`);
     setUploadStatus(null);
     try {
       const formData = new FormData();
       formData.append('file', salesFile);
-      formData.append('file2', settlementFile);
-      formData.append('description', `${vendorId} sales/settlement bulk upload for ${months[selectedMonth]} ${selectedYear}`);
-      formData.append('month', months[selectedMonth]);
-      formData.append('year', selectedYear.toString());
-      formData.append('report_type', `${vendorId}_sales`);
-      formData.append('report_type2', `${vendorId}_settlement`);
+      if (vendorId === 'amazon' && salesB2bFile) {
+        formData.append('file2', salesB2bFile);
+        formData.append('file3', settlementFile);
+        formData.append('description', `${vendorId} B2C sales/B2B sales/settlement bulk upload for ${months[selectedMonth]} ${selectedYear}`);
+        formData.append('month', months[selectedMonth]);
+        formData.append('year', selectedYear.toString());
+        formData.append('report_type', `${vendorId}_sales`);
+        formData.append('report_type2', 'amazon_sales_b2b');
+        formData.append('report_type3', `${vendorId}_settlement`);
+      } else {
+        formData.append('file2', settlementFile);
+        formData.append('description', `${vendorId} sales/settlement bulk upload for ${months[selectedMonth]} ${selectedYear}`);
+        formData.append('month', months[selectedMonth]);
+        formData.append('year', selectedYear.toString());
+        formData.append('report_type', `${vendorId}_sales`);
+        formData.append('report_type2', `${vendorId}_settlement`);
+      }
       formData.append('bulk', 'true');
       let customToken: string | null = null;
       if (session) {
@@ -403,7 +422,7 @@ const UploadDocuments: React.FC = () => {
         }
         throw new Error(errorData.message || errorData.error || `Bulk upload failed with status ${response.status}`);
       }
-      setUploadStatus({ type: 'success', message: `Successfully uploaded both files for ${vendorId}` });
+      setUploadStatus({ type: 'success', message: `Successfully uploaded ${vendorId === 'amazon' ? 'all files' : 'both files'} for ${vendorId}` });
       // refresh list
       if (selectedYear !== null && selectedMonth !== null) {
         await fetchUploadedDocuments(selectedYear, selectedMonth);
@@ -633,7 +652,7 @@ const UploadDocuments: React.FC = () => {
   };
 
   // Check if a vendor already has an uploaded document
-  const isVendorUploaded = (vendorId: string, kind?: 'sales' | 'settlement'): boolean => {
+  const isVendorUploaded = (vendorId: string, kind?: 'sales' | 'sales_b2b' | 'settlement'): boolean => {
     const key = kind ? `${vendorId}_${kind}` : vendorId;
     const expected = getReportType(vendorId, kind);
     return uploadedDocuments.some(doc => {
@@ -643,7 +662,7 @@ const UploadDocuments: React.FC = () => {
   };
 
   // Get uploaded document for a vendor
-  const getUploadedDocument = (vendorId: string, kind?: 'sales' | 'settlement'): UploadedDocument | undefined => {
+  const getUploadedDocument = (vendorId: string, kind?: 'sales' | 'sales_b2b' | 'settlement'): UploadedDocument | undefined => {
     const key = kind ? `${vendorId}_${kind}` : vendorId;
     const expected = getReportType(vendorId, kind);
     return uploadedDocuments.find(doc => {
@@ -1137,9 +1156,9 @@ const UploadDocuments: React.FC = () => {
 
           {rightPanelVendor && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {/* Both file pickers */}
+              {/* File pickers */}
               <Paper elevation={0} sx={{ p: 2, border: '1px solid #e5e7eb', borderRadius: '10px' }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>Sales report (XLSX/CSV)</Typography>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>B2C Sales report (XLSX/CSV)</Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <input
                     accept=".xlsx,.xls,.csv"
@@ -1158,6 +1177,29 @@ const UploadDocuments: React.FC = () => {
                     {marketplaceFiles[rightPanelVendor]?.sales?.name || 'No file selected'}
                   </Typography>
                 </Box>
+                {rightPanelVendor === 'amazon' && (
+                  <>
+                    <Typography variant="subtitle2" sx={{ mb: 1, mt: 2 }}>B2B Sales report (XLSX/CSV)</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <input
+                        accept=".xlsx,.xls,.csv"
+                        style={{ display: 'none' }}
+                        id={`drawer-${rightPanelVendor}-sales-b2b`}
+                        type="file"
+                        onChange={(e) => {
+                          setMarketplaceFile(rightPanelVendor, 'sales_b2b', e.target.files?.[0] || null);
+                          e.target.value = '';
+                        }}
+                      />
+                      <label htmlFor={`drawer-${rightPanelVendor}-sales-b2b`}>
+                        <Button variant="outlined" component="span" startIcon={<CloudUploadIcon />}>Choose file</Button>
+                      </label>
+                      <Typography variant="caption" color="text.secondary">
+                        {marketplaceFiles[rightPanelVendor]?.sales_b2b?.name || 'No file selected'}
+                      </Typography>
+                    </Box>
+                  </>
+                )}
                 <Typography variant="subtitle2" sx={{ mb: 1, mt: 2 }}>Settlement report (XLSX/CSV)</Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <input
@@ -1182,12 +1224,17 @@ const UploadDocuments: React.FC = () => {
                     size="large"
                     variant="contained"
                     fullWidth
-                    disabled={uploadingVendor === `${rightPanelVendor}_bulk` || !marketplaceFiles[rightPanelVendor]?.sales || !marketplaceFiles[rightPanelVendor]?.settlement}
+                    disabled={
+                      uploadingVendor === `${rightPanelVendor}_bulk` || 
+                      !marketplaceFiles[rightPanelVendor]?.sales || 
+                      !marketplaceFiles[rightPanelVendor]?.settlement ||
+                      (rightPanelVendor === 'amazon' && !marketplaceFiles[rightPanelVendor]?.sales_b2b)
+                    }
                     onClick={() => handleMarketplaceBulkUpload(rightPanelVendor)}
                     startIcon={uploadingVendor === `${rightPanelVendor}_bulk` ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <CloudUploadIcon />}
                     sx={{ background: '#111111', '&:hover': { background: '#333333' }, fontWeight: 700 }}
                   >
-                    {uploadingVendor === `${rightPanelVendor}_bulk` ? 'Uploading…' : 'Upload both files'}
+                    {uploadingVendor === `${rightPanelVendor}_bulk` ? 'Uploading…' : rightPanelVendor === 'amazon' ? 'Upload all files' : 'Upload both files'}
                   </Button>
                 </Box>
               </Paper>
