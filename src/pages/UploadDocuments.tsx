@@ -38,8 +38,9 @@ const vendors: Vendor[] = [
   { id: 'amazon', name: 'Amazon' },
   { id: 'flipkart', name: 'Flipkart' },
   { id: 'delhivery', name: 'Delhivery' },
+  { id: 'ecomexpress', name: 'Ecom Express' },
   { id: 'bluedart', name: 'Blue Dart' },
-  { id: 'blitznow', name: 'BlitzNow' },
+  { id: 'growsimplee', name: 'BlitzNow' },
   { id: 'xpressbees', name: 'Xpressbees' },
   { id: 'shiprocket', name: 'Shiprocket' },
   { id: 'shadowfax', name: 'Shadowfax' },
@@ -372,14 +373,14 @@ const UploadDocuments: React.FC = () => {
       const formData = new FormData();
       formData.append('file', salesFile);
       if (vendorId === 'amazon' && salesB2bFile) {
-        formData.append('file2', salesB2bFile);
-        formData.append('file3', settlementFile);
-        formData.append('description', `${vendorId} B2C sales/B2B sales/settlement bulk upload for ${months[selectedMonth]} ${selectedYear}`);
+        formData.append('file2', settlementFile);
+        formData.append('file3', salesB2bFile);
+        formData.append('description', `${vendorId} B2C sales/settlement/B2B sales bulk upload for ${months[selectedMonth]} ${selectedYear}`);
         formData.append('month', months[selectedMonth]);
         formData.append('year', selectedYear.toString());
         formData.append('report_type', `${vendorId}_sales`);
-        formData.append('report_type2', 'amazon_sales_b2b');
-        formData.append('report_type3', `${vendorId}_settlement`);
+        formData.append('report_type2', `${vendorId}_settlement`);
+        formData.append('report_type3', 'amazon_sales_b2b');
       } else {
         formData.append('file2', settlementFile);
         formData.append('description', `${vendorId} sales/settlement bulk upload for ${months[selectedMonth]} ${selectedYear}`);
