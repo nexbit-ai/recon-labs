@@ -444,28 +444,28 @@ export interface AgeingAnalysisParams {
 }
 
 // Sales Transactions Types
-export interface SalesTransaction {
-  ship_from: string;
-  ship_to: string;
-  invoice_number: string;
-  order_item_id: string;
-  invoice_date: string;
-  gstin: string;
-  hsn: string;
-  marketplace_sku_code: string;
-  gst_rate: number;
-  quantity: number;
-  gmv: number;
-  gross: number;
-  basic: number;
-  igst: number;
-  cgst: number;
-  sgst: number;
-  tax: number;
+export type SalesTransaction = Record<string, any>;
+
+export interface SalesTransactionsColumn {
+  key: string;
+  title: string;
+  type: string;
+}
+
+export interface SalesTransactionsPagination {
+  current_count: number;
+  has_next: boolean;
+  has_prev: boolean;
+  limit: number;
+  page: number;
+  total_count: number;
+  total_pages: number;
 }
 
 export interface SalesTransactionsResponse {
+  columns: SalesTransactionsColumn[];
   count: number;
   platform: string;
   transactions: SalesTransaction[];
-} 
+  pagination?: SalesTransactionsPagination;
+}

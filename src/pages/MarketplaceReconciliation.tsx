@@ -1520,11 +1520,23 @@ const MarketplaceReconciliation: React.FC = () => {
     setSelectedDisputeIds([]);
   };
 
+  const refreshMainSummaryForCurrentFilters = async () => {
+    if (selectedDateRange === 'custom') {
+      if (customStartDate && customEndDate) {
+        await fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
+      }
+      return;
+    }
+
+    await fetchReconciliationDataByDateRange(selectedDateRange);
+  };
+
   // Sync data sources function
   const handleSyncDataSources = async () => {
     setSyncLoading(true);
     try {
       await apiService.post('/d2c/recon', undefined, { useD2CHeaders: true });
+      await refreshMainSummaryForCurrentFilters();
       setLastSynced(new Date());
     } catch (error) {
       console.error('Error syncing data sources:', error);
