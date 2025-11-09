@@ -119,36 +119,36 @@ class TokenManager {
 
   /**
    * Get D2C API headers - Always use legacy API key + org ID for D2C calls
+   * Also includes Authorization header if JWT token is available
    */
   getD2CApiHeaders(): Record<string, string> {
     const apiKey = this.getApiKey();
     const orgId = this.getOrgId();
+    const jwtToken = this.getJWTToken();
     
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    
+    // Always include API key and org ID if available
     if (apiKey && orgId) {
-      return {
-        'X-API-Key': apiKey,
-        'X-Org-ID': orgId,
-        'Content-Type': 'application/json'
-      };
+      headers['X-API-Key'] = apiKey;
+      headers['X-Org-ID'] = orgId;
     }
     
-    // Fallback to JWT if legacy credentials not available
-    const jwtToken = this.getJWTToken();
+    // Also include Authorization header if JWT token is available
     if (jwtToken && !JWTService.isTokenExpired(jwtToken)) {
-      // Decode token to get organization_id
+      headers['Authorization'] = `Bearer ${jwtToken}`;
+      
+      // Prefer organization ID from token if available
       const decoded = JWTService.decodeToken(jwtToken);
-      const organizationId = decoded?.organization_id || orgId;
-      
-      const headers: Record<string, string> = {
-        'Authorization': `Bearer ${jwtToken}`,
-        'Content-Type': 'application/json'
-      };
-      
-      // Add organization ID header if available (prefer from token)
-      if (organizationId) {
-        headers['X-Org-ID'] = organizationId;
+      if (decoded?.organization_id) {
+        headers['X-Org-ID'] = decoded.organization_id;
       }
-      
+    }
+    
+    // If we have at least API key or JWT, return headers
+    if (apiKey || (jwtToken && !JWTService.isTokenExpired(jwtToken))) {
       return headers;
     }
     
