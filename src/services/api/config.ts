@@ -55,6 +55,7 @@ export const API_CONFIG = {
     // Transactions
     TOTAL_TRANSACTIONS: '/recon/total-transactions',
     D2C_TRANSACTIONS: '/recon/total-transactions',
+    SALES_TRANSACTIONS: '/recon/sales-transactions',
     
     // Ageing Analysis
     AGEING_ANALYSIS: '/recon/aging-analysis',

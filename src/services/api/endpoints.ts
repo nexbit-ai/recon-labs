@@ -10,7 +10,8 @@ import {
   PaginatedResponse,
   MarketplaceReconciliationResponse,
   TotalTransactionsResponse,
-  AgeingAnalysisResponse
+  AgeingAnalysisResponse,
+  SalesTransactionsResponse
 } from './types';
 
 // Authentication API
@@ -88,6 +89,10 @@ export const transactionsAPI = {
   // Get D2C transactions with specific parameters
   getD2CTransactions: (params?: { page?: number; limit?: number; recon_status?: string; platform?: string; pagination?: boolean }) =>
     apiService.get<TotalTransactionsResponse>(API_CONFIG.ENDPOINTS.D2C_TRANSACTIONS, params, { useD2CHeaders: true }),
+
+  // Get sales transactions
+  getSalesTransactions: (params?: { platform?: string; order_date_from?: string; order_date_to?: string; limit?: number }) =>
+    apiService.get<SalesTransactionsResponse>(API_CONFIG.ENDPOINTS.SALES_TRANSACTIONS, params),
 };
 
 // Reconciliation manual actions API

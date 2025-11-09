@@ -441,4 +441,31 @@ export interface AgeingAnalysisParams {
   platform?: string;
   invoice_date_from: string;
   invoice_date_to: string;
-} 
+}
+
+// Sales Transactions Types
+export type SalesTransaction = Record<string, any>;
+
+export interface SalesTransactionsColumn {
+  key: string;
+  title: string;
+  type: string;
+}
+
+export interface SalesTransactionsPagination {
+  current_count: number;
+  has_next: boolean;
+  has_prev: boolean;
+  limit: number;
+  page: number;
+  total_count: number;
+  total_pages: number;
+}
+
+export interface SalesTransactionsResponse {
+  columns: SalesTransactionsColumn[];
+  count: number;
+  platform: string;
+  transactions: SalesTransaction[];
+  pagination?: SalesTransactionsPagination;
+}

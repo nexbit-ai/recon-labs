@@ -53,7 +53,7 @@ import ColumnFilterControls from '../components/ColumnFilterControls';
 import { api } from '../services/api';
 import { apiService } from '../services/api/apiService';
 import { API_CONFIG } from '../services/api/config';
-import { OrdersResponse, OrderItem, MarketplaceReconciliationResponse, TotalTransactionsResponse, TransactionRow as ApiTransactionRow, TransactionColumn } from '../services/api/types';
+import { OrdersResponse, OrderItem, MarketplaceReconciliationResponse, TotalTransactionsResponse, TransactionRow as ApiTransactionRow, TransactionColumn, SalesTransactionsResponse, SalesTransactionsPagination } from '../services/api/types';
 import {
   ArrowBack as ArrowBackIcon,
   Search as SearchIcon,
@@ -1273,8 +1273,16 @@ const BreakupsModal: React.FC<{
 
   // Extract the breakups object from metadata
   // The metadata.breakups is directly on the row object
-  const breakupsObj = (breakups as any)?.metadata?.breakups;
-  if (!breakupsObj) return null;
+  const breakupsObj = (breakups as any)?.originalData?.metadata?.breakups || 
+                      (breakups as any)?.metadata?.breakups || {};
+  
+  // Extract metadata to get shipping_courier (check both originalData.metadata and metadata)
+  const metadata = (breakups as any)?.originalData?.metadata || 
+                   (breakups as any)?.metadata || {};
+  const shippingCourier = metadata?.shipping_courier;
+  
+  // Allow modal to show even if breakups is empty, as long as we have metadata or shipping_courier
+  // This fixes the issue where D2C transactions have empty breakups but should still show the modal
 
   // Convert snake_case keys to readable format: remove underscores and capitalize first letter
   const formatKey = (key: string) => {
@@ -1299,11 +1307,13 @@ const BreakupsModal: React.FC<{
   const settlementValue = (breakups as any)?.settlement_amount || 0;
   const diff = (breakups as any)?.diff || 0;
 
-  // Get entries from breakups object
-  const breakupsData = Object.entries(breakupsObj).map(([key, value]) => ({
-    label: formatKey(key),
-    value: Number(value) || 0
-  }));
+  // Get entries from breakups object (only numeric values)
+  const breakupsData = Object.entries(breakupsObj)
+    .filter(([key, value]) => typeof value === 'number')
+    .map(([key, value]) => ({
+      label: formatKey(key),
+      value: Number(value) || 0
+    }));
 
   // Calculate smart positioning similar to TransactionDetailsPopup
   const getPopupPosition = () => {
@@ -1628,6 +1638,47 @@ const BreakupsModal: React.FC<{
                 {formatCurrency(diff)}
               </Typography>
             </Box>
+
+            {/* Shipping Courier - show if available */}
+            {shippingCourier && (
+              <>
+                {/* Divider */}
+                <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    p: 1.5,
+                    pl: 3,
+                    background: '#f9fafb',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb',
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 500,
+                      color: '#374151',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    Shipping Courier
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 600,
+                      color: '#111827',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    {shippingCourier}
+                  </Typography>
+                </Box>
+              </>
+            )}
           </Box>
         </Box>
       </Box>
@@ -1766,8 +1817,23 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   const isFetchingRef = React.useRef(false);
 
+  // Sales Report state management
+  const [salesReportData, setSalesReportData] = useState<SalesTransactionsResponse | null>(null);
+  const [salesReportLoading, setSalesReportLoading] = useState(false);
+  const [lastSalesReportDateRange, setLastSalesReportDateRange] = useState<{start: string, end: string} | null>(null);
+  const [salesReportPagination, setSalesReportPagination] = useState<SalesTransactionsPagination | null>(null);
+  const [salesReportSortConfig, setSalesReportSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  // Sales Report search state
+  const [salesReportSearch, setSalesReportSearch] = useState<string>('');
+  const [showSalesReportSearch, setShowSalesReportSearch] = useState(false);
+
   // Get current data based on which API is being used
   const getCurrentData = (): any[] => {
+    // Sales Report tab (index 4)
+    if (activeTab === 4) {
+      return salesReportData?.transactions || [];
+    }
+    
     // Use quad API data if available (can be null when filtering)
     if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
       let currentData: TotalTransactionsResponse | null = null;
@@ -1797,6 +1863,22 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Get current columns based on which API is being used
   const getCurrentColumns = () => {
+    // Sales Report tab (index 4) - fixed columns
+    if (activeTab === 4) {
+      const salesColumns = salesReportData?.columns || [];
+      if (salesColumns.length === 0) {
+        return [];
+      }
+
+      const priorityKeys: Array<'order_id' | 'order_item_id'> = ['order_id', 'order_item_id'];
+      const prioritized = priorityKeys
+        .map(priorityKey => salesColumns.find(col => col.key === priorityKey))
+        .filter(Boolean) as typeof salesColumns;
+      const remaining = salesColumns.filter(col => !priorityKeys.includes(col.key as typeof priorityKeys[number]));
+
+      return [...prioritized, ...remaining].map(col => col.title);
+    }
+    
     // Use quad API data if available (can be null when filtering)
     if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
       let currentData: TotalTransactionsResponse | null = null;
@@ -2018,6 +2100,94 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     return sortConfig.direction === 'asc' 
       ? <ArrowDownwardIcon fontSize="small" /> 
       : <ArrowUpwardIcon fontSize="small" />;
+  };
+
+  // Helper function to get sort_by value from Sales Report column title
+  const getSalesReportSortBy = (columnTitle: string): string | null => {
+    if (!salesReportData?.columns) return null;
+    const column = salesReportData.columns.find(col => col.title === columnTitle);
+    return column?.key || null;
+  };
+
+  // Sales Report sorting function
+  const handleSalesReportSort = async (columnTitle: string) => {
+    const sortBy = getSalesReportSortBy(columnTitle);
+    if (!sortBy) return;
+
+    // Compute next sort state deterministically
+    let nextSort: { key: string; direction: 'asc' | 'desc' } | null;
+    if (salesReportSortConfig?.key === columnTitle) {
+      if (salesReportSortConfig.direction === 'asc') {
+        nextSort = { key: columnTitle, direction: 'desc' };
+      } else {
+        nextSort = null; // Remove sorting -> backend default applies
+      }
+    } else {
+      nextSort = { key: columnTitle, direction: 'asc' };
+    }
+
+    setSalesReportSortConfig(nextSort);
+
+    // Trigger server-side refetch with sorting (reset to first page)
+    setPage(0);
+    setCurrentPage(1);
+    setIsSorting(true);
+    try {
+      await fetchSalesTransactions(dateRange, selectedPlatform, { 
+        page: 1, 
+        limit: rowsPerPage, 
+        force: true 
+      }, nextSort, salesReportSearch || null);
+    } finally {
+      setIsSorting(false);
+    }
+  };
+
+  const getSalesReportSortIcon = (columnTitle: string) => {
+    if (salesReportSortConfig?.key !== columnTitle) {
+      return <UnfoldMoreIcon fontSize="small" />;
+    }
+    // Flipped: show Down arrow for ascending, Up arrow for descending
+    return salesReportSortConfig.direction === 'asc' 
+      ? <ArrowDownwardIcon fontSize="small" /> 
+      : <ArrowUpwardIcon fontSize="small" />;
+  };
+
+  // Sales Report search handlers
+  const handleSalesReportSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setSalesReportSearch(value);
+  };
+
+  const handleSalesReportSearchClick = () => {
+    const value = salesReportSearch.trim();
+    // Trigger API call with search
+    setPage(0);
+    setCurrentPage(1);
+    setIsSorting(true);
+    fetchSalesTransactions(dateRange, selectedPlatform, { 
+      page: 1, 
+      limit: rowsPerPage, 
+      force: true 
+    }, salesReportSortConfig, value || null).finally(() => {
+      setIsSorting(false);
+    });
+  };
+
+  const handleSalesReportSearchClear = () => {
+    setSalesReportSearch('');
+    setShowSalesReportSearch(false);
+    // Trigger API call without search
+    setPage(0);
+    setCurrentPage(1);
+    setIsSorting(true);
+    fetchSalesTransactions(dateRange, selectedPlatform, { 
+      page: 1, 
+      limit: rowsPerPage, 
+      force: true 
+    }, salesReportSortConfig, null).finally(() => {
+      setIsSorting(false);
+    });
   };
 
   const sortData = (data: TransactionRow[]) => {
@@ -2542,7 +2712,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   useEffect(() => {
     if (initialTab !== undefined) {
       // Backward compatibility: map legacy unsettled (1) to new unsettled (2)
-      setActiveTab(initialTab === 1 ? 2 : initialTab);
+      const tabToSet = initialTab === 1 ? 2 : initialTab;
+      setActiveTab(tabToSet);
+      
+      // If opening Sales Report tab (index 4), fetch the data
+      if (tabToSet === 4) {
+        fetchSalesTransactions(dateRange, selectedPlatform, { page: 1, limit: 100, force: true }, undefined, salesReportSearch || null);
+      }
     }
   }, [initialTab]);
 
@@ -2574,7 +2750,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setSelectedPlatform(pendingSelectedPlatform);
     
     // Use dual API with filters and pending platform
-    fetchQuadTransactions(1, pendingColumnFilters, pendingDateRange, pendingSelectedPlatform);
+    if (activeTab === 4) {
+      fetchSalesTransactions(pendingDateRange, pendingSelectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+    } else {
+      fetchQuadTransactions(1, pendingColumnFilters, pendingDateRange, pendingSelectedPlatform);
+    }
     
     // Close the filter popover
     closeFilterPopover();
@@ -2585,7 +2765,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setSelectedPlatform(pendingSelectedPlatform);
     setPage(0);
     setCurrentPage(1);
-    fetchQuadTransactions(1, columnFilters, dateRange, pendingSelectedPlatform);
+    if (activeTab === 4) {
+      fetchSalesTransactions(dateRange, pendingSelectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+    } else {
+      fetchQuadTransactions(1, columnFilters, dateRange, pendingSelectedPlatform);
+    }
   };
 
   // Apply header date range changes - called when Apply button next to date selector is clicked
@@ -2595,15 +2779,20 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setDateRange(pendingHeaderDateRange);
     setPage(0);
     setCurrentPage(1);
-    fetchQuadTransactions(1, columnFilters, pendingHeaderDateRange, selectedPlatform);
+    if (activeTab === 4) {
+      fetchSalesTransactions(pendingHeaderDateRange, selectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+    } else {
+      fetchQuadTransactions(1, columnFilters, pendingHeaderDateRange, selectedPlatform);
+    }
   };
 
   // Only refresh data when rowsPerPage changes (not filters)
   useEffect(() => {
+    if (activeTab === 4) return;
     if (hasInitialLoad && (matchedData || mismatchedData || unsettledData || allData)) { // Only refetch if data has been loaded initially
       fetchQuadTransactions(1, columnFilters, dateRange, selectedPlatform);
     }
-  }, [rowsPerPage]);
+  }, [rowsPerPage, activeTab]);
 
   // Close filter on outside click with proper event handling
   useEffect(() => {
@@ -2918,14 +3107,124 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         unsettled: unsettledResponse.success ? (unsettledResponse.data?.data?.length || 0) : null,
         all: allResponse.success ? (allResponse.data?.data?.length || 0) : null,
       });
-      
-    } catch (error) {
-      console.error('[fetchQuadTransactions] Error:', error);
-      setError('Failed to fetch transaction data');
+    } catch (err: any) {
+      console.error('[fetchQuadTransactions] Error:', err);
+      setError(err?.message || 'Failed to fetch transactions');
     } finally {
       setQuadApiLoading(false);
       setPaginationLoading(false);
-      isFetchingRef.current = false; // Reset the flag
+      isFetchingRef.current = false;
+    }
+  };
+
+  // Fetch sales transactions - only called when tab 4 is clicked and date range has changed
+  const fetchSalesTransactions = async (
+    dateRangeFilter?: {start: string, end: string},
+    overridePlatform?: Platform,
+    options?: { page?: number; limit?: number; force?: boolean },
+    sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
+    searchTerm?: string | null
+  ) => {
+    const currentDateRange = dateRangeFilter || dateRange;
+    const requestedPage = options?.page ?? 1;
+    const requestedLimit = options?.limit ?? rowsPerPage ?? 100;
+    const forceRefetch = options?.force ?? false;
+
+    if (!currentDateRange.start || !currentDateRange.end) {
+      setError('Please select a date range to view sales report');
+      return;
+    }
+
+    const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
+    const dateRangeChanged = !lastSalesReportDateRange || 
+      lastSalesReportDateRange.start !== currentDateRange.start || 
+      lastSalesReportDateRange.end !== currentDateRange.end;
+    const paginationMatches = salesReportPagination ? (
+      salesReportPagination.page === requestedPage &&
+      salesReportPagination.limit === requestedLimit
+    ) : false;
+    const platformMatches = salesReportData ? salesReportData.platform === platformToUse : false;
+    
+    // Check if sort config changed
+    const sortToUse = sortOverride !== undefined ? sortOverride : salesReportSortConfig;
+    const sortByValue = sortToUse ? getSalesReportSortBy(sortToUse.key) : null;
+    const sortChanged = sortOverride !== undefined || 
+      (sortToUse?.key !== salesReportSortConfig?.key || sortToUse?.direction !== salesReportSortConfig?.direction);
+    
+    // Check if search changed
+    const searchToUse = searchTerm !== undefined ? searchTerm : salesReportSearch;
+    const searchChanged = searchTerm !== undefined || searchToUse !== salesReportSearch;
+
+    if (!forceRefetch && salesReportData !== null && !dateRangeChanged && paginationMatches && platformMatches && !sortChanged && !searchChanged) {
+      return;
+    }
+
+    setSalesReportLoading(true);
+    setError(null);
+
+    try {
+      const params: any = {
+        platform: platformToUse,
+        order_date_from: currentDateRange.start,
+        order_date_to: currentDateRange.end,
+        limit: requestedLimit,
+        page: requestedPage,
+      };
+
+      // Add sorting parameters if provided
+      if (sortByValue) {
+        params.sort_by = sortByValue;
+        params.sort_order = sortToUse?.direction || 'asc';
+      }
+
+      // Add search parameter if provided
+      if (searchToUse && searchToUse.trim()) {
+        params.search = searchToUse.trim();
+      }
+
+      const response = await api.transactions.getSalesTransactions(params);
+
+      if (response.success && response.data) {
+        const responseData = response.data;
+        let pagination = responseData.pagination || null;
+
+        if (!pagination) {
+          const inferredTotal = responseData.count ?? responseData.transactions?.length ?? 0;
+          pagination = {
+            current_count: responseData.transactions?.length ?? 0,
+            has_next: false,
+            has_prev: requestedPage > 1,
+            limit: requestedLimit,
+            page: requestedPage,
+            total_count: inferredTotal,
+            total_pages: inferredTotal > 0 ? Math.ceil(inferredTotal / requestedLimit) : 1,
+          };
+        }
+
+        setSalesReportData(responseData);
+        setSalesReportPagination({
+          ...pagination,
+          limit: pagination.limit ?? requestedLimit,
+          page: pagination.page ?? requestedPage,
+        });
+        setLastSalesReportDateRange({
+          start: currentDateRange.start,
+          end: currentDateRange.end,
+        });
+
+        const totalRecords = pagination.total_count ?? responseData.count ?? responseData.transactions?.length ?? 0;
+        setTotalCount(totalRecords);
+        setRowsPerPage(pagination.limit ?? requestedLimit);
+        setPage((pagination.page ?? requestedPage) - 1);
+        setCurrentPage(pagination.page ?? requestedPage);
+      } else {
+        setError('Failed to fetch sales transactions');
+      }
+    } catch (err: any) {
+      console.error('[fetchSalesTransactions] Error:', err);
+      setError(err?.message || 'Failed to fetch sales transactions');
+    } finally {
+      setSalesReportLoading(false);
     }
   };
 
@@ -3241,7 +3540,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       breakups = row.metadata.breakups;
     }
     
-    if (breakups && typeof breakups === 'object' && Object.keys(breakups).length > 0) {
+    // Get metadata to check if shipping_courier exists
+    const metadata = (row as any)?.originalData?.metadata || row.metadata;
+    const hasBreakups = breakups && typeof breakups === 'object' && Object.keys(breakups).length > 0;
+    
+    // Allow opening modal if breakups has data OR if metadata exists (even with empty breakups)
+    // This allows D2C transactions with empty breakups but shipping_courier to show the modal
+    // We always have metadata for transactions, so this ensures the modal can open for all transactions
+    if (hasBreakups || metadata) {
       // Store the full row so we can access order_value, settlement_value, and diff
       setSelectedBreakups(row);
       setBreakupsOrderId(orderId);
@@ -3339,6 +3645,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     const newPageNumber = newPage + 1; // Convert from 0-based to 1-based
     setPage(newPage);
     
+    if (activeTab === 4) {
+      fetchSalesTransactions(dateRange, selectedPlatform, { page: newPageNumber, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+      return;
+    }
+
     // Always use dual API with current filters
     fetchQuadTransactions(newPageNumber, columnFilters, dateRange, selectedPlatform);
   };
@@ -3348,7 +3659,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setRowsPerPage(newRowsPerPage);
     setPage(0);
     // Reset to first page when changing rows per page
-    fetchQuadTransactions(1, columnFilters, dateRange, selectedPlatform);
+    if (activeTab === 4) {
+      fetchSalesTransactions(dateRange, selectedPlatform, { page: 1, limit: newRowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+    } else {
+      fetchQuadTransactions(1, columnFilters, dateRange, selectedPlatform);
+    }
   };
 
   
@@ -3373,6 +3688,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setActiveTab(newValue);
     setPage(0); // Reset to first page when changing tabs
     setCurrentPage(1); // Reset current page
+    
+    // Clear Sales Report search when switching away from Sales Report tab
+    if (newValue !== 4) {
+      setSalesReportSearch('');
+      setShowSalesReportSearch(false);
+    }
+    
+    // Sales Report tab (index 4) - fetch data when clicked
+    if (newValue === 4) {
+      fetchSalesTransactions(dateRange, selectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+      return;
+    }
     
     // Update totalCount based on the new active tab
     if (newValue === 0 && matchedTotalCount !== null) {
@@ -3418,6 +3745,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   };
 
   const visibleColumns = getVisibleColumns();
+  const salesTabTotalCount = salesReportPagination?.total_count ?? salesReportData?.count ?? null;
 
   return (
     <Slide direction="left" in mountOnEnter unmountOnExit>
@@ -3529,23 +3857,25 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         <RefreshIcon fontSize={isSmallScreen ? 'small' : 'medium'} />
                       </IconButton>
                       
-                      <Button
-                        variant="outlined"
-                        startIcon={<FilterIcon fontSize={isSmallScreen ? 'small' : 'medium'} />}
-                        onClick={(e) => openFilterPopover('Status', e.currentTarget as any)}
-                        sx={{ 
-                          textTransform: 'none', 
-                          borderColor: '#1f2937', 
-                          color: '#1f2937',
-                          flexShrink: 0,
-                          fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                          padding: { xs: '4px 8px', sm: '6px 12px' },
-                          minWidth: 'auto',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        Filters
-                      </Button>
+                      {activeTab !== 4 && (
+                        <Button
+                          variant="outlined"
+                          startIcon={<FilterIcon fontSize={isSmallScreen ? 'small' : 'medium'} />}
+                          onClick={(e) => openFilterPopover('Status', e.currentTarget as any)}
+                          sx={{ 
+                            textTransform: 'none', 
+                            borderColor: '#1f2937', 
+                            color: '#1f2937',
+                            flexShrink: 0,
+                            fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                            padding: { xs: '4px 8px', sm: '6px 12px' },
+                            minWidth: 'auto',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Filters
+                        </Button>
+                      )}
                     </Box>
                     
                     {/* Platform Filter - Fully Responsive */}
@@ -3978,6 +4308,33 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         </Box>
                       } 
                     />
+                    <Tab 
+                      label={
+                        <Box sx={{ 
+                          display: 'flex', 
+                          flexDirection: { xs: 'column', sm: 'row' },
+                          alignItems: 'center',
+                          gap: { xs: 0, sm: 0.25 },
+                          width: '100%',
+                          justifyContent: 'center'
+                        }}>
+                          <Box component="span">Sales Report</Box>
+                          {salesTabTotalCount !== null && (
+                            <Box 
+                              component="span"
+                              sx={{ 
+                                fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
+                                opacity: 0.8,
+                                fontWeight: 500,
+                                lineHeight: 1
+                              }}
+                            >
+                              ({salesTabTotalCount.toLocaleString()})
+                            </Box>
+                          )}
+                        </Box>
+                      } 
+                    />
                   </Tabs>
                 </Box>
 
@@ -4051,7 +4408,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           )}
 
           {/* Loading Indicator */}
-          {(loading || quadApiLoading) && !isSorting && (
+          {(loading || quadApiLoading || salesReportLoading) && !isSorting && (
             <LinearProgress 
               sx={{ 
                 mb: 2,
@@ -4137,47 +4494,96 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
                                 {column === 'Status' ? 'Status' : column}
                               </Typography>
-                                    <IconButton 
-                                      size="small" 
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleSort(column);
-                                      }}
-                                      sx={{
-                                        ml: 0.5,
-                                        color: sortConfig?.key === column ? '#1f2937' : '#6b7280',
-                                        background: sortConfig?.key === column ? '#e5e7eb' : 'transparent',
-                                        '&:hover': { background: '#f3f4f6' },
-                                      }}
-                                      disabled={!COLUMN_TO_SORT_BY_MAP[column]}
-                                      aria-label={`Sort ${column}`}
-                                    >
-                                      {getSortIcon(column)}
-                                    </IconButton>
-                                    {/* Magnifying glass button for Order ID search */}
-                                    {column === 'Order ID' && (
-                                      <IconButton 
-                                        size="small" 
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          setShowOrderIdSearch(!showOrderIdSearch);
-                                        }}
-                                        sx={{
-                                          ml: 0.5,
-                                          color: showOrderIdSearch ? '#1f2937' : '#6b7280',
-                                          background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
-                                          '&:hover': { background: '#f3f4f6' },
-                                        }}
-                                        aria-label="Toggle search"
-                                      >
-                                        <SearchIcon sx={{ fontSize: '1rem' }} />
-                                      </IconButton>
+                                    {/* Sorting button - different handlers for Sales Report vs other tabs */}
+                                    {activeTab === 4 ? (
+                                      // Sales Report tab sorting
+                                      <>
+                                        <IconButton 
+                                          size="small" 
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleSalesReportSort(column);
+                                          }}
+                                          sx={{
+                                            ml: 0.5,
+                                            color: salesReportSortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                            background: salesReportSortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                            '&:hover': { background: '#f3f4f6' },
+                                          }}
+                                          disabled={!getSalesReportSortBy(column)}
+                                          aria-label={`Sort ${column}`}
+                                        >
+                                          {getSalesReportSortIcon(column)}
+                                        </IconButton>
+                                        {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon */}
+                                        {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                          (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                          <IconButton 
+                                            size="small" 
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              setShowSalesReportSearch(!showSalesReportSearch);
+                                            }}
+                                            sx={{
+                                              ml: 0.5,
+                                              color: showSalesReportSearch ? '#1f2937' : '#6b7280',
+                                              background: showSalesReportSearch ? '#e5e7eb' : 'transparent',
+                                              '&:hover': { background: '#f3f4f6' },
+                                            }}
+                                            aria-label="Toggle search"
+                                          >
+                                            <SearchIcon sx={{ fontSize: '1rem' }} />
+                                          </IconButton>
+                                        )}
+                                      </>
+                                    ) : (
+                                      // Other tabs sorting
+                                      <>
+                                        <IconButton 
+                                          size="small" 
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleSort(column);
+                                          }}
+                                          sx={{
+                                            ml: 0.5,
+                                            color: sortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                            background: sortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                            '&:hover': { background: '#f3f4f6' },
+                                          }}
+                                          disabled={!COLUMN_TO_SORT_BY_MAP[column]}
+                                          aria-label={`Sort ${column}`}
+                                        >
+                                          {getSortIcon(column)}
+                                        </IconButton>
+                                        {/* Magnifying glass button for Order ID search */}
+                                        {column === 'Order ID' && (
+                                          <IconButton 
+                                            size="small" 
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              setShowOrderIdSearch(!showOrderIdSearch);
+                                            }}
+                                            sx={{
+                                              ml: 0.5,
+                                              color: showOrderIdSearch ? '#1f2937' : '#6b7280',
+                                              background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
+                                              '&:hover': { background: '#f3f4f6' },
+                                            }}
+                                            aria-label="Toggle search"
+                                          >
+                                            <SearchIcon sx={{ fontSize: '1rem' }} />
+                                          </IconButton>
+                                        )}
+                                      </>
                                     )}
                               </Box>
                               {/* Order ID Search Bar - Expandable */}
-                              {column === 'Order ID' && showOrderIdSearch && (
+                              {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && (
                                 <Box 
                                   sx={{ 
                                     display: 'flex', 
@@ -4235,24 +4641,74 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   />
                                 </Box>
                               )}
+                              {/* Sales Report Search Bar - Expandable */}
+                              {activeTab === 4 && showSalesReportSearch && 
+                                ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                 (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                <Box 
+                                  sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 0.5,
+                                    animation: 'expand 0.3s ease-in-out',
+                                    '@keyframes expand': {
+                                      '0%': { width: '0', opacity: 0 },
+                                      '100%': { width: '280px', opacity: 1 }
+                                    }
+                                  }}
+                                >
+                                  <TextField
+                                    size="small"
+                                    value={salesReportSearch}
+                                    onChange={handleSalesReportSearchChange}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSalesReportSearchClick();
+                                      }
+                                    }}
+                                    InputProps={{
+                                      endAdornment: (
+                                        <InputAdornment position="end">
+                                          {salesReportSearch?.trim() && (
+                                            <IconButton
+                                              size="small"
+                                              onClick={handleSalesReportSearchClear}
+                                              disabled={salesReportLoading && !isSorting}
+                                              sx={{ p: 0.5, mr: 0.25 }}
+                                            >
+                                              <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
+                                            </IconButton>
+                                          )}
+                                          <IconButton
+                                            size="small"
+                                            onClick={handleSalesReportSearchClick}
+                                            disabled={salesReportLoading && !isSorting}
+                                            sx={{ p: 0.5 }}
+                                          >
+                                            <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                          </IconButton>
+                                        </InputAdornment>
+                                      ),
+                                    }}
+                                    sx={{
+                                      width: '280px',
+                                      '& .MuiOutlinedInput-root': {
+                                        height: '32px',
+                                        fontSize: '0.75rem',
+                                        background: 'white',
+                                      }
+                                    }}
+                                  />
+                                </Box>
+                              )}
                             </Box>
                           </TableCell>
                         ))}
                       </TableRow>
                   </TableHead>
                   <TableBody>
-                    {(loading || quadApiLoading) && !isSorting && getCurrentData().length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 6 }}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                            <CircularProgress size={40} sx={{ color: '#1f2937' }} />
-                            <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500 }}>
-                              Loading transaction data...
-                            </Typography>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ) : (paginationLoading && !isSorting) ? (
+                    {(paginationLoading && !isSorting) ? (
                       <TableRow>
                         <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
@@ -4283,6 +4739,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     activeTab === 0 ? '#10b981' : // Matched - green
                                     activeTab === 1 ? '#f59e0b' : // Mismatched - orange
                                     activeTab === 2 ? '#ef4444' : // Unsettled - red
+                                    activeTab === 4 ? '#8b5cf6' : // Sales Report - purple
                                     '#6366f1' // All - indigo
                                   }`,
                                   background: '#ffffff',
@@ -4292,7 +4749,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         {getCurrentColumns().map((column, colIndex) => {
                           // For new API, we need to map column titles to row keys
                           let value;
-                          if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
+                          
+                          // Sales Report tab (index 4) - use backend-provided metadata
+                          if (activeTab === 4) {
+                            const salesColumnDef = salesReportData?.columns?.find(col => col.title === column);
+                            const fieldName = salesColumnDef?.key;
+                            value = fieldName ? (row as any)[fieldName] : undefined;
+                          } else if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
                             // Use quad API data
                             let currentData: TotalTransactionsResponse | null = null;
                             if (activeTab === 0) {
@@ -4339,14 +4802,33 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           
                           // Override settlement date for unsettled transactions
                           // Show NA for Settlement Date when the transaction is unsettled (across all tabs)
-                          if (column === 'Settlement Date' && (row as any)?.recon_status === 'unsettled') {
+                          // Also show NA when on the unsettled tab (tab 2) - all transactions there are unsettled
+                          if (column === 'Settlement Date' && ((row as any)?.recon_status === 'unsettled' || activeTab === 2)) {
                             value = 'NA';
                           }
                           
                           // Format value based on type
                           let displayValue = value;
                           
-                          if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
+                          // Sales Report tab formatting
+                          if (activeTab === 4) {
+                            const salesColumnDef = salesReportData?.columns?.find(col => col.title === column);
+                            const columnType = salesColumnDef?.type;
+                            if (columnType === 'date') {
+                              displayValue = value ? formatDate(String(value)) : '';
+                            } else if (columnType === 'currency') {
+                              const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
+                              displayValue = numericValue !== null && !Number.isNaN(numericValue) ? formatCurrency(numericValue) : '';
+                            } else if (columnType === 'number' && column.toLowerCase().includes('rate')) {
+                              const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
+                              displayValue = numericValue !== null && !Number.isNaN(numericValue) ? `${numericValue * 100}%` : '';
+                            } else if (columnType === 'number') {
+                              const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
+                              displayValue = numericValue !== null && !Number.isNaN(numericValue) ? numericValue.toLocaleString('en-IN') : '';
+                            } else {
+                              displayValue = value !== undefined && value !== null ? String(value) : '';
+                            }
+                          } else if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
                             // Use quad API data for formatting
                             let currentData: TotalTransactionsResponse | null = null;
                             if (activeTab === 0) {
@@ -4564,7 +5046,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 <TablePagination
                   rowsPerPageOptions={[100]}
                   component="div"
-                  count={totalCount || filteredData.length}
+                  count={activeTab === 4 ? (salesTabTotalCount ?? 0) : (totalCount || filteredData.length)}
                   rowsPerPage={rowsPerPage}
                   page={page}
                   onPageChange={handleChangePage}
@@ -4611,7 +5093,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
         {/* Filter Menu Portal - Rendered outside table container */}
         {(() => {
-          const shouldRender = Boolean(headerFilterAnchor) && Boolean(activeFilterColumn);
+          const shouldRender = Boolean(headerFilterAnchor) && Boolean(activeFilterColumn) && activeTab !== 4;
           
           return shouldRender;
         })() && (
