@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, Grid, Breadcrumbs, Link, Chip, Button, Alert, CircularProgress, Drawer, Divider } from '@mui/material';
+import { Box, Typography, Paper, Grid, Breadcrumbs, Link, Chip, Button, Alert, CircularProgress, Drawer, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { 
   CalendarToday as CalendarIcon,
   CheckCircle as CheckCircleIcon,
@@ -80,6 +80,8 @@ const UploadDocuments: React.FC = () => {
   const [loadingUploads, setLoadingUploads] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [rightPanelVendor, setRightPanelVendor] = useState<'amazon' | 'flipkart' | null>(null);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [pendingUpload, setPendingUpload] = useState<{ vendorId: 'amazon' | 'flipkart'; kind: 'sales' | 'sales_b2b' | 'settlement' } | null>(null);
 
   // Map vendor/kind to backend report_type
   // Marketplace (amazon/flipkart): use format {vendorid}_{kind}
@@ -290,7 +292,35 @@ const UploadDocuments: React.FC = () => {
     }));
   };
 
-  const handleMarketplaceUpload = async (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'sales_b2b' | 'settlement') => {
+  const handleMarketplaceUploadClick = (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'sales_b2b' | 'settlement') => {
+    const file = marketplaceFiles[vendorId]?.[kind];
+    if (!file || selectedYear === null || selectedMonth === null) return;
+
+    // Check if file is already uploaded
+    if (isVendorUploaded(vendorId, kind)) {
+      // Show confirmation dialog
+      setPendingUpload({ vendorId, kind });
+      setConfirmDialogOpen(true);
+    } else {
+      // Proceed directly with upload
+      performMarketplaceUpload(vendorId, kind);
+    }
+  };
+
+  const handleConfirmReupload = () => {
+    if (pendingUpload) {
+      setConfirmDialogOpen(false);
+      performMarketplaceUpload(pendingUpload.vendorId, pendingUpload.kind);
+      setPendingUpload(null);
+    }
+  };
+
+  const handleCancelReupload = () => {
+    setConfirmDialogOpen(false);
+    setPendingUpload(null);
+  };
+
+  const performMarketplaceUpload = async (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'sales_b2b' | 'settlement') => {
     const file = marketplaceFiles[vendorId]?.[kind];
     if (!file || selectedYear === null || selectedMonth === null) return;
 
@@ -959,7 +989,6 @@ const UploadDocuments: React.FC = () => {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 800, mb: 4 }}>
               {vendors.filter(v => v.id === 'amazon' || v.id === 'flipkart').map((vendor) => {
                 const isUploaded = isVendorUploaded(vendor.id, 'sales') || isVendorUploaded(vendor.id, 'settlement');
-                const uploadedDoc = getUploadedDocument(vendor.id, 'sales') || getUploadedDocument(vendor.id, 'settlement');
                 const isUploading = uploadingVendor === `${vendor.id}_sales` || uploadingVendor === `${vendor.id}_settlement` || uploadingVendor === vendor.id;
                 return (
                   <Paper
@@ -980,11 +1009,9 @@ const UploadDocuments: React.FC = () => {
                           <Typography variant="subtitle1" fontWeight={700} color="#111111">{vendor.name}</Typography>
                           {isUploaded && (<Chip label="Uploaded" size="small" sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} />)}
                         </Box>
-                        {isUploaded && uploadedDoc ? (
-                          <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mt: 0.5 }}>{uploadedDoc.filename} • {new Date(uploadedDoc.upload_date).toLocaleDateString()}</Typography>
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">Upload sales and settlement sheets</Typography>
-                        )}
+                        <Typography variant="caption" color={isUploaded ? '#16a34a' : 'text.secondary'} sx={{ display: 'block', mt: 0.5 }}>
+                          {isUploaded ? 'Files uploaded' : 'Upload sales and settlement sheets'}
+                        </Typography>
                       </Box>
                     </Box>
                     <Button
@@ -1159,28 +1186,94 @@ const UploadDocuments: React.FC = () => {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {/* File pickers */}
               <Paper elevation={0} sx={{ p: 2, border: '1px solid #e5e7eb', borderRadius: '10px' }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>B2C Sales report (XLSX/CSV)</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <input
-                    accept=".xlsx,.xls,.csv"
-                    style={{ display: 'none' }}
-                    id={`drawer-${rightPanelVendor}-sales`}
-                    type="file"
-                    onChange={(e) => {
-                      setMarketplaceFile(rightPanelVendor, 'sales', e.target.files?.[0] || null);
-                      e.target.value = '';
-                    }}
-                  />
-                  <label htmlFor={`drawer-${rightPanelVendor}-sales`}>
-                    <Button variant="outlined" component="span" startIcon={<CloudUploadIcon />}>Choose file</Button>
-                  </label>
-                  <Typography variant="caption" color="text.secondary">
-                    {marketplaceFiles[rightPanelVendor]?.sales?.name || 'No file selected'}
-                  </Typography>
+                {/* B2C Sales report */}
+                <Box sx={{ mb: 2, p: 1.5, borderRadius: '8px', background: isVendorUploaded(rightPanelVendor, 'sales') ? '#f0fdf4' : 'transparent', border: isVendorUploaded(rightPanelVendor, 'sales') ? '1px solid #dcfce7' : 'none' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Typography variant="subtitle2">B2C Sales report (XLSX/CSV)</Typography>
+                    {isVendorUploaded(rightPanelVendor, 'sales') && (
+                      <Chip 
+                        label="Uploaded" 
+                        size="small" 
+                        icon={<CheckCircleIcon sx={{ fontSize: 14, color: '#16a34a !important' }} />}
+                        sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} 
+                      />
+                    )}
+                  </Box>
+                  {isVendorUploaded(rightPanelVendor, 'sales') && getUploadedDocument(rightPanelVendor, 'sales') && (
+                    <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mb: 1 }}>
+                      {getUploadedDocument(rightPanelVendor, 'sales')?.filename} • {new Date(getUploadedDocument(rightPanelVendor, 'sales')!.upload_date).toLocaleDateString()}
+                    </Typography>
+                  )}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <input
+                      accept=".xlsx,.xls,.csv"
+                      style={{ display: 'none' }}
+                      id={`drawer-${rightPanelVendor}-sales`}
+                      type="file"
+                      onChange={(e) => {
+                        setMarketplaceFile(rightPanelVendor, 'sales', e.target.files?.[0] || null);
+                        e.target.value = '';
+                      }}
+                      disabled={!!uploadingVendor}
+                    />
+                    <label htmlFor={`drawer-${rightPanelVendor}-sales`}>
+                      <Button 
+                        variant="outlined" 
+                        component="span" 
+                        startIcon={<CloudUploadIcon />}
+                        disabled={!!uploadingVendor}
+                      >
+                        Choose file
+                      </Button>
+                    </label>
+                    <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                      {marketplaceFiles[rightPanelVendor]?.sales?.name || 'No file selected'}
+                    </Typography>
+                    <Button
+                      variant={isVendorUploaded(rightPanelVendor, 'sales') ? 'outlined' : 'contained'}
+                      size="small"
+                      disabled={
+                        !marketplaceFiles[rightPanelVendor]?.sales ||
+                        !!uploadingVendor ||
+                        uploadingVendor === `${rightPanelVendor}_sales`
+                      }
+                      onClick={() => handleMarketplaceUploadClick(rightPanelVendor, 'sales')}
+                      startIcon={uploadingVendor === `${rightPanelVendor}_sales` ? <CircularProgress size={16} sx={{ color: isVendorUploaded(rightPanelVendor, 'sales') ? '#111111' : '#fff' }} /> : <ArrowForwardIcon />}
+                      sx={{ 
+                        background: isVendorUploaded(rightPanelVendor, 'sales') ? '#ffffff' : '#111111', 
+                        color: isVendorUploaded(rightPanelVendor, 'sales') ? '#111111' : '#ffffff',
+                        borderColor: isVendorUploaded(rightPanelVendor, 'sales') ? '#e5e7eb' : 'transparent',
+                        '&:hover': { 
+                          background: isVendorUploaded(rightPanelVendor, 'sales') ? '#f8fafc' : '#333333',
+                          borderColor: isVendorUploaded(rightPanelVendor, 'sales') ? '#d1d5db' : 'transparent'
+                        }, 
+                        fontWeight: 600 
+                      }}
+                    >
+                      {uploadingVendor === `${rightPanelVendor}_sales` ? 'Uploading...' : isVendorUploaded(rightPanelVendor, 'sales') ? 'Re-upload' : 'Upload'}
+                    </Button>
+                  </Box>
                 </Box>
+
+                {/* B2B Sales report (Amazon only) */}
                 {rightPanelVendor === 'amazon' && (
-                  <>
-                    <Typography variant="subtitle2" sx={{ mb: 1, mt: 2 }}>B2B Sales report (XLSX/CSV)</Typography>
+                  <Box sx={{ mb: 2, p: 1.5, borderRadius: '8px', background: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#f0fdf4' : 'transparent', border: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '1px solid #dcfce7' : 'none' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Typography variant="subtitle2">B2B Sales report (XLSX/CSV)</Typography>
+                      {isVendorUploaded(rightPanelVendor, 'sales_b2b') && (
+                        <Chip 
+                          label="Uploaded" 
+                          size="small" 
+                          icon={<CheckCircleIcon sx={{ fontSize: 14, color: '#16a34a !important' }} />}
+                          sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} 
+                        />
+                      )}
+                    </Box>
+                    {isVendorUploaded(rightPanelVendor, 'sales_b2b') && getUploadedDocument(rightPanelVendor, 'sales_b2b') && (
+                      <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mb: 1 }}>
+                        {getUploadedDocument(rightPanelVendor, 'sales_b2b')?.filename} • {new Date(getUploadedDocument(rightPanelVendor, 'sales_b2b')!.upload_date).toLocaleDateString()}
+                      </Typography>
+                    )}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <input
                         accept=".xlsx,.xls,.csv"
@@ -1191,52 +1284,115 @@ const UploadDocuments: React.FC = () => {
                           setMarketplaceFile(rightPanelVendor, 'sales_b2b', e.target.files?.[0] || null);
                           e.target.value = '';
                         }}
+                        disabled={!!uploadingVendor}
                       />
                       <label htmlFor={`drawer-${rightPanelVendor}-sales-b2b`}>
-                        <Button variant="outlined" component="span" startIcon={<CloudUploadIcon />}>Choose file</Button>
+                        <Button 
+                          variant="outlined" 
+                          component="span" 
+                          startIcon={<CloudUploadIcon />}
+                          disabled={!!uploadingVendor}
+                        >
+                          Choose file
+                        </Button>
                       </label>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
                         {marketplaceFiles[rightPanelVendor]?.sales_b2b?.name || 'No file selected'}
                       </Typography>
+                      <Button
+                        variant={isVendorUploaded(rightPanelVendor, 'sales_b2b') ? 'outlined' : 'contained'}
+                        size="small"
+                        disabled={
+                          !marketplaceFiles[rightPanelVendor]?.sales_b2b ||
+                          !!uploadingVendor ||
+                          uploadingVendor === `${rightPanelVendor}_sales_b2b`
+                        }
+                        onClick={() => handleMarketplaceUploadClick(rightPanelVendor, 'sales_b2b')}
+                        startIcon={uploadingVendor === `${rightPanelVendor}_sales_b2b` ? <CircularProgress size={16} sx={{ color: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#111111' : '#fff' }} /> : <ArrowForwardIcon />}
+                        sx={{ 
+                          background: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#ffffff' : '#111111', 
+                          color: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#111111' : '#ffffff',
+                          borderColor: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#e5e7eb' : 'transparent',
+                          '&:hover': { 
+                            background: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#f8fafc' : '#333333',
+                            borderColor: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#d1d5db' : 'transparent'
+                          }, 
+                          fontWeight: 600 
+                        }}
+                      >
+                        {uploadingVendor === `${rightPanelVendor}_sales_b2b` ? 'Uploading...' : isVendorUploaded(rightPanelVendor, 'sales_b2b') ? 'Re-upload' : 'Upload'}
+                      </Button>
                     </Box>
-                  </>
+                  </Box>
                 )}
-                <Typography variant="subtitle2" sx={{ mb: 1, mt: 2 }}>Settlement report (XLSX/CSV)</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <input
-                    accept=".xlsx,.xls,.csv"
-                    style={{ display: 'none' }}
-                    id={`drawer-${rightPanelVendor}-settlement`}
-                    type="file"
-                    onChange={(e) => {
-                      setMarketplaceFile(rightPanelVendor, 'settlement', e.target.files?.[0] || null);
-                      e.target.value = '';
-                    }}
-                  />
-                  <label htmlFor={`drawer-${rightPanelVendor}-settlement`}>
-                    <Button variant="outlined" component="span" startIcon={<CloudUploadIcon />}>Choose file</Button>
-                  </label>
-                  <Typography variant="caption" color="text.secondary">
-                    {marketplaceFiles[rightPanelVendor]?.settlement?.name || 'No file selected'}
-                  </Typography>
-                </Box>
-                <Box sx={{ mt: 3 }}>
-                  <Button
-                    size="large"
-                    variant="contained"
-                    fullWidth
-                    disabled={
-                      uploadingVendor === `${rightPanelVendor}_bulk` || 
-                      !marketplaceFiles[rightPanelVendor]?.sales || 
-                      !marketplaceFiles[rightPanelVendor]?.settlement ||
-                      (rightPanelVendor === 'amazon' && !marketplaceFiles[rightPanelVendor]?.sales_b2b)
-                    }
-                    onClick={() => handleMarketplaceBulkUpload(rightPanelVendor)}
-                    startIcon={uploadingVendor === `${rightPanelVendor}_bulk` ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <CloudUploadIcon />}
-                    sx={{ background: '#111111', '&:hover': { background: '#333333' }, fontWeight: 700 }}
-                  >
-                    {uploadingVendor === `${rightPanelVendor}_bulk` ? 'Uploading…' : rightPanelVendor === 'amazon' ? 'Upload all files' : 'Upload both files'}
-                  </Button>
+
+                {/* Settlement report */}
+                <Box sx={{ p: 1.5, borderRadius: '8px', background: isVendorUploaded(rightPanelVendor, 'settlement') ? '#f0fdf4' : 'transparent', border: isVendorUploaded(rightPanelVendor, 'settlement') ? '1px solid #dcfce7' : 'none' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Typography variant="subtitle2">Settlement report (XLSX/CSV)</Typography>
+                    {isVendorUploaded(rightPanelVendor, 'settlement') && (
+                      <Chip 
+                        label="Uploaded" 
+                        size="small" 
+                        icon={<CheckCircleIcon sx={{ fontSize: 14, color: '#16a34a !important' }} />}
+                        sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} 
+                      />
+                    )}
+                  </Box>
+                  {isVendorUploaded(rightPanelVendor, 'settlement') && getUploadedDocument(rightPanelVendor, 'settlement') && (
+                    <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mb: 1 }}>
+                      {getUploadedDocument(rightPanelVendor, 'settlement')?.filename} • {new Date(getUploadedDocument(rightPanelVendor, 'settlement')!.upload_date).toLocaleDateString()}
+                    </Typography>
+                  )}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <input
+                      accept=".xlsx,.xls,.csv"
+                      style={{ display: 'none' }}
+                      id={`drawer-${rightPanelVendor}-settlement`}
+                      type="file"
+                      onChange={(e) => {
+                        setMarketplaceFile(rightPanelVendor, 'settlement', e.target.files?.[0] || null);
+                        e.target.value = '';
+                      }}
+                      disabled={!!uploadingVendor}
+                    />
+                    <label htmlFor={`drawer-${rightPanelVendor}-settlement`}>
+                      <Button 
+                        variant="outlined" 
+                        component="span" 
+                        startIcon={<CloudUploadIcon />}
+                        disabled={!!uploadingVendor}
+                      >
+                        Choose file
+                      </Button>
+                    </label>
+                    <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                      {marketplaceFiles[rightPanelVendor]?.settlement?.name || 'No file selected'}
+                    </Typography>
+                    <Button
+                      variant={isVendorUploaded(rightPanelVendor, 'settlement') ? 'outlined' : 'contained'}
+                      size="small"
+                      disabled={
+                        !marketplaceFiles[rightPanelVendor]?.settlement ||
+                        !!uploadingVendor ||
+                        uploadingVendor === `${rightPanelVendor}_settlement`
+                      }
+                      onClick={() => handleMarketplaceUploadClick(rightPanelVendor, 'settlement')}
+                      startIcon={uploadingVendor === `${rightPanelVendor}_settlement` ? <CircularProgress size={16} sx={{ color: isVendorUploaded(rightPanelVendor, 'settlement') ? '#111111' : '#fff' }} /> : <ArrowForwardIcon />}
+                      sx={{ 
+                        background: isVendorUploaded(rightPanelVendor, 'settlement') ? '#ffffff' : '#111111', 
+                        color: isVendorUploaded(rightPanelVendor, 'settlement') ? '#111111' : '#ffffff',
+                        borderColor: isVendorUploaded(rightPanelVendor, 'settlement') ? '#e5e7eb' : 'transparent',
+                        '&:hover': { 
+                          background: isVendorUploaded(rightPanelVendor, 'settlement') ? '#f8fafc' : '#333333',
+                          borderColor: isVendorUploaded(rightPanelVendor, 'settlement') ? '#d1d5db' : 'transparent'
+                        }, 
+                        fontWeight: 600 
+                      }}
+                    >
+                      {uploadingVendor === `${rightPanelVendor}_settlement` ? 'Uploading...' : isVendorUploaded(rightPanelVendor, 'settlement') ? 'Re-upload' : 'Upload'}
+                    </Button>
+                  </Box>
                 </Box>
               </Paper>
             </Box>
@@ -1248,6 +1404,39 @@ const UploadDocuments: React.FC = () => {
           </Box>
         </Box>
       </Drawer>
+
+      {/* Confirmation Dialog for Re-upload */}
+      <Dialog
+        open={confirmDialogOpen}
+        onClose={handleCancelReupload}
+        aria-labelledby="confirm-reupload-dialog-title"
+        aria-describedby="confirm-reupload-dialog-description"
+      >
+        <DialogTitle id="confirm-reupload-dialog-title">
+          Confirm Re-upload
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-reupload-dialog-description">
+            {pendingUpload && getUploadedDocument(pendingUpload.vendorId, pendingUpload.kind) ? (
+              <>
+                The previous file <strong>{getUploadedDocument(pendingUpload.vendorId, pendingUpload.kind)?.filename}</strong> will be deleted and all its related data will be permanently removed.
+                <br /><br />
+                Do you want to continue?
+              </>
+            ) : (
+              'The previous file will be deleted and all its related data will be permanently removed. Do you want to continue?'
+            )}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelReupload} color="inherit">
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmReupload} variant="contained" color="error" autoFocus>
+            Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
