@@ -182,6 +182,7 @@ import TransactionSheet from './TransactionSheet';
 import { apiService } from '../services/api/apiService';
 import { MarketplaceReconciliationResponse, MainSummaryResponse, ProviderAgeingData, AgeingAnalysisResponse } from '../services/api/types';
 import { api as apiIndex } from '../services/api';
+import { API_CONFIG } from '../services/api/config';
 import { mockReconciliationData, getSafeReconciliationData, isValidReconciliationData } from '../data/mockReconciliationData';
 import { Platform } from '../data/mockData';
 import { padding } from '@mui/system';
@@ -1535,7 +1536,12 @@ const MarketplaceReconciliation: React.FC = () => {
   const handleSyncDataSources = async () => {
     setSyncLoading(true);
     try {
-      await apiService.post('/d2c/recon', undefined, { useD2CHeaders: true });
+      // Use regular headers (which include Authorization) and add X-API-Key for D2C
+      await apiService.post('/d2c/recon', undefined, { 
+        headers: {
+          'X-API-Key': API_CONFIG.API_KEY,
+        }
+      });
       await refreshMainSummaryForCurrentFilters();
       setLastSynced(new Date());
     } catch (error) {

@@ -1870,7 +1870,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         return [];
       }
 
-      const priorityKeys: Array<'order_id' | 'order_item_id'> = ['order_id', 'order_item_id'];
+      // Platform-specific column priority:
+      // Flipkart: order_item_id first, then order_id
+      // Amazon & D2C: order_id first, then order_item_id
+      const priorityKeys: Array<'order_id' | 'order_item_id'> = 
+        selectedPlatform === 'flipkart' 
+          ? ['order_item_id', 'order_id']
+          : ['order_id', 'order_item_id'];
+      
       const prioritized = priorityKeys
         .map(priorityKey => salesColumns.find(col => col.key === priorityKey))
         .filter(Boolean) as typeof salesColumns;
@@ -4516,9 +4523,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         >
                                           {getSalesReportSortIcon(column)}
                                         </IconButton>
-                                        {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon */}
+                                        {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
                                         {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
-                                          (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                          (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
+                                          (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
                                           <IconButton 
                                             size="small" 
                                             onClick={(e) => {
@@ -4644,7 +4652,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               {/* Sales Report Search Bar - Expandable */}
                               {activeTab === 4 && showSalesReportSearch && 
                                 ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
-                                 (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                 (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
+                                 (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
                                 <Box 
                                   sx={{ 
                                     display: 'flex', 
