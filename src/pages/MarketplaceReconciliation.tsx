@@ -186,9 +186,11 @@ import { mockReconciliationData, getSafeReconciliationData, isValidReconciliatio
 import { Platform } from '../data/mockData';
 import { padding } from '@mui/system';
 import { useUser } from '../contexts/UserContext';
+import { useOrganization } from '../hooks/useOrganization';
 
 const MarketplaceReconciliation: React.FC = () => {
   const { setMemberName } = useUser();
+  const { hasValidCredentials, isInitialized } = useOrganization();
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
   const [initialTsFilters, setInitialTsFilters] = useState<{ [key: string]: any } | undefined>(undefined);
   const [initialTsTab, setInitialTsTab] = useState<number>(0);
@@ -1615,6 +1617,12 @@ const MarketplaceReconciliation: React.FC = () => {
 
   // Unified data fetch effect: triggers on relevant inputs
   useEffect(() => {
+    // Wait for authentication to be ready
+    if (!isInitialized || !hasValidCredentials) {
+      console.log('⏳ Waiting for authentication to initialize...');
+      return;
+    }
+
     const key = `${selectedDateRange}|${customStartDate}|${customEndDate}|${dateField}|${selectedPlatform}`;
     const shouldFetchMainSummary = lastMainSummaryKeyRef.current !== key;
     if (shouldFetchMainSummary) {
@@ -1633,7 +1641,7 @@ const MarketplaceReconciliation: React.FC = () => {
     }
     // Call upload-list API at the same time as main-summary and ageing-analysis
     fetchUploadList();
-  }, [selectedDateRange, customStartDate, customEndDate, dateField, selectedPlatform]);
+  }, [selectedDateRange, customStartDate, customEndDate, dateField, selectedPlatform, isInitialized, hasValidCredentials]);
 
   // Load sales overview data
   useEffect(() => {
