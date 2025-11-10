@@ -2005,7 +2005,7 @@ const OperationsCentrePage: React.FC = () => {
         <CardContent sx={{ p: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Tabs value={disputeSubTab} onChange={(_, v) => setDisputeSubTab(v)} sx={{ '& .MuiTab-root': { textTransform: 'none', minHeight: 32 } }}>
-              <Tab label={`Unreconciled Orders (${getUnreconciledTotalCount()})`} />
+              <Tab label={`Mismatched Orders (${getUnreconciledTotalCount()})`} />
               <Tab label={`Manually Reconciled (${getManuallyReconciledCount()})`} />
               <Tab label={`Disputed (${getDisputedCount()})`} />
             </Tabs>
