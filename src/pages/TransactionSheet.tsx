@@ -1271,18 +1271,15 @@ const BreakupsModal: React.FC<{
 }> = ({ open, onClose, breakups, orderId, anchorEl }) => {
   if (!open || !breakups || !anchorEl) return null;
 
-  // Extract the breakups object from metadata
-  // The metadata.breakups is directly on the row object
-  const breakupsObj = (breakups as any)?.originalData?.metadata?.breakups || 
-                      (breakups as any)?.metadata?.breakups || {};
-  
-  // Extract metadata to get shipping_courier (check both originalData.metadata and metadata)
+  // Extract metadata from the row (check both originalData.metadata and metadata)
   const metadata = (breakups as any)?.originalData?.metadata || 
                    (breakups as any)?.metadata || {};
-  const shippingCourier = metadata?.shipping_courier;
   
-  // Allow modal to show even if breakups is empty, as long as we have metadata or shipping_courier
-  // This fixes the issue where D2C transactions have empty breakups but should still show the modal
+  // Extract order_value and settlement_value from metadata
+  const orderValue = metadata?.order_value || {};
+  const settlementValue = metadata?.settlement_value || {};
+  const diff = metadata?.diff || 0;
+  const mismatchReason = metadata?.mismatch_reason || '';
 
   // Convert snake_case keys to readable format: remove underscores and capitalize first letter
   const formatKey = (key: string) => {
@@ -1301,18 +1298,30 @@ const BreakupsModal: React.FC<{
     }).format(value);
   };
 
-  // Extract main values from the row
-  // The row object has the data directly at the top level
-  const orderValue = (breakups as any)?.order_value || 0;
-  const settlementValue = (breakups as any)?.settlement_amount || 0;
-  const diff = (breakups as any)?.diff || 0;
+  // Format value based on type
+  const formatValue = (value: any): string => {
+    if (typeof value === 'number') {
+      return formatCurrency(value);
+    }
+    return String(value || '');
+  };
 
-  // Get entries from breakups object (only numeric values)
-  const breakupsData = Object.entries(breakupsObj)
-    .filter(([key, value]) => typeof value === 'number')
+  // Extract buyer_invoice_amount from order_value and get remaining fields
+  const buyerInvoiceAmount = orderValue?.buyer_invoice_amount || 0;
+  const orderValueOtherFields = Object.entries(orderValue)
+    .filter(([key]) => key !== 'buyer_invoice_amount')
     .map(([key, value]) => ({
       label: formatKey(key),
-      value: Number(value) || 0
+      value: value
+    }));
+
+  // Extract settlement_amount from settlement_value and get remaining fields
+  const settlementAmount = settlementValue?.settlement_amount || 0;
+  const settlementValueOtherFields = Object.entries(settlementValue)
+    .filter(([key]) => key !== 'settlement_amount')
+    .map(([key, value]) => ({
+      label: formatKey(key),
+      value: value
     }));
 
   // Calculate smart positioning similar to TransactionDetailsPopup
@@ -1492,7 +1501,8 @@ const BreakupsModal: React.FC<{
         {/* Content */}
         <Box sx={{ p: 2, maxHeight: position.maxHeight ? `${position.maxHeight - 80}px` : '300px', overflowY: 'auto' }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {/* Order Value */}
+            {/* Order Value Section */}
+            {/* Buyer Invoice Amount - shown first */}
             <Box
               sx={{
                 display: 'flex',
@@ -1512,7 +1522,7 @@ const BreakupsModal: React.FC<{
                   fontSize: '0.875rem',
                 }}
               >
-                Order Value
+                Buyer Invoice Amount
               </Typography>
               <Typography
                 variant="body2"
@@ -1522,12 +1532,12 @@ const BreakupsModal: React.FC<{
                   fontSize: '0.875rem',
                 }}
               >
-                {formatCurrency(orderValue)}
+                {formatCurrency(buyerInvoiceAmount)}
               </Typography>
             </Box>
 
-            {/* Breakups */}
-            {breakupsData.map((item, index) => (
+            {/* Other Order Value fields */}
+            {orderValueOtherFields.map((item, index) => (
               <Box
                 key={index}
                 sx={{
@@ -1559,7 +1569,7 @@ const BreakupsModal: React.FC<{
                     fontSize: '0.75rem',
                   }}
                 >
-                  {formatCurrency(item.value)}
+                  {formatValue(item.value)}
                 </Typography>
               </Box>
             ))}
@@ -1567,14 +1577,14 @@ const BreakupsModal: React.FC<{
             {/* Divider */}
             <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
 
-            {/* Settlement Value (Negative) */}
+            {/* Settlement Value Section */}
+            {/* Settlement Amount - shown first */}
             <Box
               sx={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 p: 1.5,
-                pl: 3,
                 background: '#fef2f2',
                 borderRadius: '6px',
                 border: '1px solid #fecaca',
@@ -1583,24 +1593,62 @@ const BreakupsModal: React.FC<{
               <Typography
                 variant="body2"
                 sx={{
-                  fontWeight: 500,
+                  fontWeight: 600,
                   color: '#991b1b',
-                  fontSize: '0.75rem',
+                  fontSize: '0.875rem',
                 }}
               >
-                Settlement Value
+                Settlement Amount
               </Typography>
               <Typography
                 variant="body2"
                 sx={{
-                  fontWeight: 600,
+                  fontWeight: 700,
                   color: '#991b1b',
-                  fontSize: '0.75rem',
+                  fontSize: '0.875rem',
                 }}
               >
-                {formatCurrency(-settlementValue)}
+                {formatCurrency(settlementAmount)}
               </Typography>
             </Box>
+
+            {/* Other Settlement Value fields */}
+            {settlementValueOtherFields.map((item, index) => (
+              <Box
+                key={index}
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  p: 1.5,
+                  pl: 3,
+                  background: '#f9fafb',
+                  borderRadius: '6px',
+                  border: '1px solid #e5e7eb',
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 500,
+                    color: '#374151',
+                    fontSize: '0.75rem',
+                  }}
+                >
+                  {item.label}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 600,
+                    color: '#111827',
+                    fontSize: '0.75rem',
+                  }}
+                >
+                  {formatValue(item.value)}
+                </Typography>
+              </Box>
+            ))}
 
             {/* Divider */}
             <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
@@ -1639,8 +1687,8 @@ const BreakupsModal: React.FC<{
               </Typography>
             </Box>
 
-            {/* Shipping Courier - show if available */}
-            {shippingCourier && (
+            {/* Mismatch Reason - show if available */}
+            {mismatchReason && (
               <>
                 {/* Divider */}
                 <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
@@ -1650,7 +1698,6 @@ const BreakupsModal: React.FC<{
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     p: 1.5,
-                    pl: 3,
                     background: '#f9fafb',
                     borderRadius: '6px',
                     border: '1px solid #e5e7eb',
@@ -1664,7 +1711,7 @@ const BreakupsModal: React.FC<{
                       fontSize: '0.75rem',
                     }}
                   >
-                    Shipping Courier
+                    Mismatch Reason
                   </Typography>
                   <Typography
                     variant="body2"
@@ -1674,7 +1721,7 @@ const BreakupsModal: React.FC<{
                       fontSize: '0.75rem',
                     }}
                   >
-                    {shippingCourier}
+                    {mismatchReason}
                   </Typography>
                 </Box>
               </>
@@ -5012,24 +5059,22 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       );
                                     })()}
                                     
-                                    {/* Breakups details button - only show for settled tab (activeTab === 0) */}
-                                    {activeTab === 0 && (
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => handleBreakupsOpen(e, row)}
-                                        sx={{
-                                          p: 0.5,
-                                          minWidth: 20,
-                                          height: 20,
-                                          '&:hover': {
-                                            background: '#f3f4f6',
-                                            color: '#374151',
-                                          },
-                                        }}
-                                      >
-                                        <InfoOutlined fontSize="small" sx={{ color: '#6b7280' }}/>
-                                      </IconButton>
-                                    )}
+                                    {/* Breakups details button - show for all tabs */}
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => handleBreakupsOpen(e, row)}
+                                      sx={{
+                                        p: 0.5,
+                                        minWidth: 20,
+                                        height: 20,
+                                        '&:hover': {
+                                          background: '#f3f4f6',
+                                          color: '#374151',
+                                        },
+                                      }}
+                                    >
+                                      <InfoOutlined fontSize="small" sx={{ color: '#6b7280' }}/>
+                                    </IconButton>
                                   </Box>
 
                                 ) : (
