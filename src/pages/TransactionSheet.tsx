@@ -1778,6 +1778,25 @@ const COLUMN_TO_SORT_BY_MAP: Record<string, string> = {
   'Difference': 'diff',
 };
 
+const normalizeParams = (value: any): any => {
+  if (Array.isArray(value)) {
+    return value.map(normalizeParams);
+  }
+  if (value && typeof value === 'object') {
+    return Object.keys(value)
+      .sort()
+      .reduce((acc, key) => {
+        acc[key] = normalizeParams((value as Record<string, any>)[key]);
+        return acc;
+      }, {} as Record<string, any>);
+  }
+  return value;
+};
+
+const createQuadParamsSignature = (params: Record<string, any>) => {
+  return JSON.stringify(normalizeParams(params));
+};
+
 const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0, dateRange: propDateRange, initialPlatforms, initialFilters: propsInitialFilters }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -1863,6 +1882,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [quadApiLoading, setQuadApiLoading] = useState(false);
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   const isFetchingRef = React.useRef(false);
+  const lastQuadParamsRef = React.useRef<string | null>(null);
 
   // Sales Report state management
   const [salesReportData, setSalesReportData] = useState<SalesTransactionsResponse | null>(null);
@@ -2840,14 +2860,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   };
 
-  // Only refresh data when rowsPerPage changes (not filters)
-  useEffect(() => {
-    if (activeTab === 4) return;
-    if (hasInitialLoad && (matchedData || mismatchedData || unsettledData || allData)) { // Only refetch if data has been loaded initially
-      fetchQuadTransactions(1, columnFilters, dateRange, selectedPlatform);
-    }
-  }, [rowsPerPage, activeTab]);
-
   // Close filter on outside click with proper event handling
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -2951,129 +2963,134 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     overridePlatform?: Platform,
     orderIds?: string[],
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
-    applySortOverride?: boolean
+    applySortOverride?: boolean,
+    forceRefetch: boolean = false
   ) => {
-    
-    
+    const isInitialLoad = pageNumber === 1 && !matchedData && !mismatchedData && !unsettledData && !allData;
+
     // Prevent duplicate calls from React Strict Mode
     if (isFetchingRef.current) {
       return;
     }
+
+    const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
+
+    // Create base API call parameters
+    const baseParams: any = {
+      page: pageNumber,
+      limit: rowsPerPage,
+    };
+
+    // Convert filters to API parameters (excluding Status filter which we'll handle separately)
+    if (filters && Object.keys(filters).length > 0) {
+      Object.entries(filters).forEach(([columnKey, filterValue]) => {
+        if (!filterValue) return;
+        // Skip Status filter - we'll handle it separately for each tab
+        if (columnKey === 'Status') return;
+
+        const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
+        if (!mapping) {
+          // If no mapping, pass through as-is for backward compatibility
+          (baseParams as any)[columnKey] = filterValue;
+          return;
+        }
+
+        // Check platform compatibility
+        if (mapping.supportedPlatforms) {
+          const isSupported = mapping.supportedPlatforms!.includes(platformToUse as any);
+          if (!isSupported) {
+            return; // Skip filters not supported by selected platform
+          }
+        }
+
+        const baseParam = mapping.apiParam;
+
+        switch (mapping.type) {
+          case 'string':
+            if (columnKey === 'Order ID') {
+              // For Order ID, use chips array joined by comma
+              const orderIdsToUse = orderIds !== undefined ? orderIds : orderIdChips;
+              if (orderIdsToUse.length > 0) {
+                baseParams[baseParam] = orderIdsToUse.join(',');
+              }
+            } else if (typeof filterValue === 'string' && filterValue.trim()) {
+              baseParams[baseParam] = filterValue.trim();
+            }
+            break;
+          
+          case 'number':
+            if (typeof filterValue === 'object' && filterValue !== null) {
+              if (filterValue.min !== undefined && filterValue.min !== '') {
+                baseParams[`${baseParam}_min`] = parseFloat(filterValue.min);
+              }
+              if (filterValue.max !== undefined && filterValue.max !== '') {
+                baseParams[`${baseParam}_max`] = parseFloat(filterValue.max);
+              }
+            }
+            break;
+          
+          case 'date':
+            if (typeof filterValue === 'object' && filterValue !== null) {
+              if (filterValue.from) {
+                baseParams[`${baseParam}_from`] = filterValue.from;
+              }
+              if (filterValue.to) {
+                baseParams[`${baseParam}_to`] = filterValue.to;
+              }
+            }
+            break;
+          
+          case 'enum':
+            if (Array.isArray(filterValue) && filterValue.length > 0) {
+              baseParams[baseParam] = filterValue.join(',');
+            }
+            break;
+        }
+      });
+    }
     
-    const isInitialLoad = pageNumber === 1 && !matchedData && !mismatchedData && !unsettledData && !allData;
+    // Add date range parameters with correct keys
+    if (dateRangeFilter?.start && dateRangeFilter?.end) {
+      baseParams.order_date_from = dateRangeFilter.start;
+      baseParams.order_date_to = dateRangeFilter.end;
+    }
     
+    // Add platform parameter
+    if (platformToUse) {
+      baseParams.platform = platformToUse;
+    }
+
+    // Apply sorting if present (use override if explicitly requested to avoid state lag)
+    const sortToUse = applySortOverride ? sortOverride : sortConfig;
+    if (sortToUse && COLUMN_TO_SORT_BY_MAP[sortToUse.key]) {
+      baseParams.sort_by = COLUMN_TO_SORT_BY_MAP[sortToUse.key];
+      baseParams.sort_order = sortToUse.direction;
+    }
+    
+    // Ensure Order ID search is always applied even if not present in column filters
+    const effectiveOrderIds = (orderIds !== undefined ? orderIds : orderIdChips) || [];
+    if (Array.isArray(effectiveOrderIds) && effectiveOrderIds.length > 0) {
+      const orderIdsCsv = effectiveOrderIds.join(',');
+      baseParams.order_id = orderIdsCsv;
+    }
+
+    const paramsSignature = createQuadParamsSignature(baseParams);
+    const hasExistingQuadData = matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null;
+
+    if (!forceRefetch && hasExistingQuadData && lastQuadParamsRef.current === paramsSignature) {
+      return;
+    }
+
     // Set the flag to prevent duplicate calls
     isFetchingRef.current = true;
-    
+
     if (!isInitialLoad) {
       setPaginationLoading(true);
     }
     setQuadApiLoading(true);
     setError(null);
-    
+
     try {
-      // Build base parameters
-      const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
-      
-      // Create base API call parameters
-      const baseParams: any = {
-        page: pageNumber,
-        limit: rowsPerPage,
-      };
-      
-      // Convert filters to API parameters (excluding Status filter which we'll handle separately)
-      if (filters && Object.keys(filters).length > 0) {
-        Object.entries(filters).forEach(([columnKey, filterValue]) => {
-          if (!filterValue) return;
-          // Skip Status filter - we'll handle it separately for each tab
-          if (columnKey === 'Status') return;
-
-          const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
-          if (!mapping) {
-            // If no mapping, pass through as-is for backward compatibility
-            (baseParams as any)[columnKey] = filterValue;
-            return;
-          }
-
-          // Check platform compatibility
-          if (mapping.supportedPlatforms) {
-            const isSupported = mapping.supportedPlatforms!.includes(platformToUse as any);
-            if (!isSupported) {
-              return; // Skip filters not supported by selected platform
-            }
-          }
-
-          const baseParam = mapping.apiParam;
-
-          switch (mapping.type) {
-            case 'string':
-              if (columnKey === 'Order ID') {
-                // For Order ID, use chips array joined by comma
-                const orderIdsToUse = orderIds !== undefined ? orderIds : orderIdChips;
-                if (orderIdsToUse.length > 0) {
-                  baseParams[baseParam] = orderIdsToUse.join(',');
-                }
-              } else if (typeof filterValue === 'string' && filterValue.trim()) {
-                baseParams[baseParam] = filterValue.trim();
-              }
-              break;
-            
-            case 'number':
-              if (typeof filterValue === 'object' && filterValue !== null) {
-                if (filterValue.min !== undefined && filterValue.min !== '') {
-                  baseParams[`${baseParam}_min`] = parseFloat(filterValue.min);
-                }
-                if (filterValue.max !== undefined && filterValue.max !== '') {
-                  baseParams[`${baseParam}_max`] = parseFloat(filterValue.max);
-                }
-              }
-              break;
-            
-            case 'date':
-              if (typeof filterValue === 'object' && filterValue !== null) {
-                if (filterValue.from) {
-                  baseParams[`${baseParam}_from`] = filterValue.from;
-                }
-                if (filterValue.to) {
-                  baseParams[`${baseParam}_to`] = filterValue.to;
-                }
-              }
-              break;
-            
-            case 'enum':
-              if (Array.isArray(filterValue) && filterValue.length > 0) {
-                baseParams[baseParam] = filterValue.join(',');
-              }
-              break;
-          }
-        });
-      }
-      
-      // Add date range parameters with correct keys
-      if (dateRangeFilter?.start && dateRangeFilter?.end) {
-        baseParams.order_date_from = dateRangeFilter.start;
-        baseParams.order_date_to = dateRangeFilter.end;
-      }
-      
-      // Add platform parameter
-      if (platformToUse) {
-        baseParams.platform = platformToUse;
-      }
-
-      // Apply sorting if present (use override if explicitly requested to avoid state lag)
-      const sortToUse = applySortOverride ? sortOverride : sortConfig;
-      if (sortToUse && COLUMN_TO_SORT_BY_MAP[sortToUse.key]) {
-        baseParams.sort_by = COLUMN_TO_SORT_BY_MAP[sortToUse.key];
-        baseParams.sort_order = sortToUse.direction;
-      }
-      
-      // Ensure Order ID search is always applied even if not present in column filters
-      const effectiveOrderIds = (orderIds !== undefined ? orderIds : orderIdChips) || [];
-      if (Array.isArray(effectiveOrderIds) && effectiveOrderIds.length > 0) {
-        const orderIdsCsv = effectiveOrderIds.join(',');
-        baseParams.order_id = orderIdsCsv;
-      }
-      
       // Create 4 separate parameter sets for each tab with different status filters
       // Tab 0: Matched - settlement_matched
       const matchedParams = { ...baseParams };
@@ -3153,6 +3170,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
       
       setCurrentPage(pageNumber);
+
+      const allSucceeded = matchedResponse.success && mismatchedResponse.success && unsettledResponse.success && allResponse.success;
+      if (allSucceeded) {
+        lastQuadParamsRef.current = paramsSignature;
+      } else {
+        lastQuadParamsRef.current = null;
+      }
       
       // Update tab counts based on the actual data received
       setTabCounts({
@@ -3164,6 +3188,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     } catch (err: any) {
       console.error('[fetchQuadTransactions] Error:', err);
       setError(err?.message || 'Failed to fetch transactions');
+      lastQuadParamsRef.current = null;
     } finally {
       setQuadApiLoading(false);
       setPaginationLoading(false);

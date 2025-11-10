@@ -1798,7 +1798,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     </Typography>
                   </Box>
                 </Button>
-                <Button
+                {/* <Button
                   variant="outlined"
                   startIcon={<SyncIcon sx={{
                     animation: syncLoading ? 'spin 1s linear infinite' : 'none',
@@ -1822,7 +1822,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   }}
                 >
                   Sync
-                </Button>
+                </Button> */}
                 <Button
                   variant="outlined"
                   startIcon={<DownloadIcon />}
