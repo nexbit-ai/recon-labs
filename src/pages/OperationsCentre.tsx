@@ -1610,16 +1610,27 @@ const OperationsCentrePage: React.FC = () => {
 
     const originalData = selectedTransactionRow.originalData || {};
     const metadata = originalData.metadata || {};
-    const breakupsObj = metadata.breakups || {};
-    
-    // Extract values
-    const orderValue = originalData.order_value || 0;
-    const settlementValue = originalData.settlement_amount || 0;
-    const diff = originalData.diff || 0;
+
+    const orderValueData = metadata.order_value || {};
+    const settlementValueData = metadata.settlement_value || {};
+    const diffRaw = metadata.diff ?? originalData.diff ?? 0;
     const mismatchReason = metadata.mismatch_reason || '';
-    const reconStatus = originalData.recon_status || '';
+    const reconStatus = metadata.recon_status || originalData.recon_status || '';
     const manualOverrideBy = metadata.manual_override_by || '';
     const orderId = selectedTransactionRow["Order ID"] || originalData.order_id || '';
+
+    const parseNumericValue = (value: any): number => {
+      if (typeof value === 'number' && !Number.isNaN(value)) {
+        return value;
+      }
+      if (typeof value === 'string') {
+        const sanitized = value.replace(/[₹,$\s]/g, '');
+        if (sanitized === '') return 0;
+        const parsed = parseFloat(sanitized);
+        return Number.isNaN(parsed) ? 0 : parsed;
+      }
+      return 0;
+    };
 
     // Format currency
     const formatCurrency = (value: number) => {
@@ -1631,18 +1642,54 @@ const OperationsCentrePage: React.FC = () => {
       }).format(value);
     };
 
-    // Format key for breakups
+    // Format key for display
     const formatKey = (key: string) => {
       return key.split('_')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
     };
 
-    // Get breakups data
-    const breakupsData = Object.entries(breakupsObj).map(([key, value]) => ({
-      label: formatKey(key),
-      value: Number(value) || 0
-    }));
+    const formatValue = (value: any): string => {
+      if (value === null || value === undefined) return '';
+      if (typeof value === 'object') {
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return String(value);
+        }
+      }
+      if (typeof value === 'number' && !Number.isNaN(value)) {
+        return formatCurrency(value);
+      }
+      if (typeof value === 'string') {
+        const sanitized = value.replace(/[₹,$\s]/g, '');
+        if (sanitized !== '' && !Number.isNaN(Number(sanitized))) {
+          return formatCurrency(Number(sanitized));
+        }
+        return value;
+      }
+      return String(value);
+    };
+
+    const buyerInvoiceAmountRaw = orderValueData?.buyer_invoice_amount ?? originalData?.buyer_invoice_amount;
+    const buyerInvoiceAmount = parseNumericValue(buyerInvoiceAmountRaw);
+    const hasBuyerInvoiceAmount = buyerInvoiceAmountRaw !== undefined && buyerInvoiceAmountRaw !== null && buyerInvoiceAmountRaw !== '';
+
+    const settlementAmountRaw = settlementValueData?.settlement_amount ?? originalData?.settlement_amount;
+    const settlementAmount = parseNumericValue(settlementAmountRaw);
+    const hasSettlementAmount = settlementAmountRaw !== undefined && settlementAmountRaw !== null && settlementAmountRaw !== '';
+
+    const diffNumber = parseNumericValue(diffRaw);
+    const hasDiff = diffRaw !== undefined && diffRaw !== null && diffRaw !== '';
+    const differenceIsZero = diffNumber === 0;
+
+    const orderValueOtherFields = Object.entries(orderValueData)
+      .filter(([key]) => key !== 'buyer_invoice_amount')
+      .map(([key, value]) => ({ label: formatKey(key), value }));
+
+    const settlementValueOtherFields = Object.entries(settlementValueData)
+      .filter(([key]) => key !== 'settlement_amount')
+      .map(([key, value]) => ({ label: formatKey(key), value }));
 
     // Calculate popup position
     const getPopupPosition = () => {
@@ -1790,153 +1837,161 @@ const OperationsCentrePage: React.FC = () => {
           {/* Content */}
           <Box sx={{ p: 2, maxHeight: position.maxHeight ? `${position.maxHeight - 80}px` : '420px', overflowY: 'auto' }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              {/* Manual Override Info */}
-              {manualOverrideBy && (
+              {/* Previous Status */}
+              {(disputeSubTab === 1 || disputeSubTab === 2) && (
                 <Box
                   sx={{
+                    p: 1.5,
+                    background: '#f9fafb',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.75rem', mb: 1 }}>
+                    Previous Status
+                  </Typography>
+                  {reconStatus && (
+                    <Box sx={{ mb: 0.5 }}>
+                      <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                        Recon Status:
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#111827', fontSize: '0.875rem', fontWeight: 500 }}>
+                        {reconStatus.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                      </Typography>
+                    </Box>
+                  )}
+                  {mismatchReason && (
+                    <Box>
+                      <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                        Mismatch Reason:
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#111827', fontSize: '0.875rem', fontWeight: 500 }}>
+                        {mismatchReason}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              )}
+
+              {/* Order Value Section */}
+              {hasBuyerInvoiceAmount && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
                     p: 1.5,
                     background: '#f0f9ff',
                     borderRadius: '6px',
                     border: '1px solid #bae6fd',
                   }}
                 >
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#0c4a6e', fontSize: '0.75rem', mb: 0.5 }}>
-                    Manually Overridden By
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#0c4a6e', fontSize: '0.875rem' }}>
+                    Buyer Invoice Amount
                   </Typography>
-                  <Typography variant="body2" sx={{ color: '#0c4a6e', fontSize: '0.875rem' }}>
-                    {manualOverrideBy}
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0c4a6e', fontSize: '0.875rem' }}>
+                    {formatCurrency(buyerInvoiceAmount)}
                   </Typography>
                 </Box>
               )}
 
-              {/* Previous Status */}
-              <Box
-                sx={{
-                  p: 1.5,
-                  background: '#f9fafb',
-                  borderRadius: '6px',
-                  border: '1px solid #e5e7eb',
-                }}
-              >
-                <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.75rem', mb: 1 }}>
-                  Previous Status
-                </Typography>
-                {reconStatus && (
-                  <Box sx={{ mb: 0.5 }}>
-                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                      Recon Status:
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#111827', fontSize: '0.875rem', fontWeight: 500 }}>
-                      {reconStatus.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                    </Typography>
-                  </Box>
-                )}
-                {mismatchReason && (
-                  <Box>
-                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                      Mismatch Reason:
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#111827', fontSize: '0.875rem', fontWeight: 500 }}>
-                      {mismatchReason}
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
+              {orderValueOtherFields.map((item, index) => (
+                <Box
+                  key={`order-value-${index}`}
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    p: 1.5,
+                    pl: 3,
+                    background: '#f9fafb',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#374151', fontSize: '0.75rem' }}>
+                    {item.label}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.75rem' }}>
+                    {formatValue(item.value)}
+                  </Typography>
+                </Box>
+              ))}
 
-              {/* Order Value */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  p: 1.5,
-                  background: '#f0f9ff',
-                  borderRadius: '6px',
-                  border: '1px solid #bae6fd',
-                }}
-              >
-                <Typography variant="body2" sx={{ fontWeight: 600, color: '#0c4a6e', fontSize: '0.875rem' }}>
-                  Order Value
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700, color: '#0c4a6e', fontSize: '0.875rem' }}>
-                  {formatCurrency(orderValue)}
-                </Typography>
-              </Box>
+              {(hasBuyerInvoiceAmount || orderValueOtherFields.length > 0) && (
+                <Box sx={{ borderTop: '2px solid #e5e7eb' }} />
+              )}
 
-              {/* Breakups */}
-              {breakupsData.length > 0 && (
-                <>
-                  {breakupsData.map((item, index) => (
-                    <Box
-                      key={index}
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        p: 1.5,
-                        pl: 3,
-                        background: '#f9fafb',
-                        borderRadius: '6px',
-                        border: '1px solid #e5e7eb',
-                      }}
-                    >
-                      <Typography variant="body2" sx={{ fontWeight: 500, color: '#374151', fontSize: '0.75rem' }}>
-                        {item.label}
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.75rem' }}>
-                        {formatCurrency(item.value)}
-                      </Typography>
-                    </Box>
-                  ))}
-                  
-                  {/* Divider */}
-                  <Box sx={{ borderTop: '2px solid #e5e7eb' }} />
-                  
-                  {/* Settlement Value */}
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      p: 1.5,
-                      pl: 3,
-                      background: '#fef2f2',
-                      borderRadius: '6px',
-                      border: '1px solid #fecaca',
-                    }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#991b1b', fontSize: '0.75rem' }}>
-                      Settlement Value
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#991b1b', fontSize: '0.75rem' }}>
-                      {formatCurrency(-settlementValue)}
-                    </Typography>
-                  </Box>
-                  
-                  {/* Divider */}
-                  <Box sx={{ borderTop: '2px solid #e5e7eb' }} />
-                </>
+              {/* Settlement Value Section */}
+              {hasSettlementAmount && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    p: 1.5,
+                    background: '#fef2f2',
+                    borderRadius: '6px',
+                    border: '1px solid #fecaca',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#991b1b', fontSize: '0.875rem' }}>
+                    Settlement Amount
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#991b1b', fontSize: '0.875rem' }}>
+                    {formatCurrency(settlementAmount)}
+                  </Typography>
+                </Box>
+              )}
+
+              {settlementValueOtherFields.map((item, index) => (
+                <Box
+                  key={`settlement-value-${index}`}
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    p: 1.5,
+                    pl: 3,
+                    background: '#f9fafb',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#374151', fontSize: '0.75rem' }}>
+                    {item.label}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.75rem' }}>
+                    {formatValue(item.value)}
+                  </Typography>
+                </Box>
+              ))}
+
+              {(hasSettlementAmount || settlementValueOtherFields.length > 0) && (
+                <Box sx={{ borderTop: '2px solid #e5e7eb' }} />
               )}
 
               {/* Difference */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  p: 1.5,
-                  background: diff === 0 ? '#f0fdf4' : '#fef2f2',
-                  borderRadius: '6px',
-                  border: diff === 0 ? '1px solid #86efac' : '1px solid #fca5a5',
-                }}
-              >
-                <Typography variant="body2" sx={{ fontWeight: 700, color: diff === 0 ? '#166534' : '#991b1b', fontSize: '0.875rem' }}>
-                  Difference
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 800, color: diff === 0 ? '#166534' : '#991b1b', fontSize: '0.875rem' }}>
-                  {formatCurrency(diff)}
-                </Typography>
-              </Box>
+              {hasDiff && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    p: 1.5,
+                    background: differenceIsZero ? '#f0fdf4' : '#fef2f2',
+                    borderRadius: '6px',
+                    border: differenceIsZero ? '1px solid #86efac' : '1px solid #fca5a5',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: differenceIsZero ? '#166534' : '#991b1b', fontSize: '0.875rem' }}>
+                    Difference
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 800, color: differenceIsZero ? '#166534' : '#991b1b', fontSize: '0.875rem' }}>
+                    {formatCurrency(diffNumber)}
+                  </Typography>
+                </Box>
+              )}
             </Box>
           </Box>
         </Box>
@@ -2663,6 +2718,21 @@ const OperationsCentrePage: React.FC = () => {
                                 />
                               );
                             })()}
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleHistoryOpen(e, row)}
+                              sx={{
+                                p: 0.25,
+                                color: '#6b7280',
+                                '&:hover': {
+                                  color: '#111827',
+                                  background: '#f3f4f6',
+                                },
+                              }}
+                              aria-label="View transaction history"
+                            >
+                              <InfoIcon fontSize="small" sx={{ fontSize: '0.875rem' }} />
+                            </IconButton>
                           </Box>
                         </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
