@@ -4895,6 +4895,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           if (activeTab === 4) {
                             const salesColumnDef = salesReportData?.columns?.find(col => col.title === column);
                             const columnType = salesColumnDef?.type;
+                            const fieldName = salesColumnDef?.key;
                             if (columnType === 'date') {
                               displayValue = value ? formatDate(String(value)) : '';
                             } else if (columnType === 'currency') {
@@ -4902,7 +4903,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               displayValue = numericValue !== null && !Number.isNaN(numericValue) ? formatCurrency(numericValue) : '';
                             } else if (columnType === 'number' && column.toLowerCase().includes('rate')) {
                               const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
-                              displayValue = numericValue !== null && !Number.isNaN(numericValue) ? `${numericValue * 100}%` : '';
+                              // gst_rate is already in percentage form (12 = 12%), so don't multiply by 100
+                              if (fieldName === 'gst_rate') {
+                                displayValue = numericValue !== null && !Number.isNaN(numericValue) ? `${numericValue}%` : '';
+                              } else {
+                                // Other rate fields might be in decimal form (0.12 = 12%), so multiply by 100
+                                displayValue = numericValue !== null && !Number.isNaN(numericValue) ? `${numericValue * 100}%` : '';
+                              }
                             } else if (columnType === 'number') {
                               const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
                               displayValue = numericValue !== null && !Number.isNaN(numericValue) ? numericValue.toLocaleString('en-IN') : '';
