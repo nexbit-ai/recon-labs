@@ -1226,7 +1226,17 @@ const UploadDocuments: React.FC = () => {
                         Choose file
                       </Button>
                     </label>
-                    <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary" 
+                      sx={{ 
+                        flex: 1, 
+                        minWidth: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
                       {marketplaceFiles[rightPanelVendor]?.sales?.name || 'No file selected'}
                     </Typography>
                     <Button
@@ -1243,6 +1253,7 @@ const UploadDocuments: React.FC = () => {
                         background: isVendorUploaded(rightPanelVendor, 'sales') ? '#ffffff' : '#111111', 
                         color: isVendorUploaded(rightPanelVendor, 'sales') ? '#111111' : '#ffffff',
                         borderColor: isVendorUploaded(rightPanelVendor, 'sales') ? '#e5e7eb' : 'transparent',
+                        flexShrink: 0,
                         '&:hover': { 
                           background: isVendorUploaded(rightPanelVendor, 'sales') ? '#f8fafc' : '#333333',
                           borderColor: isVendorUploaded(rightPanelVendor, 'sales') ? '#d1d5db' : 'transparent'
@@ -1296,7 +1307,17 @@ const UploadDocuments: React.FC = () => {
                           Choose file
                         </Button>
                       </label>
-                      <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                      <Typography 
+                        variant="caption" 
+                        color="text.secondary" 
+                        sx={{ 
+                          flex: 1, 
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
                         {marketplaceFiles[rightPanelVendor]?.sales_b2b?.name || 'No file selected'}
                       </Typography>
                       <Button
@@ -1313,6 +1334,7 @@ const UploadDocuments: React.FC = () => {
                           background: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#ffffff' : '#111111', 
                           color: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#111111' : '#ffffff',
                           borderColor: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#e5e7eb' : 'transparent',
+                          flexShrink: 0,
                           '&:hover': { 
                             background: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#f8fafc' : '#333333',
                             borderColor: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#d1d5db' : 'transparent'
@@ -1366,7 +1388,17 @@ const UploadDocuments: React.FC = () => {
                         Choose file
                       </Button>
                     </label>
-                    <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary" 
+                      sx={{ 
+                        flex: 1, 
+                        minWidth: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
                       {marketplaceFiles[rightPanelVendor]?.settlement?.name || 'No file selected'}
                     </Typography>
                     <Button
@@ -1383,6 +1415,7 @@ const UploadDocuments: React.FC = () => {
                         background: isVendorUploaded(rightPanelVendor, 'settlement') ? '#ffffff' : '#111111', 
                         color: isVendorUploaded(rightPanelVendor, 'settlement') ? '#111111' : '#ffffff',
                         borderColor: isVendorUploaded(rightPanelVendor, 'settlement') ? '#e5e7eb' : 'transparent',
+                        flexShrink: 0,
                         '&:hover': { 
                           background: isVendorUploaded(rightPanelVendor, 'settlement') ? '#f8fafc' : '#333333',
                           borderColor: isVendorUploaded(rightPanelVendor, 'settlement') ? '#d1d5db' : 'transparent'
