@@ -2840,8 +2840,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setPage(0);
     setCurrentPage(1);
     if (activeTab === 4) {
+      // When on Sales Report tab, update both Sales Report and the other 4 tabs
       fetchSalesTransactions(dateRange, pendingSelectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+      fetchQuadTransactions(1, columnFilters, dateRange, pendingSelectedPlatform);
     } else {
+      // When on any other tab, only update the 4 tabs (Sales Report will be fetched when user switches to it)
       fetchQuadTransactions(1, columnFilters, dateRange, pendingSelectedPlatform);
     }
   };
@@ -4398,7 +4401,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           justifyContent: 'center'
                         }}>
                           <Box component="span">Sales Report</Box>
-                          {salesTabTotalCount !== null && (
+                          {/* Only show count when on Sales Report tab to avoid showing stale data when filters are applied on other tabs */}
+                          {activeTab === 4 && salesTabTotalCount !== null && (
                             <Box 
                               component="span"
                               sx={{ 
