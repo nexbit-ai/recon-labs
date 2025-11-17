@@ -1899,6 +1899,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Sales Report search state
   const [salesReportSearch, setSalesReportSearch] = useState<string>('');
   const [showSalesReportSearch, setShowSalesReportSearch] = useState(false);
+  // Amazon Sales Report business mode (B2C default)
+  const [amazonBusinessMode, setAmazonBusinessMode] = useState<'B2C' | 'B2B'>('B2C');
 
   // Get current data based on which API is being used
   const getCurrentData = (): any[] => {
@@ -2816,6 +2818,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   }, [initialTab]);
 
+  // Reset Amazon business mode to default when switching away from Amazon
+  useEffect(() => {
+    if (selectedPlatform !== 'amazon' && amazonBusinessMode !== 'B2C') {
+      setAmazonBusinessMode('B2C');
+    }
+  }, [selectedPlatform, amazonBusinessMode]);
+
   // Sync propDateRange with local dateRange state
   useEffect(() => {
     if (propDateRange && (propDateRange.start !== dateRange.start || propDateRange.end !== dateRange.end)) {
@@ -2866,6 +2875,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     } else {
       // When on any other tab, only update the 4 tabs (Sales Report will be fetched when user switches to it)
       fetchQuadTransactions(1, columnFilters, dateRange, pendingSelectedPlatform);
+    }
+  };
+
+  const handleAmazonBusinessModeToggle = (nextMode: 'B2C' | 'B2B') => {
+    if (!nextMode || nextMode === amazonBusinessMode) return;
+    setAmazonBusinessMode(nextMode);
+    if (activeTab === 4 && selectedPlatform === 'amazon') {
+      fetchSalesTransactions(
+        dateRange,
+        selectedPlatform,
+        { page: 1, limit: rowsPerPage, force: true },
+        salesReportSortConfig,
+        salesReportSearch || null,
+        nextMode
+      );
     }
   };
 
@@ -3242,7 +3266,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     overridePlatform?: Platform,
     options?: { page?: number; limit?: number; force?: boolean },
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
-    searchTerm?: string | null
+    searchTerm?: string | null,
+    businessModeOverride?: 'B2C' | 'B2B'
   ) => {
     const currentDateRange = dateRangeFilter || dateRange;
     const requestedPage = options?.page ?? 1;
@@ -3255,6 +3280,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
 
     const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
+    const businessModeToUse = platformToUse === 'amazon'
+      ? (businessModeOverride || amazonBusinessMode || 'B2C')
+      : undefined;
     const dateRangeChanged = !lastSalesReportDateRange || 
       lastSalesReportDateRange.start !== currentDateRange.start || 
       lastSalesReportDateRange.end !== currentDateRange.end;
@@ -3289,6 +3317,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         limit: requestedLimit,
         page: requestedPage,
       };
+
+      if (businessModeToUse) {
+        params.business_mode = businessModeToUse;
+      }
 
       // Add sorting parameters if provided
       if (sortByValue) {
@@ -4467,6 +4499,84 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     />
                   </Tabs>
                 </Box>
+
+                {activeTab === 4 && selectedPlatform === 'amazon' && (
+                  <Box
+                    sx={{
+                      mt: 2,
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: 1,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 600,
+                          color: amazonBusinessMode === 'B2C' ? '#111827' : '#9ca3af',
+                          cursor: salesReportLoading ? 'default' : 'pointer',
+                          userSelect: 'none',
+                        }}
+                        onClick={() => !salesReportLoading && handleAmazonBusinessModeToggle('B2C')}
+                      >
+                        B2C
+                      </Typography>
+                      <Box
+                        role="switch"
+                        aria-checked={amazonBusinessMode === 'B2B'}
+                        tabIndex={0}
+                        onClick={() => !salesReportLoading && handleAmazonBusinessModeToggle(amazonBusinessMode === 'B2C' ? 'B2B' : 'B2C')}
+                        onKeyDown={(e) => {
+                          if (salesReportLoading) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleAmazonBusinessModeToggle(amazonBusinessMode === 'B2C' ? 'B2B' : 'B2C');
+                          }
+                        }}
+                        sx={{
+                          width: 52,
+                          height: 28,
+                          borderRadius: 999,
+                          backgroundColor: '#111827',
+                          position: 'relative',
+                          px: 0.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          cursor: salesReportLoading ? 'not-allowed' : 'pointer',
+                          opacity: salesReportLoading ? 0.5 : 1,
+                          transition: 'background-color 0.2s ease',
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: '50%',
+                            backgroundColor: '#fff',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                            transform: amazonBusinessMode === 'B2B' ? 'translateX(22px)' : 'translateX(0)',
+                            transition: 'transform 0.2s ease',
+                          }}
+                        />
+                      </Box>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 600,
+                          color: amazonBusinessMode === 'B2B' ? '#111827' : '#9ca3af',
+                          cursor: salesReportLoading ? 'default' : 'pointer',
+                          userSelect: 'none',
+                        }}
+                        onClick={() => !salesReportLoading && handleAmazonBusinessModeToggle('B2B')}
+                      >
+                        B2B
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
 
                 {/* Active filter chips row directly under the header row, aligned under back button - Responsive */}
                 {(!!Object.keys(columnFilters).filter(k => columnFilters[k]).length || orderIdChips.length > 0) && (
