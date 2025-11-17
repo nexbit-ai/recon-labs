@@ -1850,12 +1850,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(() => {
     const tab = getInitialTab();
-    // Map old tab values: 0 = Matched, 1 = Mismatched, 2 = Unsettled, 3 = All
-    // For backward compatibility, if tab is 1 (old unsettled), map to 2 (new unsettled)
-    if (tab === 1) return 2; // Old unsettled -> new unsettled
-    // If a valid tab (0,2,3) is provided, use it; otherwise default to 0 (Matched)
-    if (tab === 0 || tab === 2 || tab === 3) return tab;
-    return 0; // Default to Matched
+    if (typeof tab === 'number' && tab >= 0 && tab <= 4) {
+      return tab;
+    }
+    return 0;
   });
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionRow | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
@@ -2797,8 +2795,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   useEffect(() => {
     if (location.state?.initialTab !== undefined) {
       const newTab = location.state.initialTab;
-      // Backward compatibility: map legacy unsettled (1) to new unsettled (2)
-      setActiveTab(newTab === 1 ? 2 : newTab);
+      if (typeof newTab === 'number' && newTab >= 0 && newTab <= 4) {
+        setActiveTab(newTab);
+      } else {
+        setActiveTab(0);
+      }
       // Clear the state to prevent re-triggering on re-renders
       navigate(location.pathname, { replace: true, state: {} });
     }
@@ -2807,11 +2808,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Handle initialTab prop changes (when opening TransactionSheet with different initialTab)
   useEffect(() => {
     if (initialTab !== undefined) {
-      // Backward compatibility: map legacy unsettled (1) to new unsettled (2)
-      const tabToSet = initialTab === 1 ? 2 : initialTab;
+      const tabToSet = typeof initialTab === 'number' && initialTab >= 0 && initialTab <= 4 ? initialTab : 0;
       setActiveTab(tabToSet);
-      
-      // If opening Sales Report tab (index 4), fetch the data
       if (tabToSet === 4) {
         fetchSalesTransactions(dateRange, selectedPlatform, { page: 1, limit: 100, force: true }, undefined, salesReportSearch || null);
       }
