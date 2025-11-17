@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -164,6 +164,15 @@ interface TransactionQueryParams {
   // Dynamic parameters for any column filtering
   [key: string]: any;
 }
+
+// Helper function to format settlement provider: capitalize first letter, replace underscores with spaces
+const formatSettlementProvider = (value: string | null | undefined): string => {
+  if (!value) return '';
+  return value
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
 
 // Transform API data to TransactionRow format
 const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
@@ -1762,10 +1771,7 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   'Difference': { apiParam: 'diff', type: 'number' },
   
   // D2C-specific CSV filters (with _in suffix support)
-  'Settlement Provider': { apiParam: 'settlement_provider_in', type: 'enum', supportedPlatforms: ['d2c'] },
-  'Recon Status': { apiParam: 'recon_status_in', type: 'enum', supportedPlatforms: ['d2c'] },
-  'Shipping Courier': { apiParam: 'shipping_courier_in', type: 'enum', supportedPlatforms: ['d2c'] },
-  'Mismatch Reason': { apiParam: 'mismatch_reason_in', type: 'enum', supportedPlatforms: ['d2c'] },
+  'Settlement Provider': { apiParam: 'settlement_provider', type: 'enum', supportedPlatforms: ['d2c'] },
 };
 
 // Mapping of sortable UI columns to backend sort_by values
@@ -1893,6 +1899,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Sales Report search state
   const [salesReportSearch, setSalesReportSearch] = useState<string>('');
   const [showSalesReportSearch, setShowSalesReportSearch] = useState(false);
+  // Amazon Sales Report business mode (B2C default)
+  const [amazonBusinessMode, setAmazonBusinessMode] = useState<'B2C' | 'B2B'>('B2C');
 
   // Get current data based on which API is being used
   const getCurrentData = (): any[] => {
@@ -2101,10 +2109,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     
     // Always add breakup fields for filtering (regardless of API type)
     meta['Event Type'] = { type: 'enum' };
-    meta['Shipping Courier'] = { type: 'enum' };
-    meta['Recon Status'] = { type: 'enum' };
     meta['Settlement Provider'] = { type: 'enum' };
-    meta['Mismatch Reason'] = { type: 'enum' };
     
     // Debug logging removed
     
@@ -2114,10 +2119,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Make COLUMN_META reactive to data changes - initialize with breakup fields
   const [COLUMN_META, setCOLUMN_META] = useState<Record<string, { type: 'string' | 'number' | 'date' | 'enum' }>>({
     'Event Type': { type: 'enum' },
-    'Shipping Courier': { type: 'enum' },
-    'Recon Status': { type: 'enum' },
     'Settlement Provider': { type: 'enum' },
-    'Mismatch Reason': { type: 'enum' },
   });
 
   // Update COLUMN_META when totalTransactionsData changes
@@ -2287,6 +2289,31 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     });
   };
 
+  // Helper function to clean enum values: capitalize first letter, remove underscores
+  const cleanEnumValue = (value: string): string => {
+    return value
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  // Create mapping from cleaned values to original values for settlement_provider
+  const settlementProviderMapping = useMemo(() => {
+    const mapping: Record<string, string> = {};
+    if (useNewAPI && totalTransactionsData?.columns) {
+      const settlementProviderColumn = totalTransactionsData.columns.find(
+        col => col.key === 'settlement_provider' && col.type === 'enum'
+      );
+      if (settlementProviderColumn?.values) {
+        settlementProviderColumn.values.forEach(originalValue => {
+          const cleanedValue = cleanEnumValue(originalValue);
+          mapping[cleanedValue] = originalValue;
+        });
+      }
+    }
+    return mapping;
+  }, [totalTransactionsData, useNewAPI]);
+
   // Helpers to get enum options from current data
   const getUniqueValuesForColumn = (columnName: string): string[] => {
     // For Status, show unique backend statuses
@@ -2299,42 +2326,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       return ['Sale', 'Return'];
     }
 
-    // For breakup fields, extract values from actual data
-    if (columnName === 'Shipping Courier' || columnName === 'Recon Status' || columnName === 'Settlement Provider' || columnName === 'Mismatch Reason') {
-      const values = new Set<string>();
-      const dataToCheck = [
-        ...allTransactionData,
-        ...(useNewAPI && totalTransactionsData?.data ? totalTransactionsData.data : [])
-      ];
-      
-      dataToCheck.forEach(row => {
-        let value: string | undefined;
-        
-        // Check in originalData first (new API structure has these at root level)
-        const originalData = (row as any)?.originalData;
-        
-        switch (columnName) {
-          case 'Shipping Courier':
-            value = (row as any)?.shipping_courier || originalData?.shipping_courier;
-            break;
-          case 'Recon Status':
-            value = (row as any)?.recon_status || originalData?.recon_status;
-            break;
-          case 'Settlement Provider':
-            value = (row as any)?.settlement_provider || originalData?.settlement_provider;
-            break;
-          case 'Mismatch Reason':
-            value = (row as any)?.mismatch_reason || originalData?.mismatch_reason;
-            break;
+    // For Settlement Provider, get values from API columns response
+    if (columnName === 'Settlement Provider') {
+      if (useNewAPI && totalTransactionsData?.columns) {
+        const settlementProviderColumn = totalTransactionsData.columns.find(
+          col => col.key === 'settlement_provider' && col.type === 'enum'
+        );
+        if (settlementProviderColumn?.values) {
+          // Return cleaned values for display
+          return settlementProviderColumn.values
+            .map(value => cleanEnumValue(value))
+            .sort();
         }
-        
-        if (typeof value === 'string' && value.trim()) {
-          values.add(value.trim());
-        }
-      });
-      
-      // If no values found, return empty array
-      return Array.from(values).sort();
+      }
+      // Fallback: return empty array if no values found
+      return [];
     }
 
     // For other columns, try to get values from data
@@ -2498,8 +2504,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           
           case 'enum':
             if (Array.isArray(filterValue) && filterValue.length > 0) {
-              // Use the mapped API param which already includes _in suffix if needed
-              (params as any)[baseParam] = filterValue.join(',');
+              // For Settlement Provider, map cleaned values back to original values
+              if (columnKey === 'Settlement Provider') {
+                const originalValues = filterValue
+                  .map(cleanedValue => settlementProviderMapping[cleanedValue] || cleanedValue)
+                  .filter(Boolean);
+                if (originalValues.length > 0) {
+                  (params as any)[baseParam] = originalValues.join(',');
+                }
+              } else {
+                // Use the mapped API param which already includes _in suffix if needed
+                (params as any)[baseParam] = filterValue.join(',');
+              }
             }
             break;
         }
@@ -2538,6 +2554,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const response = await api.transactions.getTotalTransactions(queryParams as any);
       
       if (response.success && response.data) {
+        // Store total transactions data for column metadata (enum values, etc.)
+        setTotalTransactionsData(response.data as TotalTransactionsResponse);
+        
         // Debug: Log the API response structure
         
         const responseData = response.data as any;
@@ -2666,6 +2685,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const response = await api.transactions.getTotalTransactions(queryParams as any);
       
       if (response.success && response.data) {
+        // Store total transactions data for column metadata (enum values, etc.)
+        setTotalTransactionsData(response.data as TotalTransactionsResponse);
+        
         // Debug: Log the API response structure
         
         const responseData = response.data as any;
@@ -2796,6 +2818,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   }, [initialTab]);
 
+  // Reset Amazon business mode to default when switching away from Amazon
+  useEffect(() => {
+    if (selectedPlatform !== 'amazon' && amazonBusinessMode !== 'B2C') {
+      setAmazonBusinessMode('B2C');
+    }
+  }, [selectedPlatform, amazonBusinessMode]);
+
   // Sync propDateRange with local dateRange state
   useEffect(() => {
     if (propDateRange && (propDateRange.start !== dateRange.start || propDateRange.end !== dateRange.end)) {
@@ -2846,6 +2875,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     } else {
       // When on any other tab, only update the 4 tabs (Sales Report will be fetched when user switches to it)
       fetchQuadTransactions(1, columnFilters, dateRange, pendingSelectedPlatform);
+    }
+  };
+
+  const handleAmazonBusinessModeToggle = (nextMode: 'B2C' | 'B2B') => {
+    if (!nextMode || nextMode === amazonBusinessMode) return;
+    setAmazonBusinessMode(nextMode);
+    if (activeTab === 4 && selectedPlatform === 'amazon') {
+      fetchSalesTransactions(
+        dateRange,
+        selectedPlatform,
+        { page: 1, limit: rowsPerPage, force: true },
+        salesReportSortConfig,
+        salesReportSearch || null,
+        nextMode
+      );
     }
   };
 
@@ -3043,11 +3087,20 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
             }
             break;
           
-          case 'enum':
-            if (Array.isArray(filterValue) && filterValue.length > 0) {
+        case 'enum':
+          if (Array.isArray(filterValue) && filterValue.length > 0) {
+            if (columnKey === 'Settlement Provider') {
+              const originalValues = filterValue
+                .map(cleanedValue => settlementProviderMapping[cleanedValue] || cleanedValue)
+                .filter(Boolean);
+              if (originalValues.length > 0) {
+                baseParams[baseParam] = originalValues.join(',');
+              }
+            } else {
               baseParams[baseParam] = filterValue.join(',');
             }
-            break;
+          }
+          break;
         }
       });
     }
@@ -3120,6 +3173,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       ];
       
       const [matchedResponse, mismatchedResponse, unsettledResponse, allResponse] = await Promise.all(apiCalls);
+      
+      // Use the first successful response that contains column metadata to populate filters
+      const responseWithColumns = [matchedResponse, mismatchedResponse, unsettledResponse, allResponse].find(
+        (res) => res.success && (res.data as TotalTransactionsResponse | undefined)?.columns
+      );
+      if (responseWithColumns?.data) {
+        setTotalTransactionsData(responseWithColumns.data as TotalTransactionsResponse);
+      }
       
       // Process matched response (Tab 0)
       if (matchedResponse.success) {
@@ -3205,7 +3266,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     overridePlatform?: Platform,
     options?: { page?: number; limit?: number; force?: boolean },
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
-    searchTerm?: string | null
+    searchTerm?: string | null,
+    businessModeOverride?: 'B2C' | 'B2B'
   ) => {
     const currentDateRange = dateRangeFilter || dateRange;
     const requestedPage = options?.page ?? 1;
@@ -3218,6 +3280,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
 
     const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
+    const businessModeToUse = platformToUse === 'amazon'
+      ? (businessModeOverride || amazonBusinessMode || 'B2C')
+      : undefined;
     const dateRangeChanged = !lastSalesReportDateRange || 
       lastSalesReportDateRange.start !== currentDateRange.start || 
       lastSalesReportDateRange.end !== currentDateRange.end;
@@ -3252,6 +3317,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         limit: requestedLimit,
         page: requestedPage,
       };
+
+      if (businessModeToUse) {
+        params.business_mode = businessModeToUse;
+      }
 
       // Add sorting parameters if provided
       if (sortByValue) {
@@ -3395,8 +3464,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
             
             case 'enum':
               if (Array.isArray(filterValue) && filterValue.length > 0) {
-                // Use the mapped API param which already includes _in suffix if needed
-                params[baseParam] = filterValue.join(',');
+                // For Settlement Provider, map cleaned values back to original values
+                if (columnKey === 'Settlement Provider') {
+                  const originalValues = filterValue
+                    .map(cleanedValue => settlementProviderMapping[cleanedValue] || cleanedValue)
+                    .filter(Boolean);
+                  if (originalValues.length > 0) {
+                    params[baseParam] = originalValues.join(',');
+                  }
+                } else {
+                  // Use the mapped API param which already includes _in suffix if needed
+                  params[baseParam] = filterValue.join(',');
+                }
               }
               break;
           }
@@ -4421,6 +4500,84 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   </Tabs>
                 </Box>
 
+                {activeTab === 4 && selectedPlatform === 'amazon' && (
+                  <Box
+                    sx={{
+                      mt: 2,
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: 1,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 600,
+                          color: amazonBusinessMode === 'B2C' ? '#111827' : '#9ca3af',
+                          cursor: salesReportLoading ? 'default' : 'pointer',
+                          userSelect: 'none',
+                        }}
+                        onClick={() => !salesReportLoading && handleAmazonBusinessModeToggle('B2C')}
+                      >
+                        B2C
+                      </Typography>
+                      <Box
+                        role="switch"
+                        aria-checked={amazonBusinessMode === 'B2B'}
+                        tabIndex={0}
+                        onClick={() => !salesReportLoading && handleAmazonBusinessModeToggle(amazonBusinessMode === 'B2C' ? 'B2B' : 'B2C')}
+                        onKeyDown={(e) => {
+                          if (salesReportLoading) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleAmazonBusinessModeToggle(amazonBusinessMode === 'B2C' ? 'B2B' : 'B2C');
+                          }
+                        }}
+                        sx={{
+                          width: 52,
+                          height: 28,
+                          borderRadius: 999,
+                          backgroundColor: '#111827',
+                          position: 'relative',
+                          px: 0.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          cursor: salesReportLoading ? 'not-allowed' : 'pointer',
+                          opacity: salesReportLoading ? 0.5 : 1,
+                          transition: 'background-color 0.2s ease',
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: '50%',
+                            backgroundColor: '#fff',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                            transform: amazonBusinessMode === 'B2B' ? 'translateX(22px)' : 'translateX(0)',
+                            transition: 'transform 0.2s ease',
+                          }}
+                        />
+                      </Box>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 600,
+                          color: amazonBusinessMode === 'B2B' ? '#111827' : '#9ca3af',
+                          cursor: salesReportLoading ? 'default' : 'pointer',
+                          userSelect: 'none',
+                        }}
+                        onClick={() => !salesReportLoading && handleAmazonBusinessModeToggle('B2B')}
+                      >
+                        B2B
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+
                 {/* Active filter chips row directly under the header row, aligned under back button - Responsive */}
                 {(!!Object.keys(columnFilters).filter(k => columnFilters[k]).length || orderIdChips.length > 0) && (
                   <Box sx={{
@@ -4988,6 +5145,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           // Capitalize platform column
                           if (column === 'Platform' || column === 'platform') {
                             displayValue = String(displayValue || '').toUpperCase();
+                          }
+                          
+                          // Format Settlement Provider column: capitalize first letter, replace underscores with spaces
+                          if (column === 'Settlement Provider') {
+                            displayValue = formatSettlementProvider(value);
                           }
                           
                           return (

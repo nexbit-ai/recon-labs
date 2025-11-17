@@ -91,7 +91,17 @@ export const transactionsAPI = {
     apiService.get<TotalTransactionsResponse>(API_CONFIG.ENDPOINTS.D2C_TRANSACTIONS, params, { useD2CHeaders: true }),
 
   // Get sales transactions
-  getSalesTransactions: (params?: { platform?: string; order_date_from?: string; order_date_to?: string; limit?: number }) =>
+  getSalesTransactions: (params?: { 
+    platform?: string; 
+    order_date_from?: string; 
+    order_date_to?: string; 
+    limit?: number;
+    page?: number;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+    search?: string;
+    business_mode?: 'B2C' | 'B2B';
+  }) =>
     apiService.get<SalesTransactionsResponse>(API_CONFIG.ENDPOINTS.SALES_TRANSACTIONS, params),
 };
 
