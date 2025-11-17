@@ -1969,15 +1969,30 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       if (!currentData) {
         return [];
       }
-      return currentData.columns?.map(col => col.title) || [];
+      const columns = currentData.columns?.map(col => col.title) || [];
+      // Add Settlement Provider column for d2c platform (not in Sales Report tab)
+      if (selectedPlatform === 'd2c' && activeTab !== 4 && !columns.includes('Settlement Provider')) {
+        return [...columns, 'Settlement Provider'];
+      }
+      return columns;
     }
     
     // Fallback to legacy single API data
     if (useNewAPI && totalTransactionsData) {
       // Handle null columns case - only return actual API columns, not breakup fields
-      return totalTransactionsData.columns?.map(col => col.title) || [];
+      const columns = totalTransactionsData.columns?.map(col => col.title) || [];
+      // Add Settlement Provider column for d2c platform (not in Sales Report tab)
+      if (selectedPlatform === 'd2c' && activeTab !== 4 && !columns.includes('Settlement Provider')) {
+        return [...columns, 'Settlement Provider'];
+      }
+      return columns;
     }
-    return visibleColumns;
+    const columns = visibleColumns;
+    // Add Settlement Provider column for d2c platform (not in Sales Report tab)
+    if (selectedPlatform === 'd2c' && activeTab !== 4 && !columns.includes('Settlement Provider')) {
+      return [...columns, 'Settlement Provider'];
+    }
+    return columns;
   };
 
 
@@ -1985,6 +2000,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   
   // Dropdown menu state for Status column
 
+
+  // Format settlement provider: capitalize first letter and replace underscores with spaces
+  const formatSettlementProvider = (provider: string | null | undefined): string => {
+    if (!provider) return '';
+    return provider
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
 
   // Format currency values
   const formatCurrency = (amount: number) => {
@@ -4866,6 +4890,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 }
                               }
                             }
+                            // Handle Settlement Provider column (extract from row data if not in API columns or value is missing)
+                            if (column === 'Settlement Provider' && (!columnDef || value === undefined || value === null || value === '')) {
+                              const originalData = (row as any)?.originalData;
+                              value = (row as any)?.settlement_provider || originalData?.settlement_provider;
+                            }
                           } else if (useNewAPI && totalTransactionsData) {
                             const columnDef = totalTransactionsData.columns.find(col => col.title === column);
                             if (columnDef) {
@@ -4881,14 +4910,32 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 }
                               }
                             }
+                            // Handle Settlement Provider column (extract from row data if not in API columns or value is missing)
+                            if (column === 'Settlement Provider' && (!columnDef || value === undefined || value === null || value === '')) {
+                              const originalData = (row as any)?.originalData;
+                              value = (row as any)?.settlement_provider || originalData?.settlement_provider;
+                            }
                           } else {
                             value = (row as any)[column];
+                          }
+                          
+                          // Handle Settlement Provider column (extract from row data if not already set)
+                          if (column === 'Settlement Provider' && (value === undefined || value === null || value === '')) {
+                            const originalData = (row as any)?.originalData;
+                            value = (row as any)?.settlement_provider || originalData?.settlement_provider;
                           }
                           
                           // Override settlement date for unsettled transactions
                           // Show NA for Settlement Date when the transaction is unsettled (across all tabs)
                           // Also show NA when on the unsettled tab (tab 2) - all transactions there are unsettled
                           if (column === 'Settlement Date' && ((row as any)?.recon_status === 'unsettled' || activeTab === 2)) {
+                            value = 'NA';
+                          }
+                          
+                          // Override settlement provider for unsettled transactions
+                          // Show NA for Settlement Provider when the transaction is unsettled (across all tabs)
+                          // Also show NA when on the unsettled tab (tab 2) - all transactions there are unsettled
+                          if (column === 'Settlement Provider' && ((row as any)?.recon_status === 'unsettled' || activeTab === 2)) {
                             value = 'NA';
                           }
                           
@@ -4943,7 +4990,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(String(value));
                                   break;
                                 case 'enum':
-                                  displayValue = String(value || '');
+                                  // Format Settlement Provider specially
+                                  if (column === 'Settlement Provider') {
+                                    // Don't format "NA" - show it as is
+                                    if (value === 'NA' || value === '') {
+                                      displayValue = 'NA';
+                                    } else {
+                                      displayValue = formatSettlementProvider(value);
+                                    }
+                                  } else {
+                                    displayValue = String(value || '');
+                                  }
                                   break;
                                 default:
                                   displayValue = String(value || '');
@@ -4962,7 +5019,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(String(value));
                                   break;
                                 case 'enum':
-                                  displayValue = String(value || '');
+                                  // Format Settlement Provider specially
+                                  if (column === 'Settlement Provider') {
+                                    // Don't format "NA" - show it as is
+                                    if (value === 'NA' || value === '') {
+                                      displayValue = 'NA';
+                                    } else {
+                                      displayValue = formatSettlementProvider(value);
+                                    }
+                                  } else {
+                                    displayValue = String(value || '');
+                                  }
                                   break;
                                 default:
                                   displayValue = String(value || '');
@@ -4988,6 +5055,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           // Capitalize platform column
                           if (column === 'Platform' || column === 'platform') {
                             displayValue = String(displayValue || '').toUpperCase();
+                          }
+                          
+                          // Format Settlement Provider column
+                          if (column === 'Settlement Provider') {
+                            // Don't format "NA" - show it as is
+                            if (value === 'NA' || value === '') {
+                              displayValue = 'NA';
+                            } else {
+                              displayValue = formatSettlementProvider(value);
+                            }
                           }
                           
                           return (
