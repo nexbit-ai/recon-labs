@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -164,6 +164,15 @@ interface TransactionQueryParams {
   // Dynamic parameters for any column filtering
   [key: string]: any;
 }
+
+// Helper function to format settlement provider: capitalize first letter, replace underscores with spaces
+const formatSettlementProvider = (value: string | null | undefined): string => {
+  if (!value) return '';
+  return value
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
 
 // Transform API data to TransactionRow format
 const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
@@ -1762,10 +1771,7 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   'Difference': { apiParam: 'diff', type: 'number' },
   
   // D2C-specific CSV filters (with _in suffix support)
-  'Settlement Provider': { apiParam: 'settlement_provider_in', type: 'enum', supportedPlatforms: ['d2c'] },
-  'Recon Status': { apiParam: 'recon_status_in', type: 'enum', supportedPlatforms: ['d2c'] },
-  'Shipping Courier': { apiParam: 'shipping_courier_in', type: 'enum', supportedPlatforms: ['d2c'] },
-  'Mismatch Reason': { apiParam: 'mismatch_reason_in', type: 'enum', supportedPlatforms: ['d2c'] },
+  'Settlement Provider': { apiParam: 'settlement_provider', type: 'enum', supportedPlatforms: ['d2c'] },
 };
 
 // Mapping of sortable UI columns to backend sort_by values
@@ -1969,30 +1975,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       if (!currentData) {
         return [];
       }
-      const columns = currentData.columns?.map(col => col.title) || [];
-      // Add Settlement Provider column for d2c platform (not in Sales Report tab)
-      if (selectedPlatform === 'd2c' && activeTab !== 4 && !columns.includes('Settlement Provider')) {
-        return [...columns, 'Settlement Provider'];
-      }
-      return columns;
+      return currentData.columns?.map(col => col.title) || [];
     }
     
     // Fallback to legacy single API data
     if (useNewAPI && totalTransactionsData) {
       // Handle null columns case - only return actual API columns, not breakup fields
-      const columns = totalTransactionsData.columns?.map(col => col.title) || [];
-      // Add Settlement Provider column for d2c platform (not in Sales Report tab)
-      if (selectedPlatform === 'd2c' && activeTab !== 4 && !columns.includes('Settlement Provider')) {
-        return [...columns, 'Settlement Provider'];
-      }
-      return columns;
+      return totalTransactionsData.columns?.map(col => col.title) || [];
     }
-    const columns = visibleColumns;
-    // Add Settlement Provider column for d2c platform (not in Sales Report tab)
-    if (selectedPlatform === 'd2c' && activeTab !== 4 && !columns.includes('Settlement Provider')) {
-      return [...columns, 'Settlement Provider'];
-    }
-    return columns;
+    return visibleColumns;
   };
 
 
@@ -2000,15 +1991,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   
   // Dropdown menu state for Status column
 
-
-  // Format settlement provider: capitalize first letter and replace underscores with spaces
-  const formatSettlementProvider = (provider: string | null | undefined): string => {
-    if (!provider) return '';
-    return provider
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
-  };
 
   // Format currency values
   const formatCurrency = (amount: number) => {
@@ -2125,10 +2107,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     
     // Always add breakup fields for filtering (regardless of API type)
     meta['Event Type'] = { type: 'enum' };
-    meta['Shipping Courier'] = { type: 'enum' };
-    meta['Recon Status'] = { type: 'enum' };
     meta['Settlement Provider'] = { type: 'enum' };
-    meta['Mismatch Reason'] = { type: 'enum' };
     
     // Debug logging removed
     
@@ -2138,10 +2117,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Make COLUMN_META reactive to data changes - initialize with breakup fields
   const [COLUMN_META, setCOLUMN_META] = useState<Record<string, { type: 'string' | 'number' | 'date' | 'enum' }>>({
     'Event Type': { type: 'enum' },
-    'Shipping Courier': { type: 'enum' },
-    'Recon Status': { type: 'enum' },
     'Settlement Provider': { type: 'enum' },
-    'Mismatch Reason': { type: 'enum' },
   });
 
   // Update COLUMN_META when totalTransactionsData changes
@@ -2311,6 +2287,31 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     });
   };
 
+  // Helper function to clean enum values: capitalize first letter, remove underscores
+  const cleanEnumValue = (value: string): string => {
+    return value
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  // Create mapping from cleaned values to original values for settlement_provider
+  const settlementProviderMapping = useMemo(() => {
+    const mapping: Record<string, string> = {};
+    if (useNewAPI && totalTransactionsData?.columns) {
+      const settlementProviderColumn = totalTransactionsData.columns.find(
+        col => col.key === 'settlement_provider' && col.type === 'enum'
+      );
+      if (settlementProviderColumn?.values) {
+        settlementProviderColumn.values.forEach(originalValue => {
+          const cleanedValue = cleanEnumValue(originalValue);
+          mapping[cleanedValue] = originalValue;
+        });
+      }
+    }
+    return mapping;
+  }, [totalTransactionsData, useNewAPI]);
+
   // Helpers to get enum options from current data
   const getUniqueValuesForColumn = (columnName: string): string[] => {
     // For Status, show unique backend statuses
@@ -2323,42 +2324,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       return ['Sale', 'Return'];
     }
 
-    // For breakup fields, extract values from actual data
-    if (columnName === 'Shipping Courier' || columnName === 'Recon Status' || columnName === 'Settlement Provider' || columnName === 'Mismatch Reason') {
-      const values = new Set<string>();
-      const dataToCheck = [
-        ...allTransactionData,
-        ...(useNewAPI && totalTransactionsData?.data ? totalTransactionsData.data : [])
-      ];
-      
-      dataToCheck.forEach(row => {
-        let value: string | undefined;
-        
-        // Check in originalData first (new API structure has these at root level)
-        const originalData = (row as any)?.originalData;
-        
-        switch (columnName) {
-          case 'Shipping Courier':
-            value = (row as any)?.shipping_courier || originalData?.shipping_courier;
-            break;
-          case 'Recon Status':
-            value = (row as any)?.recon_status || originalData?.recon_status;
-            break;
-          case 'Settlement Provider':
-            value = (row as any)?.settlement_provider || originalData?.settlement_provider;
-            break;
-          case 'Mismatch Reason':
-            value = (row as any)?.mismatch_reason || originalData?.mismatch_reason;
-            break;
+    // For Settlement Provider, get values from API columns response
+    if (columnName === 'Settlement Provider') {
+      if (useNewAPI && totalTransactionsData?.columns) {
+        const settlementProviderColumn = totalTransactionsData.columns.find(
+          col => col.key === 'settlement_provider' && col.type === 'enum'
+        );
+        if (settlementProviderColumn?.values) {
+          // Return cleaned values for display
+          return settlementProviderColumn.values
+            .map(value => cleanEnumValue(value))
+            .sort();
         }
-        
-        if (typeof value === 'string' && value.trim()) {
-          values.add(value.trim());
-        }
-      });
-      
-      // If no values found, return empty array
-      return Array.from(values).sort();
+      }
+      // Fallback: return empty array if no values found
+      return [];
     }
 
     // For other columns, try to get values from data
@@ -2522,8 +2502,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           
           case 'enum':
             if (Array.isArray(filterValue) && filterValue.length > 0) {
-              // Use the mapped API param which already includes _in suffix if needed
-              (params as any)[baseParam] = filterValue.join(',');
+              // For Settlement Provider, map cleaned values back to original values
+              if (columnKey === 'Settlement Provider') {
+                const originalValues = filterValue
+                  .map(cleanedValue => settlementProviderMapping[cleanedValue] || cleanedValue)
+                  .filter(Boolean);
+                if (originalValues.length > 0) {
+                  (params as any)[baseParam] = originalValues.join(',');
+                }
+              } else {
+                // Use the mapped API param which already includes _in suffix if needed
+                (params as any)[baseParam] = filterValue.join(',');
+              }
             }
             break;
         }
@@ -2562,6 +2552,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const response = await api.transactions.getTotalTransactions(queryParams as any);
       
       if (response.success && response.data) {
+        // Store total transactions data for column metadata (enum values, etc.)
+        setTotalTransactionsData(response.data as TotalTransactionsResponse);
+        
         // Debug: Log the API response structure
         
         const responseData = response.data as any;
@@ -2690,6 +2683,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const response = await api.transactions.getTotalTransactions(queryParams as any);
       
       if (response.success && response.data) {
+        // Store total transactions data for column metadata (enum values, etc.)
+        setTotalTransactionsData(response.data as TotalTransactionsResponse);
+        
         // Debug: Log the API response structure
         
         const responseData = response.data as any;
@@ -3067,11 +3063,20 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
             }
             break;
           
-          case 'enum':
-            if (Array.isArray(filterValue) && filterValue.length > 0) {
+        case 'enum':
+          if (Array.isArray(filterValue) && filterValue.length > 0) {
+            if (columnKey === 'Settlement Provider') {
+              const originalValues = filterValue
+                .map(cleanedValue => settlementProviderMapping[cleanedValue] || cleanedValue)
+                .filter(Boolean);
+              if (originalValues.length > 0) {
+                baseParams[baseParam] = originalValues.join(',');
+              }
+            } else {
               baseParams[baseParam] = filterValue.join(',');
             }
-            break;
+          }
+          break;
         }
       });
     }
@@ -3144,6 +3149,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       ];
       
       const [matchedResponse, mismatchedResponse, unsettledResponse, allResponse] = await Promise.all(apiCalls);
+      
+      // Use the first successful response that contains column metadata to populate filters
+      const responseWithColumns = [matchedResponse, mismatchedResponse, unsettledResponse, allResponse].find(
+        (res) => res.success && (res.data as TotalTransactionsResponse | undefined)?.columns
+      );
+      if (responseWithColumns?.data) {
+        setTotalTransactionsData(responseWithColumns.data as TotalTransactionsResponse);
+      }
       
       // Process matched response (Tab 0)
       if (matchedResponse.success) {
@@ -3419,8 +3432,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
             
             case 'enum':
               if (Array.isArray(filterValue) && filterValue.length > 0) {
-                // Use the mapped API param which already includes _in suffix if needed
-                params[baseParam] = filterValue.join(',');
+                // For Settlement Provider, map cleaned values back to original values
+                if (columnKey === 'Settlement Provider') {
+                  const originalValues = filterValue
+                    .map(cleanedValue => settlementProviderMapping[cleanedValue] || cleanedValue)
+                    .filter(Boolean);
+                  if (originalValues.length > 0) {
+                    params[baseParam] = originalValues.join(',');
+                  }
+                } else {
+                  // Use the mapped API param which already includes _in suffix if needed
+                  params[baseParam] = filterValue.join(',');
+                }
               }
               break;
           }
@@ -4890,11 +4913,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 }
                               }
                             }
-                            // Handle Settlement Provider column (extract from row data if not in API columns or value is missing)
-                            if (column === 'Settlement Provider' && (!columnDef || value === undefined || value === null || value === '')) {
-                              const originalData = (row as any)?.originalData;
-                              value = (row as any)?.settlement_provider || originalData?.settlement_provider;
-                            }
                           } else if (useNewAPI && totalTransactionsData) {
                             const columnDef = totalTransactionsData.columns.find(col => col.title === column);
                             if (columnDef) {
@@ -4910,32 +4928,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 }
                               }
                             }
-                            // Handle Settlement Provider column (extract from row data if not in API columns or value is missing)
-                            if (column === 'Settlement Provider' && (!columnDef || value === undefined || value === null || value === '')) {
-                              const originalData = (row as any)?.originalData;
-                              value = (row as any)?.settlement_provider || originalData?.settlement_provider;
-                            }
                           } else {
                             value = (row as any)[column];
-                          }
-                          
-                          // Handle Settlement Provider column (extract from row data if not already set)
-                          if (column === 'Settlement Provider' && (value === undefined || value === null || value === '')) {
-                            const originalData = (row as any)?.originalData;
-                            value = (row as any)?.settlement_provider || originalData?.settlement_provider;
                           }
                           
                           // Override settlement date for unsettled transactions
                           // Show NA for Settlement Date when the transaction is unsettled (across all tabs)
                           // Also show NA when on the unsettled tab (tab 2) - all transactions there are unsettled
                           if (column === 'Settlement Date' && ((row as any)?.recon_status === 'unsettled' || activeTab === 2)) {
-                            value = 'NA';
-                          }
-                          
-                          // Override settlement provider for unsettled transactions
-                          // Show NA for Settlement Provider when the transaction is unsettled (across all tabs)
-                          // Also show NA when on the unsettled tab (tab 2) - all transactions there are unsettled
-                          if (column === 'Settlement Provider' && ((row as any)?.recon_status === 'unsettled' || activeTab === 2)) {
                             value = 'NA';
                           }
                           
@@ -4990,17 +4990,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(String(value));
                                   break;
                                 case 'enum':
-                                  // Format Settlement Provider specially
-                                  if (column === 'Settlement Provider') {
-                                    // Don't format "NA" - show it as is
-                                    if (value === 'NA' || value === '') {
-                                      displayValue = 'NA';
-                                    } else {
-                                      displayValue = formatSettlementProvider(value);
-                                    }
-                                  } else {
-                                    displayValue = String(value || '');
-                                  }
+                                  displayValue = String(value || '');
                                   break;
                                 default:
                                   displayValue = String(value || '');
@@ -5019,17 +5009,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(String(value));
                                   break;
                                 case 'enum':
-                                  // Format Settlement Provider specially
-                                  if (column === 'Settlement Provider') {
-                                    // Don't format "NA" - show it as is
-                                    if (value === 'NA' || value === '') {
-                                      displayValue = 'NA';
-                                    } else {
-                                      displayValue = formatSettlementProvider(value);
-                                    }
-                                  } else {
-                                    displayValue = String(value || '');
-                                  }
+                                  displayValue = String(value || '');
                                   break;
                                 default:
                                   displayValue = String(value || '');
@@ -5057,14 +5037,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             displayValue = String(displayValue || '').toUpperCase();
                           }
                           
-                          // Format Settlement Provider column
+                          // Format Settlement Provider column: capitalize first letter, replace underscores with spaces
                           if (column === 'Settlement Provider') {
-                            // Don't format "NA" - show it as is
-                            if (value === 'NA' || value === '') {
-                              displayValue = 'NA';
-                            } else {
-                              displayValue = formatSettlementProvider(value);
-                            }
+                            displayValue = formatSettlementProvider(value);
                           }
                           
                           return (
