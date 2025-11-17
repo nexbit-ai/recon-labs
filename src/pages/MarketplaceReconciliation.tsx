@@ -143,6 +143,19 @@ const getProviderDisplayName = (code: string): string => {
   };
   return displayMap[code.toLowerCase()] || code;
 };
+
+const providerTransactionsButtonSx = {
+  textTransform: 'none',
+  fontSize: '0.8rem',
+  fontWeight: 500,
+  color: '#2563eb',
+  p: 0,
+  minWidth: 'auto',
+  '&:hover': {
+    backgroundColor: 'transparent',
+    color: '#1d4ed8',
+  },
+} as const;
 import {
   StorefrontOutlined as StorefrontIcon,
   TrendingUp as TrendingUpIcon,
@@ -205,6 +218,38 @@ const MarketplaceReconciliation: React.FC = () => {
   const [usingMockData, setUsingMockData] = useState(false);
   const [isCodExpanded, setIsCodExpanded] = useState(false);
   const [expandedProviderKey, setExpandedProviderKey] = useState<string | null>(null);
+  const getSettlementProviderCode = (providerKey?: string | null, providerName?: string | null) => {
+    const normalizedKey = providerKey ? norm(providerKey) : '';
+    if (normalizedKey) return normalizedKey;
+    if (!providerName) return undefined;
+    const lowerName = providerName.toLowerCase();
+    const displayMatch = Object.entries(DISPLAY_NAME_MAP).find(
+      ([, displayName]) => displayName.toLowerCase() === lowerName
+    );
+    if (displayMatch) return displayMatch[0];
+    return norm(providerName);
+  };
+  const openTransactionSheetForProvider = (
+    providerKey?: string | null,
+    providerName?: string | null,
+    tabIndex = 0
+  ) => {
+    const settlementProvider = getSettlementProviderCode(providerKey, providerName);
+    setInitialTsFilters(settlementProvider ? { settlement_provider: settlementProvider } : undefined);
+    setInitialTsTab(tabIndex);
+    setShowTransactionSheet(true);
+  };
+  const getPlatformForProvider = (providerKey: string, providerName: string): 'flipkart' | 'amazon' | 'd2c' => {
+    const key = providerKey?.toLowerCase?.() || '';
+    const name = providerName?.toLowerCase?.() || '';
+    if (key === 'amazon' || name.includes('amazon')) {
+      return 'amazon';
+    }
+    if (key === 'd2c' || name.includes('d2c') || name.includes('direct')) {
+      return 'd2c';
+    }
+    return 'flipkart';
+  };
   
   // Sales overview data state
   const [salesOverview, setSalesOverview] = useState({
@@ -2956,6 +3001,22 @@ const MarketplaceReconciliation: React.FC = () => {
                                                 </Typography>
                                               </Box>
                                             </Box>
+                                            {provider.key !== 'cod' && (
+                                              <Box sx={{ mt: 1.5, textAlign: 'right' }}>
+                                                <Button
+                                                  variant="text"
+                                                  size="small"
+                                                  endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                  sx={providerTransactionsButtonSx}
+                                                  onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    openTransactionSheetForProvider(provider.key, provider.name, 0);
+                                                  }}
+                                                >
+                                                  View {provider.name} transactions
+                                                </Button>
+                                              </Box>
+                                            )}
                                             {/* COD logistics partners expandable details */}
                                             {provider.key === 'cod' && (
                                               <MuiCollapse in={isCodExpanded} timeout="auto" unmountOnExit>
@@ -2972,7 +3033,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                                       const unmatchedForLp = Number((unrecCodArray.find(c => c.code === lpRaw.code))?.totalSaleAmount || 0);
                                                       const denom = settledAmountForLp + unmatchedForLp;
                                                       const percentMatched = denom === 0 ? 0 : (settledAmountForLp / denom) * 100;
-                                                      const lp = { name: lpRaw.displayName, settledAmount: settledAmountForLp, orders: ordersForLp, percentMatched };
+                                                      const lp = { code: lpRaw.code, name: lpRaw.displayName, settledAmount: settledAmountForLp, orders: ordersForLp, percentMatched };
                                                       return (
                                                         <Box key={lp.name}>
                                                           <Box sx={{
@@ -2998,38 +3059,24 @@ const MarketplaceReconciliation: React.FC = () => {
                                                               </Typography>
                                                             </Box>
                                                           </Box>
+                                                          <Box sx={{ mt: 1, textAlign: 'right' }}>
+                                                            <Button
+                                                              variant="text"
+                                                              size="small"
+                                                              endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                              sx={providerTransactionsButtonSx}
+                                                              onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                openTransactionSheetForProvider(lp.code, lp.name, 0);
+                                                              }}
+                                                            >
+                                                              View {lp.name} transactions
+                                                            </Button>
+                                                          </Box>
                                                         </Box>
                                                       );
                                                     })}
                                                   </Box>
-                                                  {/* Minimal View Transactions Button for COD - hidden for D2C */}
-                                                  {false && (
-                                                    <Box sx={{ mt: 2, textAlign: 'right' }}>
-                                                      <Button
-                                                        variant="text"
-                                                        size="small"
-                                                        endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
-                                                        sx={{
-                                                          textTransform: 'none',
-                                                          fontSize: '0.8rem',
-                                                          fontWeight: 500,
-                                                          color: '#2563eb',
-                                                          p: 0,
-                                                          minWidth: 'auto',
-                                                          '&:hover': {
-                                                            backgroundColor: 'transparent',
-                                                            color: '#1d4ed8',
-                                                          }
-                                                        }}
-                                                        onClick={() => {
-                                                          // TODO: Replace with actual link when provided
-                                                          console.log('View Cash on Delivery transactions');
-                                                        }}
-                                                      >
-                                                        View Cash on Delivery transactions
-                                                      </Button>
-                                                    </Box>
-                                                  )}
                                                 </Box>
                                               </MuiCollapse>
                                             )}
@@ -3067,40 +3114,6 @@ const MarketplaceReconciliation: React.FC = () => {
                                                           <Typography variant="body2" sx={{ fontWeight: 700, color: '#111827' }}>Payment received</Typography>
                                                           <Typography variant="body2" sx={{ fontWeight: 800, color: '#059669' }}>{formatCurrency(paymentReceived)}</Typography>
                                                         </Box>
-                                                      </Box>
-                                                    );
-                                                  })()}
-                                                  {/* Minimal View Transactions Button (hidden for D2C) */}
-                                                  {(() => {
-                                                    const providerName = (provider?.name || '').toLowerCase();
-                                                    const providerKey = (provider?.key || '').toLowerCase();
-                                                    const isD2C = providerKey === 'd2c' || providerName.includes('d2c') || providerName.includes('direct');
-                                                    if (isD2C || selectedPlatform === 'd2c') return null;
-                                                    return (
-                                                      <Box sx={{ mt: 2, textAlign: 'right' }}>
-                                                        <Button
-                                                          variant="text"
-                                                          size="small"
-                                                          endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
-                                                          sx={{
-                                                            textTransform: 'none',
-                                                            fontSize: '0.8rem',
-                                                            fontWeight: 500,
-                                                            color: '#2563eb',
-                                                            p: 0,
-                                                            minWidth: 'auto',
-                                                            '&:hover': {
-                                                              backgroundColor: 'transparent',
-                                                              color: '#1d4ed8',
-                                                            }
-                                                          }}
-                                                          onClick={() => {
-                                                            // TODO: Replace with actual link when provided
-                                                            console.log(`View ${provider.name} transactions`);
-                                                          }}
-                                                        >
-                                                          View {provider.name} transactions
-                                                        </Button>
                                                       </Box>
                                                     );
                                                   })()}
@@ -3296,51 +3309,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                               <Typography variant="caption" sx={{ color: '#6b7280' }}>{provider.count.toLocaleString('en-IN')} orders</Typography>
                                             </Box>
                                           </Box>
-                                          {/* Minimal View Transactions Button for Payment Gateways in Unsettled */}
-                                          {provider.key !== 'cod' && selectedPlatform !== 'd2c' && (
-                                            <Box sx={{ mt: 1, textAlign: 'right' }}>
-                                              <Button
-                                                variant="text"
-                                                size="small"
-                                                endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
-                                                sx={{
-                                                  textTransform: 'none',
-                                                  fontSize: '0.8rem',
-                                                  fontWeight: 500,
-                                                  color: '#2563eb',
-                                                  p: 0,
-                                                  minWidth: 'auto',
-                                                  '&:hover': {
-                                                    backgroundColor: 'transparent',
-                                                    color: '#1d4ed8',
-                                                  }
-                                                }}
-                                                onClick={() => {
-                                                  // Navigate to TransactionSheet with unsettled tab and platform filter
-                                                  setInitialTsTab(2); // Unsettled tab
-                                                  // Determine platform based on provider
-                                                  // Provider names like "Flipkart" indicate the platform
-                                                  const providerName = provider.name.toLowerCase();
-                                                  const providerKey = provider.key.toLowerCase();
-                                                  
-                                                  let platform: 'flipkart' | 'amazon' | 'd2c' = 'flipkart'; // Default to flipkart
-                                                  
-                                                  if (providerKey === 'flipkart' || providerName.includes('flipkart')) {
-                                                    platform = 'flipkart';
-                                                  } else if (providerKey === 'amazon' || providerName.includes('amazon')) {
-                                                    platform = 'amazon';
-                                                  } else if (providerKey === 'd2c' || providerName.includes('d2c') || providerName.includes('direct')) {
-                                                    platform = 'd2c';
-                                                  }
-                                                  
-                                                  setSelectedProviderPlatform(platform);
-                                                  setShowTransactionSheet(true);
-                                                }}
-                                              >
-                                                View {provider.name} transactions
-                                              </Button>
-                                            </Box>
-                                          )}
+                                          {/* No provider buttons in unsettled section */}
                                           {/* Expandable list of COD partners for unsettled pending payment */}
                                           {provider.key === 'cod' && (
                                             <MuiCollapse in={isCodExpanded} timeout="auto" unmountOnExit>
@@ -3350,49 +3319,22 @@ const MarketplaceReconciliation: React.FC = () => {
                                                 </Typography>
                                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                                                   {cod.map((lp) => (
-                                                    <Box key={lp.code} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, px: 2, borderRadius: 1.5, background: '#ffffff', border: '1px solid #e5e7eb' }}>
-                                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                        <DeliveryIcon fontSize="small" sx={{ color: '#059669' }} />
-                                                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{lp.displayName}</Typography>
-                                                        <Chip label="Logistics" size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: '#ecfeff', color: '#164e63' }} />
+                                                    <Box key={lp.code}>
+                                                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, px: 2, borderRadius: 1.5, background: '#ffffff', border: '1px solid #e5e7eb' }}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                          <DeliveryIcon fontSize="small" sx={{ color: '#059669' }} />
+                                                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{lp.displayName}</Typography>
+                                                          <Chip label="Logistics" size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: '#ecfeff', color: '#164e63' }} />
+                                                        </Box>
+                                                        <Box sx={{ textAlign: 'right' }}>
+                                                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(Number(lp.totalSaleAmount || 0))}</Typography>
+                                                          <Typography variant="caption" sx={{ color: '#6b7280' }}>{Number(lp.totalCount || 0).toLocaleString('en-IN')} orders</Typography>
+                                                        </Box>
                                                       </Box>
-                                                      <Box sx={{ textAlign: 'right' }}>
-                                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(Number(lp.totalSaleAmount || 0))}</Typography>
-                                                        <Typography variant="caption" sx={{ color: '#6b7280' }}>{Number(lp.totalCount || 0).toLocaleString('en-IN')} orders</Typography>
-                                                      </Box>
+                                                      {/* No provider buttons in unsettled COD sub-list */}
                                                     </Box>
                                                   ))}
                                                 </Box>
-                                                {/* Minimal View Transactions Button for COD in Unsettled - hidden for D2C */}
-                                                {selectedPlatform !== 'd2c' && (
-                                                  <Box sx={{ mt: 2, textAlign: 'right' }}>
-                                                    <Button
-                                                      variant="text"
-                                                      size="small"
-                                                      endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
-                                                      sx={{
-                                                        textTransform: 'none',
-                                                        fontSize: '0.8rem',
-                                                        fontWeight: 500,
-                                                        color: '#2563eb',
-                                                        p: 0,
-                                                        minWidth: 'auto',
-                                                        '&:hover': {
-                                                          backgroundColor: 'transparent',
-                                                          color: '#1d4ed8',
-                                                        }
-                                                      }}
-                                                      onClick={() => {
-                                                        // Unsettled COD → go to Unsettled tab
-                                                        setInitialTsTab(2);
-                                                        setSelectedProviderPlatform('flipkart'); // default platform; COD partners still belong to marketplace
-                                                        setShowTransactionSheet(true);
-                                                      }}
-                                                    >
-                                                      View Cash on Delivery transactions
-                                                    </Button>
-                                                  </Box>
-                                                )}
                                               </Box>
                                             </MuiCollapse>
                                           )}
@@ -3718,6 +3660,22 @@ const MarketplaceReconciliation: React.FC = () => {
                                                     </Typography>
                                                   </Box>
                                                 </Box>
+                                                {provider.key !== 'cod' && (
+                                                  <Box sx={{ mt: 1.5, textAlign: 'right' }}>
+                                                    <Button
+                                                      variant="text"
+                                                      size="small"
+                                                      endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                      sx={providerTransactionsButtonSx}
+                                                      onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        openTransactionSheetForProvider(provider.key, provider.name, 1);
+                                                      }}
+                                                    >
+                                                      View {provider.name} transactions
+                                                    </Button>
+                                                  </Box>
+                                                )}
                                                 {/* COD logistics partners expandable details (sourced from UnReconcile for amounts/counts) */}
                                                 {provider.key === 'cod' && (
                                                   <MuiCollapse in={isCodExpanded} timeout="auto" unmountOnExit>
@@ -3734,62 +3692,49 @@ const MarketplaceReconciliation: React.FC = () => {
                                                           const matchedForLp = Number((recCodArray.find(c => c.code === lpRaw.code))?.totalSaleAmount || 0);
                                                           const denom = matchedForLp + unrecAmountForLp;
                                                           const percentMismatched = denom === 0 ? 0 : (unrecAmountForLp / denom) * 100;
-                                                          const lp = { name: lpRaw.displayName, amount: unrecAmountForLp, orders: ordersForLp, percentMismatched };
+                                                          const lp = { code: lpRaw.code, name: lpRaw.displayName, amount: unrecAmountForLp, orders: ordersForLp, percentMismatched };
                                                           return (
-                                                            <Box key={lp.name} sx={{
-                                                              display: 'flex',
-                                                              alignItems: 'center',
-                                                              justifyContent: 'space-between',
-                                                              py: 1,
-                                                              px: 2,
-                                                              borderRadius: 1.5,
-                                                              background: '#ffffff',
-                                                              border: '1px solid #e5e7eb'
-                                                            }}>
-                                                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                                <DeliveryIcon fontSize="small" sx={{ color: '#059669' }} />
-                                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{lp.name}</Typography>
-                                                                <Chip label="Logistics" size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: '#ecfeff', color: '#164e63' }} />
-                                                              </Box>
-                                                              <Box sx={{ textAlign: 'right' }}>
-                                                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(lp.amount)}</Typography>
-                                                                <Typography variant="caption" sx={{ color: '#6b7280' }}>{lp.orders.toLocaleString('en-IN')} orders • </Typography>
-                                                                <Typography variant="caption" sx={{ color: '#ef4444', fontWeight: 700 }}>
-                                                                  {Number(lp.percentMismatched || 0).toFixed(1)}% mismatched
-                                                                </Typography>
-                                                              </Box>
+                                                        <Box key={lp.name}>
+                                                          <Box sx={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'space-between',
+                                                            py: 1,
+                                                            px: 2,
+                                                            borderRadius: 1.5,
+                                                            background: '#ffffff',
+                                                            border: '1px solid #e5e7eb'
+                                                          }}>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                              <DeliveryIcon fontSize="small" sx={{ color: '#059669' }} />
+                                                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{lp.name}</Typography>
+                                                              <Chip label="Logistics" size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: '#ecfeff', color: '#164e63' }} />
                                                             </Box>
+                                                            <Box sx={{ textAlign: 'right' }}>
+                                                              <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(lp.amount)}</Typography>
+                                                              <Typography variant="caption" sx={{ color: '#6b7280' }}>{lp.orders.toLocaleString('en-IN')} orders • </Typography>
+                                                              <Typography variant="caption" sx={{ color: '#ef4444', fontWeight: 700 }}>
+                                                                {Number(lp.percentMismatched || 0).toFixed(1)}% mismatched
+                                                              </Typography>
+                                                            </Box>
+                                                          </Box>
+                                                          <Box sx={{ mt: 1, textAlign: 'right' }}>
+                                                            <Button
+                                                              variant="text"
+                                                              size="small"
+                                                              endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
+                                                              sx={providerTransactionsButtonSx}
+                                                              onClick={() => {
+                                                                openTransactionSheetForProvider(lp.code, lp.name, 1);
+                                                              }}
+                                                            >
+                                                              View {lp.name} transactions
+                                                            </Button>
+                                                          </Box>
+                                                        </Box>
                                                           );
                                                         })}
                                                       </Box>
-                                                      {/* Minimal View Transactions Button for COD in Mismatched - hidden for D2C */}
-                                                      {selectedPlatform !== 'd2c' && (
-                                                        <Box sx={{ mt: 2, textAlign: 'right' }}>
-                                                          <Button
-                                                            variant="text"
-                                                            size="small"
-                                                            endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
-                                                            sx={{
-                                                              textTransform: 'none',
-                                                              fontSize: '0.8rem',
-                                                              fontWeight: 500,
-                                                              color: '#2563eb',
-                                                              p: 0,
-                                                              minWidth: 'auto',
-                                                              '&:hover': {
-                                                                backgroundColor: 'transparent',
-                                                                color: '#1d4ed8',
-                                                              }
-                                                            }}
-                                                            onClick={() => {
-                                                              // TODO: Replace with actual link when provided
-                                                              console.log('View Cash on Delivery mismatched transactions');
-                                                            }}
-                                                          >
-                                                            View Cash on Delivery transactions
-                                                          </Button>
-                                                        </Box>
-                                                      )}
                                                     </Box>
                                                   </MuiCollapse>
                                                 )}
@@ -3829,37 +3774,6 @@ const MarketplaceReconciliation: React.FC = () => {
                                                             <Typography variant="caption" sx={{ color: '#6b7280', px: 1 }}>
                                                               Orders: {provider.count?.toLocaleString('en-IN')}
                                                             </Typography>
-                                                          </Box>
-                                                        );
-                                                      })()}
-                                                      {/* Minimal View Transactions Button for Gateway in Mismatched (hidden for D2C) */}
-                                                      {(() => {
-                                                        if (selectedPlatform === 'd2c') return null;
-                                                        return (
-                                                          <Box sx={{ mt: 2, textAlign: 'right' }}>
-                                                            <Button
-                                                              variant="text"
-                                                              size="small"
-                                                              endIcon={<ArrowRight sx={{ fontSize: 14, transform: 'rotate(-45deg)' }} />}
-                                                              sx={{
-                                                                textTransform: 'none',
-                                                                fontSize: '0.8rem',
-                                                                fontWeight: 500,
-                                                                color: '#2563eb',
-                                                                p: 0,
-                                                                minWidth: 'auto',
-                                                                '&:hover': {
-                                                                  backgroundColor: 'transparent',
-                                                                  color: '#1d4ed8',
-                                                                }
-                                                              }}
-                                                              onClick={() => {
-                                                                // TODO: Replace with actual link when provided
-                                                                console.log(`View ${provider.name} mismatched transactions`);
-                                                              }}
-                                                            >
-                                                              View {provider.name} transactions
-                                                            </Button>
                                                           </Box>
                                                         );
                                                       })()}
@@ -4501,6 +4415,7 @@ const MarketplaceReconciliation: React.FC = () => {
             onBack={() => {
               setShowTransactionSheet(false);
               setSelectedProviderPlatform(undefined);
+              setInitialTsFilters(undefined);
             }} 
             statsData={reconciliationData}
             initialTab={initialTsTab}
