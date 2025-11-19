@@ -254,11 +254,30 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   fontWeight: 'bold', 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: 0.5, 
+                  gap: 0.75, 
                   color: 'text.primary',
                   fontSize: '14px'
                 }}>
                   Hi, {displayName}
+                  <Box
+                    component="span"
+                    sx={{
+                      backgroundColor: 'error.main',
+                      color: 'common.white',
+                      fontSize: '9px',
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      borderRadius: '8px',
+                      px: 1,
+                      py: 0.25,
+                      lineHeight: 1,
+                      whiteSpace: 'nowrap',
+                      letterSpacing: 0.3,
+                    }}
+                  >
+                    Trial User
+                  </Box>
                   <KeyboardArrowUpIcon sx={{ fontSize: '16px', color: 'text.primary', fontWeight: 'bold' }} />
                 </Typography>
               } 
