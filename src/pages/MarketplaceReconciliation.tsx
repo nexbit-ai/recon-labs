@@ -2828,14 +2828,14 @@ const MarketplaceReconciliation: React.FC = () => {
 
                             // Compute provider-level matched% = matched / (matched + unmatched)
                             const unrecSplit = splitGatewaysAndCod(mainSummary?.UnReconcile);
-                            const codUnrecAmount = unrecSplit.cod.reduce((s, c) => s + Number(c.totalSaleAmount || 0), 0);
+                            const codUnrecCount = unrecSplit.cod.reduce((s, c) => s + Number(c.totalCount || 0), 0);
 
                             const providers = providersBase.map((p) => {
                               if (p.key === 'cod') {
-                                const matchedAmount = Number(p.amount || 0);
-                                const unmatchedAmount = Number(codUnrecAmount || 0);
-                                const denom = matchedAmount + unmatchedAmount;
-                                const percentMatched = denom === 0 ? 0 : (matchedAmount / denom) * 100;
+                                const matchedCountForCod = Number(p.count || 0);
+                                const unmatchedCountForCod = Number(codUnrecCount || 0);
+                                const denom = matchedCountForCod + unmatchedCountForCod;
+                                const percentMatched = denom === 0 ? 0 : (matchedCountForCod / denom) * 100;
                                 return {
                                   ...p,
                                   share: totalSettledAmount === 0 ? 0 : (Number(p.amount) / totalSettledAmount),
@@ -2843,11 +2843,11 @@ const MarketplaceReconciliation: React.FC = () => {
                                 };
                               }
                               // gateways (payment providers)
-                              const matchedAmount = Number(p.amount || 0);
+                              const matchedCountForProvider = Number(p.count || 0);
                               const unrecForProvider = unrecSplit.gateways.find(g => g.code === p.key);
-                              const unmatchedAmount = Number(unrecForProvider?.totalSaleAmount || 0);
-                              const denom = matchedAmount + unmatchedAmount;
-                              const percentMatched = denom === 0 ? 0 : (matchedAmount / denom) * 100;
+                              const unmatchedCountForProvider = Number(unrecForProvider?.totalCount || 0);
+                              const denom = matchedCountForProvider + unmatchedCountForProvider;
+                              const percentMatched = denom === 0 ? 0 : (matchedCountForProvider / denom) * 100;
                               return {
                                 ...p,
                                 share: totalSettledAmount === 0 ? 0 : (Number(p.amount) / totalSettledAmount),
@@ -3030,9 +3030,10 @@ const MarketplaceReconciliation: React.FC = () => {
                                                       const ordersForLp = Number(lpRaw.totalCount || 0);
                                                       // Find unmatched for this logistics partner within UnReconcile.cod by same code
                                                       const unrecCodArray = splitGatewaysAndCod(mainSummary?.UnReconcile).cod;
-                                                      const unmatchedForLp = Number((unrecCodArray.find(c => c.code === lpRaw.code))?.totalSaleAmount || 0);
-                                                      const denom = settledAmountForLp + unmatchedForLp;
-                                                      const percentMatched = denom === 0 ? 0 : (settledAmountForLp / denom) * 100;
+                                                      const unmatchedEntryForLp = unrecCodArray.find(c => c.code === lpRaw.code);
+                                                      const unmatchedOrdersForLp = Number(unmatchedEntryForLp?.totalCount || 0);
+                                                      const countDenom = ordersForLp + unmatchedOrdersForLp;
+                                                      const percentMatched = countDenom === 0 ? 0 : (ordersForLp / countDenom) * 100;
                                                       const lp = { code: lpRaw.code, name: lpRaw.displayName, settledAmount: settledAmountForLp, orders: ordersForLp, percentMatched };
                                                       return (
                                                         <Box key={lp.name}>
@@ -3547,23 +3548,25 @@ const MarketplaceReconciliation: React.FC = () => {
                                 // Compute percent matched using Reconcile vs UnReconcile split (same logic as matched section)
                                 const splitRec = splitGatewaysAndCod(mainSummary?.Reconcile);
                                 const codRecAmount = splitRec.cod.reduce((sum, c) => sum + Number(c.totalSaleAmount || 0), 0);
+                                const codRecCount = splitRec.cod.reduce((sum, c) => sum + Number(c.totalCount || 0), 0);
 
                                 const providers = providersBase.map((p) => {
                                   if (p.key === 'cod') {
-                                    const matchedAmount = Number(codRecAmount || 0);
-                                    const unmatchedAmount = Number(codAmount || 0);
-                                    const denom = matchedAmount + unmatchedAmount;
-                                    const percentMismatched = denom === 0 ? 0 : (unmatchedAmount / denom) * 100;
+                                    const matchedCountForCod = Number(codRecCount || 0);
+                                    const unmatchedCountForCod = Number(codCount || 0);
+                                    const denom = matchedCountForCod + unmatchedCountForCod;
+                                    const percentMismatched = denom === 0 ? 0 : (unmatchedCountForCod / denom) * 100;
                                     return {
                                       ...p,
                                       share: (gatewaysAmount + codAmount) === 0 ? 0 : (Number(p.amount) / (gatewaysAmount + codAmount)),
                                       percentMismatched,
                                     };
                                   }
-                                  const matchedForProvider = Number((splitRec.gateways.find(g => g.code === p.key))?.totalSaleAmount || 0);
-                                  const unmatchedForProvider = Number(p.amount || 0);
-                                  const denom = matchedForProvider + unmatchedForProvider;
-                                  const percentMismatched = denom === 0 ? 0 : (unmatchedForProvider / denom) * 100;
+                                  const matchedEntryForProvider = splitRec.gateways.find(g => g.code === p.key);
+                                  const matchedCountForProvider = Number(matchedEntryForProvider?.totalCount || 0);
+                                  const unmatchedCountForProvider = Number(p.count || 0);
+                                  const denom = matchedCountForProvider + unmatchedCountForProvider;
+                                  const percentMismatched = denom === 0 ? 0 : (unmatchedCountForProvider / denom) * 100;
                                   return {
                                     ...p,
                                     share: (gatewaysAmount + codAmount) === 0 ? 0 : (Number(p.amount) / (gatewaysAmount + codAmount)),
@@ -3686,13 +3689,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                                                         {codUnrec.map((lpRaw) => {
                                                           const unrecAmountForLp = Number(lpRaw.totalSaleAmount || 0);
-                                                          const ordersForLp = Number(lpRaw.totalCount || 0);
+                                                          const unrecOrdersForLp = Number(lpRaw.totalCount || 0);
                                                           // matched for this LP from Reconcile.cod
                                                           const recCodArray = splitRec.cod;
-                                                          const matchedForLp = Number((recCodArray.find(c => c.code === lpRaw.code))?.totalSaleAmount || 0);
-                                                          const denom = matchedForLp + unrecAmountForLp;
-                                                          const percentMismatched = denom === 0 ? 0 : (unrecAmountForLp / denom) * 100;
-                                                          const lp = { code: lpRaw.code, name: lpRaw.displayName, amount: unrecAmountForLp, orders: ordersForLp, percentMismatched };
+                                                          const matchedEntryForLp = recCodArray.find(c => c.code === lpRaw.code);
+                                                          const matchedOrdersForLp = Number(matchedEntryForLp?.totalCount || 0);
+                                                          const countDenom = matchedOrdersForLp + unrecOrdersForLp;
+                                                          const percentMismatched = countDenom === 0 ? 0 : (unrecOrdersForLp / countDenom) * 100;
+                                                          const lp = { code: lpRaw.code, name: lpRaw.displayName, amount: unrecAmountForLp, orders: unrecOrdersForLp, percentMismatched };
                                                           return (
                                                         <Box key={lp.name}>
                                                           <Box sx={{
