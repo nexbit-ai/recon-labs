@@ -469,3 +469,25 @@ export interface SalesTransactionsResponse {
   transactions: SalesTransaction[];
   pagination?: SalesTransactionsPagination;
 }
+
+// Export List API Types
+export interface ExportListItem {
+  id: string;
+  file_name: string;
+  platform: string;
+  status: 'PENDING' | 'SUCCEEDED' | 'FAILED';
+  requested_at: string;
+  completed_at: string | null;
+  download_url: string | null;
+  error: string | null;
+}
+
+export interface ExportListResponse {
+  items: ExportListItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    total_pages: number;
+  };
+}

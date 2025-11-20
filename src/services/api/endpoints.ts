@@ -11,7 +11,8 @@ import {
   MarketplaceReconciliationResponse,
   TotalTransactionsResponse,
   AgeingAnalysisResponse,
-  SalesTransactionsResponse
+  SalesTransactionsResponse,
+  ExportListResponse
 } from './types';
 
 // Authentication API
@@ -103,6 +104,18 @@ export const transactionsAPI = {
     business_mode?: 'B2C' | 'B2B';
   }) =>
     apiService.get<SalesTransactionsResponse>(API_CONFIG.ENDPOINTS.SALES_TRANSACTIONS, params),
+
+  // Request export for transactions
+  requestExport: (params?: FilterParams & { order_date_from?: string; order_date_to?: string; platform?: string }) =>
+    apiService.request<{ job_id: string; status: string }>({
+      method: 'POST',
+      url: API_CONFIG.ENDPOINTS.EXPORT_TRANSACTIONS,
+      params,
+    }),
+
+  // Get export list
+  getExportList: (params?: PaginationParams) =>
+    apiService.get<ExportListResponse>(API_CONFIG.ENDPOINTS.EXPORT_LIST, params),
 };
 
 // Reconciliation manual actions API

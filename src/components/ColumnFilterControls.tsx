@@ -22,6 +22,8 @@ export interface ColumnFilterControlsProps {
   setOrderIdChips?: (chips: string[]) => void;
   // Optional: Custom Status filter options (if not provided, defaults to all three)
   statusFilterOptions?: string[];
+  // Optional: Disable enum checkboxes (for read-only status filter in Matched tab)
+  disableEnumCheckboxes?: boolean;
 }
 
 const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
@@ -39,6 +41,7 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
   orderIdChips = [],
   setOrderIdChips,
   statusFilterOptions,
+  disableEnumCheckboxes = false,
 }) => {
   const metaType = (columnMeta as any)[activeColumn]?.type || 'string';
   let enumOptions = activeColumn && getEnumOptions ? getEnumOptions(activeColumn) : [];
@@ -190,7 +193,9 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
                       <Checkbox
                         size="small"
                         checked={selectedValues.includes(option)}
+                        disabled={disableEnumCheckboxes}
                         onChange={(e) => {
+                          if (disableEnumCheckboxes) return;
                           const isChecked = e.target.checked;
                           const newValues = isChecked 
                             ? [...selectedValues, option]
