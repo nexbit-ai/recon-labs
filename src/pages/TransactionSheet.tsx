@@ -1995,6 +1995,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   useEffect(() => {
     if (exportDrawerOpen) {
       setIsExportDrawerVisible(true);
+      // Clear any previous export success notification when drawer opens
+      setExportSuccess(null);
       // Fetch export list when drawer opens
       fetchExportList();
     }
@@ -2606,15 +2608,33 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     };
 
     // Set status based on remark or activeTab
-    const remarkToUse = remark || (activeTab === 0 ? 'settlement_matched' : 'unsettled');
-    if (remarkToUse === 'settlement_matched') {
-      // For settled tab, use status_in with comma-separated values
-      params.status_in = 'settlement_matched,less_payment_received,more_payment_received';
-      
-    } else if (remarkToUse === 'unsettled') {
-      // For unsettled tab, use status=unsettled (not status_in)
-      params.status = 'unsettled';
-      
+    if (remark) {
+      // If remark is explicitly provided, use it
+      const remarkToUse = remark;
+      if (remarkToUse === 'settlement_matched') {
+        // For settled tab, use status=settlement_matched only
+        params.status = 'settlement_matched';
+      } else if (remarkToUse === 'unsettled') {
+        // For unsettled tab, use status=unsettled (not status_in)
+        params.status = 'unsettled';
+      }
+    } else {
+      // Set status based on activeTab
+      if (activeTab === 0) {
+        // Matched tab - use status=settlement_matched only
+        params.status = 'settlement_matched';
+      } else if (activeTab === 1) {
+        // Mismatched tab - check which sub-tab is active
+        if (mismatchedSubTab === 'less_received') {
+          params.status = 'less_payment_received';
+        } else if (mismatchedSubTab === 'more_received') {
+          params.status = 'more_payment_received';
+        }
+      } else if (activeTab === 2) {
+        // Unsettled tab - use status=unsettled (not status_in)
+        params.status = 'unsettled';
+      }
+      // activeTab === 3 (All) - no status filter needed
     }
 
     // ALWAYS add invoice date range - this is required for all API calls
@@ -4196,6 +4216,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
 
   const currentTabLabel = TAB_LABELS[activeTab] ?? 'Transactions';
+  
+  // Get the settlement status label for display in confirmation dialog
+  const getSettlementStatusLabel = () => {
+    if (activeTab === 1) {
+      // Mismatched tab - show sub-tab specific label
+      if (mismatchedSubTab === 'less_received') {
+        return 'Mismatched - Less Payment Received';
+      } else if (mismatchedSubTab === 'more_received') {
+        return 'Mismatched - More Payment Received';
+      }
+    }
+    // For other tabs, return the tab label
+    return currentTabLabel;
+  };
+  
   const formattedPlatformLabel = selectedPlatform
     ? (selectedPlatform === 'd2c'
         ? 'D2C'
@@ -4765,18 +4800,29 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
                   <Button
                     variant="contained"
+                    size="small"
                     onClick={openExportDrawer}
-                    startIcon={<DownloadIcon fontSize={isSmallScreen ? 'small' : 'medium'} />}
+                    disabled={activeTab === 4}
+                    startIcon={<DownloadIcon fontSize="small" />}
                     sx={{
                       textTransform: 'none',
-                      fontWeight: 700,
-                      fontSize: { xs: '0.75rem', sm: '0.85rem' },
-                      padding: { xs: '8px 16px', sm: '10px 24px' },
-                      borderRadius: '12px',
+                      fontWeight: 500,
+                      fontSize: { xs: '0.75rem', sm: '0.8rem' },
+                      padding: { xs: '6px 12px', sm: '6px 16px' },
+                      borderRadius: '8px',
                       alignSelf: { xs: 'stretch', lg: 'center' },
                       backgroundColor: '#0f172a',
-                      boxShadow: '0 10px 25px rgba(15,23,42,0.15)',
-                      '&:hover': { backgroundColor: '#1d4ed8' },
+                      boxShadow: '0 2px 8px rgba(15,23,42,0.1)',
+                      '&:hover': { backgroundColor: '#1a1a1a' },
+                      '&:disabled': {
+                        backgroundColor: '#fafafa',
+                        color: '#757575',
+                        cursor: 'not-allowed',
+                      },
+                      '&:disabled:hover': {
+                        backgroundColor: '#fafafa',
+                        color: '#757575',
+                      },
                     }}
                   >
                     Downloads
@@ -4796,18 +4842,39 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography
-                        variant="body2"
+                      <Box
                         sx={{
-                          fontWeight: 600,
-                          color: mismatchedSubTab === 'less_received' ? '#111827' : '#9ca3af',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
                           cursor: quadApiLoading ? 'default' : 'pointer',
-                          userSelect: 'none',
                         }}
                         onClick={() => !quadApiLoading && handleMismatchedSubTabToggle('less_received')}
                       >
-                        Less Received
-                      </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 600,
+                            color: mismatchedSubTab === 'less_received' ? '#111827' : '#9ca3af',
+                            userSelect: 'none',
+                          }}
+                        >
+                          Less Received
+                        </Typography>
+                        {mismatchedLessReceivedTotalCount !== null && (
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              fontSize: '0.7rem',
+                              color: mismatchedSubTab === 'less_received' ? '#111827' : '#9ca3af',
+                              fontWeight: 500,
+                              mt: 0.25,
+                            }}
+                          >
+                            {mismatchedLessReceivedTotalCount}
+                          </Typography>
+                        )}
+                      </Box>
                       <Box
                         role="switch"
                         aria-checked={mismatchedSubTab === 'more_received'}
@@ -4846,18 +4913,39 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           }}
                         />
                       </Box>
-                      <Typography
-                        variant="body2"
+                      <Box
                         sx={{
-                          fontWeight: 600,
-                          color: mismatchedSubTab === 'more_received' ? '#111827' : '#9ca3af',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
                           cursor: quadApiLoading ? 'default' : 'pointer',
-                          userSelect: 'none',
                         }}
                         onClick={() => !quadApiLoading && handleMismatchedSubTabToggle('more_received')}
                       >
-                        More Received
-                      </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 600,
+                            color: mismatchedSubTab === 'more_received' ? '#111827' : '#9ca3af',
+                            userSelect: 'none',
+                          }}
+                        >
+                          More Received
+                        </Typography>
+                        {mismatchedMoreReceivedTotalCount !== null && (
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              fontSize: '0.7rem',
+                              color: mismatchedSubTab === 'more_received' ? '#111827' : '#9ca3af',
+                              fontWeight: 500,
+                              mt: 0.25,
+                            }}
+                          >
+                            {mismatchedMoreReceivedTotalCount}
+                          </Typography>
+                        )}
+                      </Box>
                     </Box>
                   </Box>
                 )}
@@ -5778,7 +5866,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                       <Box>
-                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a' }}>Request Export</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.5rem' }}>Request Export</Typography>
                         <Typography variant="body2" sx={{ color: '#475569' }}>
                           Start a fresh export and you can download your file when it’s ready.
                         </Typography>
@@ -5832,7 +5920,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   >
                     <Box sx={{ px: 2.5, pt: 2.25, pb: 1.5 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.5rem' }}>
                           Download Previous Exports
                         </Typography>
                         <IconButton
@@ -5978,7 +6066,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   </Typography>
                   <Stack spacing={1.5}>
                     {[
-                      { label: 'Transactions tab', value: currentTabLabel },
+                      { label: 'Settlement status', value: getSettlementStatusLabel() },
                       { label: 'Portal', value: formattedPlatformLabel },
                       { label: 'Date range', value: selectedDateRangeLabel },
                     ].map((item) => (
