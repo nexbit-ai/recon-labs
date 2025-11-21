@@ -42,12 +42,17 @@ import {
   Alert,
   CircularProgress,
   List,
+  ListItem,
   ListItemButton,
   ListItemText,
   ListSubheader,
   Autocomplete,
   useTheme,
   useMediaQuery,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import ColumnFilterControls from '../components/ColumnFilterControls';
 import { api } from '../services/api';
@@ -69,6 +74,7 @@ import {
   ArrowDownward as ArrowDownwardIcon,
   UnfoldMore as UnfoldMoreIcon,
   InfoOutlined,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 
 
@@ -164,6 +170,41 @@ interface TransactionQueryParams {
   // Dynamic parameters for any column filtering
   [key: string]: any;
 }
+
+type ExportStatus = 'processing' | 'ready' | 'failed';
+
+interface ExportRequest {
+  id: string;
+  type: string;
+  platform: string;
+  requestedOn: string;
+  status: ExportStatus;
+  fileSize: string;
+  downloadUrl?: string | null;
+}
+
+const EXPORT_STATUS_META: Record<ExportStatus, { label: string; bg: string; color: string; helper: string }> = {
+  ready: {
+    label: 'Ready for download',
+    bg: '#dcfce7',
+    color: '#15803d',
+    helper: 'Download available for the next 7 days',
+  },
+  processing: {
+    label: 'Processing',
+    bg: '#fef9c3',
+    color: '#92400e',
+    helper: 'We will notify you once the export is ready',
+  },
+  failed: {
+    label: 'Failed',
+    bg: '#fee2e2',
+    color: '#b91c1c',
+    helper: 'Please try requesting the export again',
+  },
+};
+
+const TAB_LABELS = ['Matched', 'Mismatched', 'Unsettled', 'All', 'Sales Report'] as const;
 
 // Helper function to format settlement provider: capitalize first letter, replace underscores with spaces
 const formatSettlementProvider = (value: string | null | undefined): string => {
@@ -1863,10 +1904,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [breakupsOrderId, setBreakupsOrderId] = useState<string>('');
   const [totalCount, setTotalCount] = useState(0);
   // Separate total counts for 4 tabs: matched, mismatched, unsettled, all
+  // Mismatched now has 2 sub-tabs with separate counts
   const [matchedTotalCount, setMatchedTotalCount] = useState<number | null>(null);
-  const [mismatchedTotalCount, setMismatchedTotalCount] = useState<number | null>(null);
+  const [mismatchedLessReceivedTotalCount, setMismatchedLessReceivedTotalCount] = useState<number | null>(null);
+  const [mismatchedMoreReceivedTotalCount, setMismatchedMoreReceivedTotalCount] = useState<number | null>(null);
   const [unsettledTotalCount, setUnsettledTotalCount] = useState<number | null>(null);
   const [allTotalCount, setAllTotalCount] = useState<number | null>(null);
+  
+  // Computed mismatched total count (sum of both sub-tabs)
+  const mismatchedTotalCount = useMemo(() => {
+    const less = mismatchedLessReceivedTotalCount ?? 0;
+    const more = mismatchedMoreReceivedTotalCount ?? 0;
+    return less + more > 0 ? less + more : null;
+  }, [mismatchedLessReceivedTotalCount, mismatchedMoreReceivedTotalCount]);
   const [currentPage, setCurrentPage] = useState(1);
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HTMLElement | null>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
@@ -1879,14 +1929,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [useNewAPI, setUseNewAPI] = useState(true); // Always use new API
 
   // Quad API state management for 4 tabs: matched, mismatched, unsettled, all
+  // Mismatched now has 2 sub-tabs: less received and more received
   const [matchedData, setMatchedData] = useState<TotalTransactionsResponse | null>(null);
-  const [mismatchedData, setMismatchedData] = useState<TotalTransactionsResponse | null>(null);
+  const [mismatchedLessReceivedData, setMismatchedLessReceivedData] = useState<TotalTransactionsResponse | null>(null);
+  const [mismatchedMoreReceivedData, setMismatchedMoreReceivedData] = useState<TotalTransactionsResponse | null>(null);
   const [unsettledData, setUnsettledData] = useState<TotalTransactionsResponse | null>(null);
   const [allData, setAllData] = useState<TotalTransactionsResponse | null>(null);
   const [quadApiLoading, setQuadApiLoading] = useState(false);
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   const isFetchingRef = React.useRef(false);
   const lastQuadParamsRef = React.useRef<string | null>(null);
+  
+  // Mismatched sub-tab state (Less Received / More Received)
+  const [mismatchedSubTab, setMismatchedSubTab] = useState<'less_received' | 'more_received'>('less_received');
 
   // Sales Report state management
   const [salesReportData, setSalesReportData] = useState<SalesTransactionsResponse | null>(null);
@@ -1899,6 +1954,131 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [showSalesReportSearch, setShowSalesReportSearch] = useState(false);
   // Amazon Sales Report business mode (B2C default)
   const [amazonBusinessMode, setAmazonBusinessMode] = useState<'B2C' | 'B2B'>('B2C');
+  const [exportDrawerOpen, setExportDrawerOpen] = useState(false);
+  const [isExportDrawerVisible, setIsExportDrawerVisible] = useState(false);
+  const [exportConfirmationOpen, setExportConfirmationOpen] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState<string | null>(null);
+  const [exportListLoading, setExportListLoading] = useState(false);
+  const [exportRequests, setExportRequests] = useState<ExportRequest[]>(() => [
+    {
+      id: 'EXP-3921',
+      type: 'Transactions CSV',
+      platform: 'Flipkart',
+      requestedOn: '20 Nov 2025 • 09:10 AM',
+      status: 'ready',
+      fileSize: '2.3 MB',
+    },
+    {
+      id: 'EXP-3920',
+      type: 'Disputes Report',
+      platform: 'Amazon',
+      requestedOn: '19 Nov 2025 • 08:42 PM',
+      status: 'processing',
+      fileSize: '—',
+    },
+    {
+      id: 'EXP-3919',
+      type: 'Sales Summary',
+      platform: 'D2C',
+      requestedOn: '19 Nov 2025 • 04:05 PM',
+      status: 'failed',
+      fileSize: '—',
+    },
+  ]);
+
+  const openExportDrawer = () => {
+    setIsExportDrawerVisible(true);
+    setExportDrawerOpen(true);
+  };
+
+  useEffect(() => {
+    if (exportDrawerOpen) {
+      setIsExportDrawerVisible(true);
+      // Clear any previous export success notification when drawer opens
+      setExportSuccess(null);
+      // Fetch export list when drawer opens
+      fetchExportList();
+    }
+  }, [exportDrawerOpen]);
+
+  // Map API export item to ExportRequest format
+  const mapExportItemToRequest = (item: any): ExportRequest => {
+    // Map API status to local status
+    let status: ExportStatus = 'processing';
+    if (item.status === 'SUCCEEDED') {
+      status = 'ready';
+    } else if (item.status === 'FAILED') {
+      status = 'failed';
+    }
+
+    // Format requested date
+    const requestedDate = new Date(item.requested_at);
+    const formattedDate = new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(requestedDate);
+    const formattedTime = new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(requestedDate);
+    const requestedOn = `${formattedDate} • ${formattedTime}`;
+
+    // Extract type from file name (e.g., "all_all_order_date_2025-02-01_2025-03-28.csv" -> "all all order date 2025-02-01 2025-03-28")
+    const fileName = item.file_name || '';
+    const type = fileName
+      .replace(/\.(csv|xlsx|xls)$/i, '')
+      .split('_')
+      .filter((part: string) => part) // Only filter out empty parts
+      .join(' ') || 'Export';
+
+    // Format platform name
+    const platformName = item.platform === 'all' 
+      ? 'All Platforms' 
+      : item.platform.charAt(0).toUpperCase() + item.platform.slice(1);
+
+    return {
+      id: item.id,
+      type: type,
+      platform: platformName,
+      requestedOn: requestedOn,
+      status: status,
+      fileSize: status === 'ready' ? '—' : '—', // File size not provided in API response
+      downloadUrl: item.download_url,
+    };
+  };
+
+  // Fetch export list from API
+  const fetchExportList = async () => {
+    setExportListLoading(true);
+    try {
+      const response = await api.transactions.getExportList();
+      
+      if (response.success && response.data) {
+        const mappedRequests = response.data.items.map(mapExportItemToRequest);
+        setExportRequests(mappedRequests);
+      } else {
+        console.error('Failed to fetch export list:', response.error);
+        // Keep existing export requests on error
+      }
+    } catch (err: any) {
+      console.error('Error fetching export list:', err);
+      // Keep existing export requests on error
+    } finally {
+      setExportListLoading(false);
+    }
+  };
+
+  const handleDownload = (request: ExportRequest) => {
+    if (request.downloadUrl && request.status === 'ready') {
+      // Open download URL in new tab/window
+      window.open(request.downloadUrl, '_blank');
+    } else {
+      console.warn('Download not available for this export');
+    }
+  };
 
   // Get current data based on which API is being used
   const getCurrentData = (): any[] => {
@@ -1908,12 +2088,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
     
     // Use quad API data if available (can be null when filtering)
-    if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
+    if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
       let currentData: TotalTransactionsResponse | null = null;
       if (activeTab === 0) {
         currentData = matchedData;
       } else if (activeTab === 1) {
-        currentData = mismatchedData;
+        // For mismatched tab, use the appropriate sub-tab data
+        if (mismatchedSubTab === 'less_received') {
+          currentData = mismatchedLessReceivedData;
+        } else {
+          currentData = mismatchedMoreReceivedData;
+        }
       } else if (activeTab === 2) {
         currentData = unsettledData;
       } else if (activeTab === 3) {
@@ -1960,12 +2145,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
     
     // Use quad API data if available (can be null when filtering)
-    if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
+    if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
       let currentData: TotalTransactionsResponse | null = null;
       if (activeTab === 0) {
         currentData = matchedData;
       } else if (activeTab === 1) {
-        currentData = mismatchedData;
+        // For mismatched tab, use the appropriate sub-tab data
+        if (mismatchedSubTab === 'less_received') {
+          currentData = mismatchedLessReceivedData;
+        } else {
+          currentData = mismatchedMoreReceivedData;
+        }
       } else if (activeTab === 2) {
         currentData = unsettledData;
       } else if (activeTab === 3) {
@@ -2045,12 +2235,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     const meta: Record<string, { type: 'string' | 'number' | 'date' | 'enum' }> = {};
     
     // Use quad API data if available (can be null when filtering)
-    if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
+    if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
       let currentData: TotalTransactionsResponse | null = null;
       if (activeTab === 0) {
         currentData = matchedData;
       } else if (activeTab === 1) {
-        currentData = mismatchedData;
+        // For mismatched tab, use the appropriate sub-tab data
+        if (mismatchedSubTab === 'less_received') {
+          currentData = mismatchedLessReceivedData;
+        } else {
+          currentData = mismatchedMoreReceivedData;
+        }
       } else if (activeTab === 2) {
         currentData = unsettledData;
       } else if (activeTab === 3) {
@@ -2314,10 +2509,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Helpers to get enum options from current data
   const getUniqueValuesForColumn = (columnName: string): string[] => {
-    // For Status, show unique backend statuses
-    if (columnName === 'Status') {
-      return ['more_payment_received', 'less_payment_received', 'settlement_matched'];
-    }
+    // Status filter has been removed - mismatched tab now uses sub-tabs instead
 
     // For Event Type, show available event types
     if (columnName === 'Event Type') {
@@ -2415,15 +2607,33 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     };
 
     // Set status based on remark or activeTab
-    const remarkToUse = remark || (activeTab === 0 ? 'settlement_matched' : 'unsettled');
-    if (remarkToUse === 'settlement_matched') {
-      // For settled tab, use status_in with comma-separated values
-      params.status_in = 'settlement_matched,less_payment_received,more_payment_received';
-      
-    } else if (remarkToUse === 'unsettled') {
-      // For unsettled tab, use status=unsettled (not status_in)
-      params.status = 'unsettled';
-      
+    if (remark) {
+      // If remark is explicitly provided, use it
+      const remarkToUse = remark;
+      if (remarkToUse === 'settlement_matched') {
+        // For settled tab, use status=settlement_matched only
+        params.status = 'settlement_matched';
+      } else if (remarkToUse === 'unsettled') {
+        // For unsettled tab, use status=unsettled (not status_in)
+        params.status = 'unsettled';
+      }
+    } else {
+      // Set status based on activeTab
+      if (activeTab === 0) {
+        // Matched tab - use status=settlement_matched only
+        params.status = 'settlement_matched';
+      } else if (activeTab === 1) {
+        // Mismatched tab - check which sub-tab is active
+        if (mismatchedSubTab === 'less_received') {
+          params.status = 'less_payment_received';
+        } else if (mismatchedSubTab === 'more_received') {
+          params.status = 'more_payment_received';
+        }
+      } else if (activeTab === 2) {
+        // Unsettled tab - use status=unsettled (not status_in)
+        params.status = 'unsettled';
+      }
+      // activeTab === 3 (All) - no status filter needed
     }
 
     // ALWAYS add invoice date range - this is required for all API calls
@@ -2823,6 +3033,38 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   }, [selectedPlatform, amazonBusinessMode]);
 
+  // Status filter has been removed - mismatched tab now uses sub-tabs instead
+  // Clear any existing Status filter from columnFilters when component mounts or tab changes
+  useEffect(() => {
+    setColumnFilters(prev => {
+      if (prev['Status']) {
+        const next = { ...prev };
+        delete next['Status'];
+        return next;
+      }
+      return prev;
+    });
+    setPendingColumnFilters(prev => {
+      if (prev['Status']) {
+        const next = { ...prev };
+        delete next['Status'];
+        return next;
+      }
+      return prev;
+    });
+  }, [activeTab]);
+
+  // Update totalCount when mismatched sub-tab changes
+  useEffect(() => {
+    if (activeTab === 1) {
+      if (mismatchedSubTab === 'less_received' && mismatchedLessReceivedTotalCount !== null) {
+        setTotalCount(mismatchedLessReceivedTotalCount);
+      } else if (mismatchedSubTab === 'more_received' && mismatchedMoreReceivedTotalCount !== null) {
+        setTotalCount(mismatchedMoreReceivedTotalCount);
+      }
+    }
+  }, [mismatchedSubTab, activeTab, mismatchedLessReceivedTotalCount, mismatchedMoreReceivedTotalCount]);
+
   // Sync propDateRange with local dateRange state
   useEffect(() => {
     if (propDateRange && (propDateRange.start !== dateRange.start || propDateRange.end !== dateRange.end)) {
@@ -2879,16 +3121,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleAmazonBusinessModeToggle = (nextMode: 'B2C' | 'B2B') => {
     if (!nextMode || nextMode === amazonBusinessMode) return;
     setAmazonBusinessMode(nextMode);
-    if (activeTab === 4 && selectedPlatform === 'amazon') {
-      fetchSalesTransactions(
-        dateRange,
-        selectedPlatform,
-        { page: 1, limit: rowsPerPage, force: true },
-        salesReportSortConfig,
-        salesReportSearch || null,
-        nextMode
-      );
-    }
+  };
+
+  // Handle mismatched sub-tab toggle (Less Received / More Received)
+  const handleMismatchedSubTabToggle = (nextSubTab: 'less_received' | 'more_received') => {
+    if (!nextSubTab || nextSubTab === mismatchedSubTab) return;
+    setMismatchedSubTab(nextSubTab);
+    // Refresh data when switching sub-tabs - data is already loaded, just update the display
+    // The totalCount will be updated automatically based on the selected sub-tab
   };
 
   // Apply header date range changes - called when Apply button next to date selector is clicked
@@ -3011,7 +3251,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     applySortOverride?: boolean,
     forceRefetch: boolean = false
   ) => {
-    const isInitialLoad = pageNumber === 1 && !matchedData && !mismatchedData && !unsettledData && !allData;
+    const isInitialLoad = pageNumber === 1 && !matchedData && !mismatchedLessReceivedData && !mismatchedMoreReceivedData && !unsettledData && !allData;
 
     // Prevent duplicate calls from React Strict Mode
     if (isFetchingRef.current) {
@@ -3026,11 +3266,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       limit: rowsPerPage,
     };
 
-    // Convert filters to API parameters (excluding Status filter which we'll handle separately)
+    // Convert filters to API parameters (Status filter has been removed)
     if (filters && Object.keys(filters).length > 0) {
       Object.entries(filters).forEach(([columnKey, filterValue]) => {
         if (!filterValue) return;
-        // Skip Status filter - we'll handle it separately for each tab
+        // Skip Status filter - it has been removed
         if (columnKey === 'Status') return;
 
         const mapping = COLUMN_TO_API_PARAM_MAP[columnKey];
@@ -3129,7 +3369,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
 
     const paramsSignature = createQuadParamsSignature(baseParams);
-    const hasExistingQuadData = matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null;
+    const hasExistingQuadData = matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null;
 
     if (!forceRefetch && hasExistingQuadData && lastQuadParamsRef.current === paramsSignature) {
       return;
@@ -3145,14 +3385,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setError(null);
 
     try {
-      // Create 4 separate parameter sets for each tab with different status filters
+      // Create 5 separate parameter sets for each tab
       // Tab 0: Matched - settlement_matched
       const matchedParams = { ...baseParams };
       matchedParams.status_in = 'settlement_matched';
       
-      // Tab 1: Mismatched - less_payment_received, more_payment_received
-      const mismatchedParams = { ...baseParams };
-      mismatchedParams.status_in = 'less_payment_received,more_payment_received';
+      // Tab 1: Mismatched - two separate calls for less_received and more_received
+      const mismatchedLessReceivedParams = { ...baseParams };
+      mismatchedLessReceivedParams.status = 'less_payment_received';
+      
+      const mismatchedMoreReceivedParams = { ...baseParams };
+      mismatchedMoreReceivedParams.status = 'more_payment_received';
       
       // Tab 2: Unsettled - unsettled
       const unsettledParams = { ...baseParams };
@@ -3162,18 +3405,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const allParams = { ...baseParams };
       // No status filter applied
       
-      // Make all 4 API calls simultaneously
+      // Make all 5 API calls simultaneously
       const apiCalls = [
         api.transactions.getTotalTransactions(matchedParams),
-        api.transactions.getTotalTransactions(mismatchedParams),
+        api.transactions.getTotalTransactions(mismatchedLessReceivedParams),
+        api.transactions.getTotalTransactions(mismatchedMoreReceivedParams),
         api.transactions.getTotalTransactions(unsettledParams),
         api.transactions.getTotalTransactions(allParams),
       ];
       
-      const [matchedResponse, mismatchedResponse, unsettledResponse, allResponse] = await Promise.all(apiCalls);
+      const [matchedResponse, mismatchedLessReceivedResponse, mismatchedMoreReceivedResponse, unsettledResponse, allResponse] = await Promise.all(apiCalls);
       
       // Use the first successful response that contains column metadata to populate filters
-      const responseWithColumns = [matchedResponse, mismatchedResponse, unsettledResponse, allResponse].find(
+      const responseWithColumns = [matchedResponse, mismatchedLessReceivedResponse, mismatchedMoreReceivedResponse, unsettledResponse, allResponse].find(
         (res) => res.success && (res.data as TotalTransactionsResponse | undefined)?.columns
       );
       if (responseWithColumns?.data) {
@@ -3190,14 +3434,24 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         console.error('[fetchQuadTransactions] Matched API failed:', matchedResponse);
       }
       
-      // Process mismatched response (Tab 1)
-      if (mismatchedResponse.success) {
-        setMismatchedData(mismatchedResponse.data);
-        if (mismatchedResponse.data?.pagination) {
-          setMismatchedTotalCount(mismatchedResponse.data.pagination.total_count);
+      // Process mismatched less received response (Tab 1 - sub-tab 1)
+      if (mismatchedLessReceivedResponse.success) {
+        setMismatchedLessReceivedData(mismatchedLessReceivedResponse.data);
+        if (mismatchedLessReceivedResponse.data?.pagination) {
+          setMismatchedLessReceivedTotalCount(mismatchedLessReceivedResponse.data.pagination.total_count);
         }
       } else {
-        console.error('[fetchQuadTransactions] Mismatched API failed:', mismatchedResponse);
+        console.error('[fetchQuadTransactions] Mismatched Less Received API failed:', mismatchedLessReceivedResponse);
+      }
+      
+      // Process mismatched more received response (Tab 1 - sub-tab 2)
+      if (mismatchedMoreReceivedResponse.success) {
+        setMismatchedMoreReceivedData(mismatchedMoreReceivedResponse.data);
+        if (mismatchedMoreReceivedResponse.data?.pagination) {
+          setMismatchedMoreReceivedTotalCount(mismatchedMoreReceivedResponse.data.pagination.total_count);
+        }
+      } else {
+        console.error('[fetchQuadTransactions] Mismatched More Received API failed:', mismatchedMoreReceivedResponse);
       }
       
       // Process unsettled response (Tab 2)
@@ -3223,8 +3477,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Update totalCount based on current active tab
       if (activeTab === 0 && matchedResponse.success && matchedResponse.data?.pagination) {
         setTotalCount(matchedResponse.data.pagination.total_count);
-      } else if (activeTab === 1 && mismatchedResponse.success && mismatchedResponse.data?.pagination) {
-        setTotalCount(mismatchedResponse.data.pagination.total_count);
+      } else if (activeTab === 1) {
+        // For mismatched tab, use the appropriate sub-tab data
+        if (mismatchedSubTab === 'less_received' && mismatchedLessReceivedResponse.success && mismatchedLessReceivedResponse.data?.pagination) {
+          setTotalCount(mismatchedLessReceivedResponse.data.pagination.total_count);
+        } else if (mismatchedSubTab === 'more_received' && mismatchedMoreReceivedResponse.success && mismatchedMoreReceivedResponse.data?.pagination) {
+          setTotalCount(mismatchedMoreReceivedResponse.data.pagination.total_count);
+        }
       } else if (activeTab === 2 && unsettledResponse.success && unsettledResponse.data?.pagination) {
         setTotalCount(unsettledResponse.data.pagination.total_count);
       } else if (activeTab === 3 && allResponse.success && allResponse.data?.pagination) {
@@ -3233,7 +3492,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       
       setCurrentPage(pageNumber);
 
-      const allSucceeded = matchedResponse.success && mismatchedResponse.success && unsettledResponse.success && allResponse.success;
+      const allSucceeded = matchedResponse.success && mismatchedLessReceivedResponse.success && mismatchedMoreReceivedResponse.success && unsettledResponse.success && allResponse.success;
       if (allSucceeded) {
         lastQuadParamsRef.current = paramsSignature;
       } else {
@@ -3241,9 +3500,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
       
       // Update tab counts based on the actual data received
+      const lessReceivedCount = mismatchedLessReceivedResponse.success ? (mismatchedLessReceivedResponse.data?.data?.length || 0) : 0;
+      const moreReceivedCount = mismatchedMoreReceivedResponse.success ? (mismatchedMoreReceivedResponse.data?.data?.length || 0) : 0;
       setTabCounts({
         matched: matchedResponse.success ? (matchedResponse.data?.data?.length || 0) : null,
-        mismatched: mismatchedResponse.success ? (mismatchedResponse.data?.data?.length || 0) : null,
+        mismatched: lessReceivedCount + moreReceivedCount > 0 ? lessReceivedCount + moreReceivedCount : null,
         unsettled: unsettledResponse.success ? (unsettledResponse.data?.data?.length || 0) : null,
         all: allResponse.success ? (allResponse.data?.data?.length || 0) : null,
       });
@@ -3885,8 +4146,110 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setAnchorEl(event.currentTarget);
   };
 
+  const handleRequestExport = async () => {
+    setExportLoading(true);
+    setExportSuccess(null);
+    setError(null);
+    
+    try {
+      // Build query params using the same logic as getTotalTransactions
+      // But exclude pagination params (page, limit)
+      const queryParams = buildQueryParams(1);
+      
+      // Remove pagination params for export
+      const exportParams: any = { ...queryParams };
+      delete exportParams.page;
+      delete exportParams.limit;
+      
+      // Filter out undefined/null/empty values
+      const cleanParams: any = {};
+      Object.entries(exportParams).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          cleanParams[key] = value;
+        }
+      });
+
+      // Call the export API
+      const response = await api.transactions.requestExport(cleanParams);
+      
+      if (response.success && response.data) {
+        const timestamp = Date.now();
+        const newRequest: ExportRequest = {
+          id: response.data.job_id || `EXP-${timestamp}`,
+          type: `${currentTabLabel} Export`,
+          platform: formattedPlatformLabel,
+          requestedOn: formatExportRequestTimestamp(),
+          status: 'processing',
+          fileSize: '—',
+        };
+        setExportRequests((prev) => [newRequest, ...prev]);
+        
+        // Show success message
+        setExportSuccess('Export request submitted successfully! It will be available in the downloads section when ready.');
+        console.log('✅ Export request submitted successfully:', response.data);
+        
+        // Refresh export list after a short delay to get the new export
+        setTimeout(() => {
+          fetchExportList();
+        }, 1000);
+      } else {
+        throw new Error(response.error || 'Failed to submit export request');
+      }
+    } catch (err: any) {
+      console.error('Error requesting export:', err);
+      setError(err.message || 'Failed to submit export request. Please try again.');
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleConfirmExportRequest = async () => {
+    await handleRequestExport();
+    // Close confirmation dialog after a short delay to show success message
+    setTimeout(() => {
+      setExportConfirmationOpen(false);
+    }, 500);
+  };
 
 
+
+
+  const currentTabLabel = TAB_LABELS[activeTab] ?? 'Transactions';
+  
+  // Get the settlement status label for display in confirmation dialog
+  const getSettlementStatusLabel = () => {
+    if (activeTab === 1) {
+      // Mismatched tab - show sub-tab specific label
+      if (mismatchedSubTab === 'less_received') {
+        return 'Mismatched - Less Payment Received';
+      } else if (mismatchedSubTab === 'more_received') {
+        return 'Mismatched - More Payment Received';
+      }
+    }
+    // For other tabs, return the tab label
+    return currentTabLabel;
+  };
+  
+  const formattedPlatformLabel = selectedPlatform
+    ? (selectedPlatform === 'd2c'
+        ? 'D2C'
+        : `${selectedPlatform.charAt(0).toUpperCase()}${selectedPlatform.slice(1)}`)
+    : 'Platform';
+
+  const formatExportRequestTimestamp = () => {
+    const now = new Date();
+    const datePart = new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(now);
+    const timePart = new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(now);
+    return `${datePart.replace(',', '')} • ${timePart}`;
+  };
 
   // Get visible columns
   const getVisibleColumns = () => {
@@ -3905,6 +4268,26 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   const visibleColumns = getVisibleColumns();
   const salesTabTotalCount = salesReportPagination?.total_count ?? salesReportData?.count ?? null;
+  const tabDefinitions = [
+    { label: 'Matched', count: matchedTotalCount },
+    { label: 'Mismatched', count: mismatchedTotalCount },
+    { label: 'Unsettled', count: unsettledTotalCount },
+    { label: 'All', count: allTotalCount },
+    { label: 'Sales Report', count: activeTab === 4 ? salesTabTotalCount : null },
+  ];
+
+  const selectedDateRangeLabel = useMemo(() => {
+    if (dateRange.start && dateRange.end) {
+      return `${formatDateWithOrdinal(dateRange.start)} - ${formatDateWithOrdinal(dateRange.end)}`;
+    }
+    if (dateRange.start) {
+      return `From ${formatDateWithOrdinal(dateRange.start)}`;
+    }
+    if (dateRange.end) {
+      return `Up to ${formatDateWithOrdinal(dateRange.end)}`;
+    }
+    return 'Entire data range';
+  }, [dateRange.start, dateRange.end]);
 
   return (
     <Slide direction="left" in mountOnEnter unmountOnExit>
@@ -4020,7 +4403,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         <Button
                           variant="outlined"
                           startIcon={<FilterIcon fontSize={isSmallScreen ? 'small' : 'medium'} />}
-                          onClick={(e) => openFilterPopover('Status', e.currentTarget as any)}
+                          onClick={(e) => {
+                            // Open filter popover - Status filter has been removed, so open with first available filter
+                            const firstFilterableColumn = Object.keys(COLUMN_TO_API_PARAM_MAP).find(col => col !== 'Status' && col !== 'Order ID' && col !== 'Invoice Date');
+                            if (firstFilterableColumn) {
+                              openFilterPopover(firstFilterableColumn, e.currentTarget as any);
+                            }
+                          }}
                           sx={{ 
                             textTransform: 'none', 
                             borderColor: '#1f2937', 
@@ -4164,339 +4553,401 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       </Box>
                     </Box>
                     
-                    {/* Date Range Selector - Fully Responsive */}
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: { xs: 'flex-start', sm: 'center' },
-                      flexDirection: { xs: 'column', sm: 'row' },
-                      gap: { xs: 0.75, sm: 0.5 },
-                      padding: { xs: '8px', sm: '6px 8px' },
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px',
-                      backgroundColor: '#f9fafb',
-                      width: { xs: '100%', sm: 'auto' },
-                      minWidth: 0,
-                      maxWidth: { xs: '100%', sm: '420px', lg: '480px' },
-                      flexWrap: { xs: 'wrap', sm: 'nowrap' },
-                      rowGap: { xs: 0.75, sm: 0 },
-                    }}>
-                      {/* Date label */}
-                      <Typography variant="body2" sx={{ 
-                        fontWeight: 600, 
-                        color: '#1f2937', 
-                        fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                        width: { xs: '100%', sm: 'auto' }
-                      }}>
-                        Date Range:
-                      </Typography>
-                      
-                      {/* Date inputs - Responsive */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 0.75, sm: 0.75 }, width: { xs: '100%', sm: 'auto' }, minWidth: 0 }}>
+                      {/* Date Range Selector - Fully Responsive */}
                       <Box sx={{ 
                         display: 'flex', 
-                        gap: { xs: 0.75, sm: 0.5 }, 
-                        alignItems: 'center', 
-                        flex: { xs: '1 1 100%', sm: '1 1 auto' },
-                        minWidth: 0,
+                        alignItems: { xs: 'flex-start', sm: 'center' },
+                        flexDirection: { xs: 'column', sm: 'row' },
+                        gap: { xs: 0.75, sm: 0.5 },
+                        padding: { xs: '8px', sm: '6px 8px' },
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        backgroundColor: '#f9fafb',
                         width: { xs: '100%', sm: 'auto' },
-                        flexWrap: { xs: 'wrap', sm: 'nowrap' }
+                        minWidth: 0,
+                        maxWidth: { xs: '100%', sm: '420px', lg: '480px' },
+                        flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                        rowGap: { xs: 0.75, sm: 0 },
                       }}>
-                        <TextField
-                          label="From"
-                          type="date"
-                          size="small"
-                          value={pendingHeaderDateRange.start}
-                          onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, start: e.target.value }))}
-                          InputLabelProps={{ shrink: true }}
-                          sx={{ 
-                            flex: { xs: '1 1 100%', sm: '1 1 0' },
-                            minWidth: { xs: '100%', sm: 0 },
-                            maxWidth: { xs: '100%', sm: '110px' },
-                            '& .MuiOutlinedInput-root': {
-                              backgroundColor: '#ffffff',
-                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                              padding: { xs: '4px 6px', sm: '4px 8px' },
-                            },
-                            '& .MuiInputLabel-root': {
-                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                            },
-                            '& input': {
-                              padding: { xs: '5px 3px', sm: '6px 4px' },
-                              fontSize: { xs: '0.7rem', sm: '0.7rem' }
-                            }
-                          }}
-                        />
+                        {/* Date label */}
                         <Typography variant="body2" sx={{ 
-                          color: '#6b7280', 
+                          fontWeight: 600, 
+                          color: '#1f2937', 
                           fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                          flexShrink: 0,
-                          display: { xs: 'none', sm: 'block' }
-                        }}>
-                          to
-                        </Typography>
-                        <TextField
-                          label="To"
-                          type="date"
-                          size="small"
-                          value={pendingHeaderDateRange.end}
-                          onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, end: e.target.value }))}
-                          InputLabelProps={{ shrink: true }}
-                          sx={{ 
-                            flex: { xs: '1 1 100%', sm: '1 1 0' },
-                            minWidth: { xs: '100%', sm: 0 },
-                            maxWidth: { xs: '100%', sm: '110px' },
-                            '& .MuiOutlinedInput-root': {
-                              backgroundColor: '#ffffff',
-                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                              padding: { xs: '4px 6px', sm: '4px 8px' },
-                            },
-                            '& .MuiInputLabel-root': {
-                              fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                            },
-                            '& input': {
-                              padding: { xs: '5px 3px', sm: '6px 4px' },
-                              fontSize: { xs: '0.7rem', sm: '0.7rem' }
-                            }
-                          }}
-                        />
-                      </Box>
-                      
-                      {/* Divider - Hidden on mobile */}
-                      <Box sx={{ 
-                        display: { xs: 'none', sm: 'block' },
-                        width: '1px', 
-                        height: '18px', 
-                        backgroundColor: '#d1d5db', 
-                        mx: 0.25, 
-                        flexShrink: 0 
-                      }} />
-                      
-                      {/* Apply Button */}
-                      <Button
-                        variant="contained"
-                        size="small"
-                        onClick={applyHeaderDateRange}
-                        disabled={
-                          !pendingHeaderDateRange.start || 
-                          !pendingHeaderDateRange.end ||
-                          (pendingHeaderDateRange.start === headerDateRange.start && 
-                           pendingHeaderDateRange.end === headerDateRange.end)
-                        }
-                        sx={{
-                          textTransform: 'none',
-                          fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                          padding: { xs: '4px 8px', sm: '3px 10px' },
-                          minWidth: 'auto',
-                          backgroundColor: '#1f2937',
-                          flexShrink: 0,
                           whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          width: { xs: '100%', sm: 'auto' }
+                        }}>
+                          Date Range:
+                        </Typography>
+                        
+                        {/* Date inputs - Responsive */}
+                        <Box sx={{ 
+                          display: 'flex', 
+                          gap: { xs: 0.75, sm: 0.5 }, 
+                          alignItems: 'center', 
+                          flex: { xs: '1 1 100%', sm: '1 1 auto' },
+                          minWidth: 0,
                           width: { xs: '100%', sm: 'auto' },
-                          '&:hover': { backgroundColor: '#374151' },
-                          '&:disabled': {
-                            backgroundColor: '#9ca3af',
-                            color: '#ffffff',
-                          },
-                        }}
-                      >
-                        Apply
-                      </Button>
+                          flexWrap: { xs: 'wrap', sm: 'nowrap' }
+                        }}>
+                          <TextField
+                            label="From"
+                            type="date"
+                            size="small"
+                            value={pendingHeaderDateRange.start}
+                            onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, start: e.target.value }))}
+                            InputLabelProps={{ shrink: true }}
+                            sx={{ 
+                              flex: { xs: '1 1 100%', sm: '1 1 0' },
+                              minWidth: { xs: '100%', sm: 0 },
+                              maxWidth: { xs: '100%', sm: '110px' },
+                              '& .MuiOutlinedInput-root': {
+                                backgroundColor: '#ffffff',
+                                fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                                padding: { xs: '4px 6px', sm: '4px 8px' },
+                              },
+                              '& .MuiInputLabel-root': {
+                                fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                              },
+                              '& input': {
+                                padding: { xs: '5px 3px', sm: '6px 4px' },
+                                fontSize: { xs: '0.7rem', sm: '0.7rem' }
+                              }
+                            }}
+                          />
+                          <Typography variant="body2" sx={{ 
+                            color: '#6b7280', 
+                            fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                            flexShrink: 0,
+                            display: { xs: 'none', sm: 'block' }
+                          }}>
+                            to
+                          </Typography>
+                          <TextField
+                            label="To"
+                            type="date"
+                            size="small"
+                            value={pendingHeaderDateRange.end}
+                            onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, end: e.target.value }))}
+                            InputLabelProps={{ shrink: true }}
+                            sx={{ 
+                              flex: { xs: '1 1 100%', sm: '1 1 0' },
+                              minWidth: { xs: '100%', sm: 0 },
+                              maxWidth: { xs: '100%', sm: '110px' },
+                              '& .MuiOutlinedInput-root': {
+                                backgroundColor: '#ffffff',
+                                fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                                padding: { xs: '4px 6px', sm: '4px 8px' },
+                              },
+                              '& .MuiInputLabel-root': {
+                                fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                              },
+                              '& input': {
+                                padding: { xs: '5px 3px', sm: '6px 4px' },
+                                fontSize: { xs: '0.7rem', sm: '0.7rem' }
+                              }
+                            }}
+                          />
+                        </Box>
+                        
+                        {/* Divider - Hidden on mobile */}
+                        <Box sx={{ 
+                          display: { xs: 'none', sm: 'block' },
+                          width: '1px', 
+                          height: '18px', 
+                          backgroundColor: '#d1d5db', 
+                          mx: 0.25, 
+                          flexShrink: 0 
+                        }} />
+                        
+                        {/* Apply Button */}
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={applyHeaderDateRange}
+                          disabled={
+                            !pendingHeaderDateRange.start || 
+                            !pendingHeaderDateRange.end ||
+                            (pendingHeaderDateRange.start === headerDateRange.start && 
+                             pendingHeaderDateRange.end === headerDateRange.end)
+                          }
+                          sx={{
+                            textTransform: 'none',
+                            fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                            padding: { xs: '4px 8px', sm: '3px 10px' },
+                            minWidth: 'auto',
+                            backgroundColor: '#1f2937',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap',
+                            width: { xs: '100%', sm: 'auto' },
+                            '&:hover': { backgroundColor: '#374151' },
+                            '&:disabled': {
+                              backgroundColor: '#9ca3af',
+                              color: '#ffffff',
+                            },
+                          }}
+                        >
+                          Apply
+                        </Button>
+                      </Box>
+
                     </Box>
                     
                   </Box>
                 </Box>
 
-                {/* Transaction Tabs - Separate Row, Fully Responsive */}
-                <Box sx={{ 
-                  width: '100%',
-                  mt: { xs: 1, sm: 0.5 },
-                  mb: { xs: 1, sm: 0.5 },
-                  overflowX: 'auto',
-                  overflowY: 'hidden',
-                  '&::-webkit-scrollbar': {
-                    display: 'none'
-                  },
-                  scrollbarWidth: 'none',
-                  borderBottom: { xs: 'none', sm: '1px solid #e5e7eb' },
-                  pb: { xs: 0, sm: 0.5 }
-                }}>
-                  <Tabs 
-                    value={activeTab} 
-                    onChange={handleTabChange}
-                    variant={isSmallScreen ? 'scrollable' : 'standard'}
-                    scrollButtons={false}
-                    sx={{
-                      minWidth: 0,
-                      width: '100%',
-                      '& .MuiTabs-flexContainer': {
-                        gap: { xs: 0.5, sm: 1 },
-                        justifyContent: { xs: 'flex-start', sm: 'flex-start' },
-                      },
-                      '& .MuiTab-root': {
-                        minHeight: { xs: 32, sm: 36, md: 40 },
-                        fontSize: { xs: '0.7rem', sm: '0.8rem', md: '0.875rem' },
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        color: '#6b7280',
-                        px: { xs: 1, sm: 1.5, md: 2.5 },
-                        py: { xs: 0.75, sm: 1 },
-                        minWidth: { xs: 'auto', sm: 'fit-content' },
-                        maxWidth: { xs: '45%', sm: 'none' },
-                        whiteSpace: { xs: 'normal', sm: 'nowrap' },
-                        textAlign: { xs: 'center', sm: 'left' },
-                        overflow: 'hidden',
-                        textOverflow: { xs: 'ellipsis', sm: 'clip' },
-                        lineHeight: { xs: 1.2, sm: 1.5 },
-                        '&.Mui-selected': {
-                          color: '#1f2937',
-                          fontWeight: 700,
+                {/* Transaction Tabs + Export CTA */}
+                <Box
+                  sx={{
+                    width: '100%',
+                    mt: { xs: 1, sm: 0.5 },
+                    mb: { xs: 1, sm: 0.5 },
+                    display: 'flex',
+                    flexDirection: { xs: 'column', lg: 'row' },
+                    gap: { xs: 1, lg: 2 },
+                    alignItems: { xs: 'stretch', lg: 'center' },
+                  }}
+                >
+                  <Box sx={{ 
+                    flex: 1,
+                    overflowX: 'auto',
+                    overflowY: 'hidden',
+                    '&::-webkit-scrollbar': {
+                      display: 'none'
+                    },
+                    scrollbarWidth: 'none',
+                    pb: { xs: 0, sm: 0.5 }
+                  }}>
+                    <Box sx={{
+                      display: 'inline-block',
+                      borderBottom: { xs: 'none', sm: '1px solid #e5e7eb' },
+                    }}>
+                      <Tabs 
+                        value={activeTab} 
+                        onChange={handleTabChange}
+                        variant={isSmallScreen ? 'scrollable' : 'standard'}
+                        scrollButtons={false}
+                        sx={{
+                          minWidth: 0,
+                          width: 'auto',
+                        '& .MuiTabs-flexContainer': {
+                          gap: { xs: 0.5, sm: 1 },
+                          justifyContent: { xs: 'flex-start', sm: 'flex-start' },
                         },
+                        '& .MuiTab-root': {
+                          minHeight: { xs: 32, sm: 36, md: 40 },
+                          fontSize: { xs: '0.7rem', sm: '0.8rem', md: '0.875rem' },
+                          fontWeight: 600,
+                          textTransform: 'none',
+                          color: '#6b7280',
+                          px: { xs: 1, sm: 1.5, md: 2.5 },
+                          py: { xs: 0.75, sm: 1 },
+                          minWidth: { xs: 'auto', sm: 'fit-content' },
+                          maxWidth: { xs: '45%', sm: 'none' },
+                          whiteSpace: { xs: 'normal', sm: 'nowrap' },
+                          textAlign: { xs: 'center', sm: 'left' },
+                          overflow: 'hidden',
+                          textOverflow: { xs: 'ellipsis', sm: 'clip' },
+                          lineHeight: { xs: 1.2, sm: 1.5 },
+                          '&.Mui-selected': {
+                            color: '#1f2937',
+                            fontWeight: 700,
+                          },
+                        },
+                        '& .MuiTabs-indicator': {
+                          height: 2,
+                          borderRadius: '2px 2px 0 0',
+                          background: '#1f2937',
+                        },
+                      }}
+                    >
+                      {tabDefinitions.map(({ label, count }) => (
+                        <Tab 
+                          key={label}
+                          label={
+                            <Box sx={{ 
+                              display: 'flex', 
+                              flexDirection: { xs: 'column', sm: 'row' },
+                              alignItems: 'center',
+                              gap: { xs: 0, sm: 0.25 },
+                              width: '100%',
+                              justifyContent: 'center'
+                            }}>
+                              <Box component="span">{label}</Box>
+                              {count !== null && count !== undefined && (
+                                <Box 
+                                  component="span"
+                                  sx={{ 
+                                    fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
+                                    opacity: 0.8,
+                                    fontWeight: 500,
+                                    lineHeight: 1
+                                  }}
+                                >
+                                  ({count.toLocaleString()})
+                                </Box>
+                              )}
+                            </Box>
+                          } 
+                        />
+                      ))}
+                    </Tabs>
+                    </Box>
+                  </Box>
+
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={openExportDrawer}
+                    disabled={activeTab === 4}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: { xs: '0.75rem', sm: '0.8rem' },
+                      padding: { xs: '6px 12px', sm: '6px 16px' },
+                      minWidth: 'auto',
+                      borderRadius: '8px',
+                      alignSelf: { xs: 'stretch', lg: 'center' },
+                      backgroundColor: '#0f172a',
+                      boxShadow: '0 2px 8px rgba(15,23,42,0.1)',
+                      '&:hover': { backgroundColor: '#1a1a1a' },
+                      '&:disabled': {
+                        backgroundColor: '#fafafa',
+                        color: '#757575',
+                        cursor: 'not-allowed',
                       },
-                      '& .MuiTabs-indicator': {
-                        height: 2,
-                        borderRadius: '2px 2px 0 0',
-                        background: '#1f2937',
+                      '&:disabled:hover': {
+                        backgroundColor: '#fafafa',
+                        color: '#757575',
                       },
                     }}
                   >
-                    <Tab 
-                      label={
-                        <Box sx={{ 
-                          display: 'flex', 
-                          flexDirection: { xs: 'column', sm: 'row' },
-                          alignItems: 'center',
-                          gap: { xs: 0, sm: 0.25 },
-                          width: '100%',
-                          justifyContent: 'center'
-                        }}>
-                          <Box component="span">Matched</Box>
-                          {matchedTotalCount !== null && (
-                            <Box 
-                              component="span"
-                              sx={{ 
-                                fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
-                                opacity: 0.8,
-                                fontWeight: 500,
-                                lineHeight: 1
-                              }}
-                            >
-                              ({matchedTotalCount.toLocaleString()})
-                            </Box>
-                          )}
-                        </Box>
-                      } 
-                    />
-                    <Tab 
-                      label={
-                        <Box sx={{ 
-                          display: 'flex', 
-                          flexDirection: { xs: 'column', sm: 'row' },
-                          alignItems: 'center',
-                          gap: { xs: 0, sm: 0.25 },
-                          width: '100%',
-                          justifyContent: 'center'
-                        }}>
-                          <Box component="span">Mismatched</Box>
-                          {mismatchedTotalCount !== null && (
-                            <Box 
-                              component="span"
-                              sx={{ 
-                                fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
-                                opacity: 0.8,
-                                fontWeight: 500,
-                                lineHeight: 1
-                              }}
-                            >
-                              ({mismatchedTotalCount.toLocaleString()})
-                            </Box>
-                          )}
-                        </Box>
-                      } 
-                    />
-                    <Tab 
-                      label={
-                        <Box sx={{ 
-                          display: 'flex', 
-                          flexDirection: { xs: 'column', sm: 'row' },
-                          alignItems: 'center',
-                          gap: { xs: 0, sm: 0.25 },
-                          width: '100%',
-                          justifyContent: 'center'
-                        }}>
-                          <Box component="span">Unsettled</Box>
-                          {unsettledTotalCount !== null && (
-                            <Box 
-                              component="span"
-                              sx={{ 
-                                fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
-                                opacity: 0.8,
-                                fontWeight: 500,
-                                lineHeight: 1
-                              }}
-                            >
-                              ({unsettledTotalCount.toLocaleString()})
-                            </Box>
-                          )}
-                        </Box>
-                      } 
-                    />
-                    <Tab 
-                      label={
-                        <Box sx={{ 
-                          display: 'flex', 
-                          flexDirection: { xs: 'column', sm: 'row' },
-                          alignItems: 'center',
-                          gap: { xs: 0, sm: 0.25 },
-                          width: '100%',
-                          justifyContent: 'center'
-                        }}>
-                          <Box component="span">All</Box>
-                          {allTotalCount !== null && (
-                            <Box 
-                              component="span"
-                              sx={{ 
-                                fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
-                                opacity: 0.8,
-                                fontWeight: 500,
-                                lineHeight: 1
-                              }}
-                            >
-                              ({allTotalCount.toLocaleString()})
-                            </Box>
-                          )}
-                        </Box>
-                      } 
-                    />
-                    <Tab 
-                      label={
-                        <Box sx={{ 
-                          display: 'flex', 
-                          flexDirection: { xs: 'column', sm: 'row' },
-                          alignItems: 'center',
-                          gap: { xs: 0, sm: 0.25 },
-                          width: '100%',
-                          justifyContent: 'center'
-                        }}>
-                          <Box component="span">Sales Report</Box>
-                          {/* Only show count when on Sales Report tab to avoid showing stale data when filters are applied on other tabs */}
-                          {activeTab === 4 && salesTabTotalCount !== null && (
-                            <Box 
-                              component="span"
-                              sx={{ 
-                                fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
-                                opacity: 0.8,
-                                fontWeight: 500,
-                                lineHeight: 1
-                              }}
-                            >
-                              ({salesTabTotalCount.toLocaleString()})
-                            </Box>
-                          )}
-                        </Box>
-                      } 
-                    />
-                  </Tabs>
+                    <DownloadIcon fontSize="small" />
+                  </Button>
                 </Box>
+
+                {/* Mismatched Sub-tabs (Less Received / More Received) */}
+                {activeTab === 1 && (
+                  <Box
+                    sx={{
+                      mt: 2,
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: 1,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          cursor: quadApiLoading ? 'default' : 'pointer',
+                        }}
+                        onClick={() => !quadApiLoading && handleMismatchedSubTabToggle('less_received')}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 600,
+                            color: mismatchedSubTab === 'less_received' ? '#111827' : '#9ca3af',
+                            userSelect: 'none',
+                          }}
+                        >
+                          Less Received
+                        </Typography>
+                        {mismatchedLessReceivedTotalCount !== null && (
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              fontSize: '0.7rem',
+                              color: mismatchedSubTab === 'less_received' ? '#111827' : '#9ca3af',
+                              fontWeight: 500,
+                              mt: 0.25,
+                            }}
+                          >
+                            {mismatchedLessReceivedTotalCount}
+                          </Typography>
+                        )}
+                      </Box>
+                      <Box
+                        role="switch"
+                        aria-checked={mismatchedSubTab === 'more_received'}
+                        tabIndex={0}
+                        onClick={() => !quadApiLoading && handleMismatchedSubTabToggle(mismatchedSubTab === 'less_received' ? 'more_received' : 'less_received')}
+                        onKeyDown={(e) => {
+                          if (quadApiLoading) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleMismatchedSubTabToggle(mismatchedSubTab === 'less_received' ? 'more_received' : 'less_received');
+                          }
+                        }}
+                        sx={{
+                          width: 52,
+                          height: 28,
+                          borderRadius: 999,
+                          backgroundColor: '#111827',
+                          position: 'relative',
+                          px: 0.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          cursor: quadApiLoading ? 'not-allowed' : 'pointer',
+                          opacity: quadApiLoading ? 0.5 : 1,
+                          transition: 'background-color 0.2s ease',
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: '50%',
+                            backgroundColor: '#fff',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                            transform: mismatchedSubTab === 'more_received' ? 'translateX(22px)' : 'translateX(0)',
+                            transition: 'transform 0.2s ease',
+                          }}
+                        />
+                      </Box>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          cursor: quadApiLoading ? 'default' : 'pointer',
+                        }}
+                        onClick={() => !quadApiLoading && handleMismatchedSubTabToggle('more_received')}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 600,
+                            color: mismatchedSubTab === 'more_received' ? '#111827' : '#9ca3af',
+                            userSelect: 'none',
+                          }}
+                        >
+                          More Received
+                        </Typography>
+                        {mismatchedMoreReceivedTotalCount !== null && (
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              fontSize: '0.7rem',
+                              color: mismatchedSubTab === 'more_received' ? '#111827' : '#9ca3af',
+                              fontWeight: 500,
+                              mt: 0.25,
+                            }}
+                          >
+                            {mismatchedMoreReceivedTotalCount}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  </Box>
+                )}
 
                 {activeTab === 4 && selectedPlatform === 'amazon' && (
                   <Box
@@ -4995,13 +5446,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             const salesColumnDef = salesReportData?.columns?.find(col => col.title === column);
                             const fieldName = salesColumnDef?.key;
                             value = fieldName ? (row as any)[fieldName] : undefined;
-                          } else if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
+                          } else if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
                             // Use quad API data
                             let currentData: TotalTransactionsResponse | null = null;
                             if (activeTab === 0) {
                               currentData = matchedData;
                             } else if (activeTab === 1) {
-                              currentData = mismatchedData;
+                              // For mismatched tab, use the appropriate sub-tab data
+                              if (mismatchedSubTab === 'less_received') {
+                                currentData = mismatchedLessReceivedData;
+                              } else {
+                                currentData = mismatchedMoreReceivedData;
+                              }
                             } else if (activeTab === 2) {
                               currentData = unsettledData;
                             } else if (activeTab === 3) {
@@ -5075,13 +5531,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             } else {
                               displayValue = value !== undefined && value !== null ? String(value) : '';
                             }
-                          } else if (matchedData !== null || mismatchedData !== null || unsettledData !== null || allData !== null) {
+                          } else if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
                             // Use quad API data for formatting
                             let currentData: TotalTransactionsResponse | null = null;
                             if (activeTab === 0) {
                               currentData = matchedData;
                             } else if (activeTab === 1) {
-                              currentData = mismatchedData;
+                              // For mismatched tab, use the appropriate sub-tab data
+                              if (mismatchedSubTab === 'less_received') {
+                                currentData = mismatchedLessReceivedData;
+                              } else {
+                                currentData = mismatchedMoreReceivedData;
+                              }
                             } else if (activeTab === 2) {
                               currentData = unsettledData;
                             } else if (activeTab === 3) {
@@ -5341,6 +5802,315 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           anchorEl={breakupsAnchorEl}
         />
 
+        {/* Export Drawer */}
+        {isExportDrawerVisible && (
+          <Portal>
+            <Box
+              sx={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 12000,
+              }}
+            >
+              <Box
+                onClick={() => setExportDrawerOpen(false)}
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: 'rgba(15,23,42,0.35)',
+                  backdropFilter: 'blur(2px)',
+                  opacity: exportDrawerOpen ? 1 : 0,
+                  transition: 'opacity 200ms ease',
+                  pointerEvents: exportDrawerOpen ? 'auto' : 'none',
+                }}
+              />
+
+              <Slide
+                direction="left"
+                in={exportDrawerOpen}
+                mountOnEnter
+                unmountOnExit
+                timeout={{ enter: 300, exit: 200 }}
+                onExited={() => setIsExportDrawerVisible(false)}
+              >
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    height: '100vh',
+                    width: { xs: '100%', sm: 420 },
+                    maxWidth: '100vw',
+                    backgroundColor: '#f8fafc',
+                    boxShadow: '-12px 0 30px rgba(15,23,42,0.15)',
+                    borderTopLeftRadius: { xs: 0, sm: '16px' },
+                    borderBottomLeftRadius: { xs: 0, sm: '16px' },
+                    display: 'flex',
+                    flexDirection: 'column',
+                    p: 2.5,
+                    gap: 5,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      backgroundColor: '#ffffff',
+                      boxShadow: '0 10px 30px rgba(15,23,42,0.08)',
+                      p: 2.5,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                      <Box>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.5rem' }}>Request Export</Typography>
+                        <Typography variant="body2" sx={{ color: '#475569' }}>
+                          Start a fresh export and you can download your file when it’s ready.
+                        </Typography>
+                      </Box>
+                      <IconButton size="small" onClick={() => setExportDrawerOpen(false)}>
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      disabled={exportLoading}
+                      sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '10px' }}
+                      onClick={() => setExportConfirmationOpen(true)}
+                    >
+                      {exportLoading ? 'Requesting...' : 'Request new export'}
+                    </Button>
+
+                    {exportSuccess && (
+                      <Alert 
+                        severity="success" 
+                        onClose={() => setExportSuccess(null)}
+                        sx={{ mt: 1 }}
+                      >
+                        {exportSuccess}
+                      </Alert>
+                    )}
+
+                    {error && (
+                      <Alert 
+                        severity="error" 
+                        onClose={() => setError(null)}
+                        sx={{ mt: 1 }}
+                      >
+                        {error}
+                      </Alert>
+                    )}
+                  </Box>
+
+                  <Box
+                    sx={{
+                      flex: 1,
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      backgroundColor: '#ffffff',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Box sx={{ px: 2.5, pt: 2.25, pb: 1.5 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.5rem' }}>
+                          Download Previous Exports
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={fetchExportList}
+                          disabled={exportListLoading}
+                          sx={{
+                            color: '#475569',
+                            '&:hover': { backgroundColor: '#f1f5f9', color: '#1e293b' },
+                            '&:disabled': { color: '#cbd5e1' },
+                          }}
+                        >
+                          <RefreshIcon 
+                            fontSize="small" 
+                            sx={{
+                              animation: exportListLoading ? 'spin 1s linear infinite' : 'none',
+                              '@keyframes spin': {
+                                '0%': { transform: 'rotate(0deg)' },
+                                '100%': { transform: 'rotate(360deg)' },
+                              },
+                            }}
+                          />
+                        </IconButton>
+                      </Box>
+                      <Typography variant="body2" sx={{ color: '#475569' }}>
+                        Track your recent exports and download files when ready.
+                      </Typography>
+                    </Box>
+
+                    <Divider />
+
+                    <List sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
+                      {exportRequests.map((request) => {
+                        const meta = EXPORT_STATUS_META[request.status];
+                        return (
+                          <ListItem
+                            key={request.id}
+                            disablePadding
+                            sx={{
+                              flexDirection: 'column',
+                              alignItems: 'stretch',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '12px',
+                              p: 2,
+                              mb: 1.5,
+                              backgroundColor: '#ffffff',
+                              gap: 1,
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1 }}>
+                              <Box>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0f172a' }}>
+                                  {request.type}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                                  {request.requestedOn}
+                                </Typography>
+                              </Box>
+                              <Chip
+                                size="small"
+                                label={meta.label}
+                                sx={{
+                                  backgroundColor: meta.bg,
+                                  color: meta.color,
+                                  fontWeight: 600,
+                                  height: 24,
+                                  '& .MuiChip-label': { px: 1.5 },
+                                }}
+                              />
+                            </Box>
+
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                              {request.status === 'ready' && request.downloadUrl ? (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  startIcon={<DownloadIcon fontSize="small" />}
+                                  onClick={() => handleDownload(request)}
+                                  sx={{
+                                    textTransform: 'none',
+                                    fontWeight: 600,
+                                    borderColor: '#1d4ed8',
+                                    color: '#1d4ed8',
+                                    '&:hover': { borderColor: '#1e40af', color: '#1e40af' },
+                                  }}
+                                >
+                                  Download
+                                </Button>
+                              ) : (
+                                <Typography variant="caption" sx={{ color: meta.color, fontWeight: 500 }}>
+                                  {meta.helper}
+                                </Typography>
+                              )}
+                            </Box>
+                          </ListItem>
+                        );
+                      })}
+                    </List>
+                  </Box>
+                </Box>
+              </Slide>
+            </Box>
+          </Portal>
+        )}
+
+        {exportConfirmationOpen && (
+          <Portal>
+            <Box
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  setExportConfirmationOpen(false);
+                }
+              }}
+              sx={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 13000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(15,23,42,0.5)',
+                backdropFilter: 'blur(2px)',
+              }}
+            >
+              <Paper
+                onClick={(e) => e.stopPropagation()}
+                sx={{
+                  width: '100%',
+                  maxWidth: 500,
+                  borderRadius: 3,
+                  overflow: 'hidden',
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                }}
+              >
+                <Box sx={{ p: 3, borderBottom: '1px solid #e2e8f0' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a' }}>
+                    Confirm export request
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 3, backgroundColor: '#f8fafc' }}>
+                  <Typography variant="body2" sx={{ color: '#475569', mb: 2 }}>
+                    We'll queue a new export with the selections below. Please confirm before continuing.
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    {[
+                      { label: 'Settlement status', value: getSettlementStatusLabel() },
+                      { label: 'Portal', value: formattedPlatformLabel },
+                      { label: 'Date range', value: selectedDateRangeLabel },
+                    ].map((item) => (
+                      <Box
+                        key={item.label}
+                        sx={{
+                          borderRadius: 2,
+                          border: '1px solid #e2e8f0',
+                          backgroundColor: '#ffffff',
+                          p: 1.5,
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600, letterSpacing: 0.4 }}>
+                          {item.label.toUpperCase()}
+                        </Typography>
+                        <Typography variant="subtitle1" sx={{ color: '#0f172a', fontWeight: 600 }}>
+                          {item.value}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, p: 3 }}>
+                  <Button
+                    onClick={() => setExportConfirmationOpen(false)}
+                    disabled={exportLoading}
+                    sx={{ textTransform: 'none', fontWeight: 600, color: '#475569' }}
+                  >
+                    Go back
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleConfirmExportRequest}
+                    disabled={exportLoading}
+                    sx={{ textTransform: 'none', fontWeight: 600 }}
+                  >
+                    {exportLoading ? 'Requesting...' : 'Confirm & request'}
+                  </Button>
+                </Box>
+              </Paper>
+            </Box>
+          </Portal>
+        )}
+
         {/* Filter Menu Portal - Rendered outside table container */}
         {(() => {
           const shouldRender = Boolean(headerFilterAnchor) && Boolean(activeFilterColumn) && activeTab !== 4;
@@ -5416,6 +6186,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       .filter((col) => {
                         // Exclude Order ID from filter sidebar
                         if (col === 'Order ID') return false;
+                        // Exclude Invoice Date from filter sidebar (date filter is available outside)
+                        if (col === 'Invoice Date') return false;
+                        // Exclude Platform from filter sidebar (platform filter is available in header)
+                        if (col === 'Platform') return false;
                         // Filter columns based on selected platform
                         const mapping = COLUMN_TO_API_PARAM_MAP[col];
                         if (!mapping) return true; // Show columns without mapping
@@ -5423,12 +6197,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         // Show if supported by at least one selected platform
                         return mapping.supportedPlatforms!.includes(selectedPlatform as any);
                       })
-                      .map((col) => (
+                      .map((col) => {
+                        // Remove Status filter completely - it has been replaced with sub-tabs for mismatched tab
+                        if (col === 'Status') return null;
+                        return (
                         <ListItemButton
                           key={col}
                           selected={activeFilterColumn === col}
                           onClick={() => setActiveFilterColumn(col)}
-                          sx={{ borderRadius: 0.75, py: 0.75, px: 1 }}
+                          sx={{ 
+                            borderRadius: 0.75, 
+                            py: 0.75, 
+                            px: 1,
+                          }}
                         >
                           <ListItemText 
                             primary={col} 
@@ -5441,13 +6222,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             secondaryTypographyProps={{ fontSize: '0.65rem', color: '#9ca3af' }}
                           />
                         </ListItemButton>
-                      ))}
+                        );
+                      })}
                   </List>
                 </Box>
                 {/* Right: Reusable controls */}
                 <ColumnFilterControls
                   columnMeta={COLUMN_META as any}
-                  activeColumn={activeFilterColumn || 'Status'}
+                  activeColumn={activeFilterColumn || ''}
                   setActiveColumn={(c) => setActiveFilterColumn(c)}
                   pendingFilters={pendingColumnFilters}
                   handleStringChange={handleStringFilterChange}
@@ -5459,6 +6241,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   onApply={applyFilters}
                   orderIdChips={orderIdChips}
                   setOrderIdChips={setOrderIdChips}
+                  disableEnumCheckboxes={false}
                 />
             </Box>
             </Box>
