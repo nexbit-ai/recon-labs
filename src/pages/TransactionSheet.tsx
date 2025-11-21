@@ -2026,13 +2026,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }).format(requestedDate);
     const requestedOn = `${formattedDate} • ${formattedTime}`;
 
-    // Extract type from file name (e.g., "all_all_order_date_2025-02-01_2025-03-28.csv" -> "All Export")
+    // Extract type from file name (e.g., "all_all_order_date_2025-02-01_2025-03-28.csv" -> "all all order date 2025-02-01 2025-03-28")
     const fileName = item.file_name || '';
     const type = fileName
       .replace(/\.(csv|xlsx|xls)$/i, '')
       .split('_')
-      .filter((part: string) => part && !part.match(/^\d{4}-\d{2}-\d{2}$/)) // Remove date parts
-      .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1))
+      .filter((part: string) => part) // Only filter out empty parts
       .join(' ') || 'Export';
 
     // Format platform name
@@ -4803,12 +4802,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     size="small"
                     onClick={openExportDrawer}
                     disabled={activeTab === 4}
-                    startIcon={<DownloadIcon fontSize="small" />}
                     sx={{
                       textTransform: 'none',
                       fontWeight: 500,
                       fontSize: { xs: '0.75rem', sm: '0.8rem' },
                       padding: { xs: '6px 12px', sm: '6px 16px' },
+                      minWidth: 'auto',
                       borderRadius: '8px',
                       alignSelf: { xs: 'stretch', lg: 'center' },
                       backgroundColor: '#0f172a',
@@ -4825,7 +4824,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       },
                     }}
                   >
-                    Downloads
+                    <DownloadIcon fontSize="small" />
                   </Button>
                 </Box>
 
@@ -5849,7 +5848,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     display: 'flex',
                     flexDirection: 'column',
                     p: 2.5,
-                    gap: 3,
+                    gap: 5,
                   }}
                 >
                   <Box
