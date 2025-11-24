@@ -1,26 +1,26 @@
-import React, { useEffect, useState, useRef, Fragment } from 'react';
-import { 
-  Box, 
-  Card, 
-  CardContent, 
-  Tabs, 
-  Tab, 
-  Table, 
-  TableHead, 
-  TableRow, 
-  TableCell, 
-  TableBody, 
-  TableContainer, 
+import React, { useEffect, useState, useRef, Fragment, useMemo } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Tabs,
+  Tab,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  TableContainer,
   Fade,
-  Button, 
-  Checkbox, 
+  Button,
+  Checkbox,
   Radio,
   RadioGroup,
-  Snackbar, 
-  Typography, 
-  Chip, 
-  IconButton, 
-  Menu, 
+  Snackbar,
+  Typography,
+  Chip,
+  IconButton,
+  Menu,
   MenuItem,
   CircularProgress,
   Portal,
@@ -41,9 +41,9 @@ import {
   DialogContent,
   DialogActions
 } from '@mui/material';
-import { 
-  CalendarToday as CalendarTodayIcon, 
-  KeyboardArrowDown as KeyboardArrowDownIcon, 
+import {
+  CalendarToday as CalendarTodayIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon,
   StorefrontOutlined as StorefrontIcon,
   FilterList as FilterIcon,
   Close as CloseIcon,
@@ -68,6 +68,7 @@ interface TransactionRow {
   "Difference": number;
   "Remark": string;
   "Event Type": string;
+  "Settlement Provider"?: string;
   // Preserve original API response data for popup access
   originalData?: any;
 }
@@ -153,21 +154,21 @@ const generateDummyUnreconciledData = () => {
   ];
 
   const dummyData = [];
-  
+
   for (let i = 1; i <= 25; i++) {
     const orderValue = Math.floor(Math.random() * 50000) + 1000; // 1000 to 51000
     const settlementValue = orderValue + (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 2000) + 100; // Add/subtract random amount
     const difference = settlementValue - orderValue;
     const reason = reasons[Math.floor(Math.random() * reasons.length)];
     const status = statuses[Math.floor(Math.random() * statuses.length)];
-    
+
     // Generate dates within the last 30 days
     const orderDate = new Date();
     orderDate.setDate(orderDate.getDate() - Math.floor(Math.random() * 30));
-    
+
     const settlementDate = new Date();
     settlementDate.setDate(settlementDate.getDate() - Math.floor(Math.random() * 15));
-    
+
     dummyData.push({
       "Order ID": `ORD_${String(10000 + i).padStart(6, '0')}`,
       "Order Value": orderValue,
@@ -204,8 +205,25 @@ const generateDummyUnreconciledData = () => {
       }
     });
   }
-  
+
   return dummyData;
+};
+
+// Helper function to format settlement provider: capitalize first letter, replace underscores with spaces
+const formatSettlementProvider = (value: string | null | undefined): string => {
+  if (!value) return '';
+  return value
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
+// Helper function to clean enum values for display (same as TransactionSheet)
+const cleanEnumValue = (value: string): string => {
+  return value
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
 };
 
 // Transform API data to TransactionRow format
@@ -215,32 +233,32 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
     if (value === null || value === undefined || value === '') {
       return 0;
     }
-    
+
     // Convert to string and clean it
     const cleanedValue = String(value)
       .replace(/[₹$,\s]/g, '') // Remove currency symbols, commas, and spaces
       .replace(/[^\d.-]/g, '') // Keep only digits, dots, and minus signs
       .trim();
-    
+
     const parsed = parseFloat(cleanedValue);
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  
 
-  
+
+
 
   // Extract values from the API structure
   const orderValue = parseNumericValue(orderItem.order_value || orderItem.buyer_invoice_amount);
   const settlementValue = parseNumericValue(orderItem.settlement_value);
   const difference = parseNumericValue(orderItem.diff);
-  
+
   // Handle missing or empty order_item_id
   let orderItemId = orderItem.order_item_id;
   if (!orderItemId || orderItemId.trim() === '') {
     orderItemId = `ITEM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
-  
+
   // Determine remark based on API response
   let remark = "unsettled";
   if (orderItem.status === "settlement_matched") {
@@ -252,7 +270,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
       remark = "Excess Amount Received";
     }
   }
-  
+
   // Determine settlement date from API response
   let settlementDate = "";
   if (orderItem.settlement_date && orderItem.settlement_date.trim() !== '') {
@@ -264,7 +282,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   } else {
     settlementDate = "Invalid Date";
   }
-  
+
   return {
     "Order ID": orderItemId,
     "Amount": orderValue,
@@ -276,6 +294,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
     "Difference": difference,
     "Remark": remark,
     "Event Type": orderItem.event_type || "Sale", // Default to "Sale" if not provided
+    "Settlement Provider": formatSettlementProvider(orderItem.settlement_provider),
     // Preserve the original API response data for popup access
     originalData: orderItem,
   };
@@ -283,7 +302,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
 
 const OperationsCentrePage: React.FC = () => {
   const [disputeSubTab, setDisputeSubTab] = useState<number>(0); // 0: unreconciled, 1: manually reconciled, 2: disputed
-  
+
   // State for date filtering
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   // Initialize date range synchronously from URL → localStorage → this month to avoid race before first fetch
@@ -296,7 +315,7 @@ const OperationsCentrePage: React.FC = () => {
       const lsFrom = localStorage.getItem('recon_selected_date_from') || '';
       const lsTo = localStorage.getItem('recon_selected_date_to') || '';
       if (lsFrom && lsTo) return { start: lsFrom, end: lsTo, kind: 'custom' as const };
-    } catch {}
+    } catch { }
     const now = new Date();
     const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0];
     const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0)).toISOString().split('T')[0];
@@ -307,10 +326,10 @@ const OperationsCentrePage: React.FC = () => {
   const [customEndDate, setCustomEndDate] = useState(initialFromTo.end);
   const [tempStartDate, setTempStartDate] = useState('');
   const [tempEndDate, setTempEndDate] = useState('');
-  
+
   // Header date range state - for the date selector displayed at the top
-  const [headerDateRange, setHeaderDateRange] = useState<{start: string, end: string}>({ start: initialFromTo.start, end: initialFromTo.end });
-  const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{start: string, end: string}>({ start: initialFromTo.start, end: initialFromTo.end });
+  const [headerDateRange, setHeaderDateRange] = useState<{ start: string, end: string }>({ start: initialFromTo.start, end: initialFromTo.end });
+  const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{ start: string, end: string }>({ start: initialFromTo.start, end: initialFromTo.end });
 
   // Calendar popup state
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
@@ -318,7 +337,7 @@ const OperationsCentrePage: React.FC = () => {
   // StrictMode-safe initial-run guards
   const isInitialRenderRef = useRef(true);
   const hasFetchedOnInitialRef = useRef(false);
-  
+
   // Initialize platform from URL or localStorage - single platform only
   const getInitialPlatform = (): 'flipkart' | 'amazon' | 'd2c' => {
     const params = new URLSearchParams(window.location.search);
@@ -367,7 +386,7 @@ const OperationsCentrePage: React.FC = () => {
         setSelectedPlatform(platforms[0]); // Use first platform only
       }
     }
-    
+
     // Set tab from URL parameter if provided (0: unreconciled, 1: manually reconciled, 2: disputed)
     const tabParam = params.get('tab');
     if (tabParam) {
@@ -377,7 +396,7 @@ const OperationsCentrePage: React.FC = () => {
       }
     }
   }, []);
-  
+
   // Date range menu state
   const [dateRangeMenuAnchor, setDateRangeMenuAnchor] = useState<HTMLElement | null>(null);
 
@@ -394,14 +413,16 @@ const OperationsCentrePage: React.FC = () => {
   const [unreconciledRows, setUnreconciledRows] = useState<TransactionRow[] | GroupedUnreconciledData[]>([]);
   const [manuallyReconciledRows, setManuallyReconciledRows] = useState<TransactionRow[]>([]);
   const [disputedRows, setDisputedRows] = useState<TransactionRow[]>([]);
-  
+  // Store API response with columns for settlement provider filter
+  const [apiResponseData, setApiResponseData] = useState<any>(null);
+
   // Helper to get current tab's data (for backward compatibility)
   const getApiRows = () => {
     if (disputeSubTab === 0) return unreconciledRows;
     if (disputeSubTab === 1) return manuallyReconciledRows;
     return disputedRows;
   };
-  
+
   const [mockRows, setMockRows] = useState<Array<{ id: string; orderItemId: string; orderDate: string; difference: number; remark: string; eventType: string; status: 'unreconciled' | 'open' | 'raised'; }>>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -443,7 +464,8 @@ const OperationsCentrePage: React.FC = () => {
     'Difference': { type: 'number' },
     'Reason': { type: 'enum' },
     'Event Type': { type: 'enum' },
-    'Status': { type: 'enum' }
+    'Status': { type: 'enum' },
+    'Settlement Provider': { type: 'enum' }
   };
 
   // Complete mapping of UI columns to API parameters (similar to TransactionSheet)
@@ -463,6 +485,8 @@ const OperationsCentrePage: React.FC = () => {
     'Difference': { apiParam: 'diff', type: 'number' },
     'Reason': { apiParam: 'reason_in', type: 'enum', usesInSuffix: true },
     'Event Type': { apiParam: 'event_type', type: 'enum' },
+    // D2C-specific CSV filters (with _in suffix support)
+    'Settlement Provider': { apiParam: 'settlement_provider', type: 'enum', supportedPlatforms: ['d2c'] },
   };
 
   // Mapping of sortable UI columns to backend sort_by values
@@ -490,6 +514,23 @@ const OperationsCentrePage: React.FC = () => {
     if (!reason || reason.trim() === '') return '';
     return reason.toLowerCase();
   };
+
+  // Create mapping from cleaned values to original values for settlement_provider
+  const settlementProviderMapping = useMemo(() => {
+    const mapping: Record<string, string> = {};
+    if (apiResponseData?.columns) {
+      const settlementProviderColumn = apiResponseData.columns.find(
+        (col: any) => col.key === 'settlement_provider' && col.type === 'enum'
+      );
+      if (settlementProviderColumn?.values) {
+        settlementProviderColumn.values.forEach((originalValue: string) => {
+          const cleanedValue = cleanEnumValue(originalValue);
+          mapping[cleanedValue] = originalValue;
+        });
+      }
+    }
+    return mapping;
+  }, [apiResponseData]);
 
   // Get current date range text for display
   const getCurrentDateRangeText = () => {
@@ -561,8 +602,8 @@ const OperationsCentrePage: React.FC = () => {
       return <UnfoldMoreIcon fontSize="small" />;
     }
     // Flipped: show Down arrow for ascending, Up arrow for descending
-    return sortConfig.direction === 'asc' 
-      ? <ArrowDownwardIcon fontSize="small" /> 
+    return sortConfig.direction === 'asc'
+      ? <ArrowDownwardIcon fontSize="small" />
       : <ArrowUpwardIcon fontSize="small" />;
   };
 
@@ -595,7 +636,7 @@ const OperationsCentrePage: React.FC = () => {
   ): TransactionQueryParams => {
     const params: TransactionQueryParams = {};
     const f = filtersOverride || columnFilters;
-    
+
     // Set status for unreconciled orders (less_payment_received, more_payment_received)
     // Only set default if no status filter is explicitly applied
     if (disputeSubTab === 0 && !f['Status']) {
@@ -633,6 +674,14 @@ const OperationsCentrePage: React.FC = () => {
       // Skip Order ID as it's handled separately above
       if (columnKey === 'Order ID') return;
 
+      // Check platform compatibility
+      if (mapping.supportedPlatforms) {
+        const isSupported = mapping.supportedPlatforms.includes(selectedPlatform as any);
+        if (!isSupported) {
+          return; // Skip filters not supported by selected platform
+        }
+      }
+
       const baseParam = mapping.apiParam;
 
       switch (mapping.type) {
@@ -641,7 +690,7 @@ const OperationsCentrePage: React.FC = () => {
             (params as any)[baseParam] = filterValue.trim();
           }
           break;
-        
+
         case 'number':
           if (typeof filterValue === 'object' && filterValue !== null) {
             if (filterValue.min !== undefined && filterValue.min !== '') {
@@ -658,7 +707,7 @@ const OperationsCentrePage: React.FC = () => {
             }
           }
           break;
-        
+
         case 'date':
           if (typeof filterValue === 'object' && filterValue !== null) {
             if (filterValue.from) {
@@ -669,11 +718,21 @@ const OperationsCentrePage: React.FC = () => {
             }
           }
           break;
-        
+
         case 'enum':
           if (Array.isArray(filterValue) && filterValue.length > 0) {
-            // For enum filters, join directly
-            (params as any)[baseParam] = filterValue.join(',');
+            // For Settlement Provider, map cleaned values back to original values
+            if (columnKey === 'Settlement Provider') {
+              const originalValues = filterValue
+                .map(cleanedValue => settlementProviderMapping[cleanedValue] || cleanedValue)
+                .filter(Boolean);
+              if (originalValues.length > 0) {
+                (params as any)[baseParam] = originalValues.join(',');
+              }
+            } else {
+              // For other enum filters, join directly
+              (params as any)[baseParam] = filterValue.join(',');
+            }
           }
           break;
       }
@@ -697,20 +756,20 @@ const OperationsCentrePage: React.FC = () => {
       } else if (selectedDateRange === 'this-year') {
         const now = new Date();
         const currentYear = now.getFullYear();
-        
+
         // Use UTC dates to avoid timezone issues
         const firstDay = new Date(Date.UTC(currentYear, 0, 1)); // January 1st (month 0)
         const lastDay = new Date(Date.UTC(currentYear, 11, 31)); // December 31st (month 11)
-        
+
         // Format dates as YYYY-MM-DD using UTC methods
         params.order_date_from = firstDay.toISOString().split('T')[0];
         params.order_date_to = lastDay.toISOString().split('T')[0];
-        
+
       } else if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
         params.order_date_from = customStartDate;
         params.order_date_to = customEndDate;
       }
-      
+
       // Ensure we always have default dates if none are set
       if (!(params as any).order_date_from || !(params as any).order_date_to) {
         const now = new Date();
@@ -732,7 +791,7 @@ const OperationsCentrePage: React.FC = () => {
   // Transform API response to TransactionRow format
   const transformTransactionData = (transactionData: any[]): TransactionRow[] => {
     const transformedRows: TransactionRow[] = [];
-    
+
     if (Array.isArray(transactionData)) {
       transactionData.forEach((transaction: any) => {
         // Parse numeric values
@@ -741,7 +800,7 @@ const OperationsCentrePage: React.FC = () => {
           const cleaned = String(value).replace(/[₹$,\s]/g, '').replace(/[^\d.-]/g, '').trim();
           return parseFloat(cleaned) || 0;
         };
-        
+
         // Format dates
         const formatDate = (date: string | Date): string => {
           if (!date) return '';
@@ -751,7 +810,7 @@ const OperationsCentrePage: React.FC = () => {
             return '';
           }
         };
-        
+
         // For manually reconciled and disputed tabs, use manual_override_note if available
         // Otherwise, use mismatch_reason from breakups or metadata
         let remark = 'Not Available';
@@ -764,7 +823,7 @@ const OperationsCentrePage: React.FC = () => {
         } else if (transaction.remark) {
           remark = transaction.remark;
         }
-        
+
         transformedRows.push({
           "Order ID": transaction.order_item_id || transaction.order_id || '',
           "Amount": parseNumeric(transaction.order_value || transaction.buyer_invoice_amount),
@@ -780,7 +839,7 @@ const OperationsCentrePage: React.FC = () => {
         });
       });
     }
-    
+
     return transformedRows;
   };
 
@@ -808,7 +867,7 @@ const OperationsCentrePage: React.FC = () => {
         params.sort_by = COLUMN_TO_SORT_BY_MAP[sortOverride.key];
         params.sort_order = sortOverride.direction;
       }
-      
+
       // Add the unreconciled status filter (only if not overridden by user's Status filter)
       // buildQueryParams already handles this, but we ensure it's set if user hasn't filtered by status
       if (!params.status_in) {
@@ -817,24 +876,29 @@ const OperationsCentrePage: React.FC = () => {
       // Add manual_override_status filter to exclude manually reconciled and disputed orders
       // Pass as string "null" since the API service filters out actual null values
       (params as any).manual_override_status = 'null';
-      
+
       // Call the API
       const response = await api.transactions.getTotalTransactions(params as any);
-      
+
       if (response.success && response.data) {
         const responseData = response.data as any;
         const transactionData = responseData.transactions || responseData.data || [];
         const transformedRows = transformTransactionData(transactionData);
-        
+
+        // Store API response with columns for settlement provider filter
+        if (responseData.columns) {
+          setApiResponseData(responseData);
+        }
+
         setUnreconciledRows(transformedRows);
-        
-        // Update count from response
-        if (response.data.pagination) {
-          setUnreconciledCount(response.data.pagination.current_count || response.data.pagination.total_count || 0);
+
+        // Update count from response - use responseData which is the actual response.data
+        if (responseData.pagination) {
+          setUnreconciledCount(responseData.pagination.total_count || responseData.pagination.current_count || 0);
         } else {
           setUnreconciledCount(transformedRows.length);
         }
-        
+
         console.log('Fetched unreconciled orders from API:', transformedRows.length);
       } else {
         console.error('API returned no data');
@@ -884,11 +948,16 @@ const OperationsCentrePage: React.FC = () => {
         const transactionData = responseData.transactions || responseData.data || [];
         const transformedRows = transformTransactionData(transactionData);
 
+        // Store API response with columns for settlement provider filter
+        if (responseData.columns) {
+          setApiResponseData(responseData);
+        }
+
         setDisputedRows(transformedRows);
-        
-        // Update count from response
-        if (response.data.pagination) {
-          setDisputedCount(response.data.pagination.current_count || response.data.pagination.total_count || 0);
+
+        // Update count from response - use responseData which is the actual response.data
+        if (responseData.pagination) {
+          setDisputedCount(responseData.pagination.total_count || responseData.pagination.current_count || 0);
         } else {
           setDisputedCount(transformedRows.length);
         }
@@ -939,11 +1008,16 @@ const OperationsCentrePage: React.FC = () => {
         const transactionData = responseData.transactions || responseData.data || [];
         const transformedRows = transformTransactionData(transactionData);
 
+        // Store API response with columns for settlement provider filter
+        if (responseData.columns) {
+          setApiResponseData(responseData);
+        }
+
         setManuallyReconciledRows(transformedRows);
-        
-        // Update count from response
-        if (response.data.pagination) {
-          setManuallyReconciledCount(response.data.pagination.current_count || response.data.pagination.total_count || 0);
+
+        // Update count from response - use responseData which is the actual response.data
+        if (responseData.pagination) {
+          setManuallyReconciledCount(responseData.pagination.total_count || responseData.pagination.current_count || 0);
         } else {
           setManuallyReconciledCount(transformedRows.length);
         }
@@ -988,7 +1062,7 @@ const OperationsCentrePage: React.FC = () => {
   ) => {
     setApiLoading(true);
     setError(null);
-    
+
     try {
       // Fetch all three APIs in parallel
       await Promise.all([
@@ -1003,6 +1077,17 @@ const OperationsCentrePage: React.FC = () => {
       setApiLoading(false);
     }
   };
+
+  // Clear Settlement Provider filter when platform changes away from D2C
+  useEffect(() => {
+    if (selectedPlatform !== 'd2c' && columnFilters['Settlement Provider']) {
+      setColumnFilters(prev => {
+        const newFilters = { ...prev };
+        delete newFilters['Settlement Provider'];
+        return newFilters;
+      });
+    }
+  }, [selectedPlatform]);
 
   // Fetch all three APIs whenever filters or other inputs change (NOT when tab changes)
   useEffect(() => {
@@ -1037,9 +1122,9 @@ const OperationsCentrePage: React.FC = () => {
     // Apply column filters
     for (const [column, filter] of Object.entries(columnFilters)) {
       if (!filter) continue;
-      
+
       let value: any;
-      
+
       // Handle both API data and mock data
       if ('Order ID' in row) {
         // API data (TransactionRow) - handle D2C specific fields
@@ -1161,7 +1246,7 @@ const OperationsCentrePage: React.FC = () => {
         }
       }
     }
-    
+
     return true;
   });
 
@@ -1169,12 +1254,12 @@ const OperationsCentrePage: React.FC = () => {
   const getUnreconciledTotalCount = () => {
     return unreconciledCount;
   };
-  
+
   // Get count for manually reconciled tab
   const getManuallyReconciledCount = () => {
     return manuallyReconciledCount;
   };
-  
+
   // Get count for disputed tab
   const getDisputedCount = () => {
     return disputedCount;
@@ -1201,7 +1286,7 @@ const OperationsCentrePage: React.FC = () => {
       setSelectedIds(prev => Array.from(new Set([...prev, ...visibleIds])));
     }
   };
-  
+
   // Debug logging for data flow
   useEffect(() => {
     if (disputeSubTab === 0) {
@@ -1214,20 +1299,20 @@ const OperationsCentrePage: React.FC = () => {
       console.log('Active filter column:', activeFilterColumn);
     }
   }, [unreconciledRows, disputeSubTab, current, columnFilters, activeFilterColumn]);
-  
+
   // Force re-render when data changes
   const [forceUpdate, setForceUpdate] = useState(0);
-  
+
   useEffect(() => {
     const currentTabRows = getApiRows();
     if (Array.isArray(currentTabRows) && currentTabRows.length > 0) {
       setForceUpdate(prev => prev + 1);
     }
   }, [unreconciledRows, manuallyReconciledRows, disputedRows]);
-  
+
   // Track which rows are expanded
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  
+
   const toggleRowExpansion = (reason: string) => {
     setExpandedRows(prev => {
       const newSet = new Set(prev);
@@ -1244,7 +1329,7 @@ const OperationsCentrePage: React.FC = () => {
   const [raiseDialogOpen, setRaiseDialogOpen] = useState(false);
   const [selectedRaiseGroup, setSelectedRaiseGroup] = useState<{ reason: string; count: number; orderIds: string[] } | null>(null);
   const [raiseDescription, setRaiseDescription] = useState<string>('');
-  
+
   // Transaction history modal state (for manually reconciled and disputed tabs)
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedTransactionRow, setSelectedTransactionRow] = useState<any>(null);
@@ -1351,8 +1436,8 @@ const OperationsCentrePage: React.FC = () => {
   const confirmManualAction = async () => {
     if (pendingOrderIds.length === 0) return;
     try {
-      await api.manualActions.manualAction(selectedPlatform, { 
-        order_ids: pendingOrderIds, 
+      await api.manualActions.manualAction(selectedPlatform, {
+        order_ids: pendingOrderIds,
         note: noteInput || '',
         manual_override_status: 'MANUALLY_RECONCILED'
       });
@@ -1385,7 +1470,7 @@ const OperationsCentrePage: React.FC = () => {
 
       setSnackbarMsg('Manual action submitted successfully');
       setSnackbarOpen(true);
-      
+
       // Refresh all tabs data to ensure consistency
       fetchAllTabsData();
     } catch (error) {
@@ -1404,7 +1489,7 @@ const OperationsCentrePage: React.FC = () => {
 
   const handleRaiseDispute = (id: string) => {
     console.log('Raising dispute:', id);
-    
+
     // Find the transaction data from current tab's data
     const currentRows = getApiRows();
     const transaction = (currentRows as any[]).find(row => {
@@ -1412,10 +1497,10 @@ const OperationsCentrePage: React.FC = () => {
       return orderId === id;
     });
     if (transaction) {
-      openRaiseDispute({ 
-        reason: transaction.originalData?.breakups?.mismatch_reason || transaction["Remark"] || 'Unknown', 
-        count: 1, 
-        orderIds: [id] 
+      openRaiseDispute({
+        reason: transaction.originalData?.breakups?.mismatch_reason || transaction["Remark"] || 'Unknown',
+        count: 1,
+        orderIds: [id]
       });
     }
   };
@@ -1502,12 +1587,29 @@ const OperationsCentrePage: React.FC = () => {
 
   const getUniqueValuesForColumn = (column: string) => {
     const values = new Set<string>();
-    
+
     // For Event Type, show available event types
     if (column === 'Event Type') {
       return ['Sale', 'Return'];
     }
-    
+
+    // For Settlement Provider, get values from API columns response
+    if (column === 'Settlement Provider') {
+      if (apiResponseData?.columns) {
+        const settlementProviderColumn = apiResponseData.columns.find(
+          (col: any) => col.key === 'settlement_provider' && col.type === 'enum'
+        );
+        if (settlementProviderColumn?.values) {
+          // Return cleaned values for display
+          return settlementProviderColumn.values
+            .map((value: string) => cleanEnumValue(value))
+            .sort();
+        }
+      }
+      // Fallback: return empty array if no values found
+      return [];
+    }
+
     // Helper function to extract mismatch_reason from transaction data
     const extractMismatchReason = (originalData: any): string | null => {
       if (!originalData) return null;
@@ -1521,7 +1623,7 @@ const OperationsCentrePage: React.FC = () => {
       }
       return null;
     };
-    
+
     if (column === 'Reason') {
       // Check all tabs' data to get all unique reasons
       const allRows = [
@@ -1529,7 +1631,7 @@ const OperationsCentrePage: React.FC = () => {
         ...(Array.isArray(manuallyReconciledRows) ? manuallyReconciledRows : []),
         ...(Array.isArray(disputedRows) ? disputedRows : [])
       ];
-      
+
       allRows.forEach((row: any) => {
         const originalData = row.originalData;
         if (originalData) {
@@ -1567,7 +1669,7 @@ const OperationsCentrePage: React.FC = () => {
         if (value) values.add(value);
       });
     }
-    
+
     return Array.from(values).sort();
   };
 
@@ -1591,8 +1693,8 @@ const OperationsCentrePage: React.FC = () => {
 
   // (moved filteredCurrent above for initialization order)
 
- 
-  
+
+
   const toggleRow = (id: string) => setSelectedIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
 
   // Handler to open transaction history modal
@@ -1703,10 +1805,10 @@ const OperationsCentrePage: React.FC = () => {
       let top: number;
       let animationDirection: 'up' | 'down' = 'down';
       let maxHeight: number | undefined;
-      
+
       const spaceBelow = viewportHeight - rect.bottom;
       const spaceAbove = rect.top;
-      
+
       if (spaceBelow >= popupHeight + offset) {
         top = rect.bottom + offset;
         animationDirection = 'down';
@@ -1776,7 +1878,7 @@ const OperationsCentrePage: React.FC = () => {
             },
           }}
         />
-        
+
         {/* Modal */}
         <Box
           onClick={(e) => e.stopPropagation()}
@@ -1791,7 +1893,7 @@ const OperationsCentrePage: React.FC = () => {
             borderRadius: '12px',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             zIndex: 1400,
-            animation: position.animationDirection === 'down' 
+            animation: position.animationDirection === 'down'
               ? 'fadeInScaleDown 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
               : 'fadeInScaleUp 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
             '@keyframes fadeInScaleDown': {
@@ -2041,7 +2143,7 @@ const OperationsCentrePage: React.FC = () => {
                     <Box key={`${col}-${label}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, border: '1px solid #e5e7eb', borderRadius: '9999px', fontSize: '0.75rem', color: '#111827', background: '#f3f4f6' }}>
                       <span>{label}</span>
                       <IconButton
-                  size="small"
+                        size="small"
                         onClick={() => {
                           const next = { ...columnFilters } as Record<string, any>;
                           delete next[col];
@@ -2058,10 +2160,10 @@ const OperationsCentrePage: React.FC = () => {
                   );
                 })}
               </Box>
-              
+
               {/* Date Range Selector - Next to Filter button */}
-              <Box sx={{ 
-                display: 'flex', 
+              <Box sx={{
+                display: 'flex',
                 alignItems: 'center',
                 gap: 0.5,
                 padding: '4px 8px',
@@ -2071,20 +2173,20 @@ const OperationsCentrePage: React.FC = () => {
                 flexShrink: 0,
               }}>
                 {/* Date label */}
-                <Typography variant="body2" sx={{ 
-                  fontWeight: 600, 
-                  color: '#1f2937', 
+                <Typography variant="body2" sx={{
+                  fontWeight: 600,
+                  color: '#1f2937',
                   fontSize: '0.7rem',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                 }}>
                   Date Range:
                 </Typography>
-                
+
                 {/* Date inputs */}
-                <Box sx={{ 
-                  display: 'flex', 
-                  gap: 0.5, 
+                <Box sx={{
+                  display: 'flex',
+                  gap: 0.5,
                   alignItems: 'center',
                   flexShrink: 0,
                 }}>
@@ -2095,7 +2197,7 @@ const OperationsCentrePage: React.FC = () => {
                     value={pendingHeaderDateRange.start}
                     onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, start: e.target.value }))}
                     InputLabelProps={{ shrink: true }}
-                    sx={{ 
+                    sx={{
                       width: '110px',
                       '& .MuiOutlinedInput-root': {
                         backgroundColor: '#ffffff',
@@ -2111,8 +2213,8 @@ const OperationsCentrePage: React.FC = () => {
                       }
                     }}
                   />
-                  <Typography variant="body2" sx={{ 
-                    color: '#6b7280', 
+                  <Typography variant="body2" sx={{
+                    color: '#6b7280',
                     fontSize: '0.7rem',
                     flexShrink: 0,
                   }}>
@@ -2125,7 +2227,7 @@ const OperationsCentrePage: React.FC = () => {
                     value={pendingHeaderDateRange.end}
                     onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, end: e.target.value }))}
                     InputLabelProps={{ shrink: true }}
-                    sx={{ 
+                    sx={{
                       width: '110px',
                       '& .MuiOutlinedInput-root': {
                         backgroundColor: '#ffffff',
@@ -2142,26 +2244,26 @@ const OperationsCentrePage: React.FC = () => {
                     }}
                   />
                 </Box>
-                
+
                 {/* Divider */}
-                <Box sx={{ 
-                  width: '1px', 
-                  height: '18px', 
-                  backgroundColor: '#d1d5db', 
-                  mx: 0.25, 
-                  flexShrink: 0 
+                <Box sx={{
+                  width: '1px',
+                  height: '18px',
+                  backgroundColor: '#d1d5db',
+                  mx: 0.25,
+                  flexShrink: 0
                 }} />
-                
+
                 {/* Apply Button */}
                 <Button
                   variant="contained"
                   size="small"
                   onClick={applyHeaderDateRange}
                   disabled={
-                    !pendingHeaderDateRange.start || 
+                    !pendingHeaderDateRange.start ||
                     !pendingHeaderDateRange.end ||
-                    (pendingHeaderDateRange.start === headerDateRange.start && 
-                     pendingHeaderDateRange.end === headerDateRange.end)
+                    (pendingHeaderDateRange.start === headerDateRange.start &&
+                      pendingHeaderDateRange.end === headerDateRange.end)
                   }
                   sx={{
                     textTransform: 'none',
@@ -2203,7 +2305,7 @@ const OperationsCentrePage: React.FC = () => {
               >
                 Filter
               </Button>
-              
+
               <Button
                 variant="outlined"
                 endIcon={<KeyboardArrowDownIcon />}
@@ -2243,7 +2345,7 @@ const OperationsCentrePage: React.FC = () => {
                       // Data fetch will be triggered by useEffect watching selectedPlatform
                     }}
                   >
-                    {(['flipkart','amazon','d2c'] as const).map((p) => (
+                    {(['flipkart', 'amazon', 'd2c'] as const).map((p) => (
                       <MenuItem
                         key={p}
                         onClick={() => {
@@ -2272,7 +2374,7 @@ const OperationsCentrePage: React.FC = () => {
 
 
 
-      <Card sx={{ 
+      <Card sx={{
         background: '#ffffff',
         borderRadius: '12px',
         border: '1px solid #e5e7eb',
@@ -2280,12 +2382,12 @@ const OperationsCentrePage: React.FC = () => {
         overflow: 'hidden',
       }}>
         <CardContent sx={{ p: 0 }}>
-          <TableContainer sx={{ 
+          <TableContainer sx={{
             maxHeight: 'calc(100vh - 200px)',
             overflowX: 'auto',
           }}>
-            <Table stickyHeader sx={{ 
-              borderCollapse: 'separate', 
+            <Table stickyHeader sx={{
+              borderCollapse: 'separate',
               borderSpacing: 0,
               '& .MuiTableCell-root': {
                 border: 'none !important',
@@ -2319,8 +2421,8 @@ const OperationsCentrePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order ID</Typography>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -2338,10 +2440,10 @@ const OperationsCentrePage: React.FC = () => {
                           </IconButton>
                         </Box>
                         {showOrderIdSearch && (
-                          <Box 
-                            sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
                               justifyContent: 'center',
                               mt: 0.5
                             }}
@@ -2384,8 +2486,8 @@ const OperationsCentrePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Value</Typography>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -2407,8 +2509,8 @@ const OperationsCentrePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Value</Typography>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -2430,8 +2532,8 @@ const OperationsCentrePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Invoice Date</Typography>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -2453,8 +2555,8 @@ const OperationsCentrePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Date</Typography>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -2476,8 +2578,8 @@ const OperationsCentrePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 120, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Difference</Typography>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -2499,11 +2601,14 @@ const OperationsCentrePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Reason</Typography>
                       </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Provider</Typography>
+                      </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 120, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Status</Typography>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -2533,8 +2638,8 @@ const OperationsCentrePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Value</Typography>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -2556,8 +2661,8 @@ const OperationsCentrePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Value</Typography>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -2585,8 +2690,8 @@ const OperationsCentrePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 120, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Difference</Typography>
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -2604,6 +2709,9 @@ const OperationsCentrePage: React.FC = () => {
                             {getSortIcon('Difference')}
                           </IconButton>
                         </Box>
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Provider</Typography>
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Status</Typography>
@@ -2635,19 +2743,19 @@ const OperationsCentrePage: React.FC = () => {
                       reason = '';
                     }
                     const status = row.originalData?.breakups?.recon_status || 'less_payment_received';
-                    
-                     return (
+
+                    return (
                       <TableRow key={`flat-${index}`} sx={{ '&:hover': { background: '#f3f4f6' }, transition: 'all 0.3s ease' }}>
                         <TableCell padding="checkbox">
-                             <Checkbox
+                          <Checkbox
                             checked={selectedIds.includes(orderId)}
                             onChange={() => toggleRow(orderId)}
-                               sx={{
-                                 color: '#6b7280',
+                            sx={{
+                              color: '#6b7280',
                               '&.Mui-checked': { color: '#1f2937' },
-                               }}
-                             />
-                    </TableCell>
+                            }}
+                          />
+                        </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>{orderId}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{settlementValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
@@ -2656,7 +2764,12 @@ const OperationsCentrePage: React.FC = () => {
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>₹{difference.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           <Chip label={reason} size="small" sx={{ fontWeight: 600, color: '#1f2937', backgroundColor: '#e5e7eb', '& .MuiChip-label': { px: 1 } }} />
-                           </TableCell>
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <Typography variant="body2" sx={{ color: '#111827', fontWeight: 500 }}>
+                            {row["Settlement Provider"] || row.originalData?.settlement_provider ? formatSettlementProvider(row["Settlement Provider"] || row.originalData?.settlement_provider) : 'N/A'}
+                          </Typography>
+                        </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                             {(() => {
@@ -2736,12 +2849,12 @@ const OperationsCentrePage: React.FC = () => {
                           </Box>
                         </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
                             <Button size="small" variant="outlined" onClick={() => handleMarkReconciled(orderId)} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#10b981', color: '#10b981', '&:hover': { borderColor: '#059669', backgroundColor: 'rgba(16, 185, 129, 0.04)' } }}>Mark Reconciled</Button>
                             <Button size="small" variant="outlined" onClick={() => handleRaiseDispute(orderId)} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#6b7280', color: '#6b7280', '&:hover': { borderColor: '#4b5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' } }}>Raise Dispute</Button>
-                             </Box>
-                           </TableCell>
-                  </TableRow>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
                     );
                   } else if (disputeSubTab === 1 || disputeSubTab === 2) {
                     // Flat detailed row for Manually Reconciled or Disputed tabs
@@ -2754,7 +2867,7 @@ const OperationsCentrePage: React.FC = () => {
                     const remark = row["Remark"] || 'Not Available';
                     const eventType = row["Event Type"] || 'Sale';
                     const status = row.originalData?.breakups?.recon_status || row.originalData?.status || 'settlement_matched';
-                    
+
                     return (
                       <TableRow key={`flat-${index}`} sx={{ '&:hover': { background: '#f3f4f6' }, transition: 'all 0.3s ease' }}>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
@@ -2775,6 +2888,11 @@ const OperationsCentrePage: React.FC = () => {
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           <Typography variant="body2" sx={{ color: difference === 0 ? '#059669' : difference > 0 ? '#dc2626' : '#d97706', fontWeight: 600 }}>
                             ₹{difference.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <Typography variant="body2" sx={{ color: '#111827', fontWeight: 500 }}>
+                            {row["Settlement Provider"] || row.originalData?.settlement_provider ? formatSettlementProvider(row["Settlement Provider"] || row.originalData?.settlement_provider) : 'N/A'}
                           </Typography>
                         </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
@@ -2832,10 +2950,10 @@ const OperationsCentrePage: React.FC = () => {
                     );
                   }
                   return null;
-                 })}
+                })}
                 {(disputeSubTab === 0 ? paginatedCurrent : current).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={disputeSubTab === 0 ? 9 : 8} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
+                    <TableCell colSpan={disputeSubTab === 0 ? 10 : 9} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -2859,20 +2977,20 @@ const OperationsCentrePage: React.FC = () => {
 
       {/* Minimal Raise Dispute Dialog */}
       <Dialog open={raiseDialogOpen} onClose={closeRaiseDispute} PaperProps={{ sx: { borderRadius: 1, minWidth: 420 } }}>
-      <DialogTitle sx={{ fontWeight: 700 }}>Raise dispute to Flipkart</DialogTitle>
-<DialogContent>
-  <Typography variant="body2" sx={{ color: '#374151', mb: 2 }}>Total orders: {selectedRaiseGroup?.count || 0}</Typography>
-  <TextField
-    label="Description"
-    placeholder="Add a short note for this dispute..."
-    value={raiseDescription}
-    onChange={(e) => setRaiseDescription(e.target.value)}
-    fullWidth
-    multiline
-    minRows={3}
-    size="small"
-  />
-</DialogContent>
+        <DialogTitle sx={{ fontWeight: 700 }}>Raise dispute to Flipkart</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: '#374151', mb: 2 }}>Total orders: {selectedRaiseGroup?.count || 0}</Typography>
+          <TextField
+            label="Description"
+            placeholder="Add a short note for this dispute..."
+            value={raiseDescription}
+            onChange={(e) => setRaiseDescription(e.target.value)}
+            fullWidth
+            multiline
+            minRows={3}
+            size="small"
+          />
+        </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2 }}>
           <Button variant="text" onClick={closeRaiseDispute} sx={{ color: '#111827' }}>Cancel</Button>
           <Button variant="contained" onClick={sendRaiseDispute} sx={{ boxShadow: 'none' }}>Send</Button>
@@ -2884,14 +3002,14 @@ const OperationsCentrePage: React.FC = () => {
 
       {/* Bulk Action Buttons */}
       {selectedIds.length > 0 && (
-        <Box sx={{ 
+        <Box sx={{
           position: 'fixed',
           bottom: 20,
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 1000,
         }}>
-          <Card sx={{ 
+          <Card sx={{
             background: '#ffffff',
             borderRadius: '12px',
             border: '1px solid #e5e7eb',
@@ -3017,18 +3135,29 @@ const OperationsCentrePage: React.FC = () => {
           {/* Left: Full column list */}
           <Box sx={{ width: 240, maxHeight: 320, overflowY: 'auto', borderRight: '1px solid #eee', pr: 1.5, pl: 0.5 }}>
             <List dense subheader={<ListSubheader disableSticky sx={{ bgcolor: 'transparent', px: 0, fontSize: '0.75rem', color: '#6b7280' }}></ListSubheader>}>
-              {Object.keys(COLUMN_META).filter(col => col !== 'Order ID').map((col) => (
-                <ListItemButton
-                  key={col}
-                  selected={activeFilterColumn === col}
-                  onClick={() => setActiveFilterColumn(col)}
-                  sx={{ borderRadius: 0.75, py: 0.75, px: 1 }}
-                >
-                  <ListItemText primary={col} primaryTypographyProps={{ fontSize: '0.82rem' }} />
-                </ListItemButton>
-              ))}
+              {Object.keys(COLUMN_META)
+                .filter((col) => {
+                  // Exclude Order ID from filter sidebar
+                  if (col === 'Order ID') return false;
+                  // Filter columns based on selected platform
+                  const mapping = COLUMN_TO_API_PARAM_MAP[col];
+                  if (!mapping) return true; // Show columns without mapping
+                  if (!mapping.supportedPlatforms) return true; // Show columns available on all platforms
+                  // Show if supported by selected platform
+                  return mapping.supportedPlatforms!.includes(selectedPlatform as any);
+                })
+                .map((col) => (
+                  <ListItemButton
+                    key={col}
+                    selected={activeFilterColumn === col}
+                    onClick={() => setActiveFilterColumn(col)}
+                    sx={{ borderRadius: 0.75, py: 0.75, px: 1 }}
+                  >
+                    <ListItemText primary={col} primaryTypographyProps={{ fontSize: '0.82rem' }} />
+                  </ListItemButton>
+                ))}
             </List>
-                </Box>
+          </Box>
           {/* Right: Reusable controls */}
           <ColumnFilterControls
             columnMeta={COLUMN_META as any}
@@ -3046,7 +3175,7 @@ const OperationsCentrePage: React.FC = () => {
             }}
             statusFilterOptions={['more_payment_received', 'less_payment_received']}
           />
-              </Box>
+        </Box>
       </Popover>
 
       {/* Custom Date Picker Popup */}
