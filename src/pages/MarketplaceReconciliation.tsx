@@ -348,7 +348,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   // Date field filter for transactions-related queries
   const [dateField, setDateField] = useState<'settlement' | 'invoice'>('invoice');
-  const [unreconciledReasons, setUnreconciledReasons] = useState<Array<{ reason: string; count: number }>>([]);
+  const [unreconciledReasons, setUnreconciledReasons] = useState<Array<{ reason: string; count: number; amount: number }>>([]);
   
   // Ageing summary (Avg TAT across providers) - use real data if available, otherwise dummy
   const overallAvgTAT = ageingData.length > 0 
@@ -958,7 +958,7 @@ const MarketplaceReconciliation: React.FC = () => {
         setMainSummary(payload);
         // Update reasons from UnReconcile for UI where needed
         if (payload?.UnReconcile?.reasons?.length) {
-          setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count })));
+          setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count, amount: r.amount || 0 })));
         }
       } catch (e) {
         // Non-fatal for now
@@ -993,7 +993,7 @@ const MarketplaceReconciliation: React.FC = () => {
         const payload = (ms as any).data as MainSummaryResponse;
         setMainSummary(payload);
         if (payload?.UnReconcile?.reasons?.length) {
-          setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count })));
+          setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count, amount: r.amount || 0 })));
         }
       } catch (e) {
         console.warn('main-summary fetch failed', e);
@@ -1068,11 +1068,12 @@ const MarketplaceReconciliation: React.FC = () => {
         const summaryData = resp.data as any;
         const unreconciledReasons = summaryData.UnReconcile?.reasons || [];
 
-        // Transform reasons array [{ name, count, amount }] -> [{ reason, count }]
+        // Transform reasons array [{ name, count, amount }] -> [{ reason, count, amount }]
         const list = (Array.isArray(unreconciledReasons) ? unreconciledReasons : [])
           .map((r: any) => ({
             reason: r?.name ?? String(r?.reason ?? ''),
             count: Number(r?.count) || 0,
+            amount: Number(r?.amount) || 0,
           }))
           .sort((a: any, b: any) => b.count - a.count);
 
@@ -3500,9 +3501,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                         <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
                                           {r.reason}
                                         </Typography>
-                                        <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
-                                          {r.count.toLocaleString('en-IN')}
-                                        </Typography>
+                                        <Box sx={{ textAlign: 'right' }}>
+                                          <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
+                                            {r.count.toLocaleString('en-IN')}
+                                          </Typography>
+                                          <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                                            {formatCurrency(Math.abs(r.amount))}
+                                          </Typography>
+                                        </Box>
                                       </Box>
                                     </Grow>
                                   ))}
@@ -3892,9 +3898,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                       <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
                                         {r.reason}
                                       </Typography>
-                                      <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
-                                        {r.count.toLocaleString('en-IN')}
-                                      </Typography>
+                                      <Box sx={{ textAlign: 'right' }}>
+                                        <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
+                                          {r.count.toLocaleString('en-IN')}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                                          {formatCurrency(Math.abs(r.amount))}
+                                        </Typography>
+                                      </Box>
                                     </Box>
                                   </Grow>
                                 ))}
@@ -4198,6 +4209,238 @@ const MarketplaceReconciliation: React.FC = () => {
             })()}
           </CardContent>
         </Card>
+
+        {/* Party Composition Section - Only for D2C */}
+        {selectedPlatform === 'd2c' && (() => {
+          const partyComposition = (mainSummary as any)?.partyComposition as {
+            rows?: Array<{
+              platform: string;
+              shipping_courier_name: string;
+              order_count: number;
+              total_selling_price: number;
+            }>;
+            totals?: Array<{
+              platform: string;
+              order_count: number;
+              total_selling_price: number;
+            }>;
+          } | undefined;
+
+          if (!partyComposition || !partyComposition.rows || partyComposition.rows.length === 0) {
+            return null;
+          }
+
+          // Get D2C totals for percentage calculation
+          const d2cTotal = partyComposition.totals?.find(t => t.platform === 'd2c');
+          const totalOrderCount = d2cTotal?.order_count || 0;
+
+          // Prepare data for visualization
+          const courierData = partyComposition.rows
+            .filter(row => row.platform === 'd2c')
+            .map((row, idx) => {
+              const percentage = totalOrderCount > 0 
+                ? (row.order_count / totalOrderCount) * 100 
+                : 0;
+              return {
+                name: row.shipping_courier_name,
+                orderCount: row.order_count,
+                totalSellingPrice: row.total_selling_price,
+                percentage: percentage,
+                color: ['#7A5DBF', '#A79CDB', '#10B981', '#F59E0B', '#0EA5E9', '#6366F1', '#EF4444', '#8B5CF6'][idx % 8]
+              };
+            })
+            .sort((a, b) => b.orderCount - a.orderCount); // Sort by order count descending
+
+          return (
+            <Card sx={{ 
+              mb: 6,
+              background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+              borderRadius: '16px',
+              border: '1px solid #f1f3f4',
+              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+                transform: 'translateY(-2px)',
+              }
+            }}>
+              <CardContent sx={{ p: 5 }}>
+                <Typography variant="h3" sx={{ 
+                  fontWeight: 600, 
+                  mb: 4, 
+                  color: '#1f2937',
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                  letterSpacing: '-0.025em'
+                }}>
+                  Party Composition
+                </Typography>
+
+                <Grid container spacing={3}>
+                  {/* Visualization */}
+                  <Grid item xs={12} md={8}>
+                    <Box sx={{ height: { xs: 320, sm: 360, md: 420, lg: 480 } }}>
+                      {courierData.length === 1 ? (
+                        // Single Courier - Show detailed gradient card
+                        <Box sx={{
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: `linear-gradient(135deg, ${courierData[0].color}22 0%, ${courierData[0].color}11 100%)`,
+                          borderRadius: '20px',
+                          border: `2px solid ${courierData[0].color}`,
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}>
+                          <Box sx={{ 
+                            textAlign: 'center',
+                            position: 'relative',
+                            zIndex: 2,
+                            p: 3
+                          }}>
+                            <Typography variant="h4" sx={{ fontWeight: 700, mb: 1.5, color: '#1f2937' }}>
+                              {courierData[0].name}
+                            </Typography>
+                            <Typography variant="h3" sx={{ fontWeight: 700, mb: 2, color: courierData[0].color }}>
+                              {courierData[0].orderCount.toLocaleString('en-IN')}
+                            </Typography>
+                            <Typography variant="body1" sx={{ color: '#6b7280', mb: 1 }}>
+                              Orders
+                            </Typography>
+                            <Typography variant="h6" sx={{ color: '#1f2937', fontWeight: 600 }}>
+                              {formatCurrency(courierData[0].totalSellingPrice)}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                              Total Selling Price
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ) : courierData.length > 1 ? (
+                        // Multiple Couriers - Show pie chart
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart margin={{ top: 12, right: 12, bottom: 56, left: 12 }}>
+                            <Pie
+                              data={courierData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius="78%"
+                              outerRadius="86%"
+                              paddingAngle={1}
+                              cornerRadius={1}
+                              dataKey="orderCount"
+                            >
+                              {courierData.map((p, idx) => (
+                                <Cell key={`courier-${idx}`} fill={p.color} />
+                              ))}
+                            </Pie>
+                            <RechartsTooltip 
+                              formatter={(value: any, name: string, props: any) => [
+                                `${Number(value).toLocaleString('en-IN')} orders (${props.payload.percentage.toFixed(1)}%)`,
+                                props.payload.name
+                              ]} 
+                            />
+                            <Legend 
+                              layout="horizontal" 
+                              verticalAlign="bottom" 
+                              align="center" 
+                              iconType="circle"
+                              wrapperStyle={{ paddingTop: 8 }}
+                              height={40}
+                              formatter={(value, entry) => (
+                                <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>{value}</span>
+                              )} 
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        // No data - show message
+                        <Box sx={{ 
+                          height: '100%', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          color: '#6b7280',
+                          border: '2px dashed #e5e7eb',
+                          borderRadius: '20px'
+                        }}>
+                          <Typography variant="h6">No party composition data available</Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  </Grid>
+
+                  {/* Summary KPI cards */}
+                  <Grid item xs={12} md={4}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
+                      <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Orders</Typography>
+                        <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>
+                          {totalOrderCount.toLocaleString('en-IN')}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Selling Price</Typography>
+                        <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>
+                          {formatCurrency(d2cTotal?.total_selling_price || 0)}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+                </Grid>
+
+                {/* Courier breakdown table */}
+                <Box sx={{ mt: 4 }}>
+                  <Grid container spacing={2}>
+                    {courierData.map((courier, idx) => (
+                      <Grid key={idx} item xs={12} md={courierData.length === 1 ? 12 : 6}>
+                        <Box sx={{ p: 3, borderRadius: '14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(229,231,235,0.6)' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 2 }}>
+                            <Typography variant="subtitle1" sx={{ color: '#374151', fontWeight: 700 }}>
+                              {courier.name}
+                            </Typography>
+                            <Chip 
+                              label={`${courier.percentage.toFixed(1)}%`}
+                              sx={{ 
+                                bgcolor: `${courier.color}15`, 
+                                color: courier.color, 
+                                fontWeight: 700,
+                                fontSize: '0.75rem'
+                              }} 
+                            />
+                          </Box>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
+                            <Typography variant="body2" sx={{ color: '#374151' }}>Order Count</Typography>
+                            <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
+                              {courier.orderCount.toLocaleString('en-IN')}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                            <Typography variant="body2" sx={{ color: '#374151' }}>Total Selling Price</Typography>
+                            <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
+                              {formatCurrency(courier.totalSellingPrice)}
+                            </Typography>
+                          </Box>
+                          {/* Progress bar showing percentage */}
+                          <Box sx={{ mt: 2, height: 8, borderRadius: '4px', bgcolor: '#e5e7eb', overflow: 'hidden' }}>
+                            <Box 
+                              sx={{ 
+                                height: '100%', 
+                                width: `${courier.percentage}%`, 
+                                bgcolor: courier.color,
+                                transition: 'width 0.3s ease'
+                              }} 
+                            />
+                          </Box>
+                        </Box>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Payment Ageing Analysis (replaces Sales Dashboard) */}
         <Paper sx={{ 

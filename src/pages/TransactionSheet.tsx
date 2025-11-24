@@ -218,24 +218,24 @@ const formatSettlementProvider = (value: string | null | undefined): string => {
 // Transform API data to TransactionRow format
 const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   // Debug logging removed
-  
+
   // Helper function to parse numeric values
   const parseNumericValue = (value: any): number => {
     if (value === null || value === undefined || value === '') {
       return 0;
     }
-    
+
     // If already a number, return it
     if (typeof value === 'number') {
       return value;
     }
-    
+
     // Convert to string and clean it
     const cleanedValue = String(value)
       .replace(/[₹$,\s]/g, '') // Remove currency symbols, commas, and spaces
       .replace(/[^\d.-]/g, '') // Keep only digits, dots, and minus signs
       .trim();
-    
+
     const parsed = parseFloat(cleanedValue);
     return isNaN(parsed) ? 0 : parsed;
   };
@@ -244,9 +244,9 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   const orderValue = parseNumericValue(orderItem.order_value);
   const settlementValue = parseNumericValue(orderItem.settlement_amount); // Changed from settlement_value to settlement_amount
   const difference = parseNumericValue(orderItem.diff);
-  
+
   // Debug logging removed
-  
+
   // Determine remark based on recon_status
   let remark = "Unsettled";
   const reconStatus = orderItem.recon_status;
@@ -257,7 +257,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   } else if (reconStatus === "more_payment_received") {
     remark = "More Payment Received";
   }
-  
+
   // Determine settlement date from API response
   let settlementDate = "";
   // If transaction is unsettled, settlement date should be NA (Not Applicable)
@@ -272,10 +272,10 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   } else {
     settlementDate = "Pending";
   }
-  
+
   // Determine IDs from API response
   const backendOrderId: string | undefined = orderItem.order_id;
-  
+
   // Get invoice date
   let invoiceDate = "";
   if (orderItem.invoice_date) {
@@ -285,7 +285,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
       invoiceDate = orderItem.invoice_date;
     }
   }
-  
+
   return {
     "Order ID": backendOrderId || `ORD_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
     "Order Item ID": undefined,
@@ -866,30 +866,30 @@ const mockTransactionData: TransactionData = {
 };
 
 // Transaction Details Popup Component
-const TransactionDetailsPopup: React.FC<{ 
-  transaction: TransactionRow | null; 
+const TransactionDetailsPopup: React.FC<{
+  transaction: TransactionRow | null;
   onClose: () => void;
   formatCurrency: (amount: number) => string;
   formatDate: (dateString: string) => string;
   anchorEl: HTMLElement | null;
 }> = ({ transaction, onClose, formatCurrency, formatDate, anchorEl }) => {
   const [formulaAnchorEl, setFormulaAnchorEl] = useState<HTMLElement | null>(null);
-  
+
   if (!transaction || !anchorEl) return null;
 
   // Extract calculation data from the transaction
   // Access the preserved original API response data
   const originalData = (transaction as any)?.originalData || {};
-  
+
   // Debug logging removed
-  
+
   // Get values from the actual API response structure
   const orderValue = transaction["Order Value"] || 0;
 
   // Extract values from calculation.inputs
   const calculationInputs = originalData.calculation?.inputs || {};
   const context = originalData.context || {};
-  
+
   // Map the exact fields from the API response
   const collectionReceived = parseFloat(calculationInputs.settlement_value || 0);
   const marketplaceFee = parseFloat(calculationInputs.marketplace_fee || 0);
@@ -900,14 +900,14 @@ const TransactionDetailsPopup: React.FC<{
   const customerAddonsAmount = parseFloat(calculationInputs.customer_addons_amount || 0);
   const refund = parseFloat(calculationInputs.refund || 0);
   const reverse = parseFloat(calculationInputs.reverse || 0);
-  
+
   // Extract from context
   const tdsDeducted = parseFloat(context.tds || 0);
   const tcsDeducted = parseFloat(context.tds || 0);
-  
+
   const difference = parseFloat(originalData.diff || 0);
   const status = transaction["Remark"] || "Nan";
-  
+
   // Debug logging removed
 
   // Calculate smart positioning
@@ -923,11 +923,11 @@ const TransactionDetailsPopup: React.FC<{
     let top: number;
     let animationDirection: 'up' | 'down' = 'down';
     let maxHeight: number | undefined;
-    
+
     // Check available space above and below
     const spaceBelow = viewportHeight - rect.bottom;
     const spaceAbove = rect.top;
-    
+
     if (spaceBelow >= popupHeight + offset) {
       // Enough space below - show below
       top = rect.bottom + offset;
@@ -1012,7 +1012,7 @@ const TransactionDetailsPopup: React.FC<{
           },
         }}
       />
-      
+
       {/* Modal */}
       <Box
         onClick={(e) => e.stopPropagation()}
@@ -1027,7 +1027,7 @@ const TransactionDetailsPopup: React.FC<{
           borderRadius: '12px',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           zIndex: 1400,
-          animation: position.animationDirection === 'down' 
+          animation: position.animationDirection === 'down'
             ? 'fadeInScaleDown 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
             : 'fadeInScaleUp 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           '@keyframes fadeInScaleDown': {
@@ -1055,264 +1055,264 @@ const TransactionDetailsPopup: React.FC<{
           overflow: 'hidden',
         }}
       >
-      {/* Header */}
-      <Box sx={{ 
-        p: 1.5, 
-        borderBottom: '1px solid #e5e7eb',
-        background: '#f9fafb',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <Box>
-          <Typography variant="body2" sx={{ 
-            fontWeight: 700, 
-            color: '#111827',
-            mb: 0.5,
-            fontSize: '0.9rem',
-          }}>
-            Transaction Details
-          </Typography>
-          <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.75rem' }}>
-            Order ID: {transaction["Order ID"] || transaction["Order Item ID"]}
-          </Typography>
-        </Box>
-        <IconButton
-          onClick={onClose}
-          size="small"
-          sx={{
-            background: '#f3f4f6',
-            color: '#374151',
-            p: 0.5,
-            '&:hover': {
-              background: '#e5e7eb',
-              transform: 'scale(1.05)',
-            },
-            transition: 'all 0.2s ease',
-          }}
-        >
-          <CloseIcon sx={{ fontSize: '1rem' }} />
-        </IconButton>
-      </Box>
-
-      {/* Content */}
-      <Box sx={{ 
-        p: 1.5, 
-        flex: 1,
-        overflowY: 'auto',
-        '&::-webkit-scrollbar': {
-          width: '4px',
-        },
-        '&::-webkit-scrollbar-track': {
-          background: '#f1f5f9',
-          borderRadius: '2px',
-        },
-        '&::-webkit-scrollbar-thumb': {
-          background: '#cbd5e1',
-          borderRadius: '2px',
-          '&:hover': {
-            background: '#94a3b8',
-          },
-        },
-      }}>
-        {/* Order Value - Primary Information */}
-        <Box sx={{ 
-          p: 1.5, 
-          background: '#f8fafc',
-          borderRadius: '6px',
-          border: '1px solid #e2e8f0',
-          mb: 1.5,
+        {/* Header */}
+        <Box sx={{
+          p: 1.5,
+          borderBottom: '1px solid #e5e7eb',
+          background: '#f9fafb',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}>
-          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
-            ORDER VALUE
-          </Typography>
-          <Typography variant="body1" sx={{ 
-            fontWeight: 800, 
-            color: orderValue < 0 ? '#dc2626' : '#0f172a',
-            mt: 0.25,
-            fontSize: '1rem',
+          <Box>
+            <Typography variant="body2" sx={{
+              fontWeight: 700,
+              color: '#111827',
+              mb: 0.5,
+              fontSize: '0.9rem',
+            }}>
+              Transaction Details
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.75rem' }}>
+              Order ID: {transaction["Order ID"] || transaction["Order Item ID"]}
+            </Typography>
+          </Box>
+          <IconButton
+            onClick={onClose}
+            size="small"
+            sx={{
+              background: '#f3f4f6',
+              color: '#374151',
+              p: 0.5,
+              '&:hover': {
+                background: '#e5e7eb',
+                transform: 'scale(1.05)',
+              },
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <CloseIcon sx={{ fontSize: '1rem' }} />
+          </IconButton>
+        </Box>
+
+        {/* Content */}
+        <Box sx={{
+          p: 1.5,
+          flex: 1,
+          overflowY: 'auto',
+          '&::-webkit-scrollbar': {
+            width: '4px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: '#f1f5f9',
+            borderRadius: '2px',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: '#cbd5e1',
+            borderRadius: '2px',
+            '&:hover': {
+              background: '#94a3b8',
+            },
+          },
+        }}>
+          {/* Order Value - Primary Information */}
+          <Box sx={{
+            p: 1.5,
+            background: '#f8fafc',
+            borderRadius: '6px',
+            border: '1px solid #e2e8f0',
+            mb: 1.5,
           }}>
-            {formatCurrency(orderValue)}
-          </Typography>
-        </Box>
-
-        {/* Transaction Details */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
-              Collection Received
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
+              ORDER VALUE
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
-              {formatCurrency(collectionReceived)}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
-            Marketplace Fee
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
-              {formatCurrency(marketplaceFee)}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
-            Taxes
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
-              {formatCurrency(taxes)}
-            </Typography>
-          </Box>
-          
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
-            TDS
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
-              {formatCurrency(tdsDeducted)}
-            </Typography>
-          </Box>
-          
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
-            TCS
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
-              {formatCurrency(tcsDeducted)}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
-            Total Offer Amount
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
-              {formatCurrency(totalOfferAmount)}
+            <Typography variant="body1" sx={{
+              fontWeight: 800,
+              color: orderValue < 0 ? '#dc2626' : '#0f172a',
+              mt: 0.25,
+              fontSize: '1rem',
+            }}>
+              {formatCurrency(orderValue)}
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
-            Seller Share Offer
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
-              {formatCurrency(sellerShareOffer)}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
-            Offer Adjustments
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
-              {formatCurrency(offerAdjustments)}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
-            Customer Addons Amount
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
-              {formatCurrency(customerAddonsAmount)}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
-              Refund
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
-              {formatCurrency(refund)}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
-              Reverse
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
-              {formatCurrency(reverse)}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {/* Transaction Details */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
               <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
-                Difference
+                Collection Received
               </Typography>
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  
-                  setFormulaAnchorEl(e.currentTarget);
-                }}
-                sx={{
-                  p: 0,
-                  color: '#64748b',
-                  '&:hover': {
-                    color: '#0f172a',
-                    backgroundColor: 'transparent',
-                  },
-                }}
-              >
-                <InfoIcon sx={{ fontSize: '0.8rem' }} />
-              </IconButton>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+                {formatCurrency(collectionReceived)}
+              </Typography>
             </Box>
-            <Typography variant="body2" sx={{ 
-              fontWeight: 600, 
-              color: difference === 0 ? '#059669' : '#dc2626',
-              fontSize: '0.75rem'
-            }}>
-              {formatCurrency(difference)}
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                Marketplace Fee
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+                {formatCurrency(marketplaceFee)}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                Taxes
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+                {formatCurrency(taxes)}
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                TDS
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+                {formatCurrency(tdsDeducted)}
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                TCS
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+                {formatCurrency(tcsDeducted)}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                Total Offer Amount
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+                {formatCurrency(totalOfferAmount)}
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                Seller Share Offer
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+                {formatCurrency(sellerShareOffer)}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                Offer Adjustments
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+                {formatCurrency(offerAdjustments)}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                Customer Addons Amount
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+                {formatCurrency(customerAddonsAmount)}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                Refund
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+                {formatCurrency(refund)}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                Reverse
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.75rem' }}>
+                {formatCurrency(reverse)}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: '1px solid #f1f5f9' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                  Difference
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    setFormulaAnchorEl(e.currentTarget);
+                  }}
+                  sx={{
+                    p: 0,
+                    color: '#64748b',
+                    '&:hover': {
+                      color: '#0f172a',
+                      backgroundColor: 'transparent',
+                    },
+                  }}
+                >
+                  <InfoIcon sx={{ fontSize: '0.8rem' }} />
+                </IconButton>
+              </Box>
+              <Typography variant="body2" sx={{
+                fontWeight: 600,
+                color: difference === 0 ? '#059669' : '#dc2626',
+                fontSize: '0.75rem'
+              }}>
+                {formatCurrency(difference)}
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
+                Status
+              </Typography>
+              <Typography variant="body2" sx={{
+                fontWeight: 600,
+                color: status === 'Settlement Matched' ? '#059669' : '#dc2626',
+                fontSize: '0.75rem'
+              }}>
+                {status}
+              </Typography>
+            </Box>
           </Box>
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
-            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.7rem' }}>
-              Status
-            </Typography>
-            <Typography variant="body2" sx={{ 
-              fontWeight: 600, 
-              color: status === 'Settlement Matched' ? '#059669' : '#dc2626',
-              fontSize: '0.75rem'
-            }}>
-              {status}
-            </Typography>
-          </Box>
+          {/* Formula Popover */}
+          <Popover
+            open={Boolean(formulaAnchorEl)}
+            anchorEl={formulaAnchorEl}
+            onClose={() => {
+              setFormulaAnchorEl(null);
+            }}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'center',
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'center',
+            }}
+            sx={{
+              zIndex: 9999,
+            }}
+          >
+            <Box sx={{ p: 2, maxWidth: '300px', bgcolor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#0f172a', mb: 1, fontSize: '0.7rem' }}>
+                Formula
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.6rem', lineHeight: 1.5 }}>
+                abs(buyer_invoice_amount) + marketplace_fee + taxes + customer_addons_amount + total_offer_amount + seller_share_offer + offer_adjustments + refund + reverse - settlement_value
+              </Typography>
+            </Box>
+          </Popover>
         </Box>
-        
-        {/* Formula Popover */}
-        <Popover
-          open={Boolean(formulaAnchorEl)}
-          anchorEl={formulaAnchorEl}
-          onClose={() => {
-            setFormulaAnchorEl(null);
-          }}
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'center',
-          }}
-          transformOrigin={{
-            vertical: 'top',
-            horizontal: 'center',
-          }}
-          sx={{
-            zIndex: 9999,
-          }}
-        >
-          <Box sx={{ p: 2, maxWidth: '300px', bgcolor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#0f172a', mb: 1, fontSize: '0.7rem' }}>
-              Formula
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.6rem', lineHeight: 1.5 }}>
-              abs(buyer_invoice_amount) + marketplace_fee + taxes + customer_addons_amount + total_offer_amount + seller_share_offer + offer_adjustments + refund + reverse - settlement_value
-            </Typography>
-          </Box>
-        </Popover>
       </Box>
-    </Box>
     </>
   );
 };
 
 // Breakups Modal Component
-const BreakupsModal: React.FC<{ 
+const BreakupsModal: React.FC<{
   open: boolean;
   onClose: () => void;
   breakups: any; // This is now the full row
@@ -1322,9 +1322,9 @@ const BreakupsModal: React.FC<{
   if (!open || !breakups || !anchorEl) return null;
 
   // Extract metadata from the row (check both originalData.metadata and metadata)
-  const metadata = (breakups as any)?.originalData?.metadata || 
-                   (breakups as any)?.metadata || {};
-  
+  const metadata = (breakups as any)?.originalData?.metadata ||
+    (breakups as any)?.metadata || {};
+
   // Extract order_value and settlement_value from metadata
   const orderValue = metadata?.order_value || {};
   const settlementValue = metadata?.settlement_value || {};
@@ -1387,11 +1387,11 @@ const BreakupsModal: React.FC<{
     let top: number;
     let animationDirection: 'up' | 'down' = 'down';
     let maxHeight: number | undefined;
-    
+
     // Check available space above and below
     const spaceBelow = viewportHeight - rect.bottom;
     const spaceAbove = rect.top;
-    
+
     if (spaceBelow >= popupHeight + offset) {
       // Enough space below - show below
       top = rect.bottom + offset;
@@ -1476,7 +1476,7 @@ const BreakupsModal: React.FC<{
           },
         }}
       />
-      
+
       {/* Popup */}
       <Box
         onClick={(e) => e.stopPropagation()}
@@ -1491,7 +1491,7 @@ const BreakupsModal: React.FC<{
           borderRadius: '12px',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           zIndex: 1400,
-          animation: position.animationDirection === 'down' 
+          animation: position.animationDirection === 'down'
             ? 'fadeInScaleDown 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
             : 'fadeInScaleUp 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           '@keyframes fadeInScaleDown': {
@@ -1810,7 +1810,7 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   'Order Value': { apiParam: 'order_value', type: 'number' },
   'Settlement Value': { apiParam: 'settlement_value', type: 'number' },
   'Difference': { apiParam: 'diff', type: 'number' },
-  
+
   // D2C-specific CSV filters (with _in suffix support)
   'Settlement Provider': { apiParam: 'settlement_provider', type: 'enum', supportedPlatforms: ['d2c'] },
 };
@@ -1849,7 +1849,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const navigate = useNavigate();
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
-  
+
   // Get initialTab from navigation state or props
   const getInitialTab = () => {
     if (location.state?.initialTab !== undefined) {
@@ -1859,17 +1859,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   };
   const [searchTerm, setSearchTerm] = useState('');
   // Use date range from props if provided, otherwise use empty state
-  const [dateRange, setDateRange] = useState<{start: string, end: string}>(
+  const [dateRange, setDateRange] = useState<{ start: string, end: string }>(
     propDateRange || { start: '', end: '' }
   );
   // Column filters can be string (contains), number range {min,max}, date range {from,to}, or enum string[]
   const [columnFilters, setColumnFilters] = useState<{ [key: string]: any }>(propsInitialFilters || {});
   // Pending filters that haven't been applied yet
   const [pendingColumnFilters, setPendingColumnFilters] = useState<{ [key: string]: any }>(propsInitialFilters || {});
-  const [pendingDateRange, setPendingDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
+  const [pendingDateRange, setPendingDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   // Header date range state - for the date selector in the header next to platform selector
-  const [headerDateRange, setHeaderDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
-  const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
+  const [headerDateRange, setHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
+  const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   // Platform filter state - single selection only
   const availablePlatforms = ['flipkart', 'amazon', 'd2c'] as const;
   type Platform = typeof availablePlatforms[number];
@@ -1910,7 +1910,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [mismatchedMoreReceivedTotalCount, setMismatchedMoreReceivedTotalCount] = useState<number | null>(null);
   const [unsettledTotalCount, setUnsettledTotalCount] = useState<number | null>(null);
   const [allTotalCount, setAllTotalCount] = useState<number | null>(null);
-  
+
   // Computed mismatched total count (sum of both sub-tabs)
   const mismatchedTotalCount = useMemo(() => {
     const less = mismatchedLessReceivedTotalCount ?? 0;
@@ -1923,7 +1923,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [tabCounts, setTabCounts] = useState<{ matched: number | null; mismatched: number | null; unsettled: number | null; all: number | null }>({ matched: null, mismatched: null, unsettled: null, all: null });
   const [metadata, setMetadata] = useState<TransactionMetadata | null>(null);
-  
+
   // New state for total transactions API
   const [totalTransactionsData, setTotalTransactionsData] = useState<TotalTransactionsResponse | null>(null);
   const [useNewAPI, setUseNewAPI] = useState(true); // Always use new API
@@ -1939,14 +1939,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   const isFetchingRef = React.useRef(false);
   const lastQuadParamsRef = React.useRef<string | null>(null);
-  
+
   // Mismatched sub-tab state (Less Received / More Received)
   const [mismatchedSubTab, setMismatchedSubTab] = useState<'less_received' | 'more_received'>('less_received');
 
   // Sales Report state management
   const [salesReportData, setSalesReportData] = useState<SalesTransactionsResponse | null>(null);
   const [salesReportLoading, setSalesReportLoading] = useState(false);
-  const [lastSalesReportDateRange, setLastSalesReportDateRange] = useState<{start: string, end: string} | null>(null);
+  const [lastSalesReportDateRange, setLastSalesReportDateRange] = useState<{ start: string, end: string } | null>(null);
   const [salesReportPagination, setSalesReportPagination] = useState<SalesTransactionsPagination | null>(null);
   const [salesReportSortConfig, setSalesReportSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   // Sales Report search state
@@ -2035,8 +2035,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       .join(' ') || 'Export';
 
     // Format platform name
-    const platformName = item.platform === 'all' 
-      ? 'All Platforms' 
+    const platformName = item.platform === 'all'
+      ? 'All Platforms'
       : item.platform.charAt(0).toUpperCase() + item.platform.slice(1);
 
     return {
@@ -2055,7 +2055,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setExportListLoading(true);
     try {
       const response = await api.transactions.getExportList();
-      
+
       if (response.success && response.data) {
         const mappedRequests = response.data.items.map(mapExportItemToRequest);
         setExportRequests(mappedRequests);
@@ -2086,7 +2086,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     if (activeTab === 4) {
       return salesReportData?.transactions || [];
     }
-    
+
     // Use quad API data if available (can be null when filtering)
     if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
       let currentData: TotalTransactionsResponse | null = null;
@@ -2110,7 +2110,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
       return currentData.data || [];
     }
-    
+
     // Fallback to legacy single API data
     if (useNewAPI && totalTransactionsData) {
       // Handle null data case (0 results)
@@ -2131,11 +2131,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Platform-specific column priority:
       // Flipkart: order_item_id first, then order_id
       // Amazon & D2C: order_id first, then order_item_id
-      const priorityKeys: Array<'order_id' | 'order_item_id'> = 
-        selectedPlatform === 'flipkart' 
+      const priorityKeys: Array<'order_id' | 'order_item_id'> =
+        selectedPlatform === 'flipkart'
           ? ['order_item_id', 'order_id']
           : ['order_id', 'order_item_id'];
-      
+
       const prioritized = priorityKeys
         .map(priorityKey => salesColumns.find(col => col.key === priorityKey))
         .filter(Boolean) as typeof salesColumns;
@@ -2143,7 +2143,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       return [...prioritized, ...remaining].map(col => col.title);
     }
-    
+
     // Use quad API data if available (can be null when filtering)
     if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
       let currentData: TotalTransactionsResponse | null = null;
@@ -2167,7 +2167,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
       return currentData.columns?.map(col => col.title) || [];
     }
-    
+
     // Fallback to legacy single API data
     if (useNewAPI && totalTransactionsData) {
       // Handle null columns case - only return actual API columns, not breakup fields
@@ -2178,7 +2178,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
 
   // Rely on MUI Menu's built-in outside click handling
-  
+
   // Dropdown menu state for Status column
 
 
@@ -2203,14 +2203,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     if (!dateString || dateString === 'null' || dateString === 'undefined') {
       dateString = generateRandomDate();
     }
-    
+
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return dateString; // Return original if invalid date
-    
+
     const day = date.getDate();
     const month = date.toLocaleDateString('en-US', { month: 'long' });
     const year = date.getFullYear();
-    
+
     // Add ordinal suffix to day
     const getOrdinalSuffix = (day: number) => {
       if (day > 3 && day < 21) return 'th';
@@ -2221,7 +2221,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         default: return 'th';
       }
     };
-    
+
     return `${day}${getOrdinalSuffix(day)} ${month}, ${year}`;
   };
 
@@ -2233,7 +2233,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Get dynamic column metadata from API response
   const getColumnMeta = (): Record<string, { type: 'string' | 'number' | 'date' | 'enum' }> => {
     const meta: Record<string, { type: 'string' | 'number' | 'date' | 'enum' }> = {};
-    
+
     // Use quad API data if available (can be null when filtering)
     if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
       let currentData: TotalTransactionsResponse | null = null;
@@ -2299,13 +2299,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       meta['Difference'] = { type: 'number' };
       meta['Status'] = { type: 'enum' };
     }
-    
+
     // Always add breakup fields for filtering (regardless of API type)
     meta['Event Type'] = { type: 'enum' };
     meta['Settlement Provider'] = { type: 'enum' };
-    
+
     // Debug logging removed
-    
+
     return meta;
   };
 
@@ -2319,7 +2319,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   useEffect(() => {
     const newMeta = getColumnMeta();
     setCOLUMN_META(newMeta);
-    
+
   }, [totalTransactionsData, useNewAPI]);
 
   // Force update COLUMN_META on mount
@@ -2366,8 +2366,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       return <UnfoldMoreIcon fontSize="small" />;
     }
     // Flipped: show Down arrow for ascending, Up arrow for descending
-    return sortConfig.direction === 'asc' 
-      ? <ArrowDownwardIcon fontSize="small" /> 
+    return sortConfig.direction === 'asc'
+      ? <ArrowDownwardIcon fontSize="small" />
       : <ArrowUpwardIcon fontSize="small" />;
   };
 
@@ -2402,10 +2402,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setCurrentPage(1);
     setIsSorting(true);
     try {
-      await fetchSalesTransactions(dateRange, selectedPlatform, { 
-        page: 1, 
-        limit: rowsPerPage, 
-        force: true 
+      await fetchSalesTransactions(dateRange, selectedPlatform, {
+        page: 1,
+        limit: rowsPerPage,
+        force: true
       }, nextSort, salesReportSearch || null);
     } finally {
       setIsSorting(false);
@@ -2417,8 +2417,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       return <UnfoldMoreIcon fontSize="small" />;
     }
     // Flipped: show Down arrow for ascending, Up arrow for descending
-    return salesReportSortConfig.direction === 'asc' 
-      ? <ArrowDownwardIcon fontSize="small" /> 
+    return salesReportSortConfig.direction === 'asc'
+      ? <ArrowDownwardIcon fontSize="small" />
       : <ArrowUpwardIcon fontSize="small" />;
   };
 
@@ -2434,10 +2434,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setPage(0);
     setCurrentPage(1);
     setIsSorting(true);
-    fetchSalesTransactions(dateRange, selectedPlatform, { 
-      page: 1, 
-      limit: rowsPerPage, 
-      force: true 
+    fetchSalesTransactions(dateRange, selectedPlatform, {
+      page: 1,
+      limit: rowsPerPage,
+      force: true
     }, salesReportSortConfig, value || null).finally(() => {
       setIsSorting(false);
     });
@@ -2450,10 +2450,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setPage(0);
     setCurrentPage(1);
     setIsSorting(true);
-    fetchSalesTransactions(dateRange, selectedPlatform, { 
-      page: 1, 
-      limit: rowsPerPage, 
-      force: true 
+    fetchSalesTransactions(dateRange, selectedPlatform, {
+      page: 1,
+      limit: rowsPerPage,
+      force: true
     }, salesReportSortConfig, null).finally(() => {
       setIsSorting(false);
     });
@@ -2461,14 +2461,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   const sortData = (data: TransactionRow[]) => {
     if (!sortConfig) return data;
-    
+
     return [...data].sort((a, b) => {
       const aValue = a[sortConfig.key as keyof TransactionRow];
       const bValue = b[sortConfig.key as keyof TransactionRow];
-      
+
       if (aValue === null || aValue === undefined) return 1;
       if (bValue === null || bValue === undefined) return -1;
-      
+
       let comparison = 0;
       if (typeof aValue === 'string' && typeof bValue === 'string') {
         comparison = aValue.localeCompare(bValue);
@@ -2477,7 +2477,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       } else if (aValue instanceof Date && bValue instanceof Date) {
         comparison = aValue.getTime() - bValue.getTime();
       }
-      
+
       return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
   };
@@ -2539,7 +2539,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       ...allTransactionData,
       ...(useNewAPI && totalTransactionsData?.data ? totalTransactionsData.data : [])
     ];
-    
+
     dataToCheck.forEach(row => {
       const value = (row as any)[columnName];
       if (typeof value === 'string' && value) {
@@ -2559,7 +2559,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       case 'Short Amount Received':
         return { background: '#fee2e2', color: '#dc2626' };
       case 'Pending Settlement':
-      return { background: '#e5e7eb', color: '#111111' };
+        return { background: '#e5e7eb', color: '#111111' };
       case 'Return Initiated':
         return { background: '#f3e8ff', color: '#7c3aed' };
       default:
@@ -2576,17 +2576,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Calculate count from stats data
   const getCountFromStats = () => {
     if (!propsStatsData) return 0;
-    
+
     const ordersDelivered = parseInt(propsStatsData.ordersDelivered?.number?.toString() || '0');
     const ordersReturned = parseInt(propsStatsData.ordersReturned?.number?.toString() || '0');
-    
+
     return ordersDelivered + ordersReturned;
   };
 
   // Calculate total from stats data
   const getTotalFromStats = () => {
     if (!propsStatsData) return 0;
-    
+
     return parseFloat(propsStatsData.grossSales || '0');
   };
 
@@ -2595,10 +2595,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Fetch orders from API with pagination
   // Build query parameters from filters
   const buildQueryParams = (
-    pageNumber: number = 1, 
-    remark?: string, 
-    overrideFilters?: { [key: string]: any }, 
-    overrideDateRange?: {start: string, end: string},
+    pageNumber: number = 1,
+    remark?: string,
+    overrideFilters?: { [key: string]: any },
+    overrideDateRange?: { start: string, end: string },
     overridePlatform?: Platform
   ): TransactionQueryParams => {
     const params: TransactionQueryParams = {
@@ -2641,7 +2641,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     if (dateRangeToUse.start && dateRangeToUse.end) {
       params.order_date_from = dateRangeToUse.start;
       params.order_date_to = dateRangeToUse.end;
-      
+
     } else {
       console.warn('[buildQueryParams] No date range provided - API call may fail');
     }
@@ -2659,7 +2659,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Add sorting
       params.sort_by = 'order_date';
       params.sort_order = 'desc';
-      
+
       // Apply column filters (use override filters if provided, otherwise use current state)
       const filtersToUse = overrideFilters || columnFilters;
       Object.entries(filtersToUse).forEach(([columnKey, filterValue]) => {
@@ -2689,7 +2689,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               (params as any)[baseParam] = filterValue.trim();
             }
             break;
-          
+
           case 'number':
             if (typeof filterValue === 'object' && filterValue !== null) {
               if (filterValue.min !== undefined && filterValue.min !== '') {
@@ -2700,7 +2700,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               }
             }
             break;
-          
+
           case 'date':
             if (typeof filterValue === 'object' && filterValue !== null) {
               if (filterValue.from && filterValue.to) {
@@ -2709,7 +2709,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               }
             }
             break;
-          
+
           case 'enum':
             if (Array.isArray(filterValue) && filterValue.length > 0) {
               // For Settlement Provider, map cleaned values back to original values
@@ -2735,71 +2735,71 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Fetch orders with specific filters (used when applying filters)
   const fetchOrdersWithFilters = async (
-    pageNumber: number = 1, 
-    remark?: string, 
-    filters?: { [key: string]: any }, 
-    dateRangeFilter?: {start: string, end: string}
+    pageNumber: number = 1,
+    remark?: string,
+    filters?: { [key: string]: any },
+    dateRangeFilter?: { start: string, end: string }
   ) => {
     const isInitialLoad = pageNumber === 1 && allTransactionData.length === 0;
-    
+
     if (!isInitialLoad) {
       setPaginationLoading(true);
     }
     setError(null);
-    
+
     try {
       const queryParams = buildQueryParams(pageNumber, remark, filters, dateRangeFilter);
-      
-      
+
+
       // Example query string that would be sent to API:
       // status_in=unsettled&order_date_from=2025-04-01&order_date_to=2025-04-30&diff_min=-500&diff_max=0&sort_by=order_date&sort_order=desc&order_item_id=333981993553920100
       const queryString = Object.entries(queryParams)
         .filter(([_, value]) => value !== undefined && value !== null && value !== '')
         .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
         .join('&');
-      
-      
+
+
       const response = await api.transactions.getTotalTransactions(queryParams as any);
-      
+
       if (response.success && response.data) {
         // Store total transactions data for column metadata (enum values, etc.)
         setTotalTransactionsData(response.data as TotalTransactionsResponse);
-        
+
         // Debug: Log the API response structure
-        
+
         const responseData = response.data as any;
         const transactionData = responseData.transactions || responseData.orders || responseData;
-        
-        
+
+
         // Handle metadata if available
         if ((response.data as any).meta) {
           const meta = (response.data as any).meta as TransactionMetadata;
           setMetadata(meta);
-          
+
           // Update tab counts from metadata
           setTabCounts(prev => ({
             ...prev,
             matched: (meta.counts as any).settlement_matched ?? meta.counts.settled,
             unsettled: meta.counts.unsettled,
           }));
-          
+
           // Update total count from metadata
           if (meta.pagination) {
             setTotalCount(meta.pagination.total_count);
           }
         }
-        
+
         // Transform all transaction/order items to transaction rows
         const transactionRows: TransactionRow[] = [];
-        
+
         if (Array.isArray(transactionData)) {
           // If transactionData is directly an array of transactions
           transactionData.forEach((transaction: any, transactionIndex: number) => {
-            
+
             if (transaction.order_items) {
               // If it's in the old orders format
               transaction.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
-                
+
                 transactionRows.push(transformOrderItemToTransactionRow(orderItem));
               });
             } else {
@@ -2809,21 +2809,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           });
         } else if (transactionData && typeof transactionData === 'object') {
           // If transactionData is an object, check if it has array properties
-          
-          
+
+
           // Try to find array properties that might contain the actual data
           const possibleArrays = ['transactions', 'orders', 'data', 'items'];
           let foundData = false;
-          
+
           for (const key of possibleArrays) {
             if (Array.isArray(transactionData[key])) {
-              
+
               transactionData[key].forEach((item: any, index: number) => {
-                
+
                 if (item.order_items) {
                   // If it's in the old orders format
                   item.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
-                    
+
                     transactionRows.push(transformOrderItemToTransactionRow(orderItem));
                   });
                 } else {
@@ -2835,19 +2835,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               break;
             }
           }
-          
+
           if (!foundData) {
             console.warn('No recognizable data array found in response');
           }
         } else {
           console.error('TransactionData is neither an array nor an object:', transactionData);
         }
-        
+
         // For pagination, we show only the current page data
         setAllTransactionData(transactionRows);
         setFilteredData(transactionRows);
         setCurrentPage(pageNumber);
-        
+
         // Fallback total count if metadata not available
         if (!metadata?.pagination && (response.data as any).pagination) {
           setTotalCount((response.data as any).pagination.total);
@@ -2872,65 +2872,65 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   const fetchOrders = async (pageNumber: number = 1, remark?: string, overridePlatform?: Platform) => {
     const isInitialLoad = pageNumber === 1 && allTransactionData.length === 0;
-    
+
     if (!isInitialLoad) {
       setPaginationLoading(true);
     }
     setError(null);
-    
+
     try {
       const queryParams = buildQueryParams(pageNumber, remark, undefined, undefined, overridePlatform);
-      
-      
+
+
       // Example query string that would be sent to API:
       // status_in=unsettled&order_date_from=2025-04-01&order_date_to=2025-04-30&diff_min=-500&diff_max=0&sort_by=order_date&sort_order=desc&order_item_id=333981993553920100
       const queryString = Object.entries(queryParams)
         .filter(([_, value]) => value !== undefined && value !== null && value !== '')
         .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
         .join('&');
-      
-      
+
+
       const response = await api.transactions.getTotalTransactions(queryParams as any);
-      
+
       if (response.success && response.data) {
         // Store total transactions data for column metadata (enum values, etc.)
         setTotalTransactionsData(response.data as TotalTransactionsResponse);
-        
+
         // Debug: Log the API response structure
-        
+
         const responseData = response.data as any;
         const transactionData = responseData.transactions || responseData.orders || responseData;
-        
-        
+
+
         // Handle metadata if available
         if ((response.data as any).meta) {
           const meta = (response.data as any).meta as TransactionMetadata;
           setMetadata(meta);
-          
+
           // Update tab counts from metadata
           setTabCounts(prev => ({
             ...prev,
             matched: meta.counts.settled,
             unsettled: meta.counts.unsettled,
           }));
-          
+
           // Update total count from metadata
           if (meta.pagination) {
             setTotalCount(meta.pagination.total_count);
           }
         }
-        
+
         // Transform all transaction/order items to transaction rows
         const transactionRows: TransactionRow[] = [];
-        
+
         if (Array.isArray(transactionData)) {
           // If transactionData is directly an array of transactions
           transactionData.forEach((transaction: any, transactionIndex: number) => {
-            
+
             if (transaction.order_items) {
               // If it's in the old orders format
               transaction.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
-                
+
                 transactionRows.push(transformOrderItemToTransactionRow(orderItem));
               });
             } else {
@@ -2940,21 +2940,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           });
         } else if (transactionData && typeof transactionData === 'object') {
           // If transactionData is an object, check if it has array properties
-          
-          
+
+
           // Try to find array properties that might contain the actual data
           const possibleArrays = ['transactions', 'orders', 'data', 'items'];
           let foundData = false;
-          
+
           for (const key of possibleArrays) {
             if (Array.isArray(transactionData[key])) {
-              
+
               transactionData[key].forEach((item: any, index: number) => {
-                
+
                 if (item.order_items) {
                   // If it's in the old orders format
                   item.order_items.forEach((orderItem: OrderItem, itemIndex: number) => {
-                    
+
                     transactionRows.push(transformOrderItemToTransactionRow(orderItem));
                   });
                 } else {
@@ -2966,19 +2966,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               break;
             }
           }
-          
+
           if (!foundData) {
             console.warn('No recognizable data array found in response');
           }
         } else {
           console.error('TransactionData is neither an array nor an object:', transactionData);
         }
-        
+
         // For pagination, we show only the current page data
         setAllTransactionData(transactionRows);
         setFilteredData(transactionRows);
         setCurrentPage(pageNumber);
-        
+
         // Fallback total count if metadata not available
         if (!metadata?.pagination && (response.data as any).pagination) {
           setTotalCount((response.data as any).pagination.total);
@@ -3091,14 +3091,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setColumnFilters(pendingColumnFilters);
     setDateRange(pendingDateRange);
     setSelectedPlatform(pendingSelectedPlatform);
-    
+
     // Use dual API with filters and pending platform
     if (activeTab === 4) {
       fetchSalesTransactions(pendingDateRange, pendingSelectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
     } else {
       fetchQuadTransactions(1, pendingColumnFilters, pendingDateRange, pendingSelectedPlatform);
     }
-    
+
     // Close the filter popover
     closeFilterPopover();
   };
@@ -3133,7 +3133,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Apply header date range changes - called when Apply button next to date selector is clicked
   const applyHeaderDateRange = () => {
-    
+
     setHeaderDateRange(pendingHeaderDateRange);
     setDateRange(pendingHeaderDateRange);
     setPage(0);
@@ -3152,35 +3152,35 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const target = event.target as Element;
       const isFilterIcon = target?.closest('[aria-label*="Filter"]');
       const isInsidePopup = target?.closest('[data-filter-popup="true"]');
-      
+
       if (!isFilterIcon && !isInsidePopup && headerFilterAnchor) {
         closeFilterPopover();
       }
     };
-    
+
     if (headerFilterAnchor) {
       // Add a small delay to prevent immediate closing
       setTimeout(() => {
         document.addEventListener('click', handleClickOutside, true);
       }, 100);
-      
+
       return () => document.removeEventListener('click', handleClickOutside, true);
     }
   }, [headerFilterAnchor]);
 
   // Fetch tab count with specific filters (used when applying filters)
   const fetchTabCountWithFilters = async (
-    remark: 'settlement_matched' | 'unsettled', 
-    filters?: { [key: string]: any }, 
-    dateRangeFilter?: {start: string, end: string}
+    remark: 'settlement_matched' | 'unsettled',
+    filters?: { [key: string]: any },
+    dateRangeFilter?: { start: string, end: string }
   ) => {
     try {
       const queryParams = buildQueryParams(1, remark, filters, dateRangeFilter);
       queryParams.limit = 1; // Only need metadata, not actual data
-      
+
       const response = await api.transactions.getTotalTransactions(queryParams as any);
       let count = 0;
-      
+
       // Try to get count from metadata first
       if ((response.data as any)?.meta?.counts) {
         const meta = (response.data as any).meta as TransactionMetadata;
@@ -3196,7 +3196,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         const orders = (response.data as any).orders;
         count = orders.reduce((acc: number, o: any) => acc + (Array.isArray(o?.order_items) ? o.order_items.length : 0), 0);
       }
-      
+
       setTabCounts(prev => ({
         ...prev,
         [remark === 'settlement_matched' ? 'settled' : remark === 'unsettled' ? 'unsettled' : 'unreconciled']: count,
@@ -3211,10 +3211,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     try {
       const queryParams = buildQueryParams(1, remark);
       queryParams.limit = 1; // Only need metadata, not actual data
-      
+
       const response = await api.transactions.getTotalTransactions(queryParams as any);
       let count = 0;
-      
+
       // Try to get count from metadata first
       if ((response.data as any)?.meta?.counts) {
         const meta = (response.data as any).meta as TransactionMetadata;
@@ -3230,7 +3230,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         const orders = (response.data as any).orders;
         count = orders.reduce((acc: number, o: any) => acc + (Array.isArray(o?.order_items) ? o.order_items.length : 0), 0);
       }
-      
+
       setTabCounts(prev => ({
         ...prev,
         [remark === 'settlement_matched' ? 'settled' : remark === 'unsettled' ? 'unsettled' : 'unreconciled']: count,
@@ -3242,9 +3242,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Quad API call function - fetches matched, mismatched, unsettled, and all data simultaneously
   const fetchQuadTransactions = async (
-    pageNumber: number = 1, 
-    filters?: { [key: string]: any }, 
-    dateRangeFilter?: {start: string, end: string},
+    pageNumber: number = 1,
+    filters?: { [key: string]: any },
+    dateRangeFilter?: { start: string, end: string },
     overridePlatform?: Platform,
     orderIds?: string[],
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
@@ -3302,7 +3302,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               baseParams[baseParam] = filterValue.trim();
             }
             break;
-          
+
           case 'number':
             if (typeof filterValue === 'object' && filterValue !== null) {
               if (filterValue.min !== undefined && filterValue.min !== '') {
@@ -3313,7 +3313,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               }
             }
             break;
-          
+
           case 'date':
             if (typeof filterValue === 'object' && filterValue !== null) {
               if (filterValue.from) {
@@ -3324,31 +3324,31 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               }
             }
             break;
-          
-        case 'enum':
-          if (Array.isArray(filterValue) && filterValue.length > 0) {
-            if (columnKey === 'Settlement Provider') {
-              const originalValues = filterValue
-                .map(cleanedValue => settlementProviderMapping[cleanedValue] || cleanedValue)
-                .filter(Boolean);
-              if (originalValues.length > 0) {
-                baseParams[baseParam] = originalValues.join(',');
+
+          case 'enum':
+            if (Array.isArray(filterValue) && filterValue.length > 0) {
+              if (columnKey === 'Settlement Provider') {
+                const originalValues = filterValue
+                  .map(cleanedValue => settlementProviderMapping[cleanedValue] || cleanedValue)
+                  .filter(Boolean);
+                if (originalValues.length > 0) {
+                  baseParams[baseParam] = originalValues.join(',');
+                }
+              } else {
+                baseParams[baseParam] = filterValue.join(',');
               }
-            } else {
-              baseParams[baseParam] = filterValue.join(',');
             }
-          }
-          break;
+            break;
         }
       });
     }
-    
+
     // Add date range parameters with correct keys
     if (dateRangeFilter?.start && dateRangeFilter?.end) {
       baseParams.order_date_from = dateRangeFilter.start;
       baseParams.order_date_to = dateRangeFilter.end;
     }
-    
+
     // Add platform parameter
     if (platformToUse) {
       baseParams.platform = platformToUse;
@@ -3360,7 +3360,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       baseParams.sort_by = COLUMN_TO_SORT_BY_MAP[sortToUse.key];
       baseParams.sort_order = sortToUse.direction;
     }
-    
+
     // Ensure Order ID search is always applied even if not present in column filters
     const effectiveOrderIds = (orderIds !== undefined ? orderIds : orderIdChips) || [];
     if (Array.isArray(effectiveOrderIds) && effectiveOrderIds.length > 0) {
@@ -3389,22 +3389,22 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Tab 0: Matched - settlement_matched
       const matchedParams = { ...baseParams };
       matchedParams.status_in = 'settlement_matched';
-      
+
       // Tab 1: Mismatched - two separate calls for less_received and more_received
       const mismatchedLessReceivedParams = { ...baseParams };
       mismatchedLessReceivedParams.status = 'less_payment_received';
-      
+
       const mismatchedMoreReceivedParams = { ...baseParams };
       mismatchedMoreReceivedParams.status = 'more_payment_received';
-      
+
       // Tab 2: Unsettled - unsettled
       const unsettledParams = { ...baseParams };
       unsettledParams.status = 'unsettled';
-      
+
       // Tab 3: All - no status filter
       const allParams = { ...baseParams };
       // No status filter applied
-      
+
       // Make all 5 API calls simultaneously
       const apiCalls = [
         api.transactions.getTotalTransactions(matchedParams),
@@ -3413,9 +3413,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         api.transactions.getTotalTransactions(unsettledParams),
         api.transactions.getTotalTransactions(allParams),
       ];
-      
+
       const [matchedResponse, mismatchedLessReceivedResponse, mismatchedMoreReceivedResponse, unsettledResponse, allResponse] = await Promise.all(apiCalls);
-      
+
       // Use the first successful response that contains column metadata to populate filters
       const responseWithColumns = [matchedResponse, mismatchedLessReceivedResponse, mismatchedMoreReceivedResponse, unsettledResponse, allResponse].find(
         (res) => res.success && (res.data as TotalTransactionsResponse | undefined)?.columns
@@ -3423,7 +3423,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       if (responseWithColumns?.data) {
         setTotalTransactionsData(responseWithColumns.data as TotalTransactionsResponse);
       }
-      
+
       // Process matched response (Tab 0)
       if (matchedResponse.success) {
         setMatchedData(matchedResponse.data);
@@ -3433,7 +3433,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       } else {
         console.error('[fetchQuadTransactions] Matched API failed:', matchedResponse);
       }
-      
+
       // Process mismatched less received response (Tab 1 - sub-tab 1)
       if (mismatchedLessReceivedResponse.success) {
         setMismatchedLessReceivedData(mismatchedLessReceivedResponse.data);
@@ -3443,7 +3443,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       } else {
         console.error('[fetchQuadTransactions] Mismatched Less Received API failed:', mismatchedLessReceivedResponse);
       }
-      
+
       // Process mismatched more received response (Tab 1 - sub-tab 2)
       if (mismatchedMoreReceivedResponse.success) {
         setMismatchedMoreReceivedData(mismatchedMoreReceivedResponse.data);
@@ -3453,7 +3453,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       } else {
         console.error('[fetchQuadTransactions] Mismatched More Received API failed:', mismatchedMoreReceivedResponse);
       }
-      
+
       // Process unsettled response (Tab 2)
       if (unsettledResponse.success) {
         setUnsettledData(unsettledResponse.data);
@@ -3463,7 +3463,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       } else {
         console.error('[fetchQuadTransactions] Unsettled API failed:', unsettledResponse);
       }
-      
+
       // Process all response (Tab 3)
       if (allResponse.success) {
         setAllData(allResponse.data);
@@ -3473,7 +3473,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       } else {
         console.error('[fetchQuadTransactions] All API failed:', allResponse);
       }
-      
+
       // Update totalCount based on current active tab
       if (activeTab === 0 && matchedResponse.success && matchedResponse.data?.pagination) {
         setTotalCount(matchedResponse.data.pagination.total_count);
@@ -3489,7 +3489,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       } else if (activeTab === 3 && allResponse.success && allResponse.data?.pagination) {
         setTotalCount(allResponse.data.pagination.total_count);
       }
-      
+
       setCurrentPage(pageNumber);
 
       const allSucceeded = matchedResponse.success && mismatchedLessReceivedResponse.success && mismatchedMoreReceivedResponse.success && unsettledResponse.success && allResponse.success;
@@ -3498,7 +3498,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       } else {
         lastQuadParamsRef.current = null;
       }
-      
+
       // Update tab counts based on the actual data received
       const lessReceivedCount = mismatchedLessReceivedResponse.success ? (mismatchedLessReceivedResponse.data?.data?.length || 0) : 0;
       const moreReceivedCount = mismatchedMoreReceivedResponse.success ? (mismatchedMoreReceivedResponse.data?.data?.length || 0) : 0;
@@ -3521,7 +3521,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Fetch sales transactions - only called when tab 4 is clicked and date range has changed
   const fetchSalesTransactions = async (
-    dateRangeFilter?: {start: string, end: string},
+    dateRangeFilter?: { start: string, end: string },
     overridePlatform?: Platform,
     options?: { page?: number; limit?: number; force?: boolean },
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
@@ -3542,21 +3542,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     const businessModeToUse = platformToUse === 'amazon'
       ? (businessModeOverride || amazonBusinessMode || 'B2C')
       : undefined;
-    const dateRangeChanged = !lastSalesReportDateRange || 
-      lastSalesReportDateRange.start !== currentDateRange.start || 
+    const dateRangeChanged = !lastSalesReportDateRange ||
+      lastSalesReportDateRange.start !== currentDateRange.start ||
       lastSalesReportDateRange.end !== currentDateRange.end;
     const paginationMatches = salesReportPagination ? (
       salesReportPagination.page === requestedPage &&
       salesReportPagination.limit === requestedLimit
     ) : false;
     const platformMatches = salesReportData ? salesReportData.platform === platformToUse : false;
-    
+
     // Check if sort config changed
     const sortToUse = sortOverride !== undefined ? sortOverride : salesReportSortConfig;
     const sortByValue = sortToUse ? getSalesReportSortBy(sortToUse.key) : null;
-    const sortChanged = sortOverride !== undefined || 
+    const sortChanged = sortOverride !== undefined ||
       (sortToUse?.key !== salesReportSortConfig?.key || sortToUse?.direction !== salesReportSortConfig?.direction);
-    
+
     // Check if search changed
     const searchToUse = searchTerm !== undefined ? searchTerm : salesReportSearch;
     const searchChanged = searchTerm !== undefined || searchToUse !== salesReportSearch;
@@ -3640,20 +3640,20 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Fetch data from new total transactions API
   const fetchTotalTransactions = async (
-    pageNumber: number = 1, 
-    filters?: { [key: string]: any }, 
-    dateRangeFilter?: {start: string, end: string},
+    pageNumber: number = 1,
+    filters?: { [key: string]: any },
+    dateRangeFilter?: { start: string, end: string },
     overridePlatform?: Platform
   ) => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const params: any = {
         page: pageNumber,
         limit: rowsPerPage, // Use current rows per page setting
       };
-      
+
       // ALWAYS add platform parameter
       const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
       if (platformToUse) {
@@ -3661,7 +3661,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       } else {
         console.warn('[fetchTotalTransactions] No platform selected');
       }
-      
+
       // Apply status based on active tab selection
       if (activeTab === 0) {
         // Settled tab - use status_in with comma-separated values
@@ -3670,7 +3670,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         // Unsettled tab - use status=unsettled
         params.status = 'unsettled';
       }
-      
+
       // Apply filters if provided
       if (filters && Object.keys(filters).some(key => filters[key])) {
         Object.entries(filters).forEach(([columnKey, filterValue]) => {
@@ -3700,7 +3700,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 params[baseParam] = filterValue.trim();
               }
               break;
-            
+
             case 'number':
               if (typeof filterValue === 'object' && filterValue !== null) {
                 if (filterValue.min !== undefined && filterValue.min !== '') {
@@ -3711,7 +3711,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 }
               }
               break;
-            
+
             case 'date':
               if (typeof filterValue === 'object' && filterValue !== null) {
                 if (filterValue.from && filterValue.to) {
@@ -3720,7 +3720,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 }
               }
               break;
-            
+
             case 'enum':
               if (Array.isArray(filterValue) && filterValue.length > 0) {
                 // For Settlement Provider, map cleaned values back to original values
@@ -3746,12 +3746,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         params.order_date_from = dateRangeFilter.start;
         params.order_date_to = dateRangeFilter.end;
       }
-      
-      
-      
+
+
+
       // Use custom API call with specific organization ID for this API only
       const response = await apiService.get<TotalTransactionsResponse>(
-        API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS, 
+        API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS,
         params,
         {
           headers: {
@@ -3760,31 +3760,31 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           }
         }
       );
-      
+
       if (response.success && response.data) {
-        
+
         setTotalTransactionsData(response.data);
         setTotalCount(response.data.pagination?.total_count || 0);
         setCurrentPage(response.data.pagination?.page || 1);
-        
+
         // Handle null data case (0 results)
         const dataArray = response.data.data || [];
-        
+
         // Update tab counts based on the data
-        const settledCount = dataArray.filter(row => 
+        const settledCount = dataArray.filter(row =>
           row.recon_status === 'settlement_matched' || row.recon_status === 'less_payment_received' || row.recon_status === 'more_payment_received'
         ).length;
-        const unsettledCount = dataArray.filter(row => 
+        const unsettledCount = dataArray.filter(row =>
           row.recon_status === 'unsettled'
         ).length;
-        
+
         setTabCounts(prev => ({
           ...prev,
           matched: settledCount,
           unsettled: unsettledCount
         }));
-        
-        
+
+
       } else {
         setError('Failed to fetch transactions');
       }
@@ -3833,15 +3833,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Handle Order ID search button click
   const handleOrderIdSearchClick = () => {
     const value = orderIdSearch;
-    
+
     // Convert comma-separated values to array
     const orderIds = value.split(',').map(id => id.trim()).filter(id => id.length > 0);
     setOrderIdChips(orderIds);
-    
+
     // Trigger API call
     setPage(0);
     setCurrentPage(1);
-    
+
     // Build query params with order IDs
     const newFilters = { ...columnFilters };
     if (orderIds.length > 0) {
@@ -3856,7 +3856,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setOrderIdSearch('');
     setOrderIdChips([]);
     setShowOrderIdSearch(false);
-    
+
     // Trigger API call without order IDs
     setPage(0);
     setCurrentPage(1);
@@ -3907,15 +3907,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Open/close popover for a column
   const openFilterPopover = (columnKey: string, target: HTMLElement) => {
-    
+
     // Initialize pending filters with current active filters
     setPendingColumnFilters(columnFilters);
     setPendingDateRange(dateRange);
-    
+
     setActiveFilterColumn(columnKey);
     setHeaderFilterAnchor(target);
-    
-    
+
+
   };
 
   const closeFilterPopover = () => {
@@ -3938,8 +3938,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleTransactionDetailsOpen = (event: React.MouseEvent<HTMLElement>, row: any) => {
     event.preventDefault();
     event.stopPropagation();
-    
-    
+
+
     setSelectedTransaction(row);
     setAnchorEl(event.currentTarget);
   };
@@ -3948,10 +3948,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleBreakupsOpen = (event: React.MouseEvent<HTMLElement>, row: any) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     // Extract order ID from the row data
     const orderId = row.order_id || row['Order ID'] || row['Order Item ID'] || row.order_item_id || 'Unknown';
-    
+
     // Get breakups from metadata.breakups
     let breakups = null;
     if ((row as any)?.originalData?.metadata?.breakups) {
@@ -3959,11 +3959,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     } else if (row.metadata?.breakups) {
       breakups = row.metadata.breakups;
     }
-    
+
     // Get metadata to check if shipping_courier exists
     const metadata = (row as any)?.originalData?.metadata || row.metadata;
     const hasBreakups = breakups && typeof breakups === 'object' && Object.keys(breakups).length > 0;
-    
+
     // Allow opening modal if breakups has data OR if metadata exists (even with empty breakups)
     // This allows D2C transactions with empty breakups but shipping_courier to show the modal
     // We always have metadata for transactions, so this ensures the modal can open for all transactions
@@ -3980,23 +3980,23 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   useEffect(() => {
     if (getCurrentData().length > 0) {
       let filtered = getCurrentData();
-    
+
       // Search filter
       if (searchTerm) {
-        filtered = filtered.filter(row => 
-          Object.values(row).some(value => 
+        filtered = filtered.filter(row =>
+          Object.values(row).some(value =>
             typeof value === 'string' && value.toLowerCase().includes(searchTerm.toLowerCase())
           )
         );
       }
-      
+
       // Date range filter
       if (dateRange.start || dateRange.end) {
         filtered = filtered.filter(row => {
           const orderDate = new Date(row["Invoice Date"] || row["invoice_date"]);
           const startDate = dateRange.start ? new Date(dateRange.start) : null;
           const endDate = dateRange.end ? new Date(dateRange.end) : null;
-          
+
           if (startDate && endDate) {
             return orderDate >= startDate && orderDate <= endDate;
           } else if (startDate) {
@@ -4007,15 +4007,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           return true;
         });
       }
-      
+
       // Column filters
       Object.entries(columnFilters).forEach(([columnKey, filterValue]) => {
         const meta = COLUMN_META[columnKey] || { type: 'string' as const };
 
-          filtered = filtered.filter(row => {
+        filtered = filtered.filter(row => {
           const value = (row as any)[columnKey];
-            if (value === null || value === undefined) return false;
-            
+          if (value === null || value === undefined) return false;
+
           switch (meta.type) {
             case 'string': {
               const text = (filterValue || '').toString().trim();
@@ -4053,7 +4053,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           }
         });
       });
-      
+
       // Apply sorting
       const sortedData = sortData(filtered);
       setFilteredData(sortedData);
@@ -4064,7 +4064,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleChangePage = (event: unknown, newPage: number) => {
     const newPageNumber = newPage + 1; // Convert from 0-based to 1-based
     setPage(newPage);
-    
+
     if (activeTab === 4) {
       fetchSalesTransactions(dateRange, selectedPlatform, { page: newPageNumber, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
       return;
@@ -4086,7 +4086,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   };
 
-  
+
 
   // Clear filters
   const handleClearFilters = () => {
@@ -4108,19 +4108,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setActiveTab(newValue);
     setPage(0); // Reset to first page when changing tabs
     setCurrentPage(1); // Reset current page
-    
+
     // Clear Sales Report search when switching away from Sales Report tab
     if (newValue !== 4) {
       setSalesReportSearch('');
       setShowSalesReportSearch(false);
     }
-    
+
     // Sales Report tab (index 4) - fetch data when clicked
     if (newValue === 4) {
       fetchSalesTransactions(dateRange, selectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
       return;
     }
-    
+
     // Update totalCount based on the new active tab
     if (newValue === 0 && matchedTotalCount !== null) {
       // Matched tab
@@ -4135,7 +4135,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // All tab
       setTotalCount(allTotalCount);
     }
-    
+
     // No API call needed - just switch the displayed data
     // The data is already loaded from quad API calls
   };
@@ -4150,17 +4150,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setExportLoading(true);
     setExportSuccess(null);
     setError(null);
-    
+
     try {
       // Build query params using the same logic as getTotalTransactions
       // But exclude pagination params (page, limit)
       const queryParams = buildQueryParams(1);
-      
+
       // Remove pagination params for export
       const exportParams: any = { ...queryParams };
       delete exportParams.page;
       delete exportParams.limit;
-      
+
       // Filter out undefined/null/empty values
       const cleanParams: any = {};
       Object.entries(exportParams).forEach(([key, value]) => {
@@ -4171,7 +4171,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       // Call the export API
       const response = await api.transactions.requestExport(cleanParams);
-      
+
       if (response.success && response.data) {
         const timestamp = Date.now();
         const newRequest: ExportRequest = {
@@ -4183,11 +4183,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           fileSize: '—',
         };
         setExportRequests((prev) => [newRequest, ...prev]);
-        
+
         // Show success message
         setExportSuccess('Export request submitted successfully! It will be available in the downloads section when ready.');
         console.log('✅ Export request submitted successfully:', response.data);
-        
+
         // Refresh export list after a short delay to get the new export
         setTimeout(() => {
           fetchExportList();
@@ -4215,7 +4215,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
 
   const currentTabLabel = TAB_LABELS[activeTab] ?? 'Transactions';
-  
+
   // Get the settlement status label for display in confirmation dialog
   const getSettlementStatusLabel = () => {
     if (activeTab === 1) {
@@ -4229,11 +4229,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // For other tabs, return the tab label
     return currentTabLabel;
   };
-  
+
   const formattedPlatformLabel = selectedPlatform
     ? (selectedPlatform === 'd2c'
-        ? 'D2C'
-        : `${selectedPlatform.charAt(0).toUpperCase()}${selectedPlatform.slice(1)}`)
+      ? 'D2C'
+      : `${selectedPlatform.charAt(0).toUpperCase()}${selectedPlatform.slice(1)}`)
     : 'Platform';
 
   const formatExportRequestTimestamp = () => {
@@ -4291,7 +4291,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   return (
     <Slide direction="left" in mountOnEnter unmountOnExit>
-      <Box sx={{ 
+      <Box sx={{
         width: '100%',
         height: '100%',
         background: '#fafafa',
@@ -4301,7 +4301,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         <Box sx={{ p: { xs: 1, md: 2 }, position: 'relative', zIndex: 1 }}>
           {/* Header */}
           <Fade in timeout={800}>
-            <Card sx={{ 
+            <Card sx={{
               mb: 1,
               background: '#ffffff',
               borderRadius: '12px',
@@ -4309,19 +4309,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
             }}>
               <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
                 {/* Main Header Row - Responsive Layout */}
-                <Box sx={{ 
-                  display: 'flex', 
+                <Box sx={{
+                  display: 'flex',
                   flexDirection: { xs: 'column', md: 'row' },
                   alignItems: { xs: 'flex-start', md: 'center' },
                   justifyContent: 'space-between',
-                  mb: 1, 
+                  mb: 1,
                   gap: { xs: 1.5, md: 2 },
                   width: '100%'
                 }}>
                   {/* Left Section: Back Button and Title */}
-                  <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: { xs: 1, sm: 2 },
                     flexShrink: 0,
                     width: { xs: '100%', sm: 'auto' },
@@ -4343,10 +4343,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     >
                       <ArrowBackIcon fontSize="small" />
                     </IconButton>
-                    <Typography 
-                      variant="h5" 
-                      sx={{ 
-                        fontWeight: 700, 
+                    <Typography
+                      variant="h5"
+                      sx={{
+                        fontWeight: 700,
                         color: '#111827',
                         letterSpacing: '-0.02em',
                         py: 0.5,
@@ -4361,10 +4361,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       Transaction Sheet
                     </Typography>
                   </Box>
-                  
+
                   {/* Right Section: Filters, Platform Selector, Date Range - Responsive */}
-                  <Box sx={{ 
-                    display: 'flex', 
+                  <Box sx={{
+                    display: 'flex',
                     alignItems: { xs: 'flex-start', sm: 'center' },
                     flexDirection: { xs: 'column', sm: 'row' },
                     gap: { xs: 1, sm: 1 },
@@ -4372,9 +4372,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     width: { xs: '100%', md: 'auto' },
                     justifyContent: { xs: 'flex-start', md: 'flex-end' }
                   }}>
-                    
+
                     {/* Action Buttons Row */}
-                    <Box sx={{ 
+                    <Box sx={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: { xs: 0.75, sm: 1 },
@@ -4398,7 +4398,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       >
                         <RefreshIcon fontSize={isSmallScreen ? 'small' : 'medium'} />
                       </IconButton>
-                      
+
                       {activeTab !== 4 && (
                         <Button
                           variant="outlined"
@@ -4410,9 +4410,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               openFilterPopover(firstFilterableColumn, e.currentTarget as any);
                             }
                           }}
-                          sx={{ 
-                            textTransform: 'none', 
-                            borderColor: '#1f2937', 
+                          sx={{
+                            textTransform: 'none',
+                            borderColor: '#1f2937',
                             color: '#1f2937',
                             flexShrink: 0,
                             fontSize: { xs: '0.7rem', sm: '0.75rem' },
@@ -4425,10 +4425,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         </Button>
                       )}
                     </Box>
-                    
+
                     {/* Platform Filter - Fully Responsive */}
-                    <Box sx={{ 
-                      display: 'flex', 
+                    <Box sx={{
+                      display: 'flex',
                       alignItems: { xs: 'flex-start', sm: 'center' },
                       flexDirection: { xs: 'column', sm: 'row' },
                       gap: { xs: 0.75, sm: 0.5 },
@@ -4443,9 +4443,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       rowGap: { xs: 0.75, sm: 0 },
                     }}>
                       {/* Platform label */}
-                      <Typography variant="body2" sx={{ 
-                        fontWeight: 600, 
-                        color: '#1f2937', 
+                      <Typography variant="body2" sx={{
+                        fontWeight: 600,
+                        color: '#1f2937',
                         fontSize: { xs: '0.65rem', sm: '0.7rem' },
                         whiteSpace: 'nowrap',
                         flexShrink: 0,
@@ -4453,10 +4453,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       }}>
                         Platforms:
                       </Typography>
-                      
+
                       {/* Platform radio buttons - Responsive layout */}
-                      <Box sx={{ 
-                        display: 'flex', 
+                      <Box sx={{
+                        display: 'flex',
                         gap: { xs: 0.5, sm: 0.25 },
                         flexShrink: 0,
                         flexWrap: { xs: 'wrap', sm: 'nowrap' },
@@ -4467,17 +4467,17 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           onChange={(e) => {
                             setPendingSelectedPlatform(e.target.value as Platform);
                           }}
-                          sx={{ 
+                          sx={{
                             display: 'flex',
                             flexDirection: 'row',
                             gap: { xs: 0.5, sm: 0.25 }
                           }}
                         >
                           {availablePlatforms.map((platform) => (
-                            <Box 
+                            <Box
                               key={platform}
-                              sx={{ 
-                                display: 'flex', 
+                              sx={{
+                                display: 'flex',
                                 alignItems: 'center',
                                 cursor: 'pointer',
                                 '&:hover': {
@@ -4490,16 +4490,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 setPendingSelectedPlatform(platform);
                               }}
                             >
-                              <Radio 
+                              <Radio
                                 checked={pendingSelectedPlatform === platform}
                                 value={platform}
                                 size="small"
                                 sx={{ padding: '2px', '& svg': { fontSize: { xs: '16px', sm: '18px' } } }}
                               />
-                              <Typography variant="body2" sx={{ 
-                                color: '#374151', 
+                              <Typography variant="body2" sx={{
+                                color: '#374151',
                                 fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                                whiteSpace: 'nowrap' 
+                                whiteSpace: 'nowrap'
                               }}>
                                 {platform === 'flipkart' ? 'Flipkart' : platform === 'amazon' ? 'Amazon' : 'D2C'}
                               </Typography>
@@ -4507,19 +4507,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           ))}
                         </RadioGroup>
                       </Box>
-                      
+
                       {/* Divider - Hidden on mobile */}
-                      <Box sx={{ 
+                      <Box sx={{
                         display: { xs: 'none', sm: 'block' },
-                        width: '1px', 
-                        height: '18px', 
-                        backgroundColor: '#d1d5db', 
-                        mx: 0.25, 
-                        flexShrink: 0 
+                        width: '1px',
+                        height: '18px',
+                        backgroundColor: '#d1d5db',
+                        mx: 0.25,
+                        flexShrink: 0
                       }} />
-                      
+
                       {/* Action buttons container */}
-                      <Box sx={{ 
+                      <Box sx={{
                         display: 'flex',
                         gap: 0.5,
                         alignItems: 'center',
@@ -4552,11 +4552,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         </Button>
                       </Box>
                     </Box>
-                    
+
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 0.75, sm: 0.75 }, width: { xs: '100%', sm: 'auto' }, minWidth: 0 }}>
                       {/* Date Range Selector - Fully Responsive */}
-                      <Box sx={{ 
-                        display: 'flex', 
+                      <Box sx={{
+                        display: 'flex',
                         alignItems: { xs: 'flex-start', sm: 'center' },
                         flexDirection: { xs: 'column', sm: 'row' },
                         gap: { xs: 0.75, sm: 0.5 },
@@ -4571,9 +4571,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         rowGap: { xs: 0.75, sm: 0 },
                       }}>
                         {/* Date label */}
-                        <Typography variant="body2" sx={{ 
-                          fontWeight: 600, 
-                          color: '#1f2937', 
+                        <Typography variant="body2" sx={{
+                          fontWeight: 600,
+                          color: '#1f2937',
                           fontSize: { xs: '0.65rem', sm: '0.7rem' },
                           whiteSpace: 'nowrap',
                           flexShrink: 0,
@@ -4581,12 +4581,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         }}>
                           Date Range:
                         </Typography>
-                        
+
                         {/* Date inputs - Responsive */}
-                        <Box sx={{ 
-                          display: 'flex', 
-                          gap: { xs: 0.75, sm: 0.5 }, 
-                          alignItems: 'center', 
+                        <Box sx={{
+                          display: 'flex',
+                          gap: { xs: 0.75, sm: 0.5 },
+                          alignItems: 'center',
                           flex: { xs: '1 1 100%', sm: '1 1 auto' },
                           minWidth: 0,
                           width: { xs: '100%', sm: 'auto' },
@@ -4599,7 +4599,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             value={pendingHeaderDateRange.start}
                             onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, start: e.target.value }))}
                             InputLabelProps={{ shrink: true }}
-                            sx={{ 
+                            sx={{
                               flex: { xs: '1 1 100%', sm: '1 1 0' },
                               minWidth: { xs: '100%', sm: 0 },
                               maxWidth: { xs: '100%', sm: '110px' },
@@ -4617,8 +4617,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               }
                             }}
                           />
-                          <Typography variant="body2" sx={{ 
-                            color: '#6b7280', 
+                          <Typography variant="body2" sx={{
+                            color: '#6b7280',
                             fontSize: { xs: '0.65rem', sm: '0.7rem' },
                             flexShrink: 0,
                             display: { xs: 'none', sm: 'block' }
@@ -4632,7 +4632,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             value={pendingHeaderDateRange.end}
                             onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, end: e.target.value }))}
                             InputLabelProps={{ shrink: true }}
-                            sx={{ 
+                            sx={{
                               flex: { xs: '1 1 100%', sm: '1 1 0' },
                               minWidth: { xs: '100%', sm: 0 },
                               maxWidth: { xs: '100%', sm: '110px' },
@@ -4651,27 +4651,27 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             }}
                           />
                         </Box>
-                        
+
                         {/* Divider - Hidden on mobile */}
-                        <Box sx={{ 
+                        <Box sx={{
                           display: { xs: 'none', sm: 'block' },
-                          width: '1px', 
-                          height: '18px', 
-                          backgroundColor: '#d1d5db', 
-                          mx: 0.25, 
-                          flexShrink: 0 
+                          width: '1px',
+                          height: '18px',
+                          backgroundColor: '#d1d5db',
+                          mx: 0.25,
+                          flexShrink: 0
                         }} />
-                        
+
                         {/* Apply Button */}
                         <Button
                           variant="contained"
                           size="small"
                           onClick={applyHeaderDateRange}
                           disabled={
-                            !pendingHeaderDateRange.start || 
+                            !pendingHeaderDateRange.start ||
                             !pendingHeaderDateRange.end ||
-                            (pendingHeaderDateRange.start === headerDateRange.start && 
-                             pendingHeaderDateRange.end === headerDateRange.end)
+                            (pendingHeaderDateRange.start === headerDateRange.start &&
+                              pendingHeaderDateRange.end === headerDateRange.end)
                           }
                           sx={{
                             textTransform: 'none',
@@ -4694,7 +4694,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       </Box>
 
                     </Box>
-                    
+
                   </Box>
                 </Box>
 
@@ -4710,7 +4710,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     alignItems: { xs: 'stretch', lg: 'center' },
                   }}
                 >
-                  <Box sx={{ 
+                  <Box sx={{
                     flex: 1,
                     overflowX: 'auto',
                     overflowY: 'hidden',
@@ -4724,76 +4724,76 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       display: 'inline-block',
                       borderBottom: { xs: 'none', sm: '1px solid #e5e7eb' },
                     }}>
-                      <Tabs 
-                        value={activeTab} 
+                      <Tabs
+                        value={activeTab}
                         onChange={handleTabChange}
                         variant={isSmallScreen ? 'scrollable' : 'standard'}
                         scrollButtons={false}
                         sx={{
                           minWidth: 0,
                           width: 'auto',
-                        '& .MuiTabs-flexContainer': {
-                          gap: { xs: 0.5, sm: 1 },
-                          justifyContent: { xs: 'flex-start', sm: 'flex-start' },
-                        },
-                        '& .MuiTab-root': {
-                          minHeight: { xs: 32, sm: 36, md: 40 },
-                          fontSize: { xs: '0.7rem', sm: '0.8rem', md: '0.875rem' },
-                          fontWeight: 600,
-                          textTransform: 'none',
-                          color: '#6b7280',
-                          px: { xs: 1, sm: 1.5, md: 2.5 },
-                          py: { xs: 0.75, sm: 1 },
-                          minWidth: { xs: 'auto', sm: 'fit-content' },
-                          maxWidth: { xs: '45%', sm: 'none' },
-                          whiteSpace: { xs: 'normal', sm: 'nowrap' },
-                          textAlign: { xs: 'center', sm: 'left' },
-                          overflow: 'hidden',
-                          textOverflow: { xs: 'ellipsis', sm: 'clip' },
-                          lineHeight: { xs: 1.2, sm: 1.5 },
-                          '&.Mui-selected': {
-                            color: '#1f2937',
-                            fontWeight: 700,
+                          '& .MuiTabs-flexContainer': {
+                            gap: { xs: 0.5, sm: 1 },
+                            justifyContent: { xs: 'flex-start', sm: 'flex-start' },
                           },
-                        },
-                        '& .MuiTabs-indicator': {
-                          height: 2,
-                          borderRadius: '2px 2px 0 0',
-                          background: '#1f2937',
-                        },
-                      }}
-                    >
-                      {tabDefinitions.map(({ label, count }) => (
-                        <Tab 
-                          key={label}
-                          label={
-                            <Box sx={{ 
-                              display: 'flex', 
-                              flexDirection: { xs: 'column', sm: 'row' },
-                              alignItems: 'center',
-                              gap: { xs: 0, sm: 0.25 },
-                              width: '100%',
-                              justifyContent: 'center'
-                            }}>
-                              <Box component="span">{label}</Box>
-                              {count !== null && count !== undefined && (
-                                <Box 
-                                  component="span"
-                                  sx={{ 
-                                    fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
-                                    opacity: 0.8,
-                                    fontWeight: 500,
-                                    lineHeight: 1
-                                  }}
-                                >
-                                  ({count.toLocaleString()})
-                                </Box>
-                              )}
-                            </Box>
-                          } 
-                        />
-                      ))}
-                    </Tabs>
+                          '& .MuiTab-root': {
+                            minHeight: { xs: 32, sm: 36, md: 40 },
+                            fontSize: { xs: '0.7rem', sm: '0.8rem', md: '0.875rem' },
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            color: '#6b7280',
+                            px: { xs: 1, sm: 1.5, md: 2.5 },
+                            py: { xs: 0.75, sm: 1 },
+                            minWidth: { xs: 'auto', sm: 'fit-content' },
+                            maxWidth: { xs: '45%', sm: 'none' },
+                            whiteSpace: { xs: 'normal', sm: 'nowrap' },
+                            textAlign: { xs: 'center', sm: 'left' },
+                            overflow: 'hidden',
+                            textOverflow: { xs: 'ellipsis', sm: 'clip' },
+                            lineHeight: { xs: 1.2, sm: 1.5 },
+                            '&.Mui-selected': {
+                              color: '#1f2937',
+                              fontWeight: 700,
+                            },
+                          },
+                          '& .MuiTabs-indicator': {
+                            height: 2,
+                            borderRadius: '2px 2px 0 0',
+                            background: '#1f2937',
+                          },
+                        }}
+                      >
+                        {tabDefinitions.map(({ label, count }) => (
+                          <Tab
+                            key={label}
+                            label={
+                              <Box sx={{
+                                display: 'flex',
+                                flexDirection: { xs: 'column', sm: 'row' },
+                                alignItems: 'center',
+                                gap: { xs: 0, sm: 0.25 },
+                                width: '100%',
+                                justifyContent: 'center'
+                              }}>
+                                <Box component="span">{label}</Box>
+                                {count !== null && count !== undefined && (
+                                  <Box
+                                    component="span"
+                                    sx={{
+                                      fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' },
+                                      opacity: 0.8,
+                                      fontWeight: 500,
+                                      lineHeight: 1
+                                    }}
+                                  >
+                                    ({count.toLocaleString()})
+                                  </Box>
+                                )}
+                              </Box>
+                            }
+                          />
+                        ))}
+                      </Tabs>
                     </Box>
                   </Box>
 
@@ -5068,8 +5068,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             delete p[key as any];
                             return p;
                           });
-                                                      // Re-apply after deletion
-                            fetchQuadTransactions(1, next, pendingDateRange, selectedPlatform);
+                          // Re-apply after deletion
+                          fetchQuadTransactions(1, next, pendingDateRange, selectedPlatform);
                         }}
                       />
                     ))}
@@ -5081,8 +5081,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
           {/* Error Display */}
           {error && (
-            <Alert 
-              severity="error" 
+            <Alert
+              severity="error"
               sx={{ mb: 2 }}
               action={
                 <Button color="inherit" size="small" onClick={() => {
@@ -5098,8 +5098,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
           {/* Loading Indicator */}
           {(loading || quadApiLoading || salesReportLoading) && !isSorting && (
-            <LinearProgress 
-              sx={{ 
+            <LinearProgress
+              sx={{
                 mb: 2,
                 borderRadius: '8px',
                 height: 4,
@@ -5107,14 +5107,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 '& .MuiLinearProgress-bar': {
                   background: '#1f2937',
                 },
-              }} 
+              }}
             />
           )}
 
           {/* Pagination Loading Indicator */}
           {paginationLoading && !isSorting && (
-            <LinearProgress 
-              sx={{ 
+            <LinearProgress
+              sx={{
                 mb: 2,
                 borderRadius: '8px',
                 height: 2,
@@ -5122,27 +5122,27 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 '& .MuiLinearProgress-bar': {
                   background: '#3b82f6',
                 },
-              }} 
+              }}
             />
           )}
 
           {/* Transaction Table */}
           <Fade in timeout={1000}>
-            <Card sx={{ 
+            <Card sx={{
               background: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #e5e7eb',
               boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
               overflow: 'hidden',
             }}>
-              <TableContainer sx={{ 
+              <TableContainer sx={{
                 maxHeight: 'calc(100vh - 200px)',
                 overflowX: 'auto',
                 position: 'relative',
                 zIndex: 1,
               }}>
-                <Table stickyHeader sx={{ 
-                  borderCollapse: 'separate', 
+                <Table stickyHeader sx={{
+                  borderCollapse: 'separate',
                   borderSpacing: 0,
                   '& .MuiTableCell-root': {
                     border: 'none !important',
@@ -5163,9 +5163,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 }}>
                   <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
                     <TableRow>
-                                              {getCurrentColumns().map((column, index) => (
-                          <TableCell
-                            key={`header-${column}`}
+                      {getCurrentColumns().map((column, index) => (
+                        <TableCell
+                          key={`header-${column}`}
                           sx={{
                             fontWeight: 700,
                             color: '#111827',
@@ -5179,167 +5179,167 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         >
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                             {/* Column Header */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
                                 {column === 'Status' ? 'Status' : column}
                               </Typography>
-                                    {/* Sorting button - different handlers for Sales Report vs other tabs */}
-                                    {activeTab === 4 ? (
-                                      // Sales Report tab sorting
-                                      <>
-                                        <IconButton 
-                                          size="small" 
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            handleSalesReportSort(column);
-                                          }}
-                                          sx={{
-                                            ml: 0.5,
-                                            color: salesReportSortConfig?.key === column ? '#1f2937' : '#6b7280',
-                                            background: salesReportSortConfig?.key === column ? '#e5e7eb' : 'transparent',
-                                            '&:hover': { background: '#f3f4f6' },
-                                          }}
-                                          disabled={!getSalesReportSortBy(column)}
-                                          aria-label={`Sort ${column}`}
-                                        >
-                                          {getSalesReportSortIcon(column)}
-                                        </IconButton>
-                                        {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
-                                        {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
-                                          (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
-                                          (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
-                                          <IconButton 
-                                            size="small" 
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              e.stopPropagation();
-                                              setShowSalesReportSearch(!showSalesReportSearch);
-                                            }}
-                                            sx={{
-                                              ml: 0.5,
-                                              color: showSalesReportSearch ? '#1f2937' : '#6b7280',
-                                              background: showSalesReportSearch ? '#e5e7eb' : 'transparent',
-                                              '&:hover': { background: '#f3f4f6' },
-                                            }}
-                                            aria-label="Toggle search"
-                                          >
-                                            <SearchIcon sx={{ fontSize: '1rem' }} />
-                                          </IconButton>
-                                        )}
-                                      </>
-                                    ) : (
-                                      // Other tabs sorting
-                                      <>
-                                        <IconButton 
-                                          size="small" 
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            handleSort(column);
-                                          }}
-                                          sx={{
-                                            ml: 0.5,
-                                            color: sortConfig?.key === column ? '#1f2937' : '#6b7280',
-                                            background: sortConfig?.key === column ? '#e5e7eb' : 'transparent',
-                                            '&:hover': { background: '#f3f4f6' },
-                                          }}
-                                          disabled={!COLUMN_TO_SORT_BY_MAP[column]}
-                                          aria-label={`Sort ${column}`}
-                                        >
-                                          {getSortIcon(column)}
-                                        </IconButton>
-                                        {/* Magnifying glass button for Order ID search */}
-                                        {column === 'Order ID' && (
-                                          <IconButton 
-                                            size="small" 
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              e.stopPropagation();
-                                              setShowOrderIdSearch(!showOrderIdSearch);
-                                            }}
-                                            sx={{
-                                              ml: 0.5,
-                                              color: showOrderIdSearch ? '#1f2937' : '#6b7280',
-                                              background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
-                                              '&:hover': { background: '#f3f4f6' },
-                                            }}
-                                            aria-label="Toggle search"
-                                          >
-                                            <SearchIcon sx={{ fontSize: '1rem' }} />
-                                          </IconButton>
-                                        )}
-                                      </>
-                                    )}
-                              </Box>
-                              {/* Order ID Search Bar - Expandable */}
-                              {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && (
-                                <Box 
-                                  sx={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: 0.5,
-                                    animation: 'expand 0.3s ease-in-out',
-                                    '@keyframes expand': {
-                                      '0%': { width: '0', opacity: 0 },
-                                      '100%': { width: '280px', opacity: 1 }
-                                    }
-                                  }}
-                                >
-                                  <TextField
+                              {/* Sorting button - different handlers for Sales Report vs other tabs */}
+                              {activeTab === 4 ? (
+                                // Sales Report tab sorting
+                                <>
+                                  <IconButton
                                     size="small"
-                                    value={orderIdSearch}
-                                    onChange={handleOrderIdSearchChange}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        handleOrderIdSearchClick();
-                                      }
-                                    }}
-                                    InputProps={{
-                                      endAdornment: (
-                                        <InputAdornment position="end">
-                                          {orderIdSearch?.trim() && (
-                                            <IconButton
-                                              size="small"
-                                              onClick={handleOrderIdSearchClear}
-                                              disabled={(loading || quadApiLoading) && !isSorting}
-                                              sx={{ p: 0.5, mr: 0.25 }}
-                                            >
-                                              <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
-                                            </IconButton>
-                                          )}
-                                          <IconButton
-                                            size="small"
-                                            onClick={handleOrderIdSearchClick}
-                                            disabled={(loading || quadApiLoading) && !isSorting}
-                                            sx={{ p: 0.5 }}
-                                          >
-                                            <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
-                                          </IconButton>
-                                        </InputAdornment>
-                                      ),
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSalesReportSort(column);
                                     }}
                                     sx={{
-                                      width: '280px',
-                                      '& .MuiOutlinedInput-root': {
-                                        height: '32px',
-                                        fontSize: '0.75rem',
-                                        background: 'white',
-                                      }
+                                      ml: 0.5,
+                                      color: salesReportSortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                      background: salesReportSortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                      '&:hover': { background: '#f3f4f6' },
                                     }}
-                                  />
-                                </Box>
+                                    disabled={!getSalesReportSortBy(column)}
+                                    aria-label={`Sort ${column}`}
+                                  >
+                                    {getSalesReportSortIcon(column)}
+                                  </IconButton>
+                                  {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
+                                  {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                    (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
+                                    (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setShowSalesReportSearch(!showSalesReportSearch);
+                                        }}
+                                        sx={{
+                                          ml: 0.5,
+                                          color: showSalesReportSearch ? '#1f2937' : '#6b7280',
+                                          background: showSalesReportSearch ? '#e5e7eb' : 'transparent',
+                                          '&:hover': { background: '#f3f4f6' },
+                                        }}
+                                        aria-label="Toggle search"
+                                      >
+                                        <SearchIcon sx={{ fontSize: '1rem' }} />
+                                      </IconButton>
+                                    )}
+                                </>
+                              ) : (
+                                // Other tabs sorting
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSort(column);
+                                    }}
+                                    sx={{
+                                      ml: 0.5,
+                                      color: sortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                      background: sortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                      '&:hover': { background: '#f3f4f6' },
+                                    }}
+                                    disabled={!COLUMN_TO_SORT_BY_MAP[column]}
+                                    aria-label={`Sort ${column}`}
+                                  >
+                                    {getSortIcon(column)}
+                                  </IconButton>
+                                  {/* Magnifying glass button for Order ID search */}
+                                  {column === 'Order ID' && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowOrderIdSearch(!showOrderIdSearch);
+                                      }}
+                                      sx={{
+                                        ml: 0.5,
+                                        color: showOrderIdSearch ? '#1f2937' : '#6b7280',
+                                        background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
+                                        '&:hover': { background: '#f3f4f6' },
+                                      }}
+                                      aria-label="Toggle search"
+                                    >
+                                      <SearchIcon sx={{ fontSize: '1rem' }} />
+                                    </IconButton>
+                                  )}
+                                </>
                               )}
-                              {/* Sales Report Search Bar - Expandable */}
-                              {activeTab === 4 && showSalesReportSearch && 
-                                ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
-                                 (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
-                                 (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
-                                <Box 
-                                  sx={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
+                            </Box>
+                            {/* Order ID Search Bar - Expandable */}
+                            {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && (
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.5,
+                                  animation: 'expand 0.3s ease-in-out',
+                                  '@keyframes expand': {
+                                    '0%': { width: '0', opacity: 0 },
+                                    '100%': { width: '280px', opacity: 1 }
+                                  }
+                                }}
+                              >
+                                <TextField
+                                  size="small"
+                                  value={orderIdSearch}
+                                  onChange={handleOrderIdSearchChange}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleOrderIdSearchClick();
+                                    }
+                                  }}
+                                  InputProps={{
+                                    endAdornment: (
+                                      <InputAdornment position="end">
+                                        {orderIdSearch?.trim() && (
+                                          <IconButton
+                                            size="small"
+                                            onClick={handleOrderIdSearchClear}
+                                            disabled={(loading || quadApiLoading) && !isSorting}
+                                            sx={{ p: 0.5, mr: 0.25 }}
+                                          >
+                                            <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
+                                          </IconButton>
+                                        )}
+                                        <IconButton
+                                          size="small"
+                                          onClick={handleOrderIdSearchClick}
+                                          disabled={(loading || quadApiLoading) && !isSorting}
+                                          sx={{ p: 0.5 }}
+                                        >
+                                          <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                        </IconButton>
+                                      </InputAdornment>
+                                    ),
+                                  }}
+                                  sx={{
+                                    width: '280px',
+                                    '& .MuiOutlinedInput-root': {
+                                      height: '32px',
+                                      fontSize: '0.75rem',
+                                      background: 'white',
+                                    }
+                                  }}
+                                />
+                              </Box>
+                            )}
+                            {/* Sales Report Search Bar - Expandable */}
+                            {activeTab === 4 && showSalesReportSearch &&
+                              ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
+                                (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     gap: 0.5,
                                     animation: 'expand 0.3s ease-in-out',
                                     '@keyframes expand': {
@@ -5393,10 +5393,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   />
                                 </Box>
                               )}
-                            </Box>
-                          </TableCell>
-                        ))}
-                      </TableRow>
+                          </Box>
+                        </TableCell>
+                      ))}
+                    </TableRow>
                   </TableHead>
                   <TableBody>
                     {(paginationLoading && !isSorting) ? (
@@ -5421,339 +5421,338 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     ) : (
                       getCurrentData()
                         .map((row, rowIndex) => {
-                        const isSelected = (selectedTransaction?.["Order ID"] || selectedTransaction?.["Order Item ID"]) === (row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"]);
-                        return (
-                          <React.Fragment key={rowIndex}>
-                                                          <TableRow 
-                                sx={{ 
-                                  borderLeft: `4px solid ${
-                                    activeTab === 0 ? '#10b981' : // Matched - green
-                                    activeTab === 1 ? '#f59e0b' : // Mismatched - orange
-                                    activeTab === 2 ? '#ef4444' : // Unsettled - red
-                                    activeTab === 4 ? '#8b5cf6' : // Sales Report - purple
-                                    '#6366f1' // All - indigo
-                                  }`,
+                          const isSelected = (selectedTransaction?.["Order ID"] || selectedTransaction?.["Order Item ID"]) === (row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"]);
+                          return (
+                            <React.Fragment key={rowIndex}>
+                              <TableRow
+                                sx={{
+                                  borderLeft: `4px solid ${activeTab === 0 ? '#10b981' : // Matched - green
+                                      activeTab === 1 ? '#f59e0b' : // Mismatched - orange
+                                        activeTab === 2 ? '#ef4444' : // Unsettled - red
+                                          activeTab === 4 ? '#8b5cf6' : // Sales Report - purple
+                                            '#6366f1' // All - indigo
+                                    }`,
                                   background: '#ffffff',
                                   position: 'relative',
                                 }}
                               >
-                        {getCurrentColumns().map((column, colIndex) => {
-                          // For new API, we need to map column titles to row keys
-                          let value;
-                          
-                          // Sales Report tab (index 4) - use backend-provided metadata
-                          if (activeTab === 4) {
-                            const salesColumnDef = salesReportData?.columns?.find(col => col.title === column);
-                            const fieldName = salesColumnDef?.key;
-                            value = fieldName ? (row as any)[fieldName] : undefined;
-                          } else if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
-                            // Use quad API data
-                            let currentData: TotalTransactionsResponse | null = null;
-                            if (activeTab === 0) {
-                              currentData = matchedData;
-                            } else if (activeTab === 1) {
-                              // For mismatched tab, use the appropriate sub-tab data
-                              if (mismatchedSubTab === 'less_received') {
-                                currentData = mismatchedLessReceivedData;
-                              } else {
-                                currentData = mismatchedMoreReceivedData;
-                              }
-                            } else if (activeTab === 2) {
-                              currentData = unsettledData;
-                            } else if (activeTab === 3) {
-                              currentData = allData;
-                            }
-                            const columnDef = currentData?.columns?.find(col => col.title === column);
-                            if (columnDef) {
-                              value = (row as any)[columnDef.key];
-                              
-                              // Fallback: if the key from column definition doesn't exist, try common alternatives
-                              if ((value === undefined || value === null || value === '') && column === 'Settlement Value') {
-                                // Try both common key names
-                                const fallbackValue = (row as any).settlement_amount || (row as any).settlement_value;
-                                if (fallbackValue !== undefined && fallbackValue !== null) {
-                                  value = fallbackValue;
-                                  
-                                }
-                              }
-                            }
-                          } else if (useNewAPI && totalTransactionsData) {
-                            const columnDef = totalTransactionsData.columns.find(col => col.title === column);
-                            if (columnDef) {
-                              value = (row as any)[columnDef.key];
-                              
-                              // Fallback: if the key from column definition doesn't exist, try common alternatives
-                              if ((value === undefined || value === null || value === '') && column === 'Settlement Value') {
-                                // Try both common key names
-                                const fallbackValue = (row as any).settlement_amount || (row as any).settlement_value;
-                                if (fallbackValue !== undefined && fallbackValue !== null) {
-                                  value = fallbackValue;
-                                  
-                                }
-                              }
-                            }
-                          } else {
-                            value = (row as any)[column];
-                          }
-                          
-                          // Override settlement date for unsettled transactions
-                          // Show NA for Settlement Date when the transaction is unsettled (across all tabs)
-                          // Also show NA when on the unsettled tab (tab 2) - all transactions there are unsettled
-                          if (column === 'Settlement Date' && ((row as any)?.recon_status === 'unsettled' || activeTab === 2)) {
-                            value = 'NA';
-                          }
-                          
-                          // Format value based on type
-                          let displayValue = value;
-                          
-                          // Sales Report tab formatting
-                          if (activeTab === 4) {
-                            const salesColumnDef = salesReportData?.columns?.find(col => col.title === column);
-                            const columnType = salesColumnDef?.type;
-                            const fieldName = salesColumnDef?.key;
-                            if (columnType === 'date') {
-                              displayValue = value ? formatDate(String(value)) : '';
-                            } else if (columnType === 'currency') {
-                              const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
-                              displayValue = numericValue !== null && !Number.isNaN(numericValue) ? formatCurrency(numericValue) : '';
-                            } else if (columnType === 'number' && column.toLowerCase().includes('rate')) {
-                              const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
-                              // gst_rate is already in percentage form (12 = 12%), so don't multiply by 100
-                              if (fieldName === 'gst_rate') {
-                                displayValue = numericValue !== null && !Number.isNaN(numericValue) ? `${numericValue}%` : '';
-                              } else {
-                                // Other rate fields might be in decimal form (0.12 = 12%), so multiply by 100
-                                displayValue = numericValue !== null && !Number.isNaN(numericValue) ? `${numericValue * 100}%` : '';
-                              }
-                            } else if (columnType === 'number') {
-                              const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
-                              displayValue = numericValue !== null && !Number.isNaN(numericValue) ? numericValue.toLocaleString('en-IN') : '';
-                            } else {
-                              displayValue = value !== undefined && value !== null ? String(value) : '';
-                            }
-                          } else if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
-                            // Use quad API data for formatting
-                            let currentData: TotalTransactionsResponse | null = null;
-                            if (activeTab === 0) {
-                              currentData = matchedData;
-                            } else if (activeTab === 1) {
-                              // For mismatched tab, use the appropriate sub-tab data
-                              if (mismatchedSubTab === 'less_received') {
-                                currentData = mismatchedLessReceivedData;
-                              } else {
-                                currentData = mismatchedMoreReceivedData;
-                              }
-                            } else if (activeTab === 2) {
-                              currentData = unsettledData;
-                            } else if (activeTab === 3) {
-                              currentData = allData;
-                            }
-                            const columnDef = currentData?.columns?.find(col => col.title === column);
-                            if (columnDef) {
-                              switch (columnDef.type) {
-                                case 'currency':
-                                  displayValue = formatCurrency(Number(value) || 0);
-                                  break;
-                                case 'date':
-                                  // Don't format "NA" as a date
-                                  displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(String(value));
-                                  break;
-                                case 'enum':
-                                  displayValue = String(value || '');
-                                  break;
-                                default:
-                                  displayValue = String(value || '');
-                              }
-                            }
-                          } else if (useNewAPI && totalTransactionsData) {
-                            // Use column type information for formatting
-                            const columnDef = totalTransactionsData.columns.find(col => col.title === column);
-                            if (columnDef) {
-                              switch (columnDef.type) {
-                                case 'currency':
-                                  displayValue = formatCurrency(Number(value) || 0);
-                                  break;
-                                case 'date':
-                                  // Don't format "NA" as a date
-                                  displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(String(value));
-                                  break;
-                                case 'enum':
-                                  displayValue = String(value || '');
-                                  break;
-                                default:
-                                  displayValue = String(value || '');
-                              }
-                            }
-                          } else {
-                            // Old API formatting
-                            if (column === 'Reason') {
-                              // Default reason to the remark for now
-                              displayValue = (row as any)['Remark'] || value || '-';
-                            } else if (typeof value === 'number') {
-                              if (column === 'Order Value' || column === 'Settlement Value' || column === 'Difference') {
-                                displayValue = formatCurrency(value);
-                              } else {
-                                displayValue = value.toLocaleString('en-IN');
-                              }
-                            } else if (column.includes('Date')) {
-                              // Don't format "NA" as a date
-                              displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(value || '');
-                            }
-                          }
-                          
-                          // Capitalize platform column
-                          if (column === 'Platform' || column === 'platform') {
-                            displayValue = String(displayValue || '').toUpperCase();
-                          }
-                          
-                          // Format Settlement Provider column: capitalize first letter, replace underscores with spaces
-                          if (column === 'Settlement Provider') {
-                            displayValue = formatSettlementProvider(value);
-                          }
-                          
-                          return (
-                            <TableCell
-                              key={`${(row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"])}-${column}-${colIndex}`}
-                              sx={{
-                                background: '#ffffff',
-                                textAlign: 'center',
-                                minWidth: column === 'Action' ? 140 : 150,
-                                fontWeight: 600,
-                                color: column === 'Status' ? '#111827' : '#111827',
-                                pr: column === 'Action' ? 0 : undefined,
-                                pl: column === 'Action' ? 0 : undefined,
-                                '&:hover': {
-                                  background: '#f9fafb',
-                                },
-                                transition: 'all 0.2s ease',
-                              }}
-                            >
-                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                {column === 'Status' ? (
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    {/* Recon Status from row data */}
-                                    {(() => {
-                                      const reconStatus = row.recon_status || (row as any)?.originalData?.recon_status;
-                                      
-                                      if (reconStatus) {
-                                        let displayText = '';
-                                        let backgroundColor = '';
-                                        let textColor = '';
-                                        
-                                        switch (reconStatus) {
-                                          case 'settlement_matched':
-                                            displayText = 'Settlement Matched';
-                                            backgroundColor = '#dcfce7';
-                                            textColor = '#059669';
-                                            break;
-                                          case 'less_payment_received':
-                                            displayText = 'Less Payment Received';
-                                            backgroundColor = '#fef3c7';
-                                            textColor = '#d97706';
-                                            break;
-                                          case 'more_payment_received':
-                                            displayText = 'More Payment Received';
-                                            backgroundColor = '#fef3c7';
-                                            textColor = '#d97706';
-                                            break;
-                                          default:
-                                            displayText = 'Unsettled';
-                                            backgroundColor = '#fee2e2';
-                                            textColor = '#dc2626';
-                                        }
-                                        
-                                        return (
-                                          <Chip
-                                            label={displayText}
-                                            size="small"
-                                            sx={{
-                                              background: backgroundColor,
-                                              color: textColor,
-                                              fontWeight: 600,
-                                              fontSize: '0.75rem',
-                                              height: 24,
-                                              '& .MuiChip-label': { px: 1 },
-                                            }}
-                                          />
-                                        );
+                                {getCurrentColumns().map((column, colIndex) => {
+                                  // For new API, we need to map column titles to row keys
+                                  let value;
+
+                                  // Sales Report tab (index 4) - use backend-provided metadata
+                                  if (activeTab === 4) {
+                                    const salesColumnDef = salesReportData?.columns?.find(col => col.title === column);
+                                    const fieldName = salesColumnDef?.key;
+                                    value = fieldName ? (row as any)[fieldName] : undefined;
+                                  } else if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
+                                    // Use quad API data
+                                    let currentData: TotalTransactionsResponse | null = null;
+                                    if (activeTab === 0) {
+                                      currentData = matchedData;
+                                    } else if (activeTab === 1) {
+                                      // For mismatched tab, use the appropriate sub-tab data
+                                      if (mismatchedSubTab === 'less_received') {
+                                        currentData = mismatchedLessReceivedData;
                                       } else {
-                                        // Fallback to showing "Unsettled" if no recon_status
-                                        return (
-                                          <Chip
-                                            label="Unsettled"
-                                            size="small"
-                                            sx={{
-                                              background: '#fee2e2',
-                                              color: '#dc2626',
-                                              fontWeight: 600,
-                                              fontSize: '0.75rem',
-                                              height: 24,
-                                              '& .MuiChip-label': { px: 1 },
-                                            }}
-                                          />
-                                        );
+                                        currentData = mismatchedMoreReceivedData;
                                       }
-                                    })()}
-                                    
-                                    {/* Event Type chip based on event_type from API */}
-                                    {(() => {
-                                      const eventType = row.event_type || (row as any)?.originalData?.event_type || 'Sale';
-                                      const isSale = eventType?.toLowerCase() === 'sale';
-                                      
-                                      return (
-                                        <Chip
-                                          label={eventType}
-                                          size="small"
-                                          sx={{
-                                            background: isSale ? '#dcfce7' : '#fee2e2',
-                                            color: isSale ? '#059669' : '#dc2626',
-                                            fontWeight: 600,
-                                            fontSize: '0.75rem',
-                                            height: 24,
-                                            '& .MuiChip-label': { px: 1 },
-                                          }}
-                                        />
-                                      );
-                                    })()}
-                                    
-                                    {/* Breakups details button - show for all tabs */}
-                                    <IconButton
-                                      size="small"
-                                      onClick={(e) => handleBreakupsOpen(e, row)}
+                                    } else if (activeTab === 2) {
+                                      currentData = unsettledData;
+                                    } else if (activeTab === 3) {
+                                      currentData = allData;
+                                    }
+                                    const columnDef = currentData?.columns?.find(col => col.title === column);
+                                    if (columnDef) {
+                                      value = (row as any)[columnDef.key];
+
+                                      // Fallback: if the key from column definition doesn't exist, try common alternatives
+                                      if ((value === undefined || value === null || value === '') && column === 'Settlement Value') {
+                                        // Try both common key names
+                                        const fallbackValue = (row as any).settlement_amount || (row as any).settlement_value;
+                                        if (fallbackValue !== undefined && fallbackValue !== null) {
+                                          value = fallbackValue;
+
+                                        }
+                                      }
+                                    }
+                                  } else if (useNewAPI && totalTransactionsData) {
+                                    const columnDef = totalTransactionsData.columns.find(col => col.title === column);
+                                    if (columnDef) {
+                                      value = (row as any)[columnDef.key];
+
+                                      // Fallback: if the key from column definition doesn't exist, try common alternatives
+                                      if ((value === undefined || value === null || value === '') && column === 'Settlement Value') {
+                                        // Try both common key names
+                                        const fallbackValue = (row as any).settlement_amount || (row as any).settlement_value;
+                                        if (fallbackValue !== undefined && fallbackValue !== null) {
+                                          value = fallbackValue;
+
+                                        }
+                                      }
+                                    }
+                                  } else {
+                                    value = (row as any)[column];
+                                  }
+
+                                  // Override settlement date for unsettled transactions
+                                  // Show NA for Settlement Date when the transaction is unsettled (across all tabs)
+                                  // Also show NA when on the unsettled tab (tab 2) - all transactions there are unsettled
+                                  if (column === 'Settlement Date' && ((row as any)?.recon_status === 'unsettled' || activeTab === 2)) {
+                                    value = 'NA';
+                                  }
+
+                                  // Format value based on type
+                                  let displayValue = value;
+
+                                  // Sales Report tab formatting
+                                  if (activeTab === 4) {
+                                    const salesColumnDef = salesReportData?.columns?.find(col => col.title === column);
+                                    const columnType = salesColumnDef?.type;
+                                    const fieldName = salesColumnDef?.key;
+                                    if (columnType === 'date') {
+                                      displayValue = value ? formatDate(String(value)) : '';
+                                    } else if (columnType === 'currency') {
+                                      const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
+                                      displayValue = numericValue !== null && !Number.isNaN(numericValue) ? formatCurrency(numericValue) : '';
+                                    } else if (columnType === 'number' && column.toLowerCase().includes('rate')) {
+                                      const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
+                                      // gst_rate is already in percentage form (12 = 12%), so don't multiply by 100
+                                      if (fieldName === 'gst_rate') {
+                                        displayValue = numericValue !== null && !Number.isNaN(numericValue) ? `${numericValue}%` : '';
+                                      } else {
+                                        // Other rate fields might be in decimal form (0.12 = 12%), so multiply by 100
+                                        displayValue = numericValue !== null && !Number.isNaN(numericValue) ? `${numericValue * 100}%` : '';
+                                      }
+                                    } else if (columnType === 'number') {
+                                      const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
+                                      displayValue = numericValue !== null && !Number.isNaN(numericValue) ? numericValue.toLocaleString('en-IN') : '';
+                                    } else {
+                                      displayValue = value !== undefined && value !== null ? String(value) : '';
+                                    }
+                                  } else if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
+                                    // Use quad API data for formatting
+                                    let currentData: TotalTransactionsResponse | null = null;
+                                    if (activeTab === 0) {
+                                      currentData = matchedData;
+                                    } else if (activeTab === 1) {
+                                      // For mismatched tab, use the appropriate sub-tab data
+                                      if (mismatchedSubTab === 'less_received') {
+                                        currentData = mismatchedLessReceivedData;
+                                      } else {
+                                        currentData = mismatchedMoreReceivedData;
+                                      }
+                                    } else if (activeTab === 2) {
+                                      currentData = unsettledData;
+                                    } else if (activeTab === 3) {
+                                      currentData = allData;
+                                    }
+                                    const columnDef = currentData?.columns?.find(col => col.title === column);
+                                    if (columnDef) {
+                                      switch (columnDef.type) {
+                                        case 'currency':
+                                          displayValue = formatCurrency(Number(value) || 0);
+                                          break;
+                                        case 'date':
+                                          // Don't format "NA" as a date
+                                          displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(String(value));
+                                          break;
+                                        case 'enum':
+                                          displayValue = String(value || '');
+                                          break;
+                                        default:
+                                          displayValue = String(value || '');
+                                      }
+                                    }
+                                  } else if (useNewAPI && totalTransactionsData) {
+                                    // Use column type information for formatting
+                                    const columnDef = totalTransactionsData.columns.find(col => col.title === column);
+                                    if (columnDef) {
+                                      switch (columnDef.type) {
+                                        case 'currency':
+                                          displayValue = formatCurrency(Number(value) || 0);
+                                          break;
+                                        case 'date':
+                                          // Don't format "NA" as a date
+                                          displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(String(value));
+                                          break;
+                                        case 'enum':
+                                          displayValue = String(value || '');
+                                          break;
+                                        default:
+                                          displayValue = String(value || '');
+                                      }
+                                    }
+                                  } else {
+                                    // Old API formatting
+                                    if (column === 'Reason') {
+                                      // Default reason to the remark for now
+                                      displayValue = (row as any)['Remark'] || value || '-';
+                                    } else if (typeof value === 'number') {
+                                      if (column === 'Order Value' || column === 'Settlement Value' || column === 'Difference') {
+                                        displayValue = formatCurrency(value);
+                                      } else {
+                                        displayValue = value.toLocaleString('en-IN');
+                                      }
+                                    } else if (column.includes('Date')) {
+                                      // Don't format "NA" as a date
+                                      displayValue = (value === 'NA' || value === '') ? 'NA' : formatDate(value || '');
+                                    }
+                                  }
+
+                                  // Capitalize platform column
+                                  if (column === 'Platform' || column === 'platform') {
+                                    displayValue = String(displayValue || '').toUpperCase();
+                                  }
+
+                                  // Format Settlement Provider column: capitalize first letter, replace underscores with spaces
+                                  if (column === 'Settlement Provider') {
+                                    displayValue = formatSettlementProvider(value);
+                                  }
+
+                                  return (
+                                    <TableCell
+                                      key={`${(row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"])}-${column}-${colIndex}`}
                                       sx={{
-                                        p: 0.5,
-                                        minWidth: 20,
-                                        height: 20,
+                                        background: '#ffffff',
+                                        textAlign: 'center',
+                                        minWidth: column === 'Action' ? 140 : 150,
+                                        fontWeight: 600,
+                                        color: column === 'Status' ? '#111827' : '#111827',
+                                        pr: column === 'Action' ? 0 : undefined,
+                                        pl: column === 'Action' ? 0 : undefined,
                                         '&:hover': {
-                                          background: '#f3f4f6',
-                                          color: '#374151',
+                                          background: '#f9fafb',
                                         },
+                                        transition: 'all 0.2s ease',
                                       }}
                                     >
-                                      <InfoOutlined fontSize="small" sx={{ color: '#6b7280' }}/>
-                                    </IconButton>
-                                  </Box>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        {column === 'Status' ? (
+                                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            {/* Recon Status from row data */}
+                                            {(() => {
+                                              const reconStatus = row.recon_status || (row as any)?.originalData?.recon_status;
 
-                                ) : (
-                                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                    {displayValue}
-                                  </Typography>
-                                )}
-                              </Box>
-                            </TableCell>
+                                              if (reconStatus) {
+                                                let displayText = '';
+                                                let backgroundColor = '';
+                                                let textColor = '';
+
+                                                switch (reconStatus) {
+                                                  case 'settlement_matched':
+                                                    displayText = 'Settlement Matched';
+                                                    backgroundColor = '#dcfce7';
+                                                    textColor = '#059669';
+                                                    break;
+                                                  case 'less_payment_received':
+                                                    displayText = 'Less Payment Received';
+                                                    backgroundColor = '#fef3c7';
+                                                    textColor = '#d97706';
+                                                    break;
+                                                  case 'more_payment_received':
+                                                    displayText = 'More Payment Received';
+                                                    backgroundColor = '#fef3c7';
+                                                    textColor = '#d97706';
+                                                    break;
+                                                  default:
+                                                    displayText = 'Unsettled';
+                                                    backgroundColor = '#fee2e2';
+                                                    textColor = '#dc2626';
+                                                }
+
+                                                return (
+                                                  <Chip
+                                                    label={displayText}
+                                                    size="small"
+                                                    sx={{
+                                                      background: backgroundColor,
+                                                      color: textColor,
+                                                      fontWeight: 600,
+                                                      fontSize: '0.75rem',
+                                                      height: 24,
+                                                      '& .MuiChip-label': { px: 1 },
+                                                    }}
+                                                  />
+                                                );
+                                              } else {
+                                                // Fallback to showing "Unsettled" if no recon_status
+                                                return (
+                                                  <Chip
+                                                    label="Unsettled"
+                                                    size="small"
+                                                    sx={{
+                                                      background: '#fee2e2',
+                                                      color: '#dc2626',
+                                                      fontWeight: 600,
+                                                      fontSize: '0.75rem',
+                                                      height: 24,
+                                                      '& .MuiChip-label': { px: 1 },
+                                                    }}
+                                                  />
+                                                );
+                                              }
+                                            })()}
+
+                                            {/* Event Type chip based on event_type from API */}
+                                            {(() => {
+                                              const eventType = row.event_type || (row as any)?.originalData?.event_type || 'Sale';
+                                              const isSale = eventType?.toLowerCase() === 'sale';
+
+                                              return (
+                                                <Chip
+                                                  label={eventType}
+                                                  size="small"
+                                                  sx={{
+                                                    background: isSale ? '#dcfce7' : '#fee2e2',
+                                                    color: isSale ? '#059669' : '#dc2626',
+                                                    fontWeight: 600,
+                                                    fontSize: '0.75rem',
+                                                    height: 24,
+                                                    '& .MuiChip-label': { px: 1 },
+                                                  }}
+                                                />
+                                              );
+                                            })()}
+
+                                            {/* Breakups details button - show for all tabs */}
+                                            <IconButton
+                                              size="small"
+                                              onClick={(e) => handleBreakupsOpen(e, row)}
+                                              sx={{
+                                                p: 0.5,
+                                                minWidth: 20,
+                                                height: 20,
+                                                '&:hover': {
+                                                  background: '#f3f4f6',
+                                                  color: '#374151',
+                                                },
+                                              }}
+                                            >
+                                              <InfoOutlined fontSize="small" sx={{ color: '#6b7280' }} />
+                                            </IconButton>
+                                          </Box>
+
+                                        ) : (
+                                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                            {displayValue}
+                                          </Typography>
+                                        )}
+                                      </Box>
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+                            </React.Fragment>
                           );
-                        })}
-                            </TableRow>
-                          </React.Fragment>
-                        );
-                      })
+                        })
                     )}
                   </TableBody>
                 </Table>
               </TableContainer>
-              
+
               {/* Pagination */}
-              <Box sx={{  borderTop: '0.1px solid #e5e7eb' }}>
+              <Box sx={{ borderTop: '0.1px solid #e5e7eb' }}>
                 <TablePagination
                   rowsPerPageOptions={[100]}
                   component="div"
@@ -5775,7 +5774,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         </Box>
 
 
-        
+
         {/* Transaction Details Popup */}
         <TransactionDetailsPopup
           transaction={selectedTransaction}
@@ -5886,8 +5885,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     </Button>
 
                     {exportSuccess && (
-                      <Alert 
-                        severity="success" 
+                      <Alert
+                        severity="success"
                         onClose={() => setExportSuccess(null)}
                         sx={{ mt: 1 }}
                       >
@@ -5896,8 +5895,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     )}
 
                     {error && (
-                      <Alert 
-                        severity="error" 
+                      <Alert
+                        severity="error"
                         onClose={() => setError(null)}
                         sx={{ mt: 1 }}
                       >
@@ -5932,8 +5931,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             '&:disabled': { color: '#cbd5e1' },
                           }}
                         >
-                          <RefreshIcon 
-                            fontSize="small" 
+                          <RefreshIcon
+                            fontSize="small"
                             sx={{
                               animation: exportListLoading ? 'spin 1s linear infinite' : 'none',
                               '@keyframes spin': {
@@ -6114,139 +6113,139 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         {/* Filter Menu Portal - Rendered outside table container */}
         {(() => {
           const shouldRender = Boolean(headerFilterAnchor) && Boolean(activeFilterColumn) && activeTab !== 4;
-          
+
           return shouldRender;
         })() && (
-          <Portal>
-            <Box
-              data-filter-popup="true"
-              aria-hidden={false}
-              tabIndex={-1}
-              sx={{
-                position: 'fixed',
-                top: (() => {
-                  if (headerFilterAnchor) {
-                    const rect = headerFilterAnchor.getBoundingClientRect();
-                    const spaceBelow = window.innerHeight - rect.bottom;
-                    const popupHeight = 200; // estimated popup height
-                    
-                    // If not enough space below, position above
-                    if (spaceBelow < popupHeight) {
-                      return rect.top - popupHeight - 5;
+            <Portal>
+              <Box
+                data-filter-popup="true"
+                aria-hidden={false}
+                tabIndex={-1}
+                sx={{
+                  position: 'fixed',
+                  top: (() => {
+                    if (headerFilterAnchor) {
+                      const rect = headerFilterAnchor.getBoundingClientRect();
+                      const spaceBelow = window.innerHeight - rect.bottom;
+                      const popupHeight = 200; // estimated popup height
+
+                      // If not enough space below, position above
+                      if (spaceBelow < popupHeight) {
+                        return rect.top - popupHeight - 5;
+                      }
+                      // Offset 5% lower for better spacing
+                      return rect.bottom + Math.round(window.innerHeight * 0.02);
                     }
-                    // Offset 5% lower for better spacing
-                    return rect.bottom + Math.round(window.innerHeight * 0.02);
-                  }
-                  return 100;
-                })(),
-                left: (() => {
-                  if (headerFilterAnchor) {
-                    const rect = headerFilterAnchor.getBoundingClientRect();
-                    // Match the wider popup; keep a little margin
-                    const popupWidth = 520;
-                    const margin = 10;
-                    const spaceRight = window.innerWidth - rect.left;
-                    
-                    // If not enough space on right, align to right edge with margin
-                    if (spaceRight < popupWidth) {
-                      return Math.max(margin, rect.right - popupWidth);
+                    return 100;
+                  })(),
+                  left: (() => {
+                    if (headerFilterAnchor) {
+                      const rect = headerFilterAnchor.getBoundingClientRect();
+                      // Match the wider popup; keep a little margin
+                      const popupWidth = 520;
+                      const margin = 10;
+                      const spaceRight = window.innerWidth - rect.left;
+
+                      // If not enough space on right, align to right edge with margin
+                      if (spaceRight < popupWidth) {
+                        return Math.max(margin, rect.right - popupWidth);
+                      }
+                      // Otherwise clamp within viewport
+                      return Math.max(margin, Math.min(rect.left, window.innerWidth - popupWidth - margin));
                     }
-                    // Otherwise clamp within viewport
-                    return Math.max(margin, Math.min(rect.left, window.innerWidth - popupWidth - margin));
-                  }
-                  return 100;
-                })(),
-                zIndex: 9999,
-                backgroundColor: 'white',
-                border: '1px solid #e0e0e0',
-                borderRadius: '10px',
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
-                p: 2,
-                minWidth: 480,
-                maxWidth: 560,
-                animation: 'filterPopupFadeIn 0.15s ease-out',
-                '@keyframes filterPopupFadeIn': {
-                  '0%': {
-                    opacity: 0,
-                    transform: 'translateY(-10px) scale(0.95)',
+                    return 100;
+                  })(),
+                  zIndex: 9999,
+                  backgroundColor: 'white',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '10px',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+                  p: 2,
+                  minWidth: 480,
+                  maxWidth: 560,
+                  animation: 'filterPopupFadeIn 0.15s ease-out',
+                  '@keyframes filterPopupFadeIn': {
+                    '0%': {
+                      opacity: 0,
+                      transform: 'translateY(-10px) scale(0.95)',
+                    },
+                    '100%': {
+                      opacity: 1,
+                      transform: 'translateY(0) scale(1)',
+                    },
                   },
-                  '100%': {
-                    opacity: 1,
-                    transform: 'translateY(0) scale(1)',
-                  },
-                },
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Box sx={{ display: 'flex', gap: 1.5 }}>
-                {/* Left: Full column list */}
-                <Box sx={{ width: 240, maxHeight: 320, overflowY: 'auto', borderRight: '1px solid #eee', pr: 1.5, pl: 0.5 }}>
-                  <List dense subheader={<ListSubheader disableSticky sx={{ bgcolor: 'transparent', px: 0, fontSize: '0.75rem', color: '#6b7280' }}></ListSubheader>}>
-                    {Object.keys(COLUMN_META)
-                      .filter((col) => {
-                        // Exclude Order ID from filter sidebar
-                        if (col === 'Order ID') return false;
-                        // Exclude Invoice Date from filter sidebar (date filter is available outside)
-                        if (col === 'Invoice Date') return false;
-                        // Exclude Platform from filter sidebar (platform filter is available in header)
-                        if (col === 'Platform') return false;
-                        // Filter columns based on selected platform
-                        const mapping = COLUMN_TO_API_PARAM_MAP[col];
-                        if (!mapping) return true; // Show columns without mapping
-                        if (!mapping.supportedPlatforms) return true; // Show columns available on all platforms
-                        // Show if supported by at least one selected platform
-                        return mapping.supportedPlatforms!.includes(selectedPlatform as any);
-                      })
-                      .map((col) => {
-                        // Remove Status filter completely - it has been replaced with sub-tabs for mismatched tab
-                        if (col === 'Status') return null;
-                        return (
-                        <ListItemButton
-                          key={col}
-                          selected={activeFilterColumn === col}
-                          onClick={() => setActiveFilterColumn(col)}
-                          sx={{ 
-                            borderRadius: 0.75, 
-                            py: 0.75, 
-                            px: 1,
-                          }}
-                        >
-                          <ListItemText 
-                            primary={col} 
-                            primaryTypographyProps={{ fontSize: '0.82rem' }}
-                            secondary={
-                              COLUMN_TO_API_PARAM_MAP[col]?.supportedPlatforms 
-                                ? `(${COLUMN_TO_API_PARAM_MAP[col].supportedPlatforms?.join(', ')})` 
-                                : undefined
-                            }
-                            secondaryTypographyProps={{ fontSize: '0.65rem', color: '#9ca3af' }}
-                          />
-                        </ListItemButton>
-                        );
-                      })}
-                  </List>
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  {/* Left: Full column list */}
+                  <Box sx={{ width: 240, maxHeight: 320, overflowY: 'auto', borderRight: '1px solid #eee', pr: 1.5, pl: 0.5 }}>
+                    <List dense subheader={<ListSubheader disableSticky sx={{ bgcolor: 'transparent', px: 0, fontSize: '0.75rem', color: '#6b7280' }}></ListSubheader>}>
+                      {Object.keys(COLUMN_META)
+                        .filter((col) => {
+                          // Exclude Order ID from filter sidebar
+                          if (col === 'Order ID') return false;
+                          // Exclude Invoice Date from filter sidebar (date filter is available outside)
+                          if (col === 'Invoice Date') return false;
+                          // Exclude Platform from filter sidebar (platform filter is available in header)
+                          if (col === 'Platform') return false;
+                          // Filter columns based on selected platform
+                          const mapping = COLUMN_TO_API_PARAM_MAP[col];
+                          if (!mapping) return true; // Show columns without mapping
+                          if (!mapping.supportedPlatforms) return true; // Show columns available on all platforms
+                          // Show if supported by at least one selected platform
+                          return mapping.supportedPlatforms!.includes(selectedPlatform as any);
+                        })
+                        .map((col) => {
+                          // Remove Status filter completely - it has been replaced with sub-tabs for mismatched tab
+                          if (col === 'Status') return null;
+                          return (
+                            <ListItemButton
+                              key={col}
+                              selected={activeFilterColumn === col}
+                              onClick={() => setActiveFilterColumn(col)}
+                              sx={{
+                                borderRadius: 0.75,
+                                py: 0.75,
+                                px: 1,
+                              }}
+                            >
+                              <ListItemText
+                                primary={col}
+                                primaryTypographyProps={{ fontSize: '0.82rem' }}
+                                secondary={
+                                  COLUMN_TO_API_PARAM_MAP[col]?.supportedPlatforms
+                                    ? `(${COLUMN_TO_API_PARAM_MAP[col].supportedPlatforms?.join(', ')})`
+                                    : undefined
+                                }
+                                secondaryTypographyProps={{ fontSize: '0.65rem', color: '#9ca3af' }}
+                              />
+                            </ListItemButton>
+                          );
+                        })}
+                    </List>
+                  </Box>
+                  {/* Right: Reusable controls */}
+                  <ColumnFilterControls
+                    columnMeta={COLUMN_META as any}
+                    activeColumn={activeFilterColumn || ''}
+                    setActiveColumn={(c) => setActiveFilterColumn(c)}
+                    pendingFilters={pendingColumnFilters}
+                    handleStringChange={handleStringFilterChange}
+                    handleNumberRangeChange={handleNumberRangeChange}
+                    handleDateRangeChange={handleDateRangeFilterChange}
+                    handleEnumChange={handleEnumFilterChange}
+                    getEnumOptions={getUniqueValuesForColumn}
+                    onClear={(col) => clearColumnFilter(col)}
+                    onApply={applyFilters}
+                    orderIdChips={orderIdChips}
+                    setOrderIdChips={setOrderIdChips}
+                    disableEnumCheckboxes={false}
+                  />
                 </Box>
-                {/* Right: Reusable controls */}
-                <ColumnFilterControls
-                  columnMeta={COLUMN_META as any}
-                  activeColumn={activeFilterColumn || ''}
-                  setActiveColumn={(c) => setActiveFilterColumn(c)}
-                  pendingFilters={pendingColumnFilters}
-                  handleStringChange={handleStringFilterChange}
-                  handleNumberRangeChange={handleNumberRangeChange}
-                  handleDateRangeChange={handleDateRangeFilterChange}
-                  handleEnumChange={handleEnumFilterChange}
-                  getEnumOptions={getUniqueValuesForColumn}
-                  onClear={(col) => clearColumnFilter(col)}
-                  onApply={applyFilters}
-                  orderIdChips={orderIdChips}
-                  setOrderIdChips={setOrderIdChips}
-                  disableEnumCheckboxes={false}
-                />
-            </Box>
-            </Box>
-          </Portal>
-        )}
+              </Box>
+            </Portal>
+          )}
       </Box>
     </Slide>
   );
