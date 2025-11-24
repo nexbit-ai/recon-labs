@@ -892,9 +892,9 @@ const OperationsCentrePage: React.FC = () => {
 
         setUnreconciledRows(transformedRows);
 
-        // Update count from response - use responseData which is the actual response.data
-        if (responseData.pagination) {
-          setUnreconciledCount(responseData.pagination.total_count || responseData.pagination.current_count || 0);
+        // Update count from response
+        if (response.data.pagination) {
+          setUnreconciledCount(response.data.pagination.current_count || response.data.pagination.total_count || 0);
         } else {
           setUnreconciledCount(transformedRows.length);
         }
@@ -955,9 +955,9 @@ const OperationsCentrePage: React.FC = () => {
 
         setDisputedRows(transformedRows);
 
-        // Update count from response - use responseData which is the actual response.data
-        if (responseData.pagination) {
-          setDisputedCount(responseData.pagination.total_count || responseData.pagination.current_count || 0);
+        // Update count from response
+        if (response.data.pagination) {
+          setDisputedCount(response.data.pagination.current_count || response.data.pagination.total_count || 0);
         } else {
           setDisputedCount(transformedRows.length);
         }
@@ -1015,9 +1015,9 @@ const OperationsCentrePage: React.FC = () => {
 
         setManuallyReconciledRows(transformedRows);
 
-        // Update count from response - use responseData which is the actual response.data
-        if (responseData.pagination) {
-          setManuallyReconciledCount(responseData.pagination.total_count || responseData.pagination.current_count || 0);
+        // Update count from response
+        if (response.data.pagination) {
+          setManuallyReconciledCount(response.data.pagination.current_count || response.data.pagination.total_count || 0);
         } else {
           setManuallyReconciledCount(transformedRows.length);
         }
