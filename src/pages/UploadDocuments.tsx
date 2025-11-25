@@ -56,6 +56,16 @@ const months = [
 
 const years = [2024, 2025];
 
+const CSV_ONLY_EXTENSIONS = ['.csv'];
+const FLIPKART_EXTENSIONS = ['.csv', '.xlsx', '.xls'];
+
+const isFlipkartVendor = (vendorId?: string | null) => vendorId?.toLowerCase() === 'flipkart';
+const getExtensionsForVendor = (vendorId?: string | null) =>
+  isFlipkartVendor(vendorId) ? FLIPKART_EXTENSIONS : CSV_ONLY_EXTENSIONS;
+const getAcceptForVendor = (vendorId?: string | null) => getExtensionsForVendor(vendorId).join(',');
+const getFormatLabelForVendor = (vendorId?: string | null) =>
+  isFlipkartVendor(vendorId) ? 'CSV/XLSX' : 'CSV only';
+
 type ViewType = 'years' | 'months' | 'vendors';
 
 const UploadDocuments: React.FC = () => {
@@ -82,6 +92,26 @@ const UploadDocuments: React.FC = () => {
   const [rightPanelVendor, setRightPanelVendor] = useState<'amazon' | 'flipkart' | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingUpload, setPendingUpload] = useState<{ vendorId: 'amazon' | 'flipkart'; kind: 'sales' | 'sales_b2b' | 'settlement' } | null>(null);
+
+  const validateFileType = (file: File, vendorId?: string | null, label?: string) => {
+    const normalizedName = file.name.toLowerCase();
+    const isAllowed = getExtensionsForVendor(vendorId).some((ext) => normalizedName.endsWith(ext));
+
+    if (!isAllowed) {
+      const friendlyName =
+        label ||
+        vendors.find((v) => v.id === vendorId)?.name ||
+        vendorId ||
+        'This upload';
+
+      setUploadStatus({
+        type: 'error',
+        message: `${friendlyName} accepts ${getFormatLabelForVendor(vendorId)} uploads.`,
+      });
+    }
+
+    return isAllowed;
+  };
 
   // Map vendor/kind to backend report_type
   // Marketplace (amazon/flipkart): use format {vendorid}_{kind}
@@ -954,13 +984,17 @@ const UploadDocuments: React.FC = () => {
                   </Box>
                 </Box>
                 <input
-                  accept=".xlsx,.xls,.csv"
+                  accept={getAcceptForVendor('unicommerce')}
                   style={{ display: 'none' }}
                   id="unicommerce-sales-upload"
                   type="file"
                   onChange={async (e) => {
                     const file = e.target.files?.[0] || null;
                     if (file) {
+                      if (!validateFileType(file, 'unicommerce', 'Unicommerce sales')) {
+                        e.target.value = '';
+                        return;
+                      }
                       setUnicommerceFile(file);
                       // Auto-upload when file is selected
                       handleUnicommerceUpload(file);
@@ -1062,13 +1096,17 @@ const UploadDocuments: React.FC = () => {
                       </Box>
                     </Box>
                     <input
-                      accept=".xlsx,.xls,.csv"
+                      accept={getAcceptForVendor(vendor.id)}
                       style={{ display: 'none' }}
                       id={`d2c-settlement-upload-${vendor.id}`}
                       type="file"
                       onChange={async (e) => {
                         const file = e.target.files?.[0] || null;
                         if (file) {
+                          if (!validateFileType(file, vendor.id, `${vendor.name} settlement`)) {
+                            e.target.value = '';
+                            return;
+                          }
                           setD2cFile(vendor.id, 'settlement', file);
                           // Auto-upload when file is selected
                           handleD2cUpload(vendor.id, 'settlement', file);
@@ -1140,13 +1178,17 @@ const UploadDocuments: React.FC = () => {
                   </Box>
                 </Box>
                 <input
-                  accept=".xlsx,.xls,.csv"
+                  accept={getAcceptForVendor('lastmile')}
                   style={{ display: 'none' }}
                   id="lastmile-status-upload"
                   type="file"
                   onChange={async (e) => {
                     const file = e.target.files?.[0] || null;
                     if (file) {
+                      if (!validateFileType(file, 'lastmile', 'Last Mile Status')) {
+                        e.target.value = '';
+                        return;
+                      }
                       setLastMileStatusFile(file);
                       // Auto-upload when file is selected
                       handleLastMileStatusUpload(file);
@@ -1189,7 +1231,9 @@ const UploadDocuments: React.FC = () => {
                 {/* B2C Sales report */}
                 <Box sx={{ mb: 2, p: 1.5, borderRadius: '8px', background: isVendorUploaded(rightPanelVendor, 'sales') ? '#f0fdf4' : 'transparent', border: isVendorUploaded(rightPanelVendor, 'sales') ? '1px solid #dcfce7' : 'none' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Typography variant="subtitle2">B2C Sales report (XLSX/CSV)</Typography>
+                    <Typography variant="subtitle2">
+                      {`B2C Sales report (${getFormatLabelForVendor(rightPanelVendor)})`}
+                    </Typography>
                     {isVendorUploaded(rightPanelVendor, 'sales') && (
                       <Chip 
                         label="Uploaded" 
@@ -1206,12 +1250,23 @@ const UploadDocuments: React.FC = () => {
                   )}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <input
-                      accept=".xlsx,.xls,.csv"
+                      accept={getAcceptForVendor(rightPanelVendor)}
                       style={{ display: 'none' }}
                       id={`drawer-${rightPanelVendor}-sales`}
                       type="file"
                       onChange={(e) => {
-                        setMarketplaceFile(rightPanelVendor, 'sales', e.target.files?.[0] || null);
+                        const vendorKey = rightPanelVendor;
+                        const file = e.target.files?.[0] || null;
+                        if (vendorKey && file) {
+                          const vendorLabel = vendorKey === 'flipkart' ? 'Flipkart' : 'Amazon';
+                          if (!validateFileType(file, vendorKey, `${vendorLabel} B2C sales`)) {
+                            e.target.value = '';
+                            return;
+                          }
+                          setMarketplaceFile(vendorKey, 'sales', file);
+                        } else if (vendorKey) {
+                          setMarketplaceFile(vendorKey, 'sales', null);
+                        }
                         e.target.value = '';
                       }}
                       disabled={!!uploadingVendor}
@@ -1270,7 +1325,9 @@ const UploadDocuments: React.FC = () => {
                 {rightPanelVendor === 'amazon' && (
                   <Box sx={{ mb: 2, p: 1.5, borderRadius: '8px', background: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#f0fdf4' : 'transparent', border: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '1px solid #dcfce7' : 'none' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <Typography variant="subtitle2">B2B Sales report (XLSX/CSV)</Typography>
+                      <Typography variant="subtitle2">
+                        {`B2B Sales report (${getFormatLabelForVendor('amazon')})`}
+                      </Typography>
                       {isVendorUploaded(rightPanelVendor, 'sales_b2b') && (
                         <Chip 
                           label="Uploaded" 
@@ -1287,12 +1344,22 @@ const UploadDocuments: React.FC = () => {
                     )}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <input
-                        accept=".xlsx,.xls,.csv"
+                        accept={getAcceptForVendor('amazon')}
                         style={{ display: 'none' }}
                         id={`drawer-${rightPanelVendor}-sales-b2b`}
                         type="file"
                         onChange={(e) => {
-                          setMarketplaceFile(rightPanelVendor, 'sales_b2b', e.target.files?.[0] || null);
+                          const vendorKey = rightPanelVendor === 'amazon' ? 'amazon' : null;
+                          const file = e.target.files?.[0] || null;
+                          if (vendorKey && file) {
+                            if (!validateFileType(file, vendorKey, 'Amazon B2B sales')) {
+                              e.target.value = '';
+                              return;
+                            }
+                            setMarketplaceFile(vendorKey, 'sales_b2b', file);
+                          } else if (vendorKey) {
+                            setMarketplaceFile(vendorKey, 'sales_b2b', null);
+                          }
                           e.target.value = '';
                         }}
                         disabled={!!uploadingVendor}
@@ -1351,7 +1418,9 @@ const UploadDocuments: React.FC = () => {
                 {/* Settlement report */}
                 <Box sx={{ p: 1.5, borderRadius: '8px', background: isVendorUploaded(rightPanelVendor, 'settlement') ? '#f0fdf4' : 'transparent', border: isVendorUploaded(rightPanelVendor, 'settlement') ? '1px solid #dcfce7' : 'none' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Typography variant="subtitle2">Settlement report (XLSX/CSV)</Typography>
+                    <Typography variant="subtitle2">
+                      {`Settlement report (${getFormatLabelForVendor(rightPanelVendor)})`}
+                    </Typography>
                     {isVendorUploaded(rightPanelVendor, 'settlement') && (
                       <Chip 
                         label="Uploaded" 
@@ -1368,12 +1437,23 @@ const UploadDocuments: React.FC = () => {
                   )}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <input
-                      accept=".xlsx,.xls,.csv"
+                      accept={getAcceptForVendor(rightPanelVendor)}
                       style={{ display: 'none' }}
                       id={`drawer-${rightPanelVendor}-settlement`}
                       type="file"
                       onChange={(e) => {
-                        setMarketplaceFile(rightPanelVendor, 'settlement', e.target.files?.[0] || null);
+                        const vendorKey = rightPanelVendor;
+                        const file = e.target.files?.[0] || null;
+                        if (vendorKey && file) {
+                          const vendorLabel = vendorKey === 'flipkart' ? 'Flipkart' : 'Amazon';
+                          if (!validateFileType(file, vendorKey, `${vendorLabel} settlement`)) {
+                            e.target.value = '';
+                            return;
+                          }
+                          setMarketplaceFile(vendorKey, 'settlement', file);
+                        } else if (vendorKey) {
+                          setMarketplaceFile(vendorKey, 'settlement', null);
+                        }
                         e.target.value = '';
                       }}
                       disabled={!!uploadingVendor}
