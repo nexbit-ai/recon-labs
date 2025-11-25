@@ -2187,21 +2187,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
   };
 
-  // Helper function to generate random date for demo purposes
-  const generateRandomDate = () => {
-    // Generate random dates between Jan 2025 and Feb 2025
-    const startDate = new Date('2025-01-01');
-    const endDate = new Date('2025-02-28');
-    const randomTime = startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime());
-    const randomDate = new Date(randomTime);
-    return randomDate.toISOString().split('T')[0]; // Return in YYYY-MM-DD format
-  };
-
   // Helper function to format date in "17th March, 2025" format
   const formatDateWithOrdinal = (dateString: string) => {
-    // If no date provided, generate a random one for demo
+    // When no date is provided, display NA instead of fabricating a date
     if (!dateString || dateString === 'null' || dateString === 'undefined') {
-      dateString = generateRandomDate();
+      return 'NA';
     }
 
     const date = new Date(dateString);
