@@ -46,7 +46,9 @@ const vendors: Vendor[] = [
   { id: 'shadowfax', name: 'Shadowfax' },
   { id: 'dtdc', name: 'DTDC' },
   { id: 'paytm', name: 'Paytm' },
-  { id: 'payu', name: 'PayU' }
+  { id: 'payu', name: 'PayU' },
+  // D2C payment gateway partner - uses report_type "cashfree"
+  { id: 'cashfree', name: 'Cashfree' },
 ];
 
 const months = [
