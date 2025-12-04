@@ -2531,7 +2531,9 @@ const OperationsCentrePage: React.FC = () => {
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Invoice Date</Typography>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
+                            {selectedPlatform === 'd2c' ? 'Order Date' : 'Invoice Date'}
+                          </Typography>
                           <IconButton
                             size="small"
                             onClick={(e) => {
