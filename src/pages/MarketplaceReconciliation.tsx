@@ -3977,8 +3977,11 @@ const MarketplaceReconciliation: React.FC = () => {
                     color: platformColors[item.platform?.toLowerCase() || ''] || palette2[idx % palette2.length],
                     originalData: item
                   };
-                })
-                .filter(item => item.value !== 0); // Only show providers with actual charges (positive or negative)
+                });
+
+              // Use the number of providers returned from backend (including zero-commission)
+              // to decide between single-provider and multi-provider (pie chart) layouts.
+              const providerCount = commissionArray.length;
 
               // Calculate totals dynamically from all providers (use absolute values for display)
               const totalCommissionCharges = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_commission || 0), 0));
@@ -4002,7 +4005,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     {/* Conditional rendering based on provider count */}
                     <Grid item xs={12} md={8}>
                       <Box sx={{ height: { xs: 320, sm: 360, md: 420, lg: 480 } }}>
-                        {providerData.length === 1 ? (
+                        {providerCount === 1 ? (
                           // Single Provider - Show detailed gradient card
                           <Box sx={{
                             height: '100%',
@@ -4059,7 +4062,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               </Tooltip>
                             </Box>
                           </Box>
-                        ) : providerData.length > 1 ? (
+                        ) : providerCount > 1 ? (
                           // Multiple Providers - Show pie chart
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart margin={{ top: 12, right: 12, bottom: 56, left: 12 }}>
@@ -4109,7 +4112,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     </Grid>
                     {/* KPI cards (totals) */}
                     <Grid item xs={12} md={4}>
-                      {providerData.length > 1 ? (
+                      {providerCount > 1 ? (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
                           <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                             <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Commission</Typography>
@@ -4143,7 +4146,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   <Box sx={{ mt: 4 }}>
                     <Grid container spacing={2}>
                       {commissionArray.map((item, idx) => (
-                        <Grid key={idx} item xs={12} md={providerData.length === 1 ? 12 : 6}>
+                        <Grid key={idx} item xs={12} md={providerCount === 1 ? 12 : 6}>
                           <Box sx={{ p: 3, borderRadius: '14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(229,231,235,0.6)' }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                               <Typography variant="subtitle1" sx={{ color: '#374151', fontWeight: 700 }}>
