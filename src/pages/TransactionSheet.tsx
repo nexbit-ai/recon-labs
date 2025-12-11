@@ -2497,6 +2497,57 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     return mapping;
   }, [totalTransactionsData, useNewAPI]);
 
+  // Add derived Courier Provider column for D2C unsettled data
+  const addCourierProviderColumn = (response: TotalTransactionsResponse | null, platform: Platform): TotalTransactionsResponse | null => {
+    if (!response || platform !== 'd2c') {
+      return response;
+    }
+
+    const courierColumn = { key: 'courier_provider', title: 'Courier Provider', type: 'string' as const };
+    const platformColumn = (response.columns || []).find(col => col.title === 'Platform') || null;
+
+    // Remove any existing Courier Provider / Platform to re-order cleanly
+    const baseColumns = (response.columns || []).filter(
+      col => col.title !== courierColumn.title && col.title !== 'Platform'
+    );
+
+    // Ensure Courier Provider is second last and Platform is last (when Platform exists)
+    let enhancedColumns = baseColumns;
+    if (platformColumn) {
+      enhancedColumns = [...baseColumns, courierColumn, platformColumn];
+    } else {
+      // If no platform column, still add courier near the end
+      enhancedColumns = [...baseColumns, courierColumn];
+    }
+
+    const enhancedData = (response.data || []).map(row => {
+      const metadata = (row as any)?.metadata || {};
+      const breakups = (row as any)?.breakups || metadata?.breakups || {};
+      const shippingCourier =
+        (metadata as any)?.shipping_courier ||
+        (breakups as any)?.shipping_courier ||
+        (row as any)?.shipping_courier;
+      const eventSubtype = (row as any)?.event_subtype || '';
+      const courierValue =
+        shippingCourier && String(shippingCourier).trim().length > 0
+          ? String(shippingCourier)
+          : eventSubtype
+            ? `NA (${eventSubtype})`
+            : 'NA';
+
+      return {
+        ...row,
+        [courierColumn.key]: courierValue,
+      };
+    });
+
+    return {
+      ...response,
+      columns: enhancedColumns,
+      data: enhancedData,
+    };
+  };
+
   // Helpers to get enum options from current data
   const getUniqueValuesForColumn = (columnName: string): string[] => {
     // Status filter has been removed - mismatched tab now uses sub-tabs instead
@@ -3406,6 +3457,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       const [matchedResponse, mismatchedLessReceivedResponse, mismatchedMoreReceivedResponse, unsettledResponse, allResponse] = await Promise.all(apiCalls);
 
+      // Enhance unsettled response for D2C with courier provider column/value
+      const processedUnsettledData = unsettledResponse.success
+        ? addCourierProviderColumn(unsettledResponse.data as TotalTransactionsResponse, platformToUse)
+        : null;
+
       // Use the first successful response that contains column metadata to populate filters
       const responseWithColumns = [matchedResponse, mismatchedLessReceivedResponse, mismatchedMoreReceivedResponse, unsettledResponse, allResponse].find(
         (res) => res.success && (res.data as TotalTransactionsResponse | undefined)?.columns
@@ -3446,9 +3502,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       // Process unsettled response (Tab 2)
       if (unsettledResponse.success) {
-        setUnsettledData(unsettledResponse.data);
-        if (unsettledResponse.data?.pagination) {
-          setUnsettledTotalCount(unsettledResponse.data.pagination.total_count);
+        setUnsettledData(processedUnsettledData);
+        if (processedUnsettledData?.pagination) {
+          setUnsettledTotalCount(processedUnsettledData.pagination.total_count);
         }
       } else {
         console.error('[fetchQuadTransactions] Unsettled API failed:', unsettledResponse);
@@ -3474,8 +3530,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         } else if (mismatchedSubTab === 'more_received' && mismatchedMoreReceivedResponse.success && mismatchedMoreReceivedResponse.data?.pagination) {
           setTotalCount(mismatchedMoreReceivedResponse.data.pagination.total_count);
         }
-      } else if (activeTab === 2 && unsettledResponse.success && unsettledResponse.data?.pagination) {
-        setTotalCount(unsettledResponse.data.pagination.total_count);
+      } else if (activeTab === 2 && unsettledResponse.success && (processedUnsettledData?.pagination || unsettledResponse.data?.pagination)) {
+        const unsettledPagination = processedUnsettledData?.pagination || unsettledResponse.data?.pagination;
+        if (unsettledPagination) {
+          setTotalCount(unsettledPagination.total_count);
+        }
       } else if (activeTab === 3 && allResponse.success && allResponse.data?.pagination) {
         setTotalCount(allResponse.data.pagination.total_count);
       }
