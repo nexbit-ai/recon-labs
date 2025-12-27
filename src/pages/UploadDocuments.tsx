@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
-import { Box, Typography, Paper, Grid, Breadcrumbs, Link, Chip, Button, Alert, CircularProgress, Drawer, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import React, { useState, useRef } from 'react';
+import { Box, Typography, Paper, Grid, Breadcrumbs, Link, Chip, Button, Alert, CircularProgress, Drawer, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, MenuItem } from '@mui/material';
 import { 
   CalendarToday as CalendarIcon,
   CheckCircle as CheckCircleIcon,
-  LocalShipping as ShippingIcon,
   ChevronRight as ChevronRightIcon,
   Home as HomeIcon,
   CloudUpload as CloudUploadIcon,
-  ArrowForward as ArrowForwardIcon
+  ArrowForward as ArrowForwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
+  KeyboardArrowRight as KeyboardArrowRightIcon,
+  Lock as LockIcon
 } from '@mui/icons-material';
 import { API_CONFIG } from '../services/api/config';
 import { tokenManager } from '../services/api/tokenManager';
@@ -68,7 +70,7 @@ const getAcceptForVendor = (vendorId?: string | null) => getExtensionsForVendor(
 const getFormatLabelForVendor = (vendorId?: string | null) =>
   isFlipkartVendor(vendorId) ? 'CSV/XLSX' : 'CSV only';
 
-type ViewType = 'years' | 'months' | 'vendors';
+type ViewType = 'years' | 'marketplace' | 'd2c';
 
 const UploadDocuments: React.FC = () => {
   const { session } = useStytchMemberSession();
@@ -94,6 +96,9 @@ const UploadDocuments: React.FC = () => {
   const [rightPanelVendor, setRightPanelVendor] = useState<'amazon' | 'flipkart' | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingUpload, setPendingUpload] = useState<{ vendorId: 'amazon' | 'flipkart'; kind: 'sales' | 'sales_b2b' | 'settlement' } | null>(null);
+  const [hoveredYear, setHoveredYear] = useState<number | null>(null);
+  const [hoveredMonth, setHoveredMonth] = useState<{ year: number; month: number } | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const validateFileType = (file: File, vendorId?: string | null, label?: string) => {
     const normalizedName = file.name.toLowerCase();
@@ -131,20 +136,28 @@ const UploadDocuments: React.FC = () => {
     return vendorIdLower;
   };
 
-  const handleYearClick = (year: number) => {
+  const handleNavigateToMarketplace = async (year: number, monthIndex: number) => {
     setSelectedYear(year);
-    setCurrentView('months');
-  };
-
-  const handleMonthClick = async (monthIndex: number) => {
     setSelectedMonth(monthIndex);
-    setCurrentView('vendors');
-    setUploadStatus(null); // Clear any previous status
+    setCurrentView('marketplace');
+    setUploadStatus(null);
+    setHoveredYear(null);
+    setHoveredMonth(null);
     
     // Fetch uploaded documents for this month
-    if (selectedYear !== null) {
-      await fetchUploadedDocuments(selectedYear, monthIndex);
-    }
+    await fetchUploadedDocuments(year, monthIndex);
+  };
+
+  const handleNavigateToD2C = async (year: number, monthIndex: number) => {
+    setSelectedYear(year);
+    setSelectedMonth(monthIndex);
+    setCurrentView('d2c');
+    setUploadStatus(null);
+    setHoveredYear(null);
+    setHoveredMonth(null);
+    
+    // Fetch uploaded documents for this month
+    await fetchUploadedDocuments(year, monthIndex);
   };
 
   const handleBackToYears = () => {
@@ -152,13 +165,8 @@ const UploadDocuments: React.FC = () => {
     setSelectedMonth(null);
     setCurrentView('years');
     setUploadStatus(null);
-  };
-
-  const handleBackToMonths = () => {
-    setSelectedMonth(null);
-    setCurrentView('months');
-    setUploadStatus(null);
-    setUploadedDocuments([]); // Clear uploaded documents
+    setHoveredYear(null);
+    setHoveredMonth(null);
   };
 
   const openRightPanel = (vendorId: 'amazon' | 'flipkart') => {
@@ -761,30 +769,43 @@ const UploadDocuments: React.FC = () => {
               <HomeIcon fontSize="small" />
               Years
             </Link>
-            {currentView !== 'years' && (
+            {(currentView === 'marketplace' || currentView === 'd2c') && selectedYear && selectedMonth !== null && (
+              <>
               <Link
                 component="button"
                 variant="body2"
-                onClick={handleBackToMonths}
+                  onClick={handleBackToYears}
                 sx={{
-                  color: currentView === 'months' ? '#111111' : '#6b7280',
+                    color: '#6b7280',
                   textDecoration: 'none',
-                  fontWeight: currentView === 'months' ? 600 : 400,
+                    fontWeight: 400,
                   '&:hover': { textDecoration: 'underline' }
                 }}
               >
                 {selectedYear}
               </Link>
-            )}
-            {currentView === 'vendors' && (
+                <Link
+                  component="button"
+                  variant="body2"
+                  onClick={handleBackToYears}
+                  sx={{
+                    color: '#6b7280',
+                    textDecoration: 'none',
+                    fontWeight: 400,
+                    '&:hover': { textDecoration: 'underline' }
+                  }}
+                >
+                  {months[selectedMonth]}
+                </Link>
               <Typography variant="body2" color="text.primary" fontWeight={600}>
-                {months[selectedMonth!]}
+                  {currentView === 'marketplace' ? 'Marketplace' : 'D2C'}
               </Typography>
+              </>
             )}
           </Breadcrumbs>
         </Box>
 
-        {/* Years View */}
+        {/* Years View with Hover Dropdowns */}
         {currentView === 'years' && (
           <Paper 
             elevation={0} 
@@ -814,12 +835,28 @@ const UploadDocuments: React.FC = () => {
                 {years.map((year) => (
                   <Grid item xs={6} sm={6} key={year}>
                     <Box
-                      onClick={() => handleYearClick(year)}
+                      onMouseEnter={() => {
+                        setHoveredYear(year);
+                        // Clear any pending timeout
+                        if (hoverTimeoutRef.current) {
+                          clearTimeout(hoverTimeoutRef.current);
+                          hoverTimeoutRef.current = null;
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        // Delay to allow moving to dropdown
+                        hoverTimeoutRef.current = setTimeout(() => {
+                          if (!hoveredMonth || hoveredMonth.year !== year) {
+                            setHoveredYear(null);
+                          }
+                          hoverTimeoutRef.current = null;
+                        }, 300);
+                      }}
                       sx={{
                         position: 'relative',
                         cursor: 'pointer',
                         background: '#ffffff',
-                        border: '1.5px solid #e5e7eb',
+                        border: hoveredYear === year ? '1.5px solid #111111' : '1.5px solid #e5e7eb',
                         borderRadius: '16px',
                         p: 5,
                         textAlign: 'center',
@@ -847,89 +884,183 @@ const UploadDocuments: React.FC = () => {
                       >
                         {year}
                       </Typography>
+                      
+                      {/* Months Dropdown */}
+                      {hoveredYear === year && (
+                        <Box
+                          onMouseEnter={() => {
+                            setHoveredYear(year);
+                            // Clear any pending timeout
+                            if (hoverTimeoutRef.current) {
+                              clearTimeout(hoverTimeoutRef.current);
+                              hoverTimeoutRef.current = null;
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            hoverTimeoutRef.current = setTimeout(() => {
+                            setHoveredYear(null);
+                            setHoveredMonth(null);
+                              hoverTimeoutRef.current = null;
+                            }, 300);
+                          }}
+            sx={{ 
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            mt: 0, // No gap
+              background: '#ffffff',
+              border: '1px solid #e5e7eb',
+                            borderRadius: '12px',
+                            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+                            zIndex: 1000,
+                            overflow: 'visible',
+                            py: 1
+                          }}
+                        >
+                          {months.map((month, monthIndex) => {
+                            const isHovered = hoveredMonth?.year === year && hoveredMonth?.month === monthIndex;
+                return (
+                              <Box 
+                                key={monthIndex}
+                                sx={{ position: 'relative', display: 'flex' }}
+                                onMouseEnter={() => {
+                                  // Clear any pending timeout
+                                  if (hoverTimeoutRef.current) {
+                                    clearTimeout(hoverTimeoutRef.current);
+                                    hoverTimeoutRef.current = null;
+                                  }
+                                  setHoveredMonth({ year, month: monthIndex });
+                                }}
+                                onMouseLeave={() => {
+                                  // Set timeout to close dropdown, but it will be cleared if mouse enters dropdown
+                                  hoverTimeoutRef.current = setTimeout(() => {
+                                    setHoveredMonth(null);
+                                    hoverTimeoutRef.current = null;
+                                  }, 200);
+                                }}
+                              >
+                                <Box
+                      sx={{
+                                    px: 2,
+                                    py: 1.5,
+                        cursor: 'pointer',
+                                    transition: 'background 0.2s',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    width: '100%',
+                                    background: isHovered ? '#f8fafc' : 'transparent',
+                                    '&:hover': {
+                                      background: '#f8fafc'
+                                    }
+                                  }}
+                                >
+                                  <Typography variant="body2" fontWeight={600} color="#111111" sx={{ textAlign: 'left' }}>
+                                    {month}
+                                  </Typography>
+                                  <KeyboardArrowRightIcon sx={{ fontSize: 20, color: '#6b7280' }} />
+                                </Box>
+                                
+                                {/* Marketplace and D2C Dropdown */}
+                                {isHovered && (
+                                  <Box
+                                    data-dropdown
+                                    onMouseEnter={() => {
+                                      // Clear timeout when entering dropdown
+                                      if (hoverTimeoutRef.current) {
+                                        clearTimeout(hoverTimeoutRef.current);
+                                        hoverTimeoutRef.current = null;
+                                      }
+                                      setHoveredMonth({ year, month: monthIndex });
+                                    }}
+                                    onMouseLeave={() => {
+                                      // Close dropdown when leaving
+                                      if (hoverTimeoutRef.current) {
+                                        clearTimeout(hoverTimeoutRef.current);
+                                      }
+                                      hoverTimeoutRef.current = setTimeout(() => {
+                                        setHoveredMonth(null);
+                                        hoverTimeoutRef.current = null;
+                                      }, 100);
+                                    }}
+                                    sx={{
+                                      position: 'absolute',
+                                      left: '100%',
+                                      top: 0,
+                                      ml: 0,
+                        background: '#ffffff',
+                                      border: '1px solid #e5e7eb',
+                        borderRadius: '12px',
+                                      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+                                      minWidth: 200,
+                                      py: 1,
+                                      zIndex: 1001,
+                                      pointerEvents: 'auto'
+                                    }}
+                                  >
+                                    <MenuItem
+                                      onClick={() => handleNavigateToMarketplace(year, monthIndex)}
+                                      sx={{
+                                        py: 1.5,
+                                        px: 2,
+                        '&:hover': {
+                                          background: '#f8fafc'
+                                        }
+                                      }}
+                                    >
+                                      <Typography variant="body2" fontWeight={600}>
+                                        Marketplace
+                                      </Typography>
+                                    </MenuItem>
+                                    <MenuItem
+                                      onClick={() => handleNavigateToD2C(year, monthIndex)}
+                        sx={{ 
+                                        py: 1.5,
+                                        px: 2,
+                                        '&:hover': {
+                                          background: '#f8fafc'
+                                        }
+                                      }}
+                                    >
+                                      <Typography variant="body2" fontWeight={600}>
+                                        D2C
+                                      </Typography>
+                                    </MenuItem>
                     </Box>
-                  </Grid>
+                                )}
+                              </Box>
+                );
+              })}
+                        </Box>
+                      )}
+                    </Box>
+            </Grid>
                 ))}
               </Grid>
             </Box>
           </Paper>
         )}
 
-        {/* Months View */}
-        {currentView === 'months' && selectedYear && (
-          <Paper 
-            elevation={0} 
-            sx={{ 
-              p: 4, 
-              background: '#ffffff',
-              borderRadius: '12px',
-              border: '1px solid #e5e7eb',
-              minHeight: '60vh'
-            }}
-          >
-            <Typography 
-              variant="h6" 
-              fontWeight={600} 
-              color="#64748b" 
-              mb={4}
-              sx={{ fontSize: '14px', letterSpacing: '0.5px', textTransform: 'uppercase' }}
-            >
-              Select Month - {selectedYear}
-            </Typography>
-            <Grid container spacing={2.5}>
-              {months.map((month, index) => {
-                return (
-                  <Grid item xs={6} sm={4} md={3} key={month}>
-                    <Box
-                      onClick={() => handleMonthClick(index)}
-                      sx={{
-                        position: 'relative',
-                        cursor: 'pointer',
-                        background: '#ffffff',
-                        border: '1.5px solid #e5e7eb',
-                        borderRadius: '12px',
-                        p: 3,
-                        textAlign: 'center',
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        '&:hover': {
-                          transform: 'translateY(-4px)',
-                          border: '1.5px solid #111111',
-                          boxShadow: '0 12px 24px rgba(0, 0, 0, 0.06)',
-                          background: '#fafafa',
-                        },
-                        '&:active': {
-                          transform: 'translateY(-1px)',
-                        }
-                      }}
-                    >
-                      <Typography 
-                        variant="h6" 
-                        fontWeight={700} 
-                        sx={{ 
-                          color: '#111111',
-                          fontSize: '18px',
-                          letterSpacing: '-0.5px'
-                        }}
-                      >
-                        {month}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                );
-              })}
-            </Grid>
-          </Paper>
-        )}
 
-        {/* Vendors View */}
-        {currentView === 'vendors' && selectedMonth !== null && (
+        {/* Marketplace View - Flipkart and Amazon side by side */}
+        {currentView === 'marketplace' && selectedMonth !== null && (
           <Paper 
             elevation={0} 
             sx={{ p: 4, background: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', minHeight: '60vh' }}
           >
-            <Typography variant="h6" fontWeight={700} color="#1e293b" mb={3}>
-              Select Vendor - {months[selectedMonth]} {selectedYear}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+              <Button
+                onClick={handleBackToYears}
+                startIcon={<ChevronRightIcon sx={{ transform: 'rotate(180deg)' }} />}
+                sx={{ minWidth: 'auto', px: 1 }}
+              >
+                Back
+              </Button>
+              <Typography variant="h6" fontWeight={700} color="#1e293b">
+                Marketplace Uploads - {months[selectedMonth]} {selectedYear}
             </Typography>
+            </Box>
             {/* Upload Status Alert */}
             {uploadStatus && (
               <Alert 
@@ -940,249 +1071,884 @@ const UploadDocuments: React.FC = () => {
                 {uploadStatus.message}
               </Alert>
             )}
-            {/* Unicommerce Sales File Upload section */}
-            <Typography variant="subtitle1" sx={{ mb: 1, mt: 2, fontWeight: 700 }} color="primary.main">Sales File</Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 800, mb: 4 }}>
-              <Paper
-                elevation={0}
-                sx={{ 
-                  p: 3, 
-                  border: isVendorUploaded('unicommerce') ? '2px solid #dcfce7' : '2px solid #e5e7eb', 
-                  borderRadius: '12px', 
-                  transition: 'all 0.3s ease', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between', 
-                  gap: 2, 
-                  opacity: uploadingVendor === 'unicommerce_sales' ? 0.9 : 1,
-                  background: isVendorUploaded('unicommerce') ? '#f0fdf4' : '#ffffff', 
-                  '&:hover': { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', borderColor: isVendorUploaded('unicommerce') ? '#bbf7d0' : '#d1d5db' } 
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
-                  <Box sx={{ width: 48, height: 48, borderRadius: '8px',                   background: isVendorUploaded('unicommerce') ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {isVendorUploaded('unicommerce') ? (
-                      <CheckCircleIcon sx={{ fontSize: 24, color: '#16a34a' }} />
-                    ) : (
-                      <ShippingIcon sx={{ fontSize: 24, color: '#111111' }} />
-                    )}
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="subtitle1" fontWeight={700} color="#111111">Unicommerce</Typography>
-                      {isVendorUploaded('unicommerce') && (
-                        <Chip label="Uploaded" size="small" sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} />
+            <Grid container spacing={4}>
+              {/* Flipkart */}
+              <Grid item xs={12}>
+                <Paper elevation={0} sx={{ p: 3, border: '2px solid #e5e7eb', borderRadius: '12px' }}>
+                  <Typography variant="h6" fontWeight={700} color="#111111" mb={4}>
+                    Flipkart
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 0, position: 'relative', maxWidth: 800, mx: 'auto' }}>
+                    {/* Step 1: Sales File */}
+                    <Paper 
+                      elevation={0}
+                      sx={{ 
+                        flex: '0 0 auto',
+                        width: 220,
+                        p: 2,
+                        border: isVendorUploaded('flipkart', 'sales') ? '2px solid #16a34a' : '2px solid #e5e7eb',
+                        borderRadius: '12px',
+                        background: isVendorUploaded('flipkart', 'sales') ? '#f0fdf4' : '#ffffff',
+                        position: 'relative',
+                        zIndex: 2
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                        {/* Step Number Circle */}
+                        <Box sx={{ 
+                          width: 32, 
+                          height: 32, 
+                          borderRadius: '50%', 
+                          background: isVendorUploaded('flipkart', 'sales') ? '#16a34a' : '#f3f4f6',
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          border: isVendorUploaded('flipkart', 'sales') ? 'none' : '2px solid #d1d5db'
+                        }}>
+                          {isVendorUploaded('flipkart', 'sales') ? (
+                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : (
+                            <Typography variant="body2" fontWeight={700} color="#6b7280">1</Typography>
+                          )}
+                        </Box>
+                        
+                        {/* Step Title */}
+                        <Typography variant="body2" fontWeight={600} color="#111111" textAlign="center">
+                          Sales File
+                        </Typography>
+                        
+                        {/* Uploaded File Info */}
+                      {isVendorUploaded('flipkart', 'sales') && getUploadedDocument('flipkart', 'sales') && (
+                          <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
+                            {getUploadedDocument('flipkart', 'sales')?.filename}
+                        </Typography>
+                      )}
+                        
+                        {/* File Input */}
+                        <input
+                          accept={getAcceptForVendor('flipkart')}
+                          style={{ display: 'none' }}
+                          id="flipkart-sales-upload"
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            if (file) {
+                              if (!validateFileType(file, 'flipkart', 'Flipkart sales')) {
+                                e.target.value = '';
+                                return;
+                              }
+                              setMarketplaceFile('flipkart', 'sales', file);
+                            }
+                            e.target.value = '';
+                          }}
+                          disabled={!!uploadingVendor}
+                        />
+                        <label htmlFor="flipkart-sales-upload">
+                          <Button
+                            variant={isVendorUploaded('flipkart', 'sales') ? 'outlined' : 'contained'}
+                            component="span"
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'flipkart_sales'}
+                            endIcon={uploadingVendor === 'flipkart_sales' ? <CircularProgress size={14} /> : null}
+                            onClick={() => {
+                              if (marketplaceFiles.flipkart?.sales) {
+                                handleMarketplaceUploadClick('flipkart', 'sales');
+                              }
+                            }}
+                            sx={{ 
+                              minWidth: 120,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              ...(isVendorUploaded('flipkart', 'sales') && {
+                                borderColor: '#16a34a',
+                                color: '#16a34a'
+                              })
+                            }}
+                          >
+                            {uploadingVendor === 'flipkart_sales' ? 'Uploading...' : marketplaceFiles.flipkart?.sales ? 'Upload' : 'Choose File'}
+                          </Button>
+                        </label>
+                        {marketplaceFiles.flipkart?.sales && !isVendorUploaded('flipkart', 'sales') && (
+                          <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
+                            {marketplaceFiles.flipkart.sales.name}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Paper>
+
+                    {/* Connector Line */}
+                    <Box sx={{ 
+                      width: 80,
+                      height: '3px',
+                      background: isVendorUploaded('flipkart', 'sales') 
+                        ? 'linear-gradient(to right, #16a34a, #16a34a)' 
+                        : 'linear-gradient(to right, #d1d5db, #d1d5db)',
+                      position: 'relative',
+                      zIndex: 3
+                    }}>
+                      {isVendorUploaded('flipkart', 'sales') && (
+                        <Box sx={{
+                          position: 'absolute',
+                          right: -8,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: 16,
+                          height: 16,
+                          borderRadius: '50%',
+                          background: '#16a34a',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 4
+                        }}>
+                          <ArrowForwardIcon sx={{ fontSize: 12, color: '#ffffff' }} />
+                        </Box>
                       )}
                     </Box>
-                    {isVendorUploaded('unicommerce') && getUploadedDocument('unicommerce') ? (
-                      <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mt: 0.5 }}>
-                        {getUploadedDocument('unicommerce')?.filename} • {new Date(getUploadedDocument('unicommerce')!.upload_date).toLocaleDateString()}
+
+                    {/* Step 2: Settlement File */}
+                    <Paper 
+                      elevation={0}
+                      sx={{ 
+                        flex: '0 0 auto',
+                        width: 220,
+                        p: 2,
+                        border: isVendorUploaded('flipkart', 'settlement') 
+                          ? '2px solid #16a34a' 
+                          : (!isVendorUploaded('flipkart', 'sales') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
+                        borderRadius: '12px',
+                        background: isVendorUploaded('flipkart', 'settlement') 
+                          ? '#f0fdf4' 
+                          : (!isVendorUploaded('flipkart', 'sales') ? '#f9fafb' : '#ffffff'),
+                        position: 'relative',
+                        zIndex: 2,
+                        opacity: isVendorUploaded('flipkart', 'sales') ? 1 : 0.6
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                        {/* Step Number Circle */}
+                        <Box sx={{ 
+                          width: 32, 
+                          height: 32, 
+                          borderRadius: '50%', 
+                          background: isVendorUploaded('flipkart', 'settlement') 
+                            ? '#16a34a' 
+                            : (!isVendorUploaded('flipkart', 'sales') ? '#f3f4f6' : '#f3f4f6'),
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          border: isVendorUploaded('flipkart', 'settlement') 
+                            ? 'none' 
+                            : (!isVendorUploaded('flipkart', 'sales') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
+                          position: 'relative'
+                        }}>
+                          {isVendorUploaded('flipkart', 'settlement') ? (
+                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : !isVendorUploaded('flipkart', 'sales') ? (
+                            <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
+                          ) : (
+                            <Typography variant="body2" fontWeight={700} color="#6b7280">2</Typography>
+                    )}
+                  </Box>
+                        
+                        {/* Step Title */}
+                        <Typography variant="body2" fontWeight={600} color={isVendorUploaded('flipkart', 'sales') ? '#111111' : '#9ca3af'} textAlign="center">
+                          Settlement File
+                        </Typography>
+                        
+                        {/* Uploaded File Info */}
+                      {isVendorUploaded('flipkart', 'settlement') && getUploadedDocument('flipkart', 'settlement') && (
+                          <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
+                            {getUploadedDocument('flipkart', 'settlement')?.filename}
                       </Typography>
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">
-                        Upload Unicommerce sales file
+                      )}
+                        
+                        {/* File Input */}
+                        <input
+                          accept={getAcceptForVendor('flipkart')}
+                          style={{ display: 'none' }}
+                          id="flipkart-settlement-upload"
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            if (file) {
+                              if (!validateFileType(file, 'flipkart', 'Flipkart settlement')) {
+                                e.target.value = '';
+                                return;
+                              }
+                              setMarketplaceFile('flipkart', 'settlement', file);
+                            }
+                            e.target.value = '';
+                          }}
+                          disabled={!!uploadingVendor || !isVendorUploaded('flipkart', 'sales')}
+                        />
+                        <label htmlFor="flipkart-settlement-upload">
+                          <Button
+                            variant={isVendorUploaded('flipkart', 'settlement') ? 'outlined' : 'contained'}
+                            component="span"
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'flipkart_settlement' || !isVendorUploaded('flipkart', 'sales')}
+                            endIcon={uploadingVendor === 'flipkart_settlement' ? <CircularProgress size={14} /> : null}
+                            onClick={() => {
+                              if (marketplaceFiles.flipkart?.settlement) {
+                                handleMarketplaceUploadClick('flipkart', 'settlement');
+                              }
+                            }}
+                            sx={{ 
+                              minWidth: 120,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              ...(!isVendorUploaded('flipkart', 'sales') && {
+                                background: '#f3f4f6',
+                                color: '#9ca3af',
+                                cursor: 'not-allowed',
+                                border: 'none',
+                                '&:hover': {
+                                  background: '#f3f4f6',
+                                }
+                              }),
+                              ...(isVendorUploaded('flipkart', 'settlement') && {
+                                borderColor: '#16a34a',
+                                color: '#16a34a'
+                              })
+                            }}
+                          >
+                            {uploadingVendor === 'flipkart_settlement' ? 'Uploading...' : marketplaceFiles.flipkart?.settlement ? 'Upload' : 'Choose File'}
+                          </Button>
+                        </label>
+                        {marketplaceFiles.flipkart?.settlement && !isVendorUploaded('flipkart', 'settlement') && (
+                          <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
+                            {marketplaceFiles.flipkart.settlement.name}
                       </Typography>
                     )}
                   </Box>
-                </Box>
+                    </Paper>
+                  </Box>
+                </Paper>
+              </Grid>
+
+              {/* Amazon */}
+              <Grid item xs={12}>
+                <Paper elevation={0} sx={{ p: 3, border: '2px solid #e5e7eb', borderRadius: '12px' }}>
+                  <Typography variant="h6" fontWeight={700} color="#111111" mb={4}>
+                    Amazon
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 0, position: 'relative', maxWidth: 1000, mx: 'auto' }}>
+                    {/* Step 1: B2C Sales File */}
+                    <Paper 
+                      elevation={0}
+                      sx={{ 
+                        flex: '0 0 auto',
+                        width: 200,
+                        p: 2,
+                        border: isVendorUploaded('amazon', 'sales') ? '2px solid #16a34a' : '2px solid #e5e7eb',
+                        borderRadius: '12px',
+                        background: isVendorUploaded('amazon', 'sales') ? '#f0fdf4' : '#ffffff',
+                        position: 'relative',
+                        zIndex: 2
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                        {/* Step Number Circle */}
+                        <Box sx={{ 
+                          width: 32, 
+                          height: 32, 
+                          borderRadius: '50%', 
+                          background: isVendorUploaded('amazon', 'sales') ? '#16a34a' : '#f3f4f6',
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          border: isVendorUploaded('amazon', 'sales') ? 'none' : '2px solid #d1d5db'
+                        }}>
+                          {isVendorUploaded('amazon', 'sales') ? (
+                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : (
+                            <Typography variant="body2" fontWeight={700} color="#6b7280">1</Typography>
+                          )}
+                        </Box>
+                        
+                        {/* Step Title */}
+                        <Typography variant="body2" fontWeight={600} color="#111111" textAlign="center">
+                          B2C Sales File
+                        </Typography>
+                        
+                        {/* Uploaded File Info */}
+                      {isVendorUploaded('amazon', 'sales') && getUploadedDocument('amazon', 'sales') && (
+                          <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
+                            {getUploadedDocument('amazon', 'sales')?.filename}
+                        </Typography>
+                      )}
+                        
+                        {/* File Input */}
                 <input
-                  accept={getAcceptForVendor('unicommerce')}
+                          accept={getAcceptForVendor('amazon')}
                   style={{ display: 'none' }}
-                  id="unicommerce-sales-upload"
+                          id="amazon-sales-upload"
                   type="file"
-                  onChange={async (e) => {
+                          onChange={(e) => {
                     const file = e.target.files?.[0] || null;
                     if (file) {
-                      if (!validateFileType(file, 'unicommerce', 'Unicommerce sales')) {
+                              if (!validateFileType(file, 'amazon', 'Amazon B2C sales')) {
                         e.target.value = '';
                         return;
                       }
-                      setUnicommerceFile(file);
-                      // Auto-upload when file is selected
-                      handleUnicommerceUpload(file);
+                              setMarketplaceFile('amazon', 'sales', file);
                     }
                     e.target.value = '';
                   }}
-                  disabled={uploadingVendor === 'unicommerce_sales'}
+                          disabled={!!uploadingVendor}
                 />
-                <label htmlFor="unicommerce-sales-upload">
+                        <label htmlFor="amazon-sales-upload">
                   <Button
-                    variant={isVendorUploaded('unicommerce') ? 'outlined' : 'contained'}
+                            variant={isVendorUploaded('amazon', 'sales') ? 'outlined' : 'contained'}
                     component="span"
-                    disabled={uploadingVendor === 'unicommerce_sales'}
-                    endIcon={uploadingVendor === 'unicommerce_sales' ? <CircularProgress size={16} sx={{ color: isVendorUploaded('unicommerce') ? '#111111' : '#fff' }} /> : <ArrowForwardIcon />}
-                    sx={{ background: isVendorUploaded('unicommerce') ? '#ffffff' : '#111111', color: isVendorUploaded('unicommerce') ? '#111111' : '#ffffff', borderColor: isVendorUploaded('unicommerce') ? '#e5e7eb' : 'transparent', fontWeight: 600, px: 3, py: 1.2, '&:hover': { background: isVendorUploaded('unicommerce') ? '#f8fafc' : '#333333', borderColor: isVendorUploaded('unicommerce') ? '#d1d5db' : 'transparent' } }}
-                  >
-                    {uploadingVendor === 'unicommerce_sales' ? 'Uploading...' : 'Upload file'}
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'amazon_sales'}
+                            endIcon={uploadingVendor === 'amazon_sales' ? <CircularProgress size={14} /> : null}
+                            onClick={() => {
+                              if (marketplaceFiles.amazon?.sales) {
+                                handleMarketplaceUploadClick('amazon', 'sales');
+                              }
+                            }}
+                            sx={{ 
+                              minWidth: 120,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              ...(isVendorUploaded('amazon', 'sales') && {
+                                borderColor: '#16a34a',
+                                color: '#16a34a'
+                              })
+                            }}
+                          >
+                            {uploadingVendor === 'amazon_sales' ? 'Uploading...' : marketplaceFiles.amazon?.sales ? 'Upload' : 'Choose File'}
                   </Button>
                 </label>
-              </Paper>
+                        {marketplaceFiles.amazon?.sales && !isVendorUploaded('amazon', 'sales') && (
+                          <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
+                            {marketplaceFiles.amazon.sales.name}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Paper>
+
+                    {/* Connector Line 1 */}
+                    <Box sx={{ 
+                      width: 60,
+                      height: '3px',
+                      background: isVendorUploaded('amazon', 'sales') 
+                        ? 'linear-gradient(to right, #16a34a, #16a34a)' 
+                        : 'linear-gradient(to right, #d1d5db, #d1d5db)',
+                      position: 'relative',
+                      zIndex: 3
+                    }}>
+                      {isVendorUploaded('amazon', 'sales') && (
+                        <Box sx={{
+                          position: 'absolute',
+                          right: -8,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: 16,
+                          height: 16,
+                          borderRadius: '50%',
+                          background: '#16a34a',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 4
+                        }}>
+                          <ArrowForwardIcon sx={{ fontSize: 12, color: '#ffffff' }} />
+                        </Box>
+                      )}
             </Box>
             
-            <Divider sx={{ mb: 3 }} />
-            {/* Marketplace section */}
-            <Typography variant="subtitle1" sx={{ mb: 1, mt: 2, fontWeight: 700 }} color="primary.main">Marketplace</Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 800, mb: 4 }}>
-              {vendors.filter(v => v.id === 'amazon' || v.id === 'flipkart').map((vendor) => {
-                const isUploaded = isVendorUploaded(vendor.id, 'sales') || isVendorUploaded(vendor.id, 'settlement');
-                const isUploading = uploadingVendor === `${vendor.id}_sales` || uploadingVendor === `${vendor.id}_settlement` || uploadingVendor === vendor.id;
-                return (
-                  <Paper
-                    key={vendor.id}
-                    elevation={0}
-                    sx={{ p: 3, border: isUploaded ? '2px solid #dcfce7' : '2px solid #e5e7eb', borderRadius: '12px', transition: 'all 0.3s ease', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, opacity: isUploading ? 0.9 : 1, background: isUploaded ? '#f0fdf4' : '#ffffff', '&:hover': { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', borderColor: isUploaded ? '#bbf7d0' : '#d1d5db' } }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
-                      <Box sx={{ width: 48, height: 48, borderRadius: '8px', background: isUploaded ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {isUploaded ? (
-                          <CheckCircleIcon sx={{ fontSize: 24, color: '#16a34a' }} />
-                        ) : (
-                          <ShippingIcon sx={{ fontSize: 24, color: '#111111' }} />
-                        )}
-                      </Box>
-                      <Box sx={{ flex: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="subtitle1" fontWeight={700} color="#111111">{vendor.name}</Typography>
-                          {isUploaded && (<Chip label="Uploaded" size="small" sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} />)}
-                        </Box>
-                        <Typography variant="caption" color={isUploaded ? '#16a34a' : 'text.secondary'} sx={{ display: 'block', mt: 0.5 }}>
-                          {isUploaded ? 'Files uploaded' : 'Upload sales and settlement sheets'}
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Button
-                      variant={isUploaded ? 'outlined' : 'contained'}
-                      onClick={() => openRightPanel(vendor.id as 'amazon' | 'flipkart')}
-                      endIcon={<ArrowForwardIcon />}
-                      sx={{ background: isUploaded ? '#ffffff' : '#111111', color: isUploaded ? '#111111' : '#ffffff', borderColor: isUploaded ? '#e5e7eb' : 'transparent', fontWeight: 600, px: 3, py: 1.2, '&:hover': { background: isUploaded ? '#f8fafc' : '#333333', borderColor: isUploaded ? '#d1d5db' : 'transparent' } }}
+                    {/* Step 2: B2B Sales File */}
+                    <Paper 
+                      elevation={0}
+                      sx={{ 
+                        flex: '0 0 auto',
+                        width: 200,
+                        p: 2,
+                        border: isVendorUploaded('amazon', 'sales_b2b') 
+                          ? '2px solid #16a34a' 
+                          : (!isVendorUploaded('amazon', 'sales') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
+                        borderRadius: '12px',
+                        background: isVendorUploaded('amazon', 'sales_b2b') 
+                          ? '#f0fdf4' 
+                          : (!isVendorUploaded('amazon', 'sales') ? '#f9fafb' : '#ffffff'),
+                        position: 'relative',
+                        zIndex: 2,
+                        opacity: isVendorUploaded('amazon', 'sales') ? 1 : 0.6
+                      }}
                     >
-                      Upload files
-                    </Button>
-                  </Paper>
-                );
-              })}
-            </Box>
-            <Divider sx={{ mb: 3 }} />
-            {/* D2C Partners section */}
-            <Typography variant="subtitle1" sx={{ mb: 1, mt: 2, fontWeight: 700 }} color="primary.main">D2C Partners</Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 800, mb: 4 }}>
-              {vendors.filter(v => v.id !== 'amazon' && v.id !== 'flipkart').map((vendor) => {
-                const isSettlementUploaded = isVendorUploaded(vendor.id, 'settlement');
-                const uploadedSettlementDoc = getUploadedDocument(vendor.id, 'settlement');
-                const isSettlementUploading = uploadingVendor === `${vendor.id}_settlement`;
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                        {/* Step Number Circle */}
+                        <Box sx={{ 
+                          width: 32, 
+                          height: 32, 
+                          borderRadius: '50%', 
+                          background: isVendorUploaded('amazon', 'sales_b2b') 
+                            ? '#16a34a' 
+                            : (!isVendorUploaded('amazon', 'sales') ? '#f3f4f6' : '#f3f4f6'),
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          border: isVendorUploaded('amazon', 'sales_b2b') 
+                            ? 'none' 
+                            : (!isVendorUploaded('amazon', 'sales') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
+                          position: 'relative'
+                        }}>
+                          {isVendorUploaded('amazon', 'sales_b2b') ? (
+                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : !isVendorUploaded('amazon', 'sales') ? (
+                            <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
+                          ) : (
+                            <Typography variant="body2" fontWeight={700} color="#6b7280">2</Typography>
+                        )}
+                      </Box>
+                        
+                        {/* Step Title */}
+                        <Typography variant="body2" fontWeight={600} color={isVendorUploaded('amazon', 'sales') ? '#111111' : '#9ca3af'} textAlign="center">
+                          B2B Sales File
+                        </Typography>
+                        
+                        {/* Uploaded File Info */}
+                      {isVendorUploaded('amazon', 'sales_b2b') && getUploadedDocument('amazon', 'sales_b2b') && (
+                          <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
+                            {getUploadedDocument('amazon', 'sales_b2b')?.filename}
+                        </Typography>
+                      )}
+                        
+                        {/* File Input */}
+                        <input
+                          accept={getAcceptForVendor('amazon')}
+                          style={{ display: 'none' }}
+                          id="amazon-sales-b2b-upload"
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            if (file) {
+                              if (!validateFileType(file, 'amazon', 'Amazon B2B sales')) {
+                                e.target.value = '';
+                                return;
+                              }
+                              setMarketplaceFile('amazon', 'sales_b2b', file);
+                            }
+                            e.target.value = '';
+                          }}
+                          disabled={!!uploadingVendor || !isVendorUploaded('amazon', 'sales')}
+                        />
+                        <label htmlFor="amazon-sales-b2b-upload">
+                          <Button
+                            variant={isVendorUploaded('amazon', 'sales_b2b') ? 'outlined' : 'contained'}
+                            component="span"
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'amazon_sales_b2b' || !isVendorUploaded('amazon', 'sales')}
+                            endIcon={uploadingVendor === 'amazon_sales_b2b' ? <CircularProgress size={14} /> : null}
+                            onClick={() => {
+                              if (marketplaceFiles.amazon?.sales_b2b) {
+                                handleMarketplaceUploadClick('amazon', 'sales_b2b');
+                              }
+                            }}
+                            sx={{ 
+                              minWidth: 120,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              ...(!isVendorUploaded('amazon', 'sales') && {
+                                background: '#f3f4f6',
+                                color: '#9ca3af',
+                                cursor: 'not-allowed',
+                                border: 'none',
+                                '&:hover': {
+                                  background: '#f3f4f6',
+                                }
+                              }),
+                              ...(isVendorUploaded('amazon', 'sales_b2b') && {
+                                borderColor: '#16a34a',
+                                color: '#16a34a'
+                              })
+                            }}
+                          >
+                            {uploadingVendor === 'amazon_sales_b2b' ? 'Uploading...' : marketplaceFiles.amazon?.sales_b2b ? 'Upload' : 'Choose File'}
+                          </Button>
+                        </label>
+                        {marketplaceFiles.amazon?.sales_b2b && !isVendorUploaded('amazon', 'sales_b2b') && (
+                          <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
+                            {marketplaceFiles.amazon.sales_b2b.name}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Paper>
 
-                return (
-                  <Paper
-                    key={vendor.id}
-                    elevation={0}
-                    sx={{ p: 3, border: isSettlementUploaded ? '2px solid #dcfce7' : '2px solid #e5e7eb', borderRadius: '12px', transition: 'all 0.3s ease', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, opacity: isSettlementUploading ? 0.9 : 1, background: isSettlementUploaded ? '#f0fdf4' : '#ffffff', '&:hover': { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', borderColor: isSettlementUploaded ? '#bbf7d0' : '#d1d5db' } }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
-                      <Box sx={{ width: 48, height: 48, borderRadius: '8px', background: isSettlementUploaded ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {isSettlementUploaded ? (
-                          <CheckCircleIcon sx={{ fontSize: 24, color: '#16a34a' }} />
-                        ) : (
-                          <ShippingIcon sx={{ fontSize: 24, color: '#111111' }} />
-                        )}
-                      </Box>
-                      <Box sx={{ flex: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="subtitle1" fontWeight={700} color="#111111">{vendor.name}</Typography>
-                          {isSettlementUploaded && (<Chip label="Uploaded" size="small" sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} />)}
+                    {/* Connector Line 2 */}
+                    <Box sx={{ 
+                      width: 60,
+                      height: '3px',
+                      background: isVendorUploaded('amazon', 'sales_b2b') 
+                        ? 'linear-gradient(to right, #16a34a, #16a34a)' 
+                        : 'linear-gradient(to right, #d1d5db, #d1d5db)',
+                      position: 'relative',
+                      zIndex: 3
+                    }}>
+                      {isVendorUploaded('amazon', 'sales_b2b') && (
+                        <Box sx={{
+                          position: 'absolute',
+                          right: -8,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: 16,
+                          height: 16,
+                          borderRadius: '50%',
+                          background: '#16a34a',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 4
+                        }}>
+                          <ArrowForwardIcon sx={{ fontSize: 12, color: '#ffffff' }} />
                         </Box>
-                        {isSettlementUploaded && uploadedSettlementDoc ? (
-                          <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mt: 0.5 }}>{uploadedSettlementDoc.filename} • {new Date(uploadedSettlementDoc.upload_date).toLocaleDateString()}</Typography>
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">Upload settlement sheet</Typography>
+                      )}
+                    </Box>
+
+                    {/* Step 3: Settlement File */}
+                    <Paper 
+                      elevation={0}
+                      sx={{ 
+                        flex: '0 0 auto',
+                        width: 200,
+                        p: 2,
+                        border: isVendorUploaded('amazon', 'settlement') 
+                          ? '2px solid #16a34a' 
+                          : (!isVendorUploaded('amazon', 'sales_b2b') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
+                        borderRadius: '12px',
+                        background: isVendorUploaded('amazon', 'settlement') 
+                          ? '#f0fdf4' 
+                          : (!isVendorUploaded('amazon', 'sales_b2b') ? '#f9fafb' : '#ffffff'),
+                        position: 'relative',
+                        zIndex: 2,
+                        opacity: isVendorUploaded('amazon', 'sales_b2b') ? 1 : 0.6
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                        {/* Step Number Circle */}
+                        <Box sx={{ 
+                          width: 32, 
+                          height: 32, 
+                          borderRadius: '50%', 
+                          background: isVendorUploaded('amazon', 'settlement') 
+                            ? '#16a34a' 
+                            : (!isVendorUploaded('amazon', 'sales_b2b') ? '#f3f4f6' : '#f3f4f6'),
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          border: isVendorUploaded('amazon', 'settlement') 
+                            ? 'none' 
+                            : (!isVendorUploaded('amazon', 'sales_b2b') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
+                          position: 'relative'
+                        }}>
+                          {isVendorUploaded('amazon', 'settlement') ? (
+                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : !isVendorUploaded('amazon', 'sales_b2b') ? (
+                            <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
+                          ) : (
+                            <Typography variant="body2" fontWeight={700} color="#6b7280">3</Typography>
+                          )}
+                        </Box>
+                        
+                        {/* Step Title */}
+                        <Typography variant="body2" fontWeight={600} color={isVendorUploaded('amazon', 'sales_b2b') ? '#111111' : '#9ca3af'} textAlign="center">
+                          Settlement File
+                        </Typography>
+                        
+                        {/* Uploaded File Info */}
+                      {isVendorUploaded('amazon', 'settlement') && getUploadedDocument('amazon', 'settlement') && (
+                          <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
+                            {getUploadedDocument('amazon', 'settlement')?.filename}
+                        </Typography>
+                      )}
+                        
+                        {/* File Input */}
+                        <input
+                          accept={getAcceptForVendor('amazon')}
+                          style={{ display: 'none' }}
+                          id="amazon-settlement-upload"
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            if (file) {
+                              if (!validateFileType(file, 'amazon', 'Amazon settlement')) {
+                                e.target.value = '';
+                                return;
+                              }
+                              setMarketplaceFile('amazon', 'settlement', file);
+                            }
+                            e.target.value = '';
+                          }}
+                          disabled={!!uploadingVendor || !isVendorUploaded('amazon', 'sales_b2b')}
+                        />
+                        <label htmlFor="amazon-settlement-upload">
+                    <Button
+                            variant={isVendorUploaded('amazon', 'settlement') ? 'outlined' : 'contained'}
+                            component="span"
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'amazon_settlement' || !isVendorUploaded('amazon', 'sales_b2b')}
+                            endIcon={uploadingVendor === 'amazon_settlement' ? <CircularProgress size={14} /> : null}
+                            onClick={() => {
+                              if (marketplaceFiles.amazon?.settlement) {
+                                handleMarketplaceUploadClick('amazon', 'settlement');
+                              }
+                            }}
+                            sx={{ 
+                              minWidth: 120,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              ...(!isVendorUploaded('amazon', 'sales_b2b') && {
+                                background: '#f3f4f6',
+                                color: '#9ca3af',
+                                cursor: 'not-allowed',
+                                border: 'none',
+                                '&:hover': {
+                                  background: '#f3f4f6',
+                                }
+                              }),
+                              ...(isVendorUploaded('amazon', 'settlement') && {
+                                borderColor: '#16a34a',
+                                color: '#16a34a'
+                              })
+                            }}
+                          >
+                            {uploadingVendor === 'amazon_settlement' ? 'Uploading...' : marketplaceFiles.amazon?.settlement ? 'Upload' : 'Choose File'}
+                    </Button>
+                        </label>
+                        {marketplaceFiles.amazon?.settlement && !isVendorUploaded('amazon', 'settlement') && (
+                          <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
+                            {marketplaceFiles.amazon.settlement.name}
+                          </Typography>
+                        )}
+            </Box>
+                    </Paper>
+                  </Box>
+                </Paper>
+              </Grid>
+            </Grid>
+          </Paper>
+        )}
+
+        {/* D2C View - 3 steps: Sales file, Last Mile Status, D2C Settlement */}
+        {currentView === 'd2c' && selectedMonth !== null && (
+                  <Paper
+                    elevation={0}
+            sx={{ p: 4, background: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', minHeight: '60vh' }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+              <Button
+                onClick={handleBackToYears}
+                startIcon={<ChevronRightIcon sx={{ transform: 'rotate(180deg)' }} />}
+                sx={{ minWidth: 'auto', px: 1 }}
+              >
+                Back
+              </Button>
+              <Typography variant="h6" fontWeight={700} color="#1e293b">
+                D2C Uploads - {months[selectedMonth]} {selectedYear}
+              </Typography>
+            </Box>
+            {/* Upload Status Alert */}
+            {uploadStatus && (
+              <Alert 
+                severity={uploadStatus.type} 
+                sx={{ mb: 3 }}
+                onClose={() => setUploadStatus(null)}
+              >
+                {uploadStatus.message}
+              </Alert>
+            )}
+            <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 0, position: 'relative', maxWidth: 1200, mx: 'auto', flexWrap: 'wrap' }}>
+                {/* Step 1: Sales File (Unicommerce) */}
+              <Paper 
+                elevation={0}
+                sx={{ 
+                  flex: '0 0 auto',
+                  width: 200,
+                  p: 2,
+                  border: isVendorUploaded('unicommerce') ? '2px solid #16a34a' : '2px solid #e5e7eb',
+                  borderRadius: '12px',
+                  background: isVendorUploaded('unicommerce') ? '#f0fdf4' : '#ffffff',
+                  position: 'relative',
+                  zIndex: 2
+                }}
+              >
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                  {/* Step Number Circle */}
+                  <Box sx={{ 
+                    width: 32, 
+                    height: 32, 
+                    borderRadius: '50%', 
+                    background: isVendorUploaded('unicommerce') ? '#16a34a' : '#f3f4f6',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    border: isVendorUploaded('unicommerce') ? 'none' : '2px solid #d1d5db'
+                  }}>
+                      {isVendorUploaded('unicommerce') ? (
+                      <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                      ) : (
+                        <Typography variant="body2" fontWeight={700} color="#6b7280">1</Typography>
                         )}
                       </Box>
-                    </Box>
+                  
+                  {/* Step Title */}
+                  <Typography variant="body2" fontWeight={600} color="#111111" textAlign="center">
+                    Sales File
+                      </Typography>
+                  
+                  {/* Uploaded File Info */}
+                  {isVendorUploaded('unicommerce') && getUploadedDocument('unicommerce') && (
+                    <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
+                      {getUploadedDocument('unicommerce')?.filename}
+                    </Typography>
+                  )}
+                  
+                  {/* File Input */}
                     <input
-                      accept={getAcceptForVendor(vendor.id)}
+                      accept={getAcceptForVendor('unicommerce')}
                       style={{ display: 'none' }}
-                      id={`d2c-settlement-upload-${vendor.id}`}
+                      id="d2c-unicommerce-sales-upload"
                       type="file"
                       onChange={async (e) => {
                         const file = e.target.files?.[0] || null;
                         if (file) {
-                          if (!validateFileType(file, vendor.id, `${vendor.name} settlement`)) {
+                          if (!validateFileType(file, 'unicommerce', 'Unicommerce sales')) {
                             e.target.value = '';
                             return;
                           }
-                          setD2cFile(vendor.id, 'settlement', file);
-                          // Auto-upload when file is selected
-                          handleD2cUpload(vendor.id, 'settlement', file);
+                          setUnicommerceFile(file);
+                          handleUnicommerceUpload(file);
                         }
                         e.target.value = '';
                       }}
-                      disabled={isSettlementUploading}
+                      disabled={uploadingVendor === 'unicommerce_sales'}
                     />
-                    <label htmlFor={`d2c-settlement-upload-${vendor.id}`}>
+                    <label htmlFor="d2c-unicommerce-sales-upload">
                       <Button
-                        variant={isSettlementUploaded ? 'outlined' : 'contained'}
+                        variant={isVendorUploaded('unicommerce') ? 'outlined' : 'contained'}
                         component="span"
-                        disabled={isSettlementUploading}
-                        endIcon={isSettlementUploading ? <CircularProgress size={16} sx={{ color: isSettlementUploaded ? '#111111' : '#fff' }} /> : <ArrowForwardIcon />}
-                        sx={{ background: isSettlementUploaded ? '#ffffff' : '#111111', color: isSettlementUploaded ? '#111111' : '#ffffff', borderColor: isSettlementUploaded ? '#e5e7eb' : 'transparent', fontWeight: 600, px: 3, py: 1.2, '&:hover': { background: isSettlementUploaded ? '#f8fafc' : '#333333', borderColor: isSettlementUploaded ? '#d1d5db' : 'transparent' } }}
-                      >
-                        {isSettlementUploading ? 'Uploading...' : 'Upload file'}
+                      size="small"
+                        startIcon={<CloudUploadIcon />}
+                        disabled={uploadingVendor === 'unicommerce_sales'}
+                      endIcon={uploadingVendor === 'unicommerce_sales' ? <CircularProgress size={14} /> : null}
+                      sx={{ 
+                        minWidth: 120,
+                        fontSize: '0.75rem',
+                        py: 0.75,
+                        ...(isVendorUploaded('unicommerce') && {
+                          borderColor: '#16a34a',
+                          color: '#16a34a'
+                        })
+                      }}
+                    >
+                      {uploadingVendor === 'unicommerce_sales' ? 'Uploading...' : 'Choose File'}
                       </Button>
                     </label>
-                  </Paper>
-                );
-              })}
             </Box>
-            
-            <Divider sx={{ mb: 3 }} />
-            {/* Last Mile Status Upload section */}
-            <Typography variant="subtitle1" sx={{ mb: 1, mt: 2, fontWeight: 700 }} color="primary.main">Last Mile Status Upload</Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 800, mb: 4 }}>
-              <Paper
+                </Paper>
+
+              {/* Connector Line 1 */}
+              <Box sx={{ 
+                width: 60,
+                height: '3px',
+                background: isVendorUploaded('unicommerce') 
+                  ? 'linear-gradient(to right, #16a34a, #16a34a)' 
+                  : 'linear-gradient(to right, #d1d5db, #d1d5db)',
+                position: 'relative',
+                zIndex: 3,
+                alignSelf: 'center'
+              }}>
+                {isVendorUploaded('unicommerce') && (
+                  <Box sx={{
+                    position: 'absolute',
+                    right: -8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    background: '#16a34a',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 4
+                  }}>
+                    <ArrowForwardIcon sx={{ fontSize: 12, color: '#ffffff' }} />
+                  </Box>
+                )}
+              </Box>
+
+                {/* Step 2: Last Mile Status */}
+              <Paper 
                 elevation={0}
                 sx={{ 
-                  p: 3, 
-                  border: isVendorUploaded('lastmile') ? '2px solid #dcfce7' : '2px solid #e5e7eb', 
-                  borderRadius: '12px', 
-                  transition: 'all 0.3s ease', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between', 
-                  gap: 2, 
-                  opacity: uploadingVendor === 'lastmile_status' ? 0.9 : 1,
-                  background: isVendorUploaded('lastmile') ? '#f0fdf4' : '#ffffff', 
-                  '&:hover': { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', borderColor: isVendorUploaded('lastmile') ? '#bbf7d0' : '#d1d5db' } 
+                  flex: '0 0 auto',
+                  width: 200,
+                  p: 2,
+                  border: isVendorUploaded('lastmile') 
+                    ? '2px solid #16a34a' 
+                    : (!isVendorUploaded('unicommerce') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
+                  borderRadius: '12px',
+                  background: isVendorUploaded('lastmile') 
+                    ? '#f0fdf4' 
+                    : (!isVendorUploaded('unicommerce') ? '#f9fafb' : '#ffffff'),
+                  position: 'relative',
+                  zIndex: 2,
+                  opacity: isVendorUploaded('unicommerce') ? 1 : 0.6
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
-                  <Box sx={{ width: 48, height: 48, borderRadius: '8px',                   background: isVendorUploaded('lastmile') ? '#dcfce7' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                  {/* Step Number Circle */}
+                  <Box sx={{ 
+                    width: 32, 
+                    height: 32, 
+                    borderRadius: '50%', 
+                    background: isVendorUploaded('lastmile') 
+                      ? '#16a34a' 
+                      : (!isVendorUploaded('unicommerce') ? '#f3f4f6' : '#f3f4f6'),
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    border: isVendorUploaded('lastmile') 
+                      ? 'none' 
+                      : (!isVendorUploaded('unicommerce') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
+                    position: 'relative'
+                  }}>
                     {isVendorUploaded('lastmile') ? (
-                      <CheckCircleIcon sx={{ fontSize: 24, color: '#16a34a' }} />
+                      <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                    ) : !isVendorUploaded('unicommerce') ? (
+                      <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
                     ) : (
-                      <ShippingIcon sx={{ fontSize: 24, color: '#111111' }} />
+                        <Typography variant="body2" fontWeight={700} color="#6b7280">2</Typography>
                     )}
                   </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="subtitle1" fontWeight={700} color="#111111">Last Mile Status</Typography>
-                      {isVendorUploaded('lastmile') && (
-                        <Chip label="Uploaded" size="small" sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} />
-                      )}
-                    </Box>
-                    {isVendorUploaded('lastmile') && getUploadedDocument('lastmile') ? (
-                      <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mt: 0.5 }}>
-                        {getUploadedDocument('lastmile')?.filename} • {new Date(getUploadedDocument('lastmile')!.upload_date).toLocaleDateString()}
+                  
+                  {/* Step Title */}
+                  <Typography variant="body2" fontWeight={600} color={isVendorUploaded('unicommerce') ? '#111111' : '#9ca3af'} textAlign="center">
+                    Last Mile Status
                       </Typography>
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">
-                        Upload Last Mile Status file
+                  
+                  {/* Uploaded File Info */}
+                  {isVendorUploaded('lastmile') && getUploadedDocument('lastmile') && (
+                    <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
+                      {getUploadedDocument('lastmile')?.filename}
                       </Typography>
                     )}
-                  </Box>
-                </Box>
+                  
+                  {/* File Input */}
                 <input
                   accept={getAcceptForVendor('lastmile')}
                   style={{ display: 'none' }}
-                  id="lastmile-status-upload"
+                      id="d2c-lastmile-status-upload"
                   type="file"
                   onChange={async (e) => {
                     const file = e.target.files?.[0] || null;
@@ -1192,25 +1958,213 @@ const UploadDocuments: React.FC = () => {
                         return;
                       }
                       setLastMileStatusFile(file);
-                      // Auto-upload when file is selected
                       handleLastMileStatusUpload(file);
                     }
                     e.target.value = '';
                   }}
-                  disabled={uploadingVendor === 'lastmile_status'}
+                    disabled={uploadingVendor === 'lastmile_status' || !isVendorUploaded('unicommerce')}
                 />
-                <label htmlFor="lastmile-status-upload">
+                    <label htmlFor="d2c-lastmile-status-upload">
                   <Button
                     variant={isVendorUploaded('lastmile') ? 'outlined' : 'contained'}
                     component="span"
-                    disabled={uploadingVendor === 'lastmile_status'}
-                    endIcon={uploadingVendor === 'lastmile_status' ? <CircularProgress size={16} sx={{ color: isVendorUploaded('lastmile') ? '#111111' : '#fff' }} /> : <ArrowForwardIcon />}
-                    sx={{ background: isVendorUploaded('lastmile') ? '#ffffff' : '#111111', color: isVendorUploaded('lastmile') ? '#111111' : '#ffffff', borderColor: isVendorUploaded('lastmile') ? '#e5e7eb' : 'transparent', fontWeight: 600, px: 3, py: 1.2, '&:hover': { background: isVendorUploaded('lastmile') ? '#f8fafc' : '#333333', borderColor: isVendorUploaded('lastmile') ? '#d1d5db' : 'transparent' } }}
-                  >
-                    {uploadingVendor === 'lastmile_status' ? 'Uploading...' : 'Upload file'}
+                      size="small"
+                        startIcon={<CloudUploadIcon />}
+                      disabled={uploadingVendor === 'lastmile_status' || !isVendorUploaded('unicommerce')}
+                      endIcon={uploadingVendor === 'lastmile_status' ? <CircularProgress size={14} /> : null}
+                      sx={{ 
+                        minWidth: 120,
+                        fontSize: '0.75rem',
+                        py: 0.75,
+                        ...(!isVendorUploaded('unicommerce') && {
+                          background: '#f3f4f6',
+                          color: '#9ca3af',
+                          cursor: 'not-allowed',
+                          border: 'none',
+                          '&:hover': {
+                            background: '#f3f4f6',
+                          }
+                        }),
+                        ...(isVendorUploaded('lastmile') && {
+                          borderColor: '#16a34a',
+                          color: '#16a34a'
+                        })
+                      }}
+                    >
+                      {uploadingVendor === 'lastmile_status' ? 'Uploading...' : 'Choose File'}
                   </Button>
                 </label>
+                  </Box>
               </Paper>
+
+              {/* Connector Line 2 */}
+              <Box sx={{ 
+                width: 60,
+                height: '3px',
+                background: isVendorUploaded('lastmile') 
+                  ? 'linear-gradient(to right, #16a34a, #16a34a)' 
+                  : 'linear-gradient(to right, #d1d5db, #d1d5db)',
+                position: 'relative',
+                zIndex: 3,
+                alignSelf: 'center'
+              }}>
+                {isVendorUploaded('lastmile') && (
+                  <Box sx={{
+                    position: 'absolute',
+                    right: -8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    background: '#16a34a',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 4
+                  }}>
+                    <ArrowForwardIcon sx={{ fontSize: 12, color: '#ffffff' }} />
+                  </Box>
+                )}
+              </Box>
+
+                {/* Step 3: D2C Settlement List */}
+              <Paper 
+                elevation={0}
+                sx={{ 
+                  flex: '0 0 auto',
+                  width: 400,
+                  p: 2,
+                  border: !isVendorUploaded('lastmile') ? '2px dashed #d1d5db' : '2px solid #e5e7eb',
+                  borderRadius: '12px',
+                  background: !isVendorUploaded('lastmile') ? '#f9fafb' : '#ffffff',
+                  position: 'relative',
+                  zIndex: 2,
+                  opacity: isVendorUploaded('lastmile') ? 1 : 0.6
+                }}
+              >
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                  {/* Step Number Circle */}
+                  <Box sx={{ 
+                    width: 32, 
+                    height: 32, 
+                    borderRadius: '50%', 
+                    background: !isVendorUploaded('lastmile') ? '#f3f4f6' : '#f3f4f6',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    border: !isVendorUploaded('lastmile') ? '2px dashed #d1d5db' : '2px solid #d1d5db',
+                    position: 'relative'
+                  }}>
+                    {!isVendorUploaded('lastmile') ? (
+                      <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
+                    ) : (
+                      <Typography variant="body2" fontWeight={700} color="#6b7280">3</Typography>
+                    )}
+                    </Box>
+                  
+                  {/* Step Title */}
+                  <Typography variant="body2" fontWeight={600} color={isVendorUploaded('lastmile') ? '#111111' : '#9ca3af'} textAlign="center">
+                    D2C Settlement
+                      </Typography>
+                  
+                  {/* Settlement Providers List */}
+                  <Box sx={{ width: '100%', mt: 1 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 400, overflowY: 'auto' }}>
+                      {vendors.filter(v => v.id !== 'amazon' && v.id !== 'flipkart').map((vendor) => {
+                        const isSettlementUploaded = isVendorUploaded(vendor.id, 'settlement');
+                        const uploadedSettlementDoc = getUploadedDocument(vendor.id, 'settlement');
+                        const isSettlementUploading = uploadingVendor === `${vendor.id}_settlement`;
+
+                        return (
+                          <Paper
+                            key={vendor.id}
+                            elevation={0}
+                            sx={{ 
+                              p: 1.5, 
+                              border: isSettlementUploaded ? '1px solid #dcfce7' : '1px solid #e5e7eb', 
+                              borderRadius: '8px', 
+                              background: isSettlementUploaded ? '#f0fdf4' : '#ffffff' 
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                                  <Typography variant="caption" fontWeight={600} color="#111111" sx={{ fontSize: '0.7rem' }}>
+                                    {vendor.name}
+                                  </Typography>
+                                  {isSettlementUploaded && (
+                                    <CheckCircleIcon sx={{ fontSize: 14, color: '#16a34a' }} />
+                                  )}
+                                </Box>
+                                {isSettlementUploaded && uploadedSettlementDoc ? (
+                                  <Typography variant="caption" color="#16a34a" sx={{ display: 'block', fontSize: '9px' }}>
+                                    {uploadedSettlementDoc.filename}
+                                  </Typography>
+                                ) : (
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '9px' }}>
+                                    Not uploaded
+                                  </Typography>
+                                )}
+                              </Box>
+                              <input
+                                accept={getAcceptForVendor(vendor.id)}
+                                style={{ display: 'none' }}
+                                id={`d2c-settlement-upload-${vendor.id}`}
+                                type="file"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0] || null;
+                                  if (file) {
+                                    if (!validateFileType(file, vendor.id, `${vendor.name} settlement`)) {
+                                      e.target.value = '';
+                                      return;
+                                    }
+                                    setD2cFile(vendor.id, 'settlement', file);
+                                    handleD2cUpload(vendor.id, 'settlement', file);
+                                  }
+                                  e.target.value = '';
+                                }}
+                                disabled={isSettlementUploading || !isVendorUploaded('lastmile')}
+                              />
+                              <label htmlFor={`d2c-settlement-upload-${vendor.id}`}>
+                                <Button
+                                  variant={isSettlementUploaded ? 'outlined' : 'contained'}
+                                  component="span"
+                                  size="small"
+                                  disabled={isSettlementUploading || !isVendorUploaded('lastmile')}
+                                  endIcon={isSettlementUploading ? <CircularProgress size={12} /> : null}
+                                  sx={{ 
+                                    minWidth: 70,
+                                    fontSize: '0.7rem',
+                                    py: 0.5,
+                                    px: 1,
+                                    ...(!isVendorUploaded('lastmile') && {
+                                      background: '#f3f4f6',
+                                      color: '#9ca3af',
+                                      cursor: 'not-allowed',
+                                      border: 'none',
+                                      '&:hover': {
+                                        background: '#f3f4f6',
+                                      }
+                                    }),
+                                    ...(isSettlementUploaded && {
+                                      borderColor: '#16a34a',
+                                      color: '#16a34a',
+                                      minWidth: 70
+                                    })
+                                  }}
+                                >
+                                  {isSettlementUploading ? '...' : isSettlementUploaded ? 'Done' : 'Upload'}
+                                </Button>
+                              </label>
+                            </Box>
+                          </Paper>
+                        );
+                      })}
+                    </Box>
+                    </Box>
+                  </Box>
+                </Paper>
             </Box>
           </Paper>
         )}
