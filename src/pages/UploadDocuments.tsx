@@ -794,58 +794,30 @@ const UploadDocuments: React.FC = () => {
             Upload Settlement Sheets
           </Typography>
           
-          <Breadcrumbs separator={<ChevronRightIcon fontSize="small" />} aria-label="breadcrumb">
-            <Link
-              component="button"
-              variant="body2"
-              onClick={handleBackToYears}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5,
-                color: currentView === 'years' ? '#111111' : '#6b7280',
-                textDecoration: 'none',
-                fontWeight: currentView === 'years' ? 600 : 400,
-                '&:hover': { textDecoration: 'underline' }
-              }}
-            >
-              <HomeIcon fontSize="small" />
-              Years
-            </Link>
-            {(currentView === 'marketplace' || currentView === 'd2c') && selectedYear && selectedMonth !== null && (
-              <>
-              <Link
-                component="button"
-                variant="body2"
-                  onClick={handleBackToYears}
-                sx={{
-                    color: '#6b7280',
-                  textDecoration: 'none',
-                    fontWeight: 400,
-                  '&:hover': { textDecoration: 'underline' }
+          {(currentView === 'marketplace' || currentView === 'd2c') && selectedYear && selectedMonth !== null && (
+            <Breadcrumbs separator={<ChevronRightIcon fontSize="small" />} aria-label="breadcrumb">
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  '&:hover': { opacity: 0.7 }
                 }}
+                onClick={handleBackToYears}
               >
+                <HomeIcon fontSize="small" sx={{ color: '#6b7280' }} />
+              </Box>
+              <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 400 }}>
                 {selectedYear}
-              </Link>
-                <Link
-                  component="button"
-                  variant="body2"
-                  onClick={handleBackToYears}
-                  sx={{
-                    color: '#6b7280',
-                    textDecoration: 'none',
-                    fontWeight: 400,
-                    '&:hover': { textDecoration: 'underline' }
-                  }}
-                >
-                  {months[selectedMonth]}
-                </Link>
-              <Typography variant="body2" color="text.primary" fontWeight={600}>
-                  {currentView === 'marketplace' ? 'Marketplace' : 'D2C'}
               </Typography>
-              </>
-            )}
-          </Breadcrumbs>
+              <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 400 }}>
+                {months[selectedMonth]}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#111111', fontWeight: 600 }}>
+                {currentView === 'marketplace' ? 'Marketplace' : 'D2C'}
+              </Typography>
+            </Breadcrumbs>
+          )}
         </Box>
 
         {/* Years View with Hover Dropdowns */}
