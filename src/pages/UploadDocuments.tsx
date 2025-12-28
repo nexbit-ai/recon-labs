@@ -1149,7 +1149,6 @@ const UploadDocuments: React.FC = () => {
                           }}
                           disabled={!!uploadingVendor}
                         />
-                        <label htmlFor="flipkart-sales-upload">
                         <label htmlFor="flipkart-sales-upload" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                           <Button
                             variant={isVendorUploaded('flipkart', 'sales') ? 'outlined' : 'contained'}
@@ -1178,7 +1177,11 @@ const UploadDocuments: React.FC = () => {
                             disabled={!!uploadingVendor || uploadingVendor === 'flipkart_sales'}
                             endIcon={uploadingVendor === 'flipkart_sales' ? <CircularProgress size={14} /> : null}
                             onClick={() => handleMarketplaceUploadClick('flipkart', 'sales')}
-                        </label>
+                            sx={{ mt: 1 }}
+                          >
+                            Upload
+                          </Button>
+                        )}
                         {marketplaceFiles.flipkart?.sales && !isVendorUploaded('flipkart', 'sales') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
                             {marketplaceFiles.flipkart.sales.name}
