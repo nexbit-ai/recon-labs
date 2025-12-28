@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -200,6 +200,7 @@ import { Platform } from '../data/mockData';
 import { padding } from '@mui/system';
 import { useUser } from '../contexts/UserContext';
 import { useOrganization } from '../hooks/useOrganization';
+import { useReconciliationStatus, formatReconciliationTimestamp } from '../hooks/useReconciliationStatus';
 
 const MarketplaceReconciliation: React.FC = () => {
   const { setMemberName } = useUser();
@@ -213,9 +214,15 @@ const MarketplaceReconciliation: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
   const [reconciliationData, setReconciliationData] = useState<MarketplaceReconciliationResponse>(mockReconciliationData);
   const [mainSummary, setMainSummary] = useState<MainSummaryResponse | null>(null);
+  const [reconciliationStatus, setReconciliationStatus] = useState<{
+    state: 'processing' | 'processed';
+    processing_count: number;
+    last_completed_at: string | null;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(false);
+  const normalizedReconciliationStatus = useReconciliationStatus(reconciliationStatus);
   const [isCodExpanded, setIsCodExpanded] = useState(false);
   const [expandedProviderKey, setExpandedProviderKey] = useState<string | null>(null);
   const getSettlementProviderCode = (providerKey?: string | null, providerName?: string | null) => {
@@ -1153,18 +1160,59 @@ const MarketplaceReconciliation: React.FC = () => {
     }
   };
 
-  // Fetch upload list to get member name
-  const fetchUploadList = async () => {
+  // Fetch upload list to get member name and reconciliation status
+  const fetchUploadList = useCallback(async () => {
     try {
       const response = await apiIndex.uploadList.getUploadList({ report_type: 'D2C-DirectUpload' });
-      if (response.success && response.data?.memberName) {
-        setMemberName(response.data.memberName);
+      if (response.success && response.data) {
+        if (response.data.memberName) {
+          setMemberName(response.data.memberName);
+        }
+        
+        const previousState = reconciliationStatus?.state;
+        
+        if (response.data.reconciliation_status) {
+          setReconciliationStatus(response.data.reconciliation_status);
+          
+          // If status changed from processing to processed, refresh all data APIs
+          if (previousState === 'processing' && response.data.reconciliation_status.state === 'processed') {
+            console.log('✅ Reconciliation completed! Refreshing main summary, ageing analysis, and upload list...');
+            // Refresh main summary to get updated reconciliation results
+            if (selectedDateRange === 'custom') {
+              if (customStartDate && customEndDate) {
+                fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
+              }
+            } else {
+              fetchReconciliationDataByDateRange(selectedDateRange);
+            }
+            // Refresh ageing analysis
+            if (selectedDateRange !== 'custom' || (customStartDate && customEndDate)) {
+              fetchAgeingAnalysis();
+            }
+            // Refresh upload list to get any updated upload data
+            // Note: This won't trigger the refresh logic again since previousState will be 'processed'
+            setTimeout(() => {
+              fetchUploadList();
+            }, 100);
+          }
+        } else {
+          setReconciliationStatus(null);
+        }
       }
     } catch (error) {
       console.error('Error fetching upload list:', error);
       // Non-fatal - don't set member name if API fails
+      setReconciliationStatus(null);
     }
-  };
+  }, [
+    reconciliationStatus?.state,
+    selectedDateRange,
+    customStartDate,
+    customEndDate,
+    fetchReconciliationDataByDateRangeWithDates,
+    fetchReconciliationDataByDateRange,
+    fetchAgeingAnalysis,
+  ]);
   
   // Platform selector state - load from localStorage if available
   const loadPlatformFromStorage = (): Platform => {
@@ -1694,6 +1742,25 @@ const MarketplaceReconciliation: React.FC = () => {
     fetchSalesOverview();
   }, []);
 
+  // Auto-poll upload-list API when reconciliation is processing
+  useEffect(() => {
+    // Only poll if status is processing
+    if (normalizedReconciliationStatus.state !== 'processing') {
+      return;
+    }
+
+    // Poll upload-list API every 30 seconds while processing
+    const pollInterval = setInterval(() => {
+      console.log('🔄 Polling upload-list API for reconciliation status update...');
+      fetchUploadList();
+    }, 30000); // Poll every 30 seconds
+
+    // Cleanup interval on unmount or when status changes
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [normalizedReconciliationStatus.state, fetchUploadList]);
+
   // Open Transaction Sheet overlay when query params indicate so
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -2167,6 +2234,61 @@ const MarketplaceReconciliation: React.FC = () => {
             )}
           </Box>
         </Fade>
+
+        {/* Reconciliation Status Message */}
+        {normalizedReconciliationStatus.state === 'processing' && (
+          <Alert 
+            severity="info" 
+            icon={<ScheduleIcon />}
+            sx={{ 
+              mb: 3, 
+              bgcolor: '#f0f9ff', 
+              color: '#0c4a6e', 
+              border: '1px solid #bae6fd',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              '& .MuiAlert-icon': {
+                alignItems: 'center',
+                display: 'flex'
+              },
+              '& .MuiAlert-message': {
+                display: 'flex',
+                alignItems: 'center'
+              }
+            }}
+          >
+            {normalizedReconciliationStatus.processing_count === 1 
+              ? '1 file is still processing. Results will update automatically.'
+              : `${normalizedReconciliationStatus.processing_count} files are still processing. Results will update automatically.`
+            }
+          </Alert>
+        )}
+        {normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at && (
+          <Alert 
+            severity="success" 
+            icon={<CheckCircleIcon />}
+            sx={{ 
+              mb: 3, 
+              bgcolor: '#f0fdf4', 
+              color: '#166534', 
+              border: '1px solid #bbf7d0',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              '& .MuiAlert-icon': {
+                alignItems: 'center',
+                display: 'flex'
+              },
+              '& .MuiAlert-message': {
+                display: 'flex',
+                alignItems: 'center'
+              }
+            }}
+          >
+            Last updated at {formatReconciliationTimestamp(normalizedReconciliationStatus.last_completed_at)}
+          </Alert>
+        )}
 
         <Grid container spacing={3} alignItems="stretch" sx={{ mb: 6 }}>
           <Grid item xs={12} md={7}>

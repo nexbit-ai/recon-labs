@@ -9,12 +9,14 @@ import {
   ArrowForward as ArrowForwardIcon,
   ArrowDownward as ArrowDownwardIcon,
   KeyboardArrowRight as KeyboardArrowRightIcon,
-  Lock as LockIcon
+  Lock as LockIcon,
+  Schedule as ScheduleIcon
 } from '@mui/icons-material';
 import { API_CONFIG } from '../services/api/config';
 import { tokenManager } from '../services/api/tokenManager';
 import JWTService from '../services/auth/jwtService';
 import { useStytchMemberSession } from '@stytch/react/b2b';
+import { useReconciliationStatus } from '../hooks/useReconciliationStatus';
 
 interface Vendor {
   id: string;
@@ -33,7 +35,13 @@ interface UploadedDocument {
 }
 
 interface UploadListResponse {
+  memberName?: string;
   uploads: UploadedDocument[];
+  reconciliation_status?: {
+    state: 'processing' | 'processed';
+    processing_count: number;
+    last_completed_at: string | null;
+  };
 }
 
 const vendors: Vendor[] = [
@@ -91,7 +99,9 @@ const UploadDocuments: React.FC = () => {
   const [unicommerceFile, setUnicommerceFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
+  const [reconciliationStatus, setReconciliationStatus] = useState<UploadListResponse['reconciliation_status']>(undefined);
   const [loadingUploads, setLoadingUploads] = useState(false);
+  const normalizedReconciliationStatus = useReconciliationStatus(reconciliationStatus);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [rightPanelVendor, setRightPanelVendor] = useState<'amazon' | 'flipkart' | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -227,14 +237,18 @@ const UploadDocuments: React.FC = () => {
       if (response.ok) {
         const data: UploadListResponse = await response.json();
         setUploadedDocuments(data.uploads || []);
+        setReconciliationStatus(data.reconciliation_status || undefined);
         console.log('📋 Fetched uploaded documents:', data.uploads);
+        console.log('📋 Reconciliation status:', data.reconciliation_status);
       } else {
         console.error('Failed to fetch uploaded documents');
         setUploadedDocuments([]);
+        setReconciliationStatus(undefined);
       }
     } catch (error) {
       console.error('Error fetching uploaded documents:', error);
       setUploadedDocuments([]);
+      setReconciliationStatus(undefined);
     } finally {
       setLoadingUploads(false);
     }
@@ -1074,6 +1088,55 @@ const UploadDocuments: React.FC = () => {
                 Marketplace Uploads - {months[selectedMonth]} {selectedYear}
             </Typography>
             </Box>
+            {/* Reconciliation Status Indicator */}
+            {normalizedReconciliationStatus.state === 'processing' && (
+              <Alert 
+                severity="info" 
+                icon={<ScheduleIcon />}
+                sx={{ 
+                  mb: 3, 
+                  bgcolor: '#f0f9ff', 
+                  color: '#0c4a6e', 
+                  border: '1px solid #bae6fd',
+                  display: 'flex',
+                  alignItems: 'center',
+                  '& .MuiAlert-icon': {
+                    alignItems: 'center',
+                    display: 'flex'
+                  },
+                  '& .MuiAlert-message': {
+                    display: 'flex',
+                    alignItems: 'center'
+                  }
+                }}
+              >
+                ⏳ Processing reconciliation for recent uploads
+              </Alert>
+            )}
+            {normalizedReconciliationStatus.state === 'processed' && (
+              <Alert 
+                severity="success" 
+                icon={<CheckCircleIcon />}
+                sx={{ 
+                  mb: 3, 
+                  bgcolor: '#f0fdf4', 
+                  color: '#166534', 
+                  border: '1px solid #bbf7d0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  '& .MuiAlert-icon': {
+                    alignItems: 'center',
+                    display: 'flex'
+                  },
+                  '& .MuiAlert-message': {
+                    display: 'flex',
+                    alignItems: 'center'
+                  }
+                }}
+              >
+                ✅ All uploads processed
+              </Alert>
+            )}
             {/* Upload Status Alert */}
             {uploadStatus && (
               <Alert 
@@ -1886,6 +1949,55 @@ const UploadDocuments: React.FC = () => {
                 D2C Uploads - {months[selectedMonth]} {selectedYear}
               </Typography>
             </Box>
+            {/* Reconciliation Status Indicator */}
+            {normalizedReconciliationStatus.state === 'processing' && (
+              <Alert 
+                severity="info" 
+                icon={<ScheduleIcon />}
+                sx={{ 
+                  mb: 3, 
+                  bgcolor: '#f0f9ff', 
+                  color: '#0c4a6e', 
+                  border: '1px solid #bae6fd',
+                  display: 'flex',
+                  alignItems: 'center',
+                  '& .MuiAlert-icon': {
+                    alignItems: 'center',
+                    display: 'flex'
+                  },
+                  '& .MuiAlert-message': {
+                    display: 'flex',
+                    alignItems: 'center'
+                  }
+                }}
+              >
+                ⏳ Processing reconciliation for recent uploads
+              </Alert>
+            )}
+            {normalizedReconciliationStatus.state === 'processed' && (
+              <Alert 
+                severity="success" 
+                icon={<CheckCircleIcon />}
+                sx={{ 
+                  mb: 3, 
+                  bgcolor: '#f0fdf4', 
+                  color: '#166534', 
+                  border: '1px solid #bbf7d0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  '& .MuiAlert-icon': {
+                    alignItems: 'center',
+                    display: 'flex'
+                  },
+                  '& .MuiAlert-message': {
+                    display: 'flex',
+                    alignItems: 'center'
+                  }
+                }}
+              >
+                ✅ All uploads processed
+              </Alert>
+            )}
             {/* Upload Status Alert */}
             {uploadStatus && (
               <Alert 
