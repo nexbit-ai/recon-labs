@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Box, Typography, Paper, Grid, Breadcrumbs, Link, Chip, Button, Alert, CircularProgress, Drawer, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, MenuItem } from '@mui/material';
 import { 
   CalendarToday as CalendarIcon,
@@ -98,7 +98,15 @@ const UploadDocuments: React.FC = () => {
   const [pendingUpload, setPendingUpload] = useState<{ vendorId: 'amazon' | 'flipkart'; kind: 'sales' | 'sales_b2b' | 'settlement' } | null>(null);
   const [hoveredYear, setHoveredYear] = useState<number | null>(null);
   const [hoveredMonth, setHoveredMonth] = useState<{ year: number; month: number } | null>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const validateFileType = (file: File, vendorId?: string | null, label?: string) => {
     const normalizedName = file.name.toLowerCase();
