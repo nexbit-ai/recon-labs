@@ -1144,6 +1144,7 @@ const UploadDocuments: React.FC = () => {
                           disabled={!!uploadingVendor}
                         />
                         <label htmlFor="flipkart-sales-upload">
+                        <label htmlFor="flipkart-sales-upload" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                           <Button
                             variant={isVendorUploaded('flipkart', 'sales') ? 'outlined' : 'contained'}
                             component="span"
@@ -1151,11 +1152,6 @@ const UploadDocuments: React.FC = () => {
                             startIcon={<CloudUploadIcon />}
                             disabled={!!uploadingVendor || uploadingVendor === 'flipkart_sales'}
                             endIcon={uploadingVendor === 'flipkart_sales' ? <CircularProgress size={14} /> : null}
-                            onClick={() => {
-                              if (marketplaceFiles.flipkart?.sales) {
-                                handleMarketplaceUploadClick('flipkart', 'sales');
-                              }
-                            }}
                             sx={{ 
                               minWidth: 120,
                               fontSize: '0.75rem',
@@ -1166,8 +1162,16 @@ const UploadDocuments: React.FC = () => {
                               })
                             }}
                           >
-                            {uploadingVendor === 'flipkart_sales' ? 'Uploading...' : marketplaceFiles.flipkart?.sales ? 'Upload' : 'Choose File'}
+                            {uploadingVendor === 'flipkart_sales' ? 'Uploading...' : marketplaceFiles.flipkart?.sales ? marketplaceFiles.flipkart.sales.name : 'Choose File'}
                           </Button>
+                        </label>
+                        {marketplaceFiles.flipkart?.sales && (
+                          <Button
+                            variant="contained"
+                            size="small"
+                            disabled={!!uploadingVendor || uploadingVendor === 'flipkart_sales'}
+                            endIcon={uploadingVendor === 'flipkart_sales' ? <CircularProgress size={14} /> : null}
+                            onClick={() => handleMarketplaceUploadClick('flipkart', 'sales')}
                         </label>
                         {marketplaceFiles.flipkart?.sales && !isVendorUploaded('flipkart', 'sales') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
