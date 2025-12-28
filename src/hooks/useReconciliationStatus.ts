@@ -2,29 +2,35 @@ import { useMemo } from 'react';
 import { ReconciliationStatus } from '../services/api/types';
 
 /**
+ * Extended type that includes computed state based on processing_count
+ */
+export interface NormalizedReconciliationStatus extends ReconciliationStatus {
+  state: 'processing' | 'processed'; // Computed from processing_count
+}
+
+/**
  * Hook to parse and normalize reconciliation_status from API response
- * Provides safe fallback values when the object is missing
+ * Derives state from processing_count: 0 = processed, >0 = processing
+ * Returns null when reconciliation_status is not provided (graceful handling)
  */
 export const useReconciliationStatus = (
   reconciliationStatus?: ReconciliationStatus | null
-): ReconciliationStatus => {
+): NormalizedReconciliationStatus | null => {
   return useMemo(() => {
     // If reconciliation_status is provided and valid, use it
     if (reconciliationStatus && typeof reconciliationStatus === 'object') {
+      const processingCount = reconciliationStatus.processing_count ?? 0;
       return {
-        state: reconciliationStatus.state || 'processing',
-        processing_count: reconciliationStatus.processing_count ?? 1,
+        platform: reconciliationStatus.platform || '',
+        processing_count: processingCount,
         last_completed_at: reconciliationStatus.last_completed_at ?? null,
+        // Derive state from processing_count: 0 = processed, >0 = processing
+        state: processingCount > 0 ? 'processing' : 'processed',
       };
     }
 
-    // Fallback to dummy values when object is missing
-    // This should be easy to remove later when backend always sends the object
-    return {
-      state: 'processing',
-      processing_count: 1,
-      last_completed_at: null,
-    };
+    // Return null when reconciliation_status is not provided - handle gracefully
+    return null;
   }, [reconciliationStatus]);
 };
 

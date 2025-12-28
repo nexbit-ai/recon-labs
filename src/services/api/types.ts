@@ -494,7 +494,7 @@ export interface ExportListResponse {
 
 // Reconciliation Status Types
 export interface ReconciliationStatus {
-  state: 'processing' | 'processed';
+  platform: string;
   processing_count: number;
   last_completed_at: string | null; // ISO timestamp
 }

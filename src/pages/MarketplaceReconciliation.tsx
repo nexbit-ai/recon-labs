@@ -193,7 +193,7 @@ import {
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
 import { apiService } from '../services/api/apiService';
-import { MarketplaceReconciliationResponse, MainSummaryResponse, ProviderAgeingData, AgeingAnalysisResponse } from '../services/api/types';
+import { MarketplaceReconciliationResponse, MainSummaryResponse, ProviderAgeingData, AgeingAnalysisResponse, ReconciliationStatus } from '../services/api/types';
 import { api as apiIndex } from '../services/api';
 import { mockReconciliationData, getSafeReconciliationData, isValidReconciliationData } from '../data/mockReconciliationData';
 import { Platform } from '../data/mockData';
@@ -214,11 +214,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
   const [reconciliationData, setReconciliationData] = useState<MarketplaceReconciliationResponse>(mockReconciliationData);
   const [mainSummary, setMainSummary] = useState<MainSummaryResponse | null>(null);
-  const [reconciliationStatus, setReconciliationStatus] = useState<{
-    state: 'processing' | 'processed';
-    processing_count: number;
-    last_completed_at: string | null;
-  } | null>(null);
+  const [reconciliationStatus, setReconciliationStatus] = useState<ReconciliationStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(false);
@@ -1160,60 +1156,6 @@ const MarketplaceReconciliation: React.FC = () => {
     }
   };
 
-  // Fetch upload list to get member name and reconciliation status
-  const fetchUploadList = useCallback(async () => {
-    try {
-      const response = await apiIndex.uploadList.getUploadList({ report_type: 'D2C-DirectUpload' });
-      if (response.success && response.data) {
-        if (response.data.memberName) {
-          setMemberName(response.data.memberName);
-        }
-        
-        const previousState = reconciliationStatus?.state;
-        
-        if (response.data.reconciliation_status) {
-          setReconciliationStatus(response.data.reconciliation_status);
-          
-          // If status changed from processing to processed, refresh all data APIs
-          if (previousState === 'processing' && response.data.reconciliation_status.state === 'processed') {
-            console.log('✅ Reconciliation completed! Refreshing main summary, ageing analysis, and upload list...');
-            // Refresh main summary to get updated reconciliation results
-            if (selectedDateRange === 'custom') {
-              if (customStartDate && customEndDate) {
-                fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
-              }
-            } else {
-              fetchReconciliationDataByDateRange(selectedDateRange);
-            }
-            // Refresh ageing analysis
-            if (selectedDateRange !== 'custom' || (customStartDate && customEndDate)) {
-              fetchAgeingAnalysis();
-            }
-            // Refresh upload list to get any updated upload data
-            // Note: This won't trigger the refresh logic again since previousState will be 'processed'
-            setTimeout(() => {
-              fetchUploadList();
-            }, 100);
-          }
-        } else {
-          setReconciliationStatus(null);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching upload list:', error);
-      // Non-fatal - don't set member name if API fails
-      setReconciliationStatus(null);
-    }
-  }, [
-    reconciliationStatus?.state,
-    selectedDateRange,
-    customStartDate,
-    customEndDate,
-    fetchReconciliationDataByDateRangeWithDates,
-    fetchReconciliationDataByDateRange,
-    fetchAgeingAnalysis,
-  ]);
-  
   // Platform selector state - load from localStorage if available
   const loadPlatformFromStorage = (): Platform => {
     try {
@@ -1236,6 +1178,73 @@ const MarketplaceReconciliation: React.FC = () => {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(loadPlatformFromStorage());
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [tempSelectedPlatform, setTempSelectedPlatform] = useState<Platform | null>(null);
+
+  // Fetch upload list to get member name and reconciliation status
+  const fetchUploadList = useCallback(async () => {
+    try {
+      // Map platform value to capitalized format for API
+      const platformMap: Record<string, string> = {
+        'd2c': 'D2C',
+        'flipkart': 'Flipkart',
+        'amazon': 'Amazon',
+      };
+      const platformParam = selectedPlatform ? platformMap[selectedPlatform] : undefined;
+      
+      const response = await apiIndex.uploadList.getUploadList({ 
+        report_type: 'D2C-DirectUpload',
+        platform: platformParam,
+      });
+      if (response.success && response.data) {
+        if (response.data.memberName) {
+          setMemberName(response.data.memberName);
+        }
+        
+        const previousProcessingCount = reconciliationStatus?.processing_count ?? 0;
+        
+        if (response.data.reconciliation_status) {
+          setReconciliationStatus(response.data.reconciliation_status);
+          
+          // If status changed from processing to processed (processing_count went from >0 to 0), refresh all data APIs
+          if (previousProcessingCount > 0 && response.data.reconciliation_status.processing_count === 0) {
+            console.log('✅ Reconciliation completed! Refreshing main summary, ageing analysis, and upload list...');
+            // Refresh main summary to get updated reconciliation results
+            if (selectedDateRange === 'custom') {
+              if (customStartDate && customEndDate) {
+                fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
+              }
+            } else {
+              fetchReconciliationDataByDateRange(selectedDateRange);
+            }
+            // Refresh ageing analysis
+            if (selectedDateRange !== 'custom' || (customStartDate && customEndDate)) {
+              fetchAgeingAnalysis();
+            }
+            // Refresh upload list to get any updated upload data
+            // Note: This won't trigger the refresh logic again since previousProcessingCount will be 0
+            setTimeout(() => {
+              fetchUploadList();
+            }, 100);
+          }
+        } else {
+          // No reconciliation_status from backend - handle gracefully by not showing any status
+          setReconciliationStatus(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching upload list:', error);
+      // Non-fatal - don't set member name if API fails
+      setReconciliationStatus(null);
+    }
+  }, [
+    reconciliationStatus?.processing_count,
+    selectedDateRange,
+    customStartDate,
+    customEndDate,
+    selectedPlatform,
+    fetchReconciliationDataByDateRangeWithDates,
+    fetchReconciliationDataByDateRange,
+    fetchAgeingAnalysis,
+  ]);
 
   // Persist platform to localStorage whenever it changes
   useEffect(() => {
@@ -1744,8 +1753,8 @@ const MarketplaceReconciliation: React.FC = () => {
 
   // Auto-poll upload-list API when reconciliation is processing
   useEffect(() => {
-    // Only poll if status is processing
-    if (normalizedReconciliationStatus.state !== 'processing') {
+    // Only poll if reconciliation_status exists and processing_count > 0 (still processing)
+    if (!normalizedReconciliationStatus || normalizedReconciliationStatus.processing_count === 0) {
       return;
     }
 
@@ -1755,11 +1764,11 @@ const MarketplaceReconciliation: React.FC = () => {
       fetchUploadList();
     }, 30000); // Poll every 30 seconds
 
-    // Cleanup interval on unmount or when status changes
+    // Cleanup interval on unmount or when processing_count changes
     return () => {
       clearInterval(pollInterval);
     };
-  }, [normalizedReconciliationStatus.state, fetchUploadList]);
+  }, [normalizedReconciliationStatus?.processing_count, fetchUploadList]);
 
   // Open Transaction Sheet overlay when query params indicate so
   useEffect(() => {
@@ -2235,8 +2244,8 @@ const MarketplaceReconciliation: React.FC = () => {
           </Box>
         </Fade>
 
-        {/* Reconciliation Status Message */}
-        {normalizedReconciliationStatus.state === 'processing' && (
+        {/* Reconciliation Status Message - only show when reconciliation_status exists from backend */}
+        {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processing' && (
           <Alert 
             severity="info" 
             icon={<ScheduleIcon />}
@@ -2264,7 +2273,7 @@ const MarketplaceReconciliation: React.FC = () => {
             }
           </Alert>
         )}
-        {normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at && (
+        {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at && (
           <Alert 
             severity="success" 
             icon={<CheckCircleIcon />}

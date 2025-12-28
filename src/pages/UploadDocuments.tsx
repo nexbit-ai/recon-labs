@@ -17,6 +17,7 @@ import { tokenManager } from '../services/api/tokenManager';
 import JWTService from '../services/auth/jwtService';
 import { useStytchMemberSession } from '@stytch/react/b2b';
 import { useReconciliationStatus } from '../hooks/useReconciliationStatus';
+import { ReconciliationStatus, UploadListResponse as APIUploadListResponse } from '../services/api/types';
 
 interface Vendor {
   id: string;
@@ -37,11 +38,7 @@ interface UploadedDocument {
 interface UploadListResponse {
   memberName?: string;
   uploads: UploadedDocument[];
-  reconciliation_status?: {
-    state: 'processing' | 'processed';
-    processing_count: number;
-    last_completed_at: string | null;
-  };
+  reconciliation_status?: ReconciliationStatus;
 }
 
 const vendors: Vendor[] = [
@@ -1089,31 +1086,7 @@ const UploadDocuments: React.FC = () => {
             </Typography>
             </Box>
             {/* Reconciliation Status Indicator */}
-            {normalizedReconciliationStatus.state === 'processing' && (
-              <Alert 
-                severity="info" 
-                icon={<ScheduleIcon />}
-                sx={{ 
-                  mb: 3, 
-                  bgcolor: '#f0f9ff', 
-                  color: '#0c4a6e', 
-                  border: '1px solid #bae6fd',
-                  display: 'flex',
-                  alignItems: 'center',
-                  '& .MuiAlert-icon': {
-                    alignItems: 'center',
-                    display: 'flex'
-                  },
-                  '& .MuiAlert-message': {
-                    display: 'flex',
-                    alignItems: 'center'
-                  }
-                }}
-              >
-                ⏳ Processing reconciliation for recent uploads
-              </Alert>
-            )}
-            {normalizedReconciliationStatus.state === 'processed' && (
+            {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && (
               <Alert 
                 severity="success" 
                 icon={<CheckCircleIcon />}
@@ -1950,31 +1923,7 @@ const UploadDocuments: React.FC = () => {
               </Typography>
             </Box>
             {/* Reconciliation Status Indicator */}
-            {normalizedReconciliationStatus.state === 'processing' && (
-              <Alert 
-                severity="info" 
-                icon={<ScheduleIcon />}
-                sx={{ 
-                  mb: 3, 
-                  bgcolor: '#f0f9ff', 
-                  color: '#0c4a6e', 
-                  border: '1px solid #bae6fd',
-                  display: 'flex',
-                  alignItems: 'center',
-                  '& .MuiAlert-icon': {
-                    alignItems: 'center',
-                    display: 'flex'
-                  },
-                  '& .MuiAlert-message': {
-                    display: 'flex',
-                    alignItems: 'center'
-                  }
-                }}
-              >
-                ⏳ Processing reconciliation for recent uploads
-              </Alert>
-            )}
-            {normalizedReconciliationStatus.state === 'processed' && (
+            {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && (
               <Alert 
                 severity="success" 
                 icon={<CheckCircleIcon />}

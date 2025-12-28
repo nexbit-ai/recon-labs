@@ -161,7 +161,7 @@ export const ageingAnalysisAPI = {
 
 // Upload List API
 export const uploadListAPI = {
-  getUploadList: (params: { report_type: string }) =>
+  getUploadList: (params: { report_type: string; platform?: string }) =>
     apiService.get<any>('/recon/upload-list', params),
 };
 
