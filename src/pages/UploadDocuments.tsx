@@ -96,6 +96,7 @@ const UploadDocuments: React.FC = () => {
   const [rightPanelVendor, setRightPanelVendor] = useState<'amazon' | 'flipkart' | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingUpload, setPendingUpload] = useState<{ vendorId: 'amazon' | 'flipkart'; kind: 'sales' | 'sales_b2b' | 'settlement' } | null>(null);
+  const [pendingFileInputId, setPendingFileInputId] = useState<string | null>(null);
   const [hoveredYear, setHoveredYear] = useState<number | null>(null);
   const [hoveredMonth, setHoveredMonth] = useState<{ year: number; month: number } | null>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -340,6 +341,26 @@ const UploadDocuments: React.FC = () => {
     }));
   };
 
+  const handleFileInputClick = (e: React.MouseEvent, fileInputId: string, vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'sales_b2b' | 'settlement') => {
+    // If file is already uploaded, prevent file selector from opening and show dialog
+    if (isVendorUploaded(vendorId, kind)) {
+      e.preventDefault();
+      e.stopPropagation();
+      setPendingFileInputId(fileInputId);
+      // If there's already a file selected, show upload confirmation dialog
+      if (marketplaceFiles[vendorId]?.[kind]) {
+        setPendingUpload({ vendorId, kind });
+      } else {
+        // Just open file selector after confirmation (no pending upload)
+        setPendingUpload(null);
+      }
+      setConfirmDialogOpen(true);
+      return false;
+    }
+    // Otherwise, allow normal file input behavior
+    return true;
+  };
+
   const handleMarketplaceUploadClick = (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'sales_b2b' | 'settlement') => {
     const file = marketplaceFiles[vendorId]?.[kind];
     if (!file || selectedYear === null || selectedMonth === null) return;
@@ -356,16 +377,30 @@ const UploadDocuments: React.FC = () => {
   };
 
   const handleConfirmReupload = () => {
+    setConfirmDialogOpen(false);
+    
+    // If there's a pending upload (file already selected), proceed with upload
     if (pendingUpload) {
-      setConfirmDialogOpen(false);
       performMarketplaceUpload(pendingUpload.vendorId, pendingUpload.kind);
       setPendingUpload(null);
+    }
+    
+    // Trigger file input if pending (user wants to choose a new file)
+    if (pendingFileInputId) {
+      setTimeout(() => {
+        const fileInput = document.getElementById(pendingFileInputId) as HTMLInputElement;
+        if (fileInput) {
+          fileInput.click();
+        }
+        setPendingFileInputId(null);
+      }, 100);
     }
   };
 
   const handleCancelReupload = () => {
     setConfirmDialogOpen(false);
     setPendingUpload(null);
+    setPendingFileInputId(null);
   };
 
   const performMarketplaceUpload = async (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'sales_b2b' | 'settlement') => {
@@ -1149,38 +1184,49 @@ const UploadDocuments: React.FC = () => {
                           }}
                           disabled={!!uploadingVendor}
                         />
-                        <label htmlFor="flipkart-sales-upload" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                        {isVendorUploaded('flipkart', 'sales') ? (
                           <Button
-                            variant={isVendorUploaded('flipkart', 'sales') ? 'outlined' : 'contained'}
-                            component="span"
+                            variant="outlined"
                             size="small"
                             startIcon={<CloudUploadIcon />}
                             disabled={!!uploadingVendor || uploadingVendor === 'flipkart_sales'}
                             endIcon={uploadingVendor === 'flipkart_sales' ? <CircularProgress size={14} /> : null}
+                            onClick={(e) => {
+                              handleFileInputClick(e, 'flipkart-sales-upload', 'flipkart', 'sales');
+                            }}
                             sx={{ 
                               minWidth: 120,
                               fontSize: '0.75rem',
                               py: 0.75,
-                              ...(isVendorUploaded('flipkart', 'sales') && {
-                                borderColor: '#16a34a',
-                                color: '#16a34a'
-                              })
+                              borderColor: '#16a34a',
+                              color: '#16a34a'
                             }}
                           >
-                            {uploadingVendor === 'flipkart_sales' ? 'Uploading...' : marketplaceFiles.flipkart?.sales ? marketplaceFiles.flipkart.sales.name : 'Choose File'}
+                            {uploadingVendor === 'flipkart_sales' ? 'Uploading...' : marketplaceFiles.flipkart?.sales ? 'Upload' : 'Choose File'}
                           </Button>
-                        </label>
-                        {marketplaceFiles.flipkart?.sales && (
-                          <Button
-                            variant="contained"
-                            size="small"
-                            disabled={!!uploadingVendor || uploadingVendor === 'flipkart_sales'}
-                            endIcon={uploadingVendor === 'flipkart_sales' ? <CircularProgress size={14} /> : null}
-                            onClick={() => handleMarketplaceUploadClick('flipkart', 'sales')}
-                            sx={{ mt: 1 }}
-                          >
-                            Upload
-                          </Button>
+                        ) : (
+                          <label htmlFor="flipkart-sales-upload">
+                            <Button
+                              variant="contained"
+                              component="span"
+                              size="small"
+                              startIcon={<CloudUploadIcon />}
+                              disabled={!!uploadingVendor || uploadingVendor === 'flipkart_sales'}
+                              endIcon={uploadingVendor === 'flipkart_sales' ? <CircularProgress size={14} /> : null}
+                              onClick={() => {
+                                if (marketplaceFiles.flipkart?.sales) {
+                                  handleMarketplaceUploadClick('flipkart', 'sales');
+                                }
+                              }}
+                              sx={{ 
+                                minWidth: 120,
+                                fontSize: '0.75rem',
+                                py: 0.75
+                              }}
+                            >
+                              {uploadingVendor === 'flipkart_sales' ? 'Uploading...' : marketplaceFiles.flipkart?.sales ? 'Upload' : 'Choose File'}
+                            </Button>
+                          </label>
                         )}
                         {marketplaceFiles.flipkart?.sales && !isVendorUploaded('flipkart', 'sales') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
@@ -1296,18 +1342,15 @@ const UploadDocuments: React.FC = () => {
                           }}
                           disabled={!!uploadingVendor || !isVendorUploaded('flipkart', 'sales')}
                         />
-                        <label htmlFor="flipkart-settlement-upload">
+                        {isVendorUploaded('flipkart', 'settlement') ? (
                           <Button
-                            variant={isVendorUploaded('flipkart', 'settlement') ? 'outlined' : 'contained'}
-                            component="span"
+                            variant="outlined"
                             size="small"
                             startIcon={<CloudUploadIcon />}
                             disabled={!!uploadingVendor || uploadingVendor === 'flipkart_settlement' || !isVendorUploaded('flipkart', 'sales')}
                             endIcon={uploadingVendor === 'flipkart_settlement' ? <CircularProgress size={14} /> : null}
-                            onClick={() => {
-                              if (marketplaceFiles.flipkart?.settlement) {
-                                handleMarketplaceUploadClick('flipkart', 'settlement');
-                              }
+                            onClick={(e) => {
+                              handleFileInputClick(e, 'flipkart-settlement-upload', 'flipkart', 'settlement');
                             }}
                             sx={{ 
                               minWidth: 120,
@@ -1322,15 +1365,45 @@ const UploadDocuments: React.FC = () => {
                                   background: '#f3f4f6',
                                 }
                               }),
-                              ...(isVendorUploaded('flipkart', 'settlement') && {
-                                borderColor: '#16a34a',
-                                color: '#16a34a'
-                              })
+                              borderColor: '#16a34a',
+                              color: '#16a34a'
                             }}
                           >
                             {uploadingVendor === 'flipkart_settlement' ? 'Uploading...' : marketplaceFiles.flipkart?.settlement ? 'Upload' : 'Choose File'}
                           </Button>
-                        </label>
+                        ) : (
+                          <label htmlFor="flipkart-settlement-upload">
+                            <Button
+                              variant="contained"
+                              component="span"
+                              size="small"
+                              startIcon={<CloudUploadIcon />}
+                              disabled={!!uploadingVendor || uploadingVendor === 'flipkart_settlement' || !isVendorUploaded('flipkart', 'sales')}
+                              endIcon={uploadingVendor === 'flipkart_settlement' ? <CircularProgress size={14} /> : null}
+                              onClick={() => {
+                                if (marketplaceFiles.flipkart?.settlement) {
+                                  handleMarketplaceUploadClick('flipkart', 'settlement');
+                                }
+                              }}
+                              sx={{ 
+                                minWidth: 120,
+                                fontSize: '0.75rem',
+                                py: 0.75,
+                                ...(!isVendorUploaded('flipkart', 'sales') && {
+                                  background: '#f3f4f6',
+                                  color: '#9ca3af',
+                                  cursor: 'not-allowed',
+                                  border: 'none',
+                                  '&:hover': {
+                                    background: '#f3f4f6',
+                                  }
+                                })
+                              }}
+                            >
+                              {uploadingVendor === 'flipkart_settlement' ? 'Uploading...' : marketplaceFiles.flipkart?.settlement ? 'Upload' : 'Choose File'}
+                            </Button>
+                          </label>
+                        )}
                         {marketplaceFiles.flipkart?.settlement && !isVendorUploaded('flipkart', 'settlement') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
                             {marketplaceFiles.flipkart.settlement.name}
@@ -1413,32 +1486,50 @@ const UploadDocuments: React.FC = () => {
                   }}
                           disabled={!!uploadingVendor}
                 />
-                        <label htmlFor="amazon-sales-upload">
-                  <Button
-                            variant={isVendorUploaded('amazon', 'sales') ? 'outlined' : 'contained'}
-                    component="span"
+                        {isVendorUploaded('amazon', 'sales') ? (
+                          <Button
+                            variant="outlined"
                             size="small"
                             startIcon={<CloudUploadIcon />}
                             disabled={!!uploadingVendor || uploadingVendor === 'amazon_sales'}
                             endIcon={uploadingVendor === 'amazon_sales' ? <CircularProgress size={14} /> : null}
-                            onClick={() => {
-                              if (marketplaceFiles.amazon?.sales) {
-                                handleMarketplaceUploadClick('amazon', 'sales');
-                              }
+                            onClick={(e) => {
+                              handleFileInputClick(e, 'amazon-sales-upload', 'amazon', 'sales');
                             }}
                             sx={{ 
                               minWidth: 120,
                               fontSize: '0.75rem',
                               py: 0.75,
-                              ...(isVendorUploaded('amazon', 'sales') && {
-                                borderColor: '#16a34a',
-                                color: '#16a34a'
-                              })
+                              borderColor: '#16a34a',
+                              color: '#16a34a'
                             }}
                           >
                             {uploadingVendor === 'amazon_sales' ? 'Uploading...' : marketplaceFiles.amazon?.sales ? 'Upload' : 'Choose File'}
-                  </Button>
-                </label>
+                          </Button>
+                        ) : (
+                          <label htmlFor="amazon-sales-upload">
+                            <Button
+                              variant="contained"
+                              component="span"
+                              size="small"
+                              startIcon={<CloudUploadIcon />}
+                              disabled={!!uploadingVendor || uploadingVendor === 'amazon_sales'}
+                              endIcon={uploadingVendor === 'amazon_sales' ? <CircularProgress size={14} /> : null}
+                              onClick={() => {
+                                if (marketplaceFiles.amazon?.sales) {
+                                  handleMarketplaceUploadClick('amazon', 'sales');
+                                }
+                              }}
+                              sx={{ 
+                                minWidth: 120,
+                                fontSize: '0.75rem',
+                                py: 0.75
+                              }}
+                            >
+                              {uploadingVendor === 'amazon_sales' ? 'Uploading...' : marketplaceFiles.amazon?.sales ? 'Upload' : 'Choose File'}
+                            </Button>
+                          </label>
+                        )}
                         {marketplaceFiles.amazon?.sales && !isVendorUploaded('amazon', 'sales') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
                             {marketplaceFiles.amazon.sales.name}
@@ -1553,18 +1644,15 @@ const UploadDocuments: React.FC = () => {
                           }}
                           disabled={!!uploadingVendor || !isVendorUploaded('amazon', 'sales')}
                         />
-                        <label htmlFor="amazon-sales-b2b-upload">
+                        {isVendorUploaded('amazon', 'sales_b2b') ? (
                           <Button
-                            variant={isVendorUploaded('amazon', 'sales_b2b') ? 'outlined' : 'contained'}
-                            component="span"
+                            variant="outlined"
                             size="small"
                             startIcon={<CloudUploadIcon />}
                             disabled={!!uploadingVendor || uploadingVendor === 'amazon_sales_b2b' || !isVendorUploaded('amazon', 'sales')}
                             endIcon={uploadingVendor === 'amazon_sales_b2b' ? <CircularProgress size={14} /> : null}
-                            onClick={() => {
-                              if (marketplaceFiles.amazon?.sales_b2b) {
-                                handleMarketplaceUploadClick('amazon', 'sales_b2b');
-                              }
+                            onClick={(e) => {
+                              handleFileInputClick(e, 'amazon-sales-b2b-upload', 'amazon', 'sales_b2b');
                             }}
                             sx={{ 
                               minWidth: 120,
@@ -1579,15 +1667,45 @@ const UploadDocuments: React.FC = () => {
                                   background: '#f3f4f6',
                                 }
                               }),
-                              ...(isVendorUploaded('amazon', 'sales_b2b') && {
-                                borderColor: '#16a34a',
-                                color: '#16a34a'
-                              })
+                              borderColor: '#16a34a',
+                              color: '#16a34a'
                             }}
                           >
                             {uploadingVendor === 'amazon_sales_b2b' ? 'Uploading...' : marketplaceFiles.amazon?.sales_b2b ? 'Upload' : 'Choose File'}
                           </Button>
-                        </label>
+                        ) : (
+                          <label htmlFor="amazon-sales-b2b-upload">
+                            <Button
+                              variant="contained"
+                              component="span"
+                              size="small"
+                              startIcon={<CloudUploadIcon />}
+                              disabled={!!uploadingVendor || uploadingVendor === 'amazon_sales_b2b' || !isVendorUploaded('amazon', 'sales')}
+                              endIcon={uploadingVendor === 'amazon_sales_b2b' ? <CircularProgress size={14} /> : null}
+                              onClick={() => {
+                                if (marketplaceFiles.amazon?.sales_b2b) {
+                                  handleMarketplaceUploadClick('amazon', 'sales_b2b');
+                                }
+                              }}
+                              sx={{ 
+                                minWidth: 120,
+                                fontSize: '0.75rem',
+                                py: 0.75,
+                                ...(!isVendorUploaded('amazon', 'sales') && {
+                                  background: '#f3f4f6',
+                                  color: '#9ca3af',
+                                  cursor: 'not-allowed',
+                                  border: 'none',
+                                  '&:hover': {
+                                    background: '#f3f4f6',
+                                  }
+                                })
+                              }}
+                            >
+                              {uploadingVendor === 'amazon_sales_b2b' ? 'Uploading...' : marketplaceFiles.amazon?.sales_b2b ? 'Upload' : 'Choose File'}
+                            </Button>
+                          </label>
+                        )}
                         {marketplaceFiles.amazon?.sales_b2b && !isVendorUploaded('amazon', 'sales_b2b') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
                             {marketplaceFiles.amazon.sales_b2b.name}
@@ -1702,18 +1820,15 @@ const UploadDocuments: React.FC = () => {
                           }}
                           disabled={!!uploadingVendor || !isVendorUploaded('amazon', 'sales_b2b')}
                         />
-                        <label htmlFor="amazon-settlement-upload">
-                    <Button
-                            variant={isVendorUploaded('amazon', 'settlement') ? 'outlined' : 'contained'}
-                            component="span"
+                        {isVendorUploaded('amazon', 'settlement') ? (
+                          <Button
+                            variant="outlined"
                             size="small"
                             startIcon={<CloudUploadIcon />}
                             disabled={!!uploadingVendor || uploadingVendor === 'amazon_settlement' || !isVendorUploaded('amazon', 'sales_b2b')}
                             endIcon={uploadingVendor === 'amazon_settlement' ? <CircularProgress size={14} /> : null}
-                            onClick={() => {
-                              if (marketplaceFiles.amazon?.settlement) {
-                                handleMarketplaceUploadClick('amazon', 'settlement');
-                              }
+                            onClick={(e) => {
+                              handleFileInputClick(e, 'amazon-settlement-upload', 'amazon', 'settlement');
                             }}
                             sx={{ 
                               minWidth: 120,
@@ -1728,15 +1843,45 @@ const UploadDocuments: React.FC = () => {
                                   background: '#f3f4f6',
                                 }
                               }),
-                              ...(isVendorUploaded('amazon', 'settlement') && {
-                                borderColor: '#16a34a',
-                                color: '#16a34a'
-                              })
+                              borderColor: '#16a34a',
+                              color: '#16a34a'
                             }}
                           >
                             {uploadingVendor === 'amazon_settlement' ? 'Uploading...' : marketplaceFiles.amazon?.settlement ? 'Upload' : 'Choose File'}
-                    </Button>
-                        </label>
+                          </Button>
+                        ) : (
+                          <label htmlFor="amazon-settlement-upload">
+                            <Button
+                              variant="contained"
+                              component="span"
+                              size="small"
+                              startIcon={<CloudUploadIcon />}
+                              disabled={!!uploadingVendor || uploadingVendor === 'amazon_settlement' || !isVendorUploaded('amazon', 'sales_b2b')}
+                              endIcon={uploadingVendor === 'amazon_settlement' ? <CircularProgress size={14} /> : null}
+                              onClick={() => {
+                                if (marketplaceFiles.amazon?.settlement) {
+                                  handleMarketplaceUploadClick('amazon', 'settlement');
+                                }
+                              }}
+                              sx={{ 
+                                minWidth: 120,
+                                fontSize: '0.75rem',
+                                py: 0.75,
+                                ...(!isVendorUploaded('amazon', 'sales_b2b') && {
+                                  background: '#f3f4f6',
+                                  color: '#9ca3af',
+                                  cursor: 'not-allowed',
+                                  border: 'none',
+                                  '&:hover': {
+                                    background: '#f3f4f6',
+                                  }
+                                })
+                              }}
+                            >
+                              {uploadingVendor === 'amazon_settlement' ? 'Uploading...' : marketplaceFiles.amazon?.settlement ? 'Upload' : 'Choose File'}
+                            </Button>
+                          </label>
+                        )}
                         {marketplaceFiles.amazon?.settlement && !isVendorUploaded('amazon', 'settlement') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
                             {marketplaceFiles.amazon.settlement.name}
@@ -2083,7 +2228,7 @@ const UploadDocuments: React.FC = () => {
                   
                   {/* Settlement Providers List */}
                   <Box sx={{ width: '100%', mt: 1 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 400, overflowY: 'auto' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       {vendors.filter(v => v.id !== 'amazon' && v.id !== 'flipkart').map((vendor) => {
                         const isSettlementUploaded = isVendorUploaded(vendor.id, 'settlement');
                         const uploadedSettlementDoc = getUploadedDocument(vendor.id, 'settlement');
