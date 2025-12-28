@@ -854,9 +854,7 @@ const UploadDocuments: React.FC = () => {
                       onMouseLeave={() => {
                         // Delay to allow moving to dropdown
                         hoverTimeoutRef.current = setTimeout(() => {
-                          if (!hoveredMonth || hoveredMonth.year !== year) {
-                            setHoveredYear(null);
-                          }
+                          setHoveredYear((currentYear) => currentYear === year ? null : currentYear);
                           hoverTimeoutRef.current = null;
                         }, 300);
                       }}
