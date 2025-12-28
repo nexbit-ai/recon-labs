@@ -1199,32 +1199,36 @@ const MarketplaceReconciliation: React.FC = () => {
           setMemberName(response.data.memberName);
         }
         
-        const previousProcessingCount = reconciliationStatus?.processing_count ?? 0;
-        
         if (response.data.reconciliation_status) {
-          setReconciliationStatus(response.data.reconciliation_status);
-          
-          // If status changed from processing to processed (processing_count went from >0 to 0), refresh all data APIs
-          if (previousProcessingCount > 0 && response.data.reconciliation_status.processing_count === 0) {
-            console.log('✅ Reconciliation completed! Refreshing main summary, ageing analysis, and upload list...');
-            // Refresh main summary to get updated reconciliation results
-            if (selectedDateRange === 'custom') {
-              if (customStartDate && customEndDate) {
-                fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
+          // Use functional state update to capture previous processing_count without dependency
+          setReconciliationStatus((prevStatus) => {
+            const previousProcessingCount = prevStatus?.processing_count ?? 0;
+            const newStatus = response.data.reconciliation_status;
+            
+            // If status changed from processing to processed (processing_count went from >0 to 0), refresh all data APIs
+            if (previousProcessingCount > 0 && newStatus.processing_count === 0) {
+              console.log('✅ Reconciliation completed! Refreshing main summary, ageing analysis, and upload list...');
+              // Refresh main summary to get updated reconciliation results
+              if (selectedDateRange === 'custom') {
+                if (customStartDate && customEndDate) {
+                  fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
+                }
+              } else {
+                fetchReconciliationDataByDateRange(selectedDateRange);
               }
-            } else {
-              fetchReconciliationDataByDateRange(selectedDateRange);
+              // Refresh ageing analysis
+              if (selectedDateRange !== 'custom' || (customStartDate && customEndDate)) {
+                fetchAgeingAnalysis();
+              }
+              // Refresh upload list to get any updated upload data
+              // Note: This won't trigger the refresh logic again since previousProcessingCount will be 0
+              setTimeout(() => {
+                fetchUploadList();
+              }, 100);
             }
-            // Refresh ageing analysis
-            if (selectedDateRange !== 'custom' || (customStartDate && customEndDate)) {
-              fetchAgeingAnalysis();
-            }
-            // Refresh upload list to get any updated upload data
-            // Note: This won't trigger the refresh logic again since previousProcessingCount will be 0
-            setTimeout(() => {
-              fetchUploadList();
-            }, 100);
-          }
+            
+            return newStatus;
+          });
         } else {
           // No reconciliation_status from backend - handle gracefully by not showing any status
           setReconciliationStatus(null);
@@ -1236,7 +1240,6 @@ const MarketplaceReconciliation: React.FC = () => {
       setReconciliationStatus(null);
     }
   }, [
-    reconciliationStatus?.processing_count,
     selectedDateRange,
     customStartDate,
     customEndDate,
