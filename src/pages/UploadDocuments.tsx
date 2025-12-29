@@ -2341,11 +2341,11 @@ const UploadDocuments: React.FC = () => {
                                     ...(isSettlementUploaded && {
                                       borderColor: '#16a34a',
                                       color: '#16a34a',
-                                      minWidth: 70
+                                      minWidth: 80
                                     })
                                   }}
                                 >
-                                  {isSettlementUploading ? '...' : isSettlementUploaded ? 'Done' : 'Upload'}
+                                  {isSettlementUploading ? '...' : isSettlementUploaded ? 'Re-upload' : 'Upload'}
                                 </Button>
                               </label>
                             </Box>

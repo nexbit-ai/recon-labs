@@ -36,6 +36,7 @@ export const useReconciliationStatus = (
 
 /**
  * Utility function to format timestamp for display
+ * Uses UTC time to match backend timestamp format
  */
 export const formatReconciliationTimestamp = (timestamp: string | null): string | null => {
   if (!timestamp) return null;
@@ -43,15 +44,18 @@ export const formatReconciliationTimestamp = (timestamp: string | null): string 
   try {
     const date = new Date(timestamp);
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const isToday = dateOnly.getTime() === today.getTime();
+    
+    // Use UTC for date comparisons
+    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const dateOnlyUTC = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const isToday = dateOnlyUTC.getTime() === todayUTC.getTime();
 
-    // Format time: 7:10 PM
+    // Format time using UTC: 7:10 PM
     const timeOptions: Intl.DateTimeFormatOptions = {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
+      timeZone: 'UTC',
     };
     const timeStr = date.toLocaleTimeString('en-US', timeOptions);
 
@@ -59,10 +63,11 @@ export const formatReconciliationTimestamp = (timestamp: string | null): string 
       return timeStr; // e.g., "7:10 PM"
     }
 
-    // Format date + time: 28 Dec, 7:10 PM
+    // Format date + time using UTC: 28 Dec, 7:10 PM
     const dateOptions: Intl.DateTimeFormatOptions = {
       day: 'numeric',
       month: 'short',
+      timeZone: 'UTC',
     };
     const dateStr = date.toLocaleDateString('en-US', dateOptions);
     return `${dateStr}, ${timeStr}`; // e.g., "28 Dec, 7:10 PM"
