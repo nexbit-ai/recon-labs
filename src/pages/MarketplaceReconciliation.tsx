@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -234,10 +234,37 @@ const MarketplaceReconciliation: React.FC = () => {
     providerName?: string | null,
     tabIndex = 0
   ) => {
-    const settlementProvider = getSettlementProviderCode(providerKey, providerName);
-    setInitialTsFilters(settlementProvider ? { settlement_provider: settlementProvider } : undefined);
-    setInitialTsTab(tabIndex);
-    setShowTransactionSheet(true);
+    // Check for special cases: RTO COD and Cancelled COD
+    // These are not settlement providers, they are event type filters
+    const normalizedKey = providerKey ? norm(providerKey) : '';
+    const normalizedName = providerName ? norm(providerName) : '';
+    
+    // Check if this is RTO COD or Cancelled COD
+    // Match patterns like "rto cod", "rto_cod", "rto", etc.
+    const isRtoCod = normalizedKey === 'rto' || normalizedKey === 'rto_cod' || 
+                     normalizedName === 'rto cod' || normalizedName === 'rto' ||
+                     (normalizedName.includes('rto') && normalizedName.includes('cod'));
+    const isCancelledCod = normalizedKey === 'cancelled' || normalizedKey === 'cancelled_cod' ||
+                           normalizedName === 'cancelled cod' || normalizedName === 'cancelled' ||
+                           (normalizedName.includes('cancelled') && normalizedName.includes('cod'));
+    
+    if (isRtoCod) {
+      // For RTO COD, set event_type filter to "rto" and open at matched tab
+      setInitialTsFilters({ 'Event Type': ['rto'] });
+      setInitialTsTab(0); // Matched tab
+      setShowTransactionSheet(true);
+    } else if (isCancelledCod) {
+      // For Cancelled COD, set event_type filter to "cancelled" and open at matched tab
+      setInitialTsFilters({ 'Event Type': ['cancelled'] });
+      setInitialTsTab(0); // Matched tab
+      setShowTransactionSheet(true);
+    } else {
+      // Regular settlement provider
+      const settlementProvider = getSettlementProviderCode(providerKey, providerName);
+      setInitialTsFilters(settlementProvider ? { settlement_provider: settlementProvider } : undefined);
+      setInitialTsTab(tabIndex);
+      setShowTransactionSheet(true);
+    }
   };
   const getPlatformForProvider = (providerKey: string, providerName: string): 'flipkart' | 'amazon' | 'd2c' => {
     const key = providerKey?.toLowerCase?.() || '';
@@ -1757,6 +1784,95 @@ const MarketplaceReconciliation: React.FC = () => {
       // ignore storage errors
     }
   }, [effectiveDateRangeForTs.start, effectiveDateRangeForTs.end]);
+
+  // Helper function to generate last 12 months labels
+  const generateLast12Months = () => {
+    const months = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      months.push(monthName);
+    }
+    return months;
+  };
+
+  /**
+   * Month on Month Growth Data
+   * 
+   * TODO: Replace dummy data with API calls
+   * 
+   * Backend API Requirements:
+   * 
+   * For Amazon/Flipkart:
+   * - Endpoint: GET /api/reconciliation/month-on-month-growth?platform={amazon|flipkart}
+   * - Response format:
+   *   {
+   *     "data": [
+   *       { "month": "Jan 2024", "sales": 2000000, "settlement": 1800000 },
+   *       { "month": "Feb 2024", "sales": 2200000, "settlement": 2000000 },
+   *       ... (last 12 months)
+   *     ]
+   *   }
+   * 
+   * For D2C:
+   * - Endpoint: GET /api/reconciliation/month-on-month-growth?platform=d2c
+   * - Response format:
+   *   {
+   *     "salesAndSettlement": [
+   *       { "month": "Jan 2024", "sales": 3000000, "settlement": 2500000 },
+   *       ... (last 12 months)
+   *     ],
+   *     "vendorSettlements": {
+   *       "Delhivery": [
+   *         { "month": "Jan 2024", "settlement": 500000 },
+   *         ... (last 12 months)
+   *       ],
+   *       "Blue Dart": [...],
+   *       "Xpressbees": [...],
+   *       "DTDC": [...]
+   *     }
+   *   }
+   */
+
+  // Memoized month-on-month data for Amazon/Flipkart (Sales + Settlement)
+  const marketplaceGrowthData = useMemo(() => {
+    const months = generateLast12Months();
+    // Using a seed based on platform for consistent dummy data
+    const seed = selectedPlatform === 'amazon' ? 1000 : 2000;
+    return months.map((month, idx) => ({
+      month,
+      sales: Math.floor(Math.sin((idx + seed) * 0.5) * 1000000 + 2000000),
+      settlement: Math.floor(Math.sin((idx + seed) * 0.5) * 900000 + 1800000),
+    }));
+  }, [selectedPlatform]);
+
+  // Memoized month-on-month data for D2C Sales + Settlement
+  const d2cSalesGrowthData = useMemo(() => {
+    const months = generateLast12Months();
+    return months.map((month, idx) => ({
+      month,
+      sales: Math.floor(Math.sin(idx * 0.4) * 1500000 + 3000000),
+      settlement: Math.floor(Math.sin(idx * 0.4) * 1200000 + 2500000),
+    }));
+  }, []);
+
+  // Memoized month-on-month data for D2C Vendor Settlements
+  const d2cVendorSettlementData = useMemo(() => {
+    const vendors = ['Delhivery', 'Blue Dart', 'Xpressbees', 'DTDC'];
+    const months = generateLast12Months();
+    const vendorData: Record<string, Array<{ month: string; settlement: number }>> = {};
+    
+    vendors.forEach((vendor, vendorIdx) => {
+      const seed = (vendorIdx + 1) * 100;
+      vendorData[vendor] = months.map((month, idx) => ({
+        month,
+        settlement: Math.floor(Math.sin((idx + seed) * 0.3) * 400000 + 500000),
+      }));
+    });
+    
+    return vendorData;
+  }, []);
 
   return (
     <Box sx={{ 
@@ -4555,6 +4671,209 @@ const MarketplaceReconciliation: React.FC = () => {
               </ResponsiveContainer>
             )}
           </Box>
+        </Paper>
+
+        {/* Month on Month Growth Section */}
+        <Paper sx={{ 
+          p: 3, 
+          mb: 6, 
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          border: '1px solid #e2e8f0',
+          borderRadius: '16px',
+          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+        }}>
+          <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600, mb: 4 }}>
+            Month on Month Growth
+          </Typography>
+
+          {selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' ? (
+            // Amazon/Flipkart: Overlapping Sales and Settlement graphs
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600, mb: 3 }}>
+                {selectedPlatform === 'amazon' ? 'Amazon' : 'Flipkart'} - Sales vs Settlement
+              </Typography>
+              <Box sx={{ width: '100%', height: 400, mb: 2 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={marketplaceGrowthData}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis 
+                      dataKey="month" 
+                      tick={{ fontSize: 12, fill: '#6b7280' }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 12, fill: '#6b7280' }}
+                      tickFormatter={(value) => `₹${(value / 100000).toFixed(1)}L`}
+                    />
+                    <RechartsTooltip 
+                      formatter={(value: number) => formatCurrency(value)}
+                      labelStyle={{ color: '#1f2937', fontWeight: 600 }}
+                      contentStyle={{ 
+                        backgroundColor: '#ffffff', 
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <Legend 
+                      wrapperStyle={{ paddingTop: 20 }}
+                      iconType="line"
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="sales" 
+                      stroke="#2563eb" 
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: '#2563eb' }}
+                      name="Sales"
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="settlement" 
+                      stroke="#10b981" 
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: '#10b981' }}
+                      name="Settlement"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Box>
+            </Box>
+          ) : selectedPlatform === 'd2c' ? (
+            // D2C: Sales + Settlement graph + Individual vendor settlement graphs
+            <Box>
+              {/* D2C Sales vs Settlement Graph */}
+              <Box sx={{ mb: 6 }}>
+                <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600, mb: 3 }}>
+                  D2C - Sales vs Settlement
+                </Typography>
+                <Box sx={{ width: '100%', height: 400 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={d2cSalesGrowthData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis 
+                        dataKey="month" 
+                        tick={{ fontSize: 12, fill: '#6b7280' }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12, fill: '#6b7280' }}
+                        tickFormatter={(value) => `₹${(value / 100000).toFixed(1)}L`}
+                      />
+                      <RechartsTooltip 
+                        formatter={(value: number) => formatCurrency(value)}
+                        labelStyle={{ color: '#1f2937', fontWeight: 600 }}
+                        contentStyle={{ 
+                          backgroundColor: '#ffffff', 
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px'
+                        }}
+                      />
+                      <Legend 
+                        wrapperStyle={{ paddingTop: 20 }}
+                        iconType="line"
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="sales" 
+                        stroke="#2563eb" 
+                        strokeWidth={3}
+                        dot={{ r: 4, fill: '#2563eb' }}
+                        name="Sales"
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="settlement" 
+                        stroke="#10b981" 
+                        strokeWidth={3}
+                        dot={{ r: 4, fill: '#10b981' }}
+                        name="Settlement"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </Box>
+              </Box>
+
+              {/* Vendor Settlement Graphs */}
+              <Box>
+                <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600, mb: 4 }}>
+                  Vendor Settlement - Month on Month
+                </Typography>
+                <Grid container spacing={3}>
+                  {['Delhivery', 'Blue Dart', 'Xpressbees', 'DTDC'].map((vendor) => (
+                    <Grid item xs={12} md={6} key={vendor}>
+                      <Card sx={{ 
+                        p: 2, 
+                        background: 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '12px',
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                      }}>
+                        <Typography variant="h6" sx={{ color: '#1f2937', fontWeight: 600, mb: 2 }}>
+                          {vendor}
+                        </Typography>
+                        <Box sx={{ width: '100%', height: 300 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart
+                              data={d2cVendorSettlementData[vendor] || []}
+                              margin={{ top: 10, right: 20, left: 10, bottom: 40 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                              <XAxis 
+                                dataKey="month" 
+                                tick={{ fontSize: 10, fill: '#6b7280' }}
+                                angle={-45}
+                                textAnchor="end"
+                                height={60}
+                              />
+                              <YAxis 
+                                tick={{ fontSize: 10, fill: '#6b7280' }}
+                                tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}K`}
+                              />
+                              <RechartsTooltip 
+                                formatter={(value: number) => formatCurrency(value)}
+                                labelStyle={{ color: '#1f2937', fontWeight: 600, fontSize: '12px' }}
+                                contentStyle={{ 
+                                  backgroundColor: '#ffffff', 
+                                  border: '1px solid #e5e7eb',
+                                  borderRadius: '8px',
+                                  fontSize: '12px'
+                                }}
+                              />
+                              <Line 
+                                type="monotone" 
+                                dataKey="settlement" 
+                                stroke="#10b981" 
+                                strokeWidth={2}
+                                dot={{ r: 3, fill: '#10b981' }}
+                                name="Settlement"
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </Box>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            </Box>
+          ) : (
+            // Default/All platforms view - show combined or placeholder
+            <Box sx={{ textAlign: 'center', py: 8 }}>
+              <Typography variant="h6" sx={{ color: '#6b7280' }}>
+                Please select a platform (Amazon, Flipkart, or D2C) to view Month on Month Growth
+              </Typography>
+            </Box>
+          )}
         </Paper>
 
         {/* Provider TAT Summary removed; avg TAT is annotated on bars above */}

@@ -2554,7 +2554,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
     // For Event Type, show available event types
     if (columnName === 'Event Type') {
-      return ['Sale', 'Return'];
+      return ['Sales', 'RTO', 'Cancelled'];
     }
 
     // For Settlement Provider, get values from API columns response
@@ -2761,6 +2761,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 if (originalValues.length > 0) {
                   (params as any)[baseParam] = originalValues.join(',');
                 }
+              } else if (columnKey === 'Event Type') {
+                // Convert Event Type values to lowercase before sending to API
+                const lowerCaseValues = filterValue.map(val => String(val).toLowerCase());
+                (params as any)[baseParam] = lowerCaseValues.join(',');
               } else {
                 // Use the mapped API param which already includes _in suffix if needed
                 (params as any)[baseParam] = filterValue.join(',');
@@ -3375,6 +3379,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 if (originalValues.length > 0) {
                   baseParams[baseParam] = originalValues.join(',');
                 }
+              } else if (columnKey === 'Event Type') {
+                // Convert Event Type values to lowercase before sending to API
+                const lowerCaseValues = filterValue.map(val => String(val).toLowerCase());
+                baseParams[baseParam] = lowerCaseValues.join(',');
               } else {
                 baseParams[baseParam] = filterValue.join(',');
               }
@@ -3780,6 +3788,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   if (originalValues.length > 0) {
                     params[baseParam] = originalValues.join(',');
                   }
+                } else if (columnKey === 'Event Type') {
+                  // Convert Event Type values to lowercase before sending to API
+                  const lowerCaseValues = filterValue.map(val => String(val).toLowerCase());
+                  params[baseParam] = lowerCaseValues.join(',');
                 } else {
                   // Use the mapped API param which already includes _in suffix if needed
                   params[baseParam] = filterValue.join(',');
