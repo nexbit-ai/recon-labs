@@ -70,6 +70,7 @@ import {
   BarChart,
   Bar,
   LabelList,
+  ReferenceLine,
 } from 'recharts';
 
 // Enhanced mock data for the new sales dashboard
@@ -1858,6 +1859,7 @@ const MarketplaceReconciliation: React.FC = () => {
   }, []);
 
   // Memoized month-on-month data for D2C Vendor Settlements
+  // Original structure: { "Delhivery": [{month, settlement}, ...], ... }
   const d2cVendorSettlementData = useMemo(() => {
     const vendors = ['Delhivery', 'Blue Dart', 'Xpressbees', 'DTDC'];
     const months = generateLast12Months();
@@ -1873,6 +1875,69 @@ const MarketplaceReconciliation: React.FC = () => {
     
     return vendorData;
   }, []);
+
+  // Transform vendor settlements data for single graph display
+  // Converts { "Delhivery": [{month, settlement}, ...], ... } 
+  // to [{ month: "Jan 2024", "Delhivery": 500000, "Blue Dart": 400000, ... }, ...]
+  const d2cVendorSettlementCombinedData = useMemo(() => {
+    const vendors = Object.keys(d2cVendorSettlementData);
+    if (vendors.length === 0) return [];
+    
+    // Get all unique months from the first vendor (all vendors should have same months)
+    const months = d2cVendorSettlementData[vendors[0]]?.map(item => item.month) || [];
+    
+    // Transform to combined format
+    return months.map(month => {
+      const dataPoint: Record<string, string | number> = { month };
+      vendors.forEach(vendor => {
+        const vendorMonthData = d2cVendorSettlementData[vendor]?.find(item => item.month === month);
+        // Use vendor name as key, but sanitize for dataKey (replace spaces with underscores)
+        const dataKey = vendor.replace(/\s+/g, '_');
+        dataPoint[dataKey] = vendorMonthData?.settlement || 0;
+      });
+      return dataPoint;
+    });
+  }, [d2cVendorSettlementData]);
+
+  // Color palette for vendor lines (20 distinct colors)
+  // Colors are assigned dynamically based on vendor order from API response
+  const vendorColorPalette = [
+    '#6366f1', // Indigo
+    '#f59e0b', // Amber
+    '#10b981', // Green
+    '#ef4444', // Red
+    '#8b5cf6', // Purple
+    '#ec4899', // Pink
+    '#06b6d4', // Cyan
+    '#f97316', // Orange
+    '#84cc16', // Lime
+    '#14b8a6', // Teal
+    '#f43f5e', // Rose
+    '#3b82f6', // Blue
+    '#a855f7', // Violet
+    '#eab308', // Yellow
+    '#22c55e', // Emerald
+    '#f59e0b', // Amber (alternate)
+    '#06b6d4', // Sky
+    '#d946ef', // Fuchsia
+    '#64748b', // Slate
+    '#78716c', // Stone
+  ];
+  
+  // Memoized vendor color mapping - assigns colors based on order vendors appear in API response
+  const vendorColorMap = useMemo(() => {
+    const vendors = Object.keys(d2cVendorSettlementData);
+    const colorMap: Record<string, string> = {};
+    vendors.forEach((vendor, index) => {
+      colorMap[vendor] = vendorColorPalette[index % vendorColorPalette.length];
+    });
+    return colorMap;
+  }, [d2cVendorSettlementData]);
+  
+  // Helper function to get vendor color dynamically
+  const getVendorColor = (vendor: string): string => {
+    return vendorColorMap[vendor] || '#6b7280'; // Default gray if vendor not found
+  };
 
   return (
     <Box sx={{ 
@@ -4719,6 +4784,16 @@ const MarketplaceReconciliation: React.FC = () => {
                         borderRadius: '8px'
                       }}
                     />
+                    {/* Vertical reference lines for each month */}
+                    {marketplaceGrowthData.map((dataPoint) => (
+                      <ReferenceLine
+                        key={dataPoint.month}
+                        x={dataPoint.month}
+                        stroke="#e5e7eb"
+                        strokeWidth={1}
+                        strokeDasharray="2 2"
+                      />
+                    ))}
                     <Legend 
                       wrapperStyle={{ paddingTop: 20 }}
                       iconType="line"
@@ -4728,7 +4803,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       dataKey="sales" 
                       stroke="#2563eb" 
                       strokeWidth={3}
-                      dot={{ r: 4, fill: '#2563eb' }}
+                      dot={false}
                       name="Sales"
                     />
                     <Line 
@@ -4736,7 +4811,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       dataKey="settlement" 
                       stroke="#10b981" 
                       strokeWidth={3}
-                      dot={{ r: 4, fill: '#10b981' }}
+                      dot={false}
                       name="Settlement"
                     />
                   </LineChart>
@@ -4782,12 +4857,22 @@ const MarketplaceReconciliation: React.FC = () => {
                         wrapperStyle={{ paddingTop: 20 }}
                         iconType="line"
                       />
+                      {/* Vertical reference lines for each month */}
+                      {d2cSalesGrowthData.map((dataPoint) => (
+                        <ReferenceLine
+                          key={dataPoint.month}
+                          x={dataPoint.month}
+                          stroke="#e5e7eb"
+                          strokeWidth={1}
+                          strokeDasharray="2 2"
+                        />
+                      ))}
                       <Line 
                         type="monotone" 
                         dataKey="sales" 
                         stroke="#2563eb" 
                         strokeWidth={3}
-                        dot={{ r: 4, fill: '#2563eb' }}
+                        dot={false}
                         name="Sales"
                       />
                       <Line 
@@ -4795,7 +4880,7 @@ const MarketplaceReconciliation: React.FC = () => {
                         dataKey="settlement" 
                         stroke="#10b981" 
                         strokeWidth={3}
-                        dot={{ r: 4, fill: '#10b981' }}
+                        dot={false}
                         name="Settlement"
                       />
                     </LineChart>
@@ -4803,67 +4888,75 @@ const MarketplaceReconciliation: React.FC = () => {
                 </Box>
               </Box>
 
-              {/* Vendor Settlement Graphs */}
+              {/* Vendor Settlement Graph - All Vendors Combined */}
               <Box>
-                <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600, mb: 4 }}>
+                <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600, mb: 3 }}>
                   Vendor Settlement - Month on Month
                 </Typography>
-                <Grid container spacing={3}>
-                  {['Delhivery', 'Blue Dart', 'Xpressbees', 'DTDC'].map((vendor) => (
-                    <Grid item xs={12} md={6} key={vendor}>
-                      <Card sx={{ 
-                        p: 2, 
-                        background: 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '12px',
-                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
-                      }}>
-                        <Typography variant="h6" sx={{ color: '#1f2937', fontWeight: 600, mb: 2 }}>
-                          {vendor}
-                        </Typography>
-                        <Box sx={{ width: '100%', height: 300 }}>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart
-                              data={d2cVendorSettlementData[vendor] || []}
-                              margin={{ top: 10, right: 20, left: 10, bottom: 40 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                              <XAxis 
-                                dataKey="month" 
-                                tick={{ fontSize: 10, fill: '#6b7280' }}
-                                angle={-45}
-                                textAnchor="end"
-                                height={60}
-                              />
-                              <YAxis 
-                                tick={{ fontSize: 10, fill: '#6b7280' }}
-                                tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}K`}
-                              />
-                              <RechartsTooltip 
-                                formatter={(value: number) => formatCurrency(value)}
-                                labelStyle={{ color: '#1f2937', fontWeight: 600, fontSize: '12px' }}
-                                contentStyle={{ 
-                                  backgroundColor: '#ffffff', 
-                                  border: '1px solid #e5e7eb',
-                                  borderRadius: '8px',
-                                  fontSize: '12px'
-                                }}
-                              />
-                              <Line 
-                                type="monotone" 
-                                dataKey="settlement" 
-                                stroke="#10b981" 
-                                strokeWidth={2}
-                                dot={{ r: 3, fill: '#10b981' }}
-                                name="Settlement"
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </Box>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
+                <Box sx={{ width: '100%', height: 400 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={d2cVendorSettlementCombinedData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis 
+                        dataKey="month" 
+                        tick={{ fontSize: 12, fill: '#6b7280' }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12, fill: '#6b7280' }}
+                        tickFormatter={(value) => `₹${(value / 100000).toFixed(1)}L`}
+                      />
+                      <RechartsTooltip 
+                        formatter={(value: number, name: string) => {
+                          // Convert dataKey back to display name
+                          const displayName = name.replace(/_/g, ' ');
+                          return [formatCurrency(value), displayName];
+                        }}
+                        labelStyle={{ color: '#1f2937', fontWeight: 600 }}
+                        contentStyle={{ 
+                          backgroundColor: '#ffffff', 
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px'
+                        }}
+                      />
+                      {/* Vertical reference lines for each month */}
+                      {d2cVendorSettlementCombinedData.map((dataPoint) => (
+                        <ReferenceLine
+                          key={dataPoint.month}
+                          x={dataPoint.month}
+                          stroke="#e5e7eb"
+                          strokeWidth={1}
+                          strokeDasharray="2 2"
+                        />
+                      ))}
+                      <Legend 
+                        wrapperStyle={{ paddingTop: 20 }}
+                        iconType="line"
+                        formatter={(value: string) => value.replace(/_/g, ' ')}
+                      />
+                      {Object.keys(d2cVendorSettlementData).map((vendor) => {
+                        const dataKey = vendor.replace(/\s+/g, '_');
+                        const color = getVendorColor(vendor);
+                        return (
+                          <Line 
+                            key={vendor}
+                            type="monotone" 
+                            dataKey={dataKey} 
+                            stroke={color}
+                            strokeWidth={3}
+                            dot={false}
+                            name={vendor}
+                          />
+                        );
+                      })}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </Box>
               </Box>
             </Box>
           ) : (
