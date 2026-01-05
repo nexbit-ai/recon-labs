@@ -342,6 +342,15 @@ const MarketplaceReconciliation: React.FC = () => {
   const [ageingData, setAgeingData] = useState<ProviderAgeingData[]>([]);
   const [ageingLoading, setAgeingLoading] = useState(false);
 
+  // Month on Month Growth state
+  const [monthOnMonthGrowthData, setMonthOnMonthGrowthData] = useState<{
+    marketplaceData?: Array<{ month: string; sales: number; settlement: number }>;
+    d2cSalesAndSettlement?: Array<{ month: string; sales: number; settlement: number }>;
+    d2cVendorSettlements?: Record<string, Array<{ month: string; settlement: number }>>;
+  } | null>(null);
+  const [monthOnMonthGrowthLoading, setMonthOnMonthGrowthLoading] = useState(false);
+  const [monthOnMonthGrowthError, setMonthOnMonthGrowthError] = useState<string | null>(null);
+
   // Sync data sources state
   // Removed sync modal; using inline button animation instead
   const [syncLoading, setSyncLoading] = useState(false);
@@ -1181,6 +1190,48 @@ const MarketplaceReconciliation: React.FC = () => {
     }
   };
 
+  // Fetch month on month growth data
+  const fetchMonthOnMonthGrowth = async () => {
+    if (!selectedPlatform || (selectedPlatform !== 'amazon' && selectedPlatform !== 'flipkart' && selectedPlatform !== 'd2c')) {
+      return;
+    }
+    
+    try {
+      setMonthOnMonthGrowthLoading(true);
+      setMonthOnMonthGrowthError(null);
+      
+      const response = await apiIndex.monthOnMonthGrowth.getMonthOnMonthGrowth({
+        platform: selectedPlatform,
+      });
+      
+      if (response.success && response.data) {
+        const data = response.data;
+        
+        if (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart') {
+          // For Amazon/Flipkart: expect { data: [{ month, sales, settlement }, ...] }
+          setMonthOnMonthGrowthData({
+            marketplaceData: data.data || [],
+          });
+        } else if (selectedPlatform === 'd2c') {
+          // For D2C: expect { salesAndSettlement: [...], vendorSettlements: {...} }
+          setMonthOnMonthGrowthData({
+            d2cSalesAndSettlement: data.salesAndSettlement || [],
+            d2cVendorSettlements: data.vendorSettlements || {},
+          });
+        }
+      } else {
+        console.warn('Month on month growth API returned unexpected format:', response);
+        setMonthOnMonthGrowthData(null);
+      }
+    } catch (error) {
+      console.error('Error fetching month on month growth:', error);
+      setMonthOnMonthGrowthError('Failed to load month on month growth data');
+      setMonthOnMonthGrowthData(null);
+    } finally {
+      setMonthOnMonthGrowthLoading(false);
+    }
+  };
+
   // Fetch upload list to get member name
   const fetchUploadList = async () => {
     try {
@@ -1713,6 +1764,10 @@ const MarketplaceReconciliation: React.FC = () => {
     if (selectedDateRange !== 'custom' || (customStartDate && customEndDate)) {
       fetchAgeingAnalysis();
     }
+    // Fetch month on month growth data when platform is selected
+    if (selectedPlatform && (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'd2c')) {
+      fetchMonthOnMonthGrowth();
+    }
     // Call upload-list API at the same time as main-summary and ageing-analysis
     fetchUploadList();
   }, [selectedDateRange, customStartDate, customEndDate, dateField, selectedPlatform, isInitialized, hasValidCredentials]);
@@ -1836,45 +1891,10 @@ const MarketplaceReconciliation: React.FC = () => {
    *   }
    */
 
-  // Memoized month-on-month data for Amazon/Flipkart (Sales + Settlement)
-  const marketplaceGrowthData = useMemo(() => {
-    const months = generateLast12Months();
-    // Using a seed based on platform for consistent dummy data
-    const seed = selectedPlatform === 'amazon' ? 1000 : 2000;
-    return months.map((month, idx) => ({
-      month,
-      sales: Math.floor(Math.sin((idx + seed) * 0.5) * 1000000 + 2000000),
-      settlement: Math.floor(Math.sin((idx + seed) * 0.5) * 900000 + 1800000),
-    }));
-  }, [selectedPlatform]);
-
-  // Memoized month-on-month data for D2C Sales + Settlement
-  const d2cSalesGrowthData = useMemo(() => {
-    const months = generateLast12Months();
-    return months.map((month, idx) => ({
-      month,
-      sales: Math.floor(Math.sin(idx * 0.4) * 1500000 + 3000000),
-      settlement: Math.floor(Math.sin(idx * 0.4) * 1200000 + 2500000),
-    }));
-  }, []);
-
-  // Memoized month-on-month data for D2C Vendor Settlements
-  // Original structure: { "Delhivery": [{month, settlement}, ...], ... }
-  const d2cVendorSettlementData = useMemo(() => {
-    const vendors = ['Delhivery', 'Blue Dart', 'Xpressbees', 'DTDC'];
-    const months = generateLast12Months();
-    const vendorData: Record<string, Array<{ month: string; settlement: number }>> = {};
-    
-    vendors.forEach((vendor, vendorIdx) => {
-      const seed = (vendorIdx + 1) * 100;
-      vendorData[vendor] = months.map((month, idx) => ({
-        month,
-        settlement: Math.floor(Math.sin((idx + seed) * 0.3) * 400000 + 500000),
-      }));
-    });
-    
-    return vendorData;
-  }, []);
+  // Month-on-month data from API (or empty arrays as fallback)
+  const marketplaceGrowthData = monthOnMonthGrowthData?.marketplaceData || [];
+  const d2cSalesGrowthData = monthOnMonthGrowthData?.d2cSalesAndSettlement || [];
+  const d2cVendorSettlementData = monthOnMonthGrowthData?.d2cVendorSettlements || {};
 
   // Transform vendor settlements data for single graph display
   // Converts { "Delhivery": [{month, settlement}, ...], ... } 
@@ -1937,6 +1957,37 @@ const MarketplaceReconciliation: React.FC = () => {
   // Helper function to get vendor color dynamically
   const getVendorColor = (vendor: string): string => {
     return vendorColorMap[vendor] || '#6b7280'; // Default gray if vendor not found
+  };
+
+  // Helper function to calculate Y-axis ticks at 100L intervals
+  // Returns array of tick values: [0, 10000000, 20000000, 30000000, ...] (in paise/rupees)
+  const calculateYAxisTicks = (data: Array<{ [key: string]: any }>, dataKeys: string[]): number[] => {
+    if (!data || data.length === 0) return [0, 10000000, 20000000, 30000000];
+    
+    // Find the maximum value across all data keys
+    let maxValue = 0;
+    data.forEach(item => {
+      dataKeys.forEach(key => {
+        const value = Number(item[key]) || 0;
+        if (value > maxValue) maxValue = value;
+      });
+    });
+    
+    // Round up to nearest 100L (10,000,000)
+    const maxTick = Math.ceil(maxValue / 10000000) * 10000000;
+    
+    // Generate ticks at 100L intervals (0, 100L, 200L, 300L, ...)
+    const ticks: number[] = [];
+    for (let i = 0; i <= maxTick; i += 10000000) {
+      ticks.push(i);
+    }
+    
+    // Ensure at least some ticks are shown even if data is small
+    if (ticks.length < 3) {
+      return [0, 10000000, 20000000, 30000000];
+    }
+    
+    return ticks;
   };
 
   return (
@@ -4757,12 +4808,30 @@ const MarketplaceReconciliation: React.FC = () => {
               <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600, mb: 3 }}>
                 {selectedPlatform === 'amazon' ? 'Amazon' : 'Flipkart'} - Sales vs Settlement
               </Typography>
-              <Box sx={{ width: '100%', height: 400, mb: 2 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={marketplaceGrowthData}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                  >
+              {monthOnMonthGrowthLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 800 }}>
+                  <CircularProgress />
+                  <Typography variant="body1" sx={{ ml: 2, color: '#6b7280' }}>
+                    Loading growth data...
+                  </Typography>
+                </Box>
+              ) : monthOnMonthGrowthError ? (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                  <Alert severity="error">{monthOnMonthGrowthError}</Alert>
+                </Box>
+              ) : marketplaceGrowthData.length === 0 ? (
+                <Box sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography variant="body1" sx={{ color: '#6b7280' }}>
+                    No data available for the selected platform
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ width: '100%', height: 800, mb: 2 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={marketplaceGrowthData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                    >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis 
                       dataKey="month" 
@@ -4773,7 +4842,9 @@ const MarketplaceReconciliation: React.FC = () => {
                     />
                     <YAxis 
                       tick={{ fontSize: 12, fill: '#6b7280' }}
-                      tickFormatter={(value) => `₹${(value / 100000).toFixed(1)}L`}
+                      tickFormatter={(value) => `₹${(value / 100000).toFixed(0)}L`}
+                      ticks={calculateYAxisTicks(marketplaceGrowthData, ['sales', 'settlement'])}
+                      domain={[0, 'auto']}
                     />
                     <RechartsTooltip 
                       formatter={(value: number) => formatCurrency(value)}
@@ -4817,6 +4888,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   </LineChart>
                 </ResponsiveContainer>
               </Box>
+              )}
             </Box>
           ) : selectedPlatform === 'd2c' ? (
             // D2C: Sales + Settlement graph + Individual vendor settlement graphs
@@ -4826,12 +4898,30 @@ const MarketplaceReconciliation: React.FC = () => {
                 <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600, mb: 3 }}>
                   D2C - Sales vs Settlement
                 </Typography>
-                <Box sx={{ width: '100%', height: 400 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={d2cSalesGrowthData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                    >
+                {monthOnMonthGrowthLoading ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 800 }}>
+                    <CircularProgress />
+                    <Typography variant="body1" sx={{ ml: 2, color: '#6b7280' }}>
+                      Loading growth data...
+                    </Typography>
+                  </Box>
+                ) : monthOnMonthGrowthError ? (
+                  <Box sx={{ p: 3, textAlign: 'center' }}>
+                    <Alert severity="error">{monthOnMonthGrowthError}</Alert>
+                  </Box>
+                ) : d2cSalesGrowthData.length === 0 ? (
+                  <Box sx={{ p: 3, textAlign: 'center' }}>
+                    <Typography variant="body1" sx={{ color: '#6b7280' }}>
+                      No data available for D2C sales
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box sx={{ width: '100%', height: 800 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={d2cSalesGrowthData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                      >
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis 
                         dataKey="month" 
@@ -4842,7 +4932,9 @@ const MarketplaceReconciliation: React.FC = () => {
                       />
                       <YAxis 
                         tick={{ fontSize: 12, fill: '#6b7280' }}
-                        tickFormatter={(value) => `₹${(value / 100000).toFixed(1)}L`}
+                        tickFormatter={(value) => `₹${(value / 100000).toFixed(0)}L`}
+                        ticks={calculateYAxisTicks(d2cSalesGrowthData, ['sales', 'settlement'])}
+                        domain={[0, 'auto']}
                       />
                       <RechartsTooltip 
                         formatter={(value: number) => formatCurrency(value)}
@@ -4883,9 +4975,10 @@ const MarketplaceReconciliation: React.FC = () => {
                         dot={false}
                         name="Settlement"
                       />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Box>
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </Box>
+                )}
               </Box>
 
               {/* Vendor Settlement Graph - All Vendors Combined */}
@@ -4893,12 +4986,30 @@ const MarketplaceReconciliation: React.FC = () => {
                 <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600, mb: 3 }}>
                   Vendor Settlement - Month on Month
                 </Typography>
-                <Box sx={{ width: '100%', height: 400 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={d2cVendorSettlementCombinedData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                    >
+                {monthOnMonthGrowthLoading ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 800 }}>
+                    <CircularProgress />
+                    <Typography variant="body1" sx={{ ml: 2, color: '#6b7280' }}>
+                      Loading vendor data...
+                    </Typography>
+                  </Box>
+                ) : monthOnMonthGrowthError ? (
+                  <Box sx={{ p: 3, textAlign: 'center' }}>
+                    <Alert severity="error">{monthOnMonthGrowthError}</Alert>
+                  </Box>
+                ) : d2cVendorSettlementCombinedData.length === 0 ? (
+                  <Box sx={{ p: 3, textAlign: 'center' }}>
+                    <Typography variant="body1" sx={{ color: '#6b7280' }}>
+                      No vendor settlement data available
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box sx={{ width: '100%', height: 800 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={d2cVendorSettlementCombinedData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                      >
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis 
                         dataKey="month" 
@@ -4909,7 +5020,9 @@ const MarketplaceReconciliation: React.FC = () => {
                       />
                       <YAxis 
                         tick={{ fontSize: 12, fill: '#6b7280' }}
-                        tickFormatter={(value) => `₹${(value / 100000).toFixed(1)}L`}
+                        tickFormatter={(value) => `₹${(value / 100000).toFixed(0)}L`}
+                        ticks={calculateYAxisTicks(d2cVendorSettlementCombinedData, Object.keys(d2cVendorSettlementData).map(v => v.replace(/\s+/g, '_')))}
+                        domain={[0, 'auto']}
                       />
                       <RechartsTooltip 
                         formatter={(value: number, name: string) => {
@@ -4957,6 +5070,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     </LineChart>
                   </ResponsiveContainer>
                 </Box>
+                )}
               </Box>
             </Box>
           ) : (

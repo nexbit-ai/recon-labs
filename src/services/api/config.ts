@@ -62,6 +62,9 @@ export const API_CONFIG = {
     // Ageing Analysis
     AGEING_ANALYSIS: '/recon/aging-analysis',
     
+    // Month on Month Growth
+    MONTH_ON_MONTH_GROWTH: '/recon/month-on-month-growth',
+    
     // Orders
     ORDERS: '/recon/orders',
     
