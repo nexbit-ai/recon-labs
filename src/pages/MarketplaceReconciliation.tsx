@@ -346,7 +346,10 @@ const MarketplaceReconciliation: React.FC = () => {
   const [monthOnMonthGrowthData, setMonthOnMonthGrowthData] = useState<{
     marketplaceData?: Array<{ month: string; sales: number; settlement: number }>;
     d2cSalesAndSettlement?: Array<{ month: string; sales: number; settlement: number }>;
-    d2cVendorSettlements?: Record<string, Array<{ month: string; settlement: number }>>;
+    d2cVendorSettlements?: {
+      cod?: Record<string, Array<{ month: string; settlement: number }>>;
+      noncod?: Record<string, Array<{ month: string; settlement: number }>>;
+    };
   } | null>(null);
   const [monthOnMonthGrowthLoading, setMonthOnMonthGrowthLoading] = useState(false);
   const [monthOnMonthGrowthError, setMonthOnMonthGrowthError] = useState<string | null>(null);
@@ -1193,42 +1196,132 @@ const MarketplaceReconciliation: React.FC = () => {
   // Fetch month on month growth data
   const fetchMonthOnMonthGrowth = async () => {
     if (!selectedPlatform || (selectedPlatform !== 'amazon' && selectedPlatform !== 'flipkart' && selectedPlatform !== 'd2c')) {
+      console.log('[MonthOnMonthGrowth] Skipping fetch - invalid platform:', selectedPlatform);
+      return;
+    }
+    
+    // Get effective date range
+    const startDate = effectiveDateRangeForTs.start;
+    const endDate = effectiveDateRangeForTs.end;
+    
+    // Only fetch if we have valid dates
+    if (!startDate || !endDate) {
+      console.log('[MonthOnMonthGrowth] Skipping fetch - missing dates:', { startDate, endDate });
       return;
     }
     
     try {
+      console.log('[MonthOnMonthGrowth] Starting fetch with params:', {
+        platform: selectedPlatform,
+        start_date: startDate,
+        end_date: endDate,
+      });
+      
       setMonthOnMonthGrowthLoading(true);
       setMonthOnMonthGrowthError(null);
       
       const response = await apiIndex.monthOnMonthGrowth.getMonthOnMonthGrowth({
         platform: selectedPlatform,
+        start_date: startDate,
+        end_date: endDate,
+      });
+      
+      console.log('[MonthOnMonthGrowth] API Response received:', {
+        success: response.success,
+        hasData: !!response.data,
+        dataKeys: response.data ? Object.keys(response.data) : [],
+        fullResponse: response,
       });
       
       if (response.success && response.data) {
         const data = response.data;
+        console.log('[MonthOnMonthGrowth] Processing data for platform:', selectedPlatform, {
+          dataStructure: data,
+          dataKeys: Object.keys(data),
+        });
         
-        if (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart') {
-          // For Amazon/Flipkart: expect { data: [{ month, sales, settlement }, ...] }
-          setMonthOnMonthGrowthData({
-            marketplaceData: data.data || [],
-          });
-        } else if (selectedPlatform === 'd2c') {
-          // For D2C: expect { salesAndSettlement: [...], vendorSettlements: {...} }
-          setMonthOnMonthGrowthData({
-            d2cSalesAndSettlement: data.salesAndSettlement || [],
-            d2cVendorSettlements: data.vendorSettlements || {},
-          });
+        try {
+          if (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart') {
+            // For Amazon/Flipkart: expect { data: [{ month, sales, settlement }, ...] }
+            const marketplaceData = data.data || data || [];
+            console.log('[MonthOnMonthGrowth] Setting marketplace data:', {
+              dataLength: Array.isArray(marketplaceData) ? marketplaceData.length : 'not an array',
+              firstItem: Array.isArray(marketplaceData) && marketplaceData.length > 0 ? marketplaceData[0] : null,
+            });
+            
+            // Validate data structure
+            if (Array.isArray(marketplaceData)) {
+              setMonthOnMonthGrowthData({
+                marketplaceData: marketplaceData,
+              });
+            } else {
+              console.error('[MonthOnMonthGrowth] Invalid marketplace data format - expected array, got:', typeof marketplaceData);
+              setMonthOnMonthGrowthError('Invalid data format received from API');
+              setMonthOnMonthGrowthData(null);
+            }
+          } else if (selectedPlatform === 'd2c') {
+            // For D2C: expect { salesAndSettlement: [...], vendorSettlements: { cod: {...}, noncod: {...} } }
+            const salesAndSettlement = data.salesAndSettlement || data.sales_and_settlement || [];
+            const vendorSettlementsRaw = data.vendorSettlements || data.vendor_settlements || {};
+            
+            console.log('[MonthOnMonthGrowth] Setting D2C data:', {
+              salesAndSettlementLength: Array.isArray(salesAndSettlement) ? salesAndSettlement.length : 'not an array',
+              vendorSettlementsRaw: vendorSettlementsRaw,
+              vendorSettlementsKeys: Object.keys(vendorSettlementsRaw),
+              hasCod: 'cod' in vendorSettlementsRaw,
+              hasNoncod: 'noncod' in vendorSettlementsRaw,
+            });
+            
+            // Validate and structure vendor settlements
+            const vendorSettlements: {
+              cod?: Record<string, Array<{ month: string; settlement: number }>>;
+              noncod?: Record<string, Array<{ month: string; settlement: number }>>;
+            } = {};
+            
+            if (vendorSettlementsRaw.cod && typeof vendorSettlementsRaw.cod === 'object') {
+              vendorSettlements.cod = vendorSettlementsRaw.cod;
+            }
+            if (vendorSettlementsRaw.noncod && typeof vendorSettlementsRaw.noncod === 'object') {
+              vendorSettlements.noncod = vendorSettlementsRaw.noncod;
+            }
+            
+            // Validate data structure
+            if (Array.isArray(salesAndSettlement) && typeof vendorSettlementsRaw === 'object') {
+              setMonthOnMonthGrowthData({
+                d2cSalesAndSettlement: salesAndSettlement,
+                d2cVendorSettlements: vendorSettlements,
+              });
+            } else {
+              console.error('[MonthOnMonthGrowth] Invalid D2C data format:', {
+                salesAndSettlementType: typeof salesAndSettlement,
+                vendorSettlementsType: typeof vendorSettlementsRaw,
+              });
+              setMonthOnMonthGrowthError('Invalid data format received from API');
+              setMonthOnMonthGrowthData(null);
+            }
+          }
+        } catch (processingError) {
+          console.error('[MonthOnMonthGrowth] Error processing data:', processingError);
+          setMonthOnMonthGrowthError(`Error processing data: ${processingError instanceof Error ? processingError.message : String(processingError)}`);
+          setMonthOnMonthGrowthData(null);
         }
       } else {
-        console.warn('Month on month growth API returned unexpected format:', response);
+        console.warn('[MonthOnMonthGrowth] API returned unexpected format:', {
+          success: response.success,
+          hasData: !!response.data,
+          response: response,
+        });
+        setMonthOnMonthGrowthError('Unexpected response format from API');
         setMonthOnMonthGrowthData(null);
       }
     } catch (error) {
-      console.error('Error fetching month on month growth:', error);
-      setMonthOnMonthGrowthError('Failed to load month on month growth data');
+      console.error('[MonthOnMonthGrowth] Error fetching data:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setMonthOnMonthGrowthError(`Failed to load month on month growth data: ${errorMessage}`);
       setMonthOnMonthGrowthData(null);
     } finally {
       setMonthOnMonthGrowthLoading(false);
+      console.log('[MonthOnMonthGrowth] Fetch completed');
     }
   };
 
@@ -1896,27 +1989,87 @@ const MarketplaceReconciliation: React.FC = () => {
   const d2cSalesGrowthData = monthOnMonthGrowthData?.d2cSalesAndSettlement || [];
   const d2cVendorSettlementData = monthOnMonthGrowthData?.d2cVendorSettlements || {};
 
-  // Transform vendor settlements data for single graph display
-  // Converts { "Delhivery": [{month, settlement}, ...], ... } 
-  // to [{ month: "Jan 2024", "Delhivery": 500000, "Blue Dart": 400000, ... }, ...]
-  const d2cVendorSettlementCombinedData = useMemo(() => {
-    const vendors = Object.keys(d2cVendorSettlementData);
-    if (vendors.length === 0) return [];
-    
-    // Get all unique months from the first vendor (all vendors should have same months)
-    const months = d2cVendorSettlementData[vendors[0]]?.map(item => item.month) || [];
-    
-    // Transform to combined format
-    return months.map(month => {
-      const dataPoint: Record<string, string | number> = { month };
-      vendors.forEach(vendor => {
-        const vendorMonthData = d2cVendorSettlementData[vendor]?.find(item => item.month === month);
-        // Use vendor name as key, but sanitize for dataKey (replace spaces with underscores)
-        const dataKey = vendor.replace(/\s+/g, '_');
-        dataPoint[dataKey] = vendorMonthData?.settlement || 0;
+  // Helper function to transform vendor settlements data for graph display
+  // Converts { "delhivery": [{month, settlement}, ...], ... } 
+  // to [{ month: "Jan 2024", "delhivery": 500000, "dtdc": 400000, ... }, ...]
+  const transformVendorSettlementData = (
+    vendorData: Record<string, Array<{ month: string; settlement: number }>>
+  ): Array<Record<string, string | number>> => {
+    try {
+      if (!vendorData || typeof vendorData !== 'object') {
+        console.warn('[MonthOnMonthGrowth] Invalid vendor data:', vendorData);
+        return [];
+      }
+      
+      const vendors = Object.keys(vendorData);
+      console.log('[MonthOnMonthGrowth] Found vendors:', vendors);
+      
+      if (vendors.length === 0) {
+        console.log('[MonthOnMonthGrowth] No vendors found, returning empty array');
+        return [];
+      }
+      
+      // Get all unique months from the first vendor (all vendors should have same months)
+      const firstVendorData = vendorData[vendors[0]];
+      if (!firstVendorData || !Array.isArray(firstVendorData)) {
+        console.error('[MonthOnMonthGrowth] First vendor data is invalid:', {
+          vendor: vendors[0],
+          data: firstVendorData,
+          type: typeof firstVendorData,
+        });
+        return [];
+      }
+      
+      const months = firstVendorData.map(item => {
+        if (!item || typeof item !== 'object') {
+          console.warn('[MonthOnMonthGrowth] Invalid item in vendor data:', item);
+          return null;
+        }
+        return item.month;
+      }).filter(month => month !== null && month !== undefined);
+      
+      console.log('[MonthOnMonthGrowth] Found months:', months);
+      
+      // Transform to combined format
+      const combined = months.map(month => {
+        const dataPoint: Record<string, string | number> = { month };
+        vendors.forEach(vendor => {
+          const vendorDataArray = vendorData[vendor];
+          if (!Array.isArray(vendorDataArray)) {
+            console.warn('[MonthOnMonthGrowth] Vendor data is not an array:', { vendor, data: vendorDataArray });
+            return;
+          }
+          
+          const vendorMonthData = vendorDataArray.find(item => item && item.month === month);
+          // Use vendor name as key, but sanitize for dataKey (replace spaces with underscores)
+          const dataKey = vendor.replace(/\s+/g, '_');
+          dataPoint[dataKey] = vendorMonthData?.settlement || 0;
+        });
+        return dataPoint;
       });
-      return dataPoint;
-    });
+      
+      console.log('[MonthOnMonthGrowth] Combined vendor data:', {
+        length: combined.length,
+        firstItem: combined[0],
+      });
+      
+      return combined;
+    } catch (error) {
+      console.error('[MonthOnMonthGrowth] Error transforming vendor settlement data:', error);
+      return [];
+    }
+  };
+
+  // Transform COD vendor settlements data
+  const d2cCodVendorSettlementCombinedData = useMemo(() => {
+    const codData = d2cVendorSettlementData?.cod || {};
+    return transformVendorSettlementData(codData);
+  }, [d2cVendorSettlementData]);
+
+  // Transform non-COD vendor settlements data
+  const d2cNonCodVendorSettlementCombinedData = useMemo(() => {
+    const nonCodData = d2cVendorSettlementData?.noncod || {};
+    return transformVendorSettlementData(nonCodData);
   }, [d2cVendorSettlementData]);
 
   // Color palette for vendor lines (20 distinct colors)
@@ -1944,9 +2097,21 @@ const MarketplaceReconciliation: React.FC = () => {
     '#78716c', // Stone
   ];
   
-  // Memoized vendor color mapping - assigns colors based on order vendors appear in API response
-  const vendorColorMap = useMemo(() => {
-    const vendors = Object.keys(d2cVendorSettlementData);
+  // Memoized vendor color mapping for COD - assigns colors based on order vendors appear in API response
+  const codVendorColorMap = useMemo(() => {
+    const codData = d2cVendorSettlementData?.cod || {};
+    const vendors = Object.keys(codData);
+    const colorMap: Record<string, string> = {};
+    vendors.forEach((vendor, index) => {
+      colorMap[vendor] = vendorColorPalette[index % vendorColorPalette.length];
+    });
+    return colorMap;
+  }, [d2cVendorSettlementData]);
+
+  // Memoized vendor color mapping for non-COD - assigns colors based on order vendors appear in API response
+  const nonCodVendorColorMap = useMemo(() => {
+    const nonCodData = d2cVendorSettlementData?.noncod || {};
+    const vendors = Object.keys(nonCodData);
     const colorMap: Record<string, string> = {};
     vendors.forEach((vendor, index) => {
       colorMap[vendor] = vendorColorPalette[index % vendorColorPalette.length];
@@ -1954,40 +2119,297 @@ const MarketplaceReconciliation: React.FC = () => {
     return colorMap;
   }, [d2cVendorSettlementData]);
   
-  // Helper function to get vendor color dynamically
-  const getVendorColor = (vendor: string): string => {
-    return vendorColorMap[vendor] || '#6b7280'; // Default gray if vendor not found
+  // Helper function to get vendor color dynamically for COD
+  const getCodVendorColor = (vendor: string): string => {
+    return codVendorColorMap[vendor] || '#6b7280'; // Default gray if vendor not found
   };
 
-  // Helper function to calculate Y-axis ticks at 100L intervals
-  // Returns array of tick values: [0, 10000000, 20000000, 30000000, ...] (in paise/rupees)
-  const calculateYAxisTicks = (data: Array<{ [key: string]: any }>, dataKeys: string[]): number[] => {
-    if (!data || data.length === 0) return [0, 10000000, 20000000, 30000000];
-    
-    // Find the maximum value across all data keys
-    let maxValue = 0;
-    data.forEach(item => {
-      dataKeys.forEach(key => {
-        const value = Number(item[key]) || 0;
-        if (value > maxValue) maxValue = value;
-      });
-    });
-    
-    // Round up to nearest 100L (10,000,000)
-    const maxTick = Math.ceil(maxValue / 10000000) * 10000000;
-    
-    // Generate ticks at 100L intervals (0, 100L, 200L, 300L, ...)
-    const ticks: number[] = [];
-    for (let i = 0; i <= maxTick; i += 10000000) {
-      ticks.push(i);
+  // Helper function to get vendor color dynamically for non-COD
+  const getNonCodVendorColor = (vendor: string): string => {
+    return nonCodVendorColorMap[vendor] || '#6b7280'; // Default gray if vendor not found
+  };
+
+  // Custom tooltip component for Sales/Settlement graphs (sorts values in descending order)
+  const SalesSettlementTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || payload.length === 0) {
+      return null;
     }
-    
-    // Ensure at least some ticks are shown even if data is small
-    if (ticks.length < 3) {
+
+    // Sort payload by value in descending order
+    const sortedPayload = [...payload].sort((a, b) => {
+      const aValue = Number(a.value) || 0;
+      const bValue = Number(b.value) || 0;
+      return bValue - aValue;
+    });
+
+    return (
+      <Box
+        sx={{
+          backgroundColor: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          padding: '12px',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+        }}
+      >
+        <Typography
+          variant="body2"
+          sx={{
+            color: '#1f2937',
+            fontWeight: 600,
+            marginBottom: '8px',
+            borderBottom: '1px solid #e5e7eb',
+            paddingBottom: '4px',
+          }}
+        >
+          {label}
+        </Typography>
+        {sortedPayload.map((entry: any, index: number) => (
+          <Box
+            key={index}
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: index > 0 ? '6px' : 0,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Box
+                sx={{
+                  width: '12px',
+                  height: '12px',
+                  backgroundColor: entry.color,
+                  borderRadius: '2px',
+                  marginRight: '8px',
+                }}
+              />
+              <Typography variant="body2" sx={{ color: '#374151' }}>
+                {entry.name}
+              </Typography>
+            </Box>
+            <Typography variant="body2" sx={{ color: '#1f2937', fontWeight: 600, marginLeft: '16px' }}>
+              {formatCurrency(entry.value)}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+    );
+  };
+
+  // Custom tooltip component for Vendor Settlement graphs (sorts values in descending order)
+  const VendorSettlementTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || payload.length === 0) {
+      return null;
+    }
+
+    // Sort payload by value in descending order
+    const sortedPayload = [...payload].sort((a, b) => {
+      const aValue = Number(a.value) || 0;
+      const bValue = Number(b.value) || 0;
+      return bValue - aValue;
+    });
+
+    return (
+      <Box
+        sx={{
+          backgroundColor: '#ffffff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          padding: '12px',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+        }}
+      >
+        <Typography
+          variant="body2"
+          sx={{
+            color: '#1f2937',
+            fontWeight: 600,
+            marginBottom: '8px',
+            borderBottom: '1px solid #e5e7eb',
+            paddingBottom: '4px',
+          }}
+        >
+          {label}
+        </Typography>
+        {sortedPayload.map((entry: any, index: number) => {
+          // Use name prop if available (set in Line component), otherwise convert dataKey back to display name
+          const displayName = entry.name || (entry.dataKey ? entry.dataKey.replace(/_/g, ' ') : 'Unknown');
+          return (
+            <Box
+              key={index}
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: index > 0 ? '6px' : 0,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Box
+                  sx={{
+                    width: '12px',
+                    height: '12px',
+                    backgroundColor: entry.color,
+                    borderRadius: '2px',
+                    marginRight: '8px',
+                  }}
+                />
+                <Typography variant="body2" sx={{ color: '#374151' }}>
+                  {displayName}
+                </Typography>
+              </Box>
+              <Typography variant="body2" sx={{ color: '#1f2937', fontWeight: 600, marginLeft: '16px' }}>
+                {formatCurrency(entry.value)}
+              </Typography>
+            </Box>
+          );
+        })}
+      </Box>
+    );
+  };
+
+  // Helper function to calculate dynamic Y-axis domain based on min/max values with margins
+  // Returns [minValue, maxValue] with padding on both ends
+  const calculateDynamicYAxisDomain = (
+    data: Array<{ [key: string]: any }>,
+    dataKeys: string[]
+  ): [number, number] => {
+    try {
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        return [0, 100000000]; // Default fallback
+      }
+
+      if (!dataKeys || !Array.isArray(dataKeys) || dataKeys.length === 0) {
+        return [0, 100000000]; // Default fallback
+      }
+
+      // Find min and max values across all data keys
+      let minValue = Infinity;
+      let maxValue = -Infinity;
+
+      data.forEach((item) => {
+        if (!item || typeof item !== 'object') {
+          return;
+        }
+
+        dataKeys.forEach((key) => {
+          const value = Number(item[key]) || 0;
+          if (!isNaN(value)) {
+            if (value < minValue) minValue = value;
+            if (value > maxValue) maxValue = value;
+          }
+        });
+      });
+
+      // If no valid values found, return default
+      if (minValue === Infinity || maxValue === -Infinity) {
+        return [0, 100000000];
+      }
+
+      // Calculate range
+      const range = maxValue - minValue;
+
+      // Add 10% margin on both ends
+      const margin = range * 0.1;
+
+      // Round down min to nearest crore (10,000,000) and round up max
+      const adjustedMin = Math.floor((minValue - margin) / 10000000) * 10000000;
+      const adjustedMax = Math.ceil((maxValue + margin) / 10000000) * 10000000;
+
+      // Ensure min is not negative (or at least 0 if all values are positive)
+      const finalMin = Math.max(0, adjustedMin);
+
+      console.log('[MonthOnMonthGrowth] Dynamic Y-axis domain:', {
+        minValue,
+        maxValue,
+        range,
+        margin,
+        finalMin,
+        adjustedMax,
+      });
+
+      return [finalMin, adjustedMax];
+    } catch (error) {
+      console.error('[MonthOnMonthGrowth] Error calculating dynamic Y-axis domain:', error);
+      return [0, 100000000]; // Default fallback
+    }
+  };
+
+  // Helper function to calculate Y-axis ticks at 1cr intervals within a domain range
+  // Returns array of tick values within the specified domain
+  const calculateYAxisTicks = (
+    data: Array<{ [key: string]: any }>,
+    dataKeys: string[],
+    domain?: [number, number]
+  ): number[] => {
+    try {
+      let minValue = 0;
+      let maxValue = 0;
+
+      if (domain) {
+        // Use provided domain
+        [minValue, maxValue] = domain;
+      } else {
+        // Calculate from data (fallback for vendor graphs that still use [0, 'auto'])
+        if (!data || !Array.isArray(data) || data.length === 0) {
+          console.log('[MonthOnMonthGrowth] calculateYAxisTicks: No data, returning default ticks');
+          return [0, 10000000, 20000000, 30000000];
+        }
+
+        if (!dataKeys || !Array.isArray(dataKeys) || dataKeys.length === 0) {
+          console.log('[MonthOnMonthGrowth] calculateYAxisTicks: No data keys, returning default ticks');
+          return [0, 10000000, 20000000, 30000000];
+        }
+
+        // Find the maximum value across all data keys
+        data.forEach((item, itemIndex) => {
+          if (!item || typeof item !== 'object') {
+            console.warn('[MonthOnMonthGrowth] calculateYAxisTicks: Invalid item at index', itemIndex, item);
+            return;
+          }
+
+          dataKeys.forEach((key) => {
+            const value = Number(item[key]) || 0;
+            if (isNaN(value)) {
+              console.warn('[MonthOnMonthGrowth] calculateYAxisTicks: Invalid value for key', key, 'in item', itemIndex, ':', item[key]);
+              return;
+            }
+            if (value > maxValue) maxValue = value;
+          });
+        });
+
+        // Round up to nearest 1cr (10,000,000)
+        maxValue = Math.ceil(maxValue / 10000000) * 10000000;
+      }
+
+      // Round min and max to nearest 1cr intervals
+      const minTick = Math.floor(minValue / 10000000) * 10000000;
+      const maxTick = Math.ceil(maxValue / 10000000) * 10000000;
+
+      // Generate ticks at 1cr intervals within the range
+      const ticks: number[] = [];
+      for (let i = minTick; i <= maxTick; i += 10000000) {
+        ticks.push(i);
+      }
+
+      // Ensure at least some ticks are shown
+      if (ticks.length < 2) {
+        console.log('[MonthOnMonthGrowth] calculateYAxisTicks: Too few ticks, adding defaults');
+        if (ticks.length === 0) {
+          return [minTick, minTick + 10000000, minTick + 20000000, minTick + 30000000];
+        }
+        // Add a few more ticks around the existing ones
+        const firstTick = ticks[0];
+        return [firstTick, firstTick + 10000000, firstTick + 20000000, firstTick + 30000000];
+      }
+
+      console.log('[MonthOnMonthGrowth] calculateYAxisTicks: Generated ticks:', ticks, 'for domain', domain || 'calculated');
+      return ticks;
+    } catch (error) {
+      console.error('[MonthOnMonthGrowth] calculateYAxisTicks: Error calculating ticks:', error);
       return [0, 10000000, 20000000, 30000000];
     }
-    
-    return ticks;
   };
 
   return (
@@ -4827,67 +5249,96 @@ const MarketplaceReconciliation: React.FC = () => {
                 </Box>
               ) : (
                 <Box sx={{ width: '100%', height: 800, mb: 2 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={marketplaceGrowthData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                    >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis 
-                      dataKey="month" 
-                      tick={{ fontSize: 12, fill: '#6b7280' }}
-                      angle={-45}
-                      textAnchor="end"
-                      height={80}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12, fill: '#6b7280' }}
-                      tickFormatter={(value) => `₹${(value / 100000).toFixed(0)}L`}
-                      ticks={calculateYAxisTicks(marketplaceGrowthData, ['sales', 'settlement'])}
-                      domain={[0, 'auto']}
-                    />
-                    <RechartsTooltip 
-                      formatter={(value: number) => formatCurrency(value)}
-                      labelStyle={{ color: '#1f2937', fontWeight: 600 }}
-                      contentStyle={{ 
-                        backgroundColor: '#ffffff', 
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px'
-                      }}
-                    />
-                    {/* Vertical reference lines for each month */}
-                    {marketplaceGrowthData.map((dataPoint) => (
-                      <ReferenceLine
-                        key={dataPoint.month}
-                        x={dataPoint.month}
-                        stroke="#e5e7eb"
-                        strokeWidth={1}
-                        strokeDasharray="2 2"
-                      />
-                    ))}
-                    <Legend 
-                      wrapperStyle={{ paddingTop: 20 }}
-                      iconType="line"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="sales" 
-                      stroke="#2563eb" 
-                      strokeWidth={3}
-                      dot={false}
-                      name="Sales"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="settlement" 
-                      stroke="#10b981" 
-                      strokeWidth={3}
-                      dot={false}
-                      name="Settlement"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </Box>
+                  {(() => {
+                    try {
+                      // Validate data before rendering
+                      if (!Array.isArray(marketplaceGrowthData) || marketplaceGrowthData.length === 0) {
+                        console.warn('[MonthOnMonthGrowth] Invalid marketplaceGrowthData for rendering:', marketplaceGrowthData);
+                        return (
+                          <Box sx={{ p: 3, textAlign: 'center' }}>
+                            <Typography variant="body1" sx={{ color: '#6b7280' }}>
+                              Invalid data format received
+                            </Typography>
+                          </Box>
+                        );
+                      }
+                      
+                      const yAxisDomain = calculateDynamicYAxisDomain(marketplaceGrowthData, ['sales', 'settlement']);
+                      const yAxisTicks = calculateYAxisTicks(marketplaceGrowthData, ['sales', 'settlement'], yAxisDomain);
+                      console.log('[MonthOnMonthGrowth] Rendering marketplace graph with', marketplaceGrowthData.length, 'data points');
+                      
+                      return (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart
+                            data={marketplaceGrowthData}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                          >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis 
+                            dataKey="month" 
+                            tick={{ fontSize: 12, fill: '#6b7280' }}
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                          />
+                          <YAxis 
+                            tick={{ fontSize: 12, fill: '#6b7280' }}
+                            tickFormatter={(value) => `₹${(value / 10000000).toFixed(0)}cr`}
+                            ticks={yAxisTicks}
+                            domain={yAxisDomain}
+                          />
+                          <RechartsTooltip content={<SalesSettlementTooltip />} />
+                          {/* Vertical reference lines for each month */}
+                          {marketplaceGrowthData.map((dataPoint, index) => {
+                            if (!dataPoint || !dataPoint.month) {
+                              console.warn('[MonthOnMonthGrowth] Invalid dataPoint at index', index, dataPoint);
+                              return null;
+                            }
+                            return (
+                              <ReferenceLine
+                                key={dataPoint.month || `ref-${index}`}
+                                x={dataPoint.month}
+                                stroke="#e5e7eb"
+                                strokeWidth={1}
+                                strokeDasharray="2 2"
+                              />
+                            );
+                          })}
+                          <Legend 
+                            wrapperStyle={{ paddingTop: 20 }}
+                            iconType="line"
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="sales" 
+                            stroke="#2563eb" 
+                            strokeWidth={3}
+                            dot={false}
+                            name="Sales"
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="settlement" 
+                            stroke="#10b981" 
+                            strokeWidth={3}
+                            dot={false}
+                            name="Settlement"
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                      );
+                    } catch (error) {
+                      console.error('[MonthOnMonthGrowth] Error rendering marketplace graph:', error);
+                      return (
+                        <Box sx={{ p: 3, textAlign: 'center' }}>
+                          <Alert severity="error">
+                            Error rendering graph: {error instanceof Error ? error.message : String(error)}
+                          </Alert>
+                        </Box>
+                      );
+                    }
+                  })()}
+                </Box>
               )}
             </Box>
           ) : selectedPlatform === 'd2c' ? (
@@ -4917,159 +5368,368 @@ const MarketplaceReconciliation: React.FC = () => {
                   </Box>
                 ) : (
                   <Box sx={{ width: '100%', height: 800 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
-                        data={d2cSalesGrowthData}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                      >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis 
-                        dataKey="month" 
-                        tick={{ fontSize: 12, fill: '#6b7280' }}
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 12, fill: '#6b7280' }}
-                        tickFormatter={(value) => `₹${(value / 100000).toFixed(0)}L`}
-                        ticks={calculateYAxisTicks(d2cSalesGrowthData, ['sales', 'settlement'])}
-                        domain={[0, 'auto']}
-                      />
-                      <RechartsTooltip 
-                        formatter={(value: number) => formatCurrency(value)}
-                        labelStyle={{ color: '#1f2937', fontWeight: 600 }}
-                        contentStyle={{ 
-                          backgroundColor: '#ffffff', 
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '8px'
-                        }}
-                      />
-                      <Legend 
-                        wrapperStyle={{ paddingTop: 20 }}
-                        iconType="line"
-                      />
-                      {/* Vertical reference lines for each month */}
-                      {d2cSalesGrowthData.map((dataPoint) => (
-                        <ReferenceLine
-                          key={dataPoint.month}
-                          x={dataPoint.month}
-                          stroke="#e5e7eb"
-                          strokeWidth={1}
-                          strokeDasharray="2 2"
-                        />
-                      ))}
-                      <Line 
-                        type="monotone" 
-                        dataKey="sales" 
-                        stroke="#2563eb" 
-                        strokeWidth={3}
-                        dot={false}
-                        name="Sales"
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="settlement" 
-                        stroke="#10b981" 
-                        strokeWidth={3}
-                        dot={false}
-                        name="Settlement"
-                      />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    {(() => {
+                      try {
+                        // Validate data before rendering
+                        if (!Array.isArray(d2cSalesGrowthData) || d2cSalesGrowthData.length === 0) {
+                          console.warn('[MonthOnMonthGrowth] Invalid d2cSalesGrowthData for rendering:', d2cSalesGrowthData);
+                          return (
+                            <Box sx={{ p: 3, textAlign: 'center' }}>
+                              <Typography variant="body1" sx={{ color: '#6b7280' }}>
+                                Invalid data format received
+                              </Typography>
+                            </Box>
+                          );
+                        }
+                        
+                        const yAxisDomain = calculateDynamicYAxisDomain(d2cSalesGrowthData, ['sales', 'settlement']);
+                        const yAxisTicks = calculateYAxisTicks(d2cSalesGrowthData, ['sales', 'settlement'], yAxisDomain);
+                        console.log('[MonthOnMonthGrowth] Rendering D2C sales graph with', d2cSalesGrowthData.length, 'data points');
+                        
+                        return (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart
+                              data={d2cSalesGrowthData}
+                              margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                            >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis 
+                              dataKey="month" 
+                              tick={{ fontSize: 12, fill: '#6b7280' }}
+                              angle={-45}
+                              textAnchor="end"
+                              height={80}
+                            />
+                            <YAxis 
+                              tick={{ fontSize: 12, fill: '#6b7280' }}
+                              tickFormatter={(value) => `₹${(value / 10000000).toFixed(0)}cr`}
+                              ticks={yAxisTicks}
+                              domain={yAxisDomain}
+                            />
+                            <RechartsTooltip content={<SalesSettlementTooltip />} />
+                            <Legend 
+                              wrapperStyle={{ paddingTop: 20 }}
+                              iconType="line"
+                            />
+                            {/* Vertical reference lines for each month */}
+                            {d2cSalesGrowthData.map((dataPoint, index) => {
+                              if (!dataPoint || !dataPoint.month) {
+                                console.warn('[MonthOnMonthGrowth] Invalid dataPoint at index', index, dataPoint);
+                                return null;
+                              }
+                              return (
+                                <ReferenceLine
+                                  key={dataPoint.month || `ref-${index}`}
+                                  x={dataPoint.month}
+                                  stroke="#e5e7eb"
+                                  strokeWidth={1}
+                                  strokeDasharray="2 2"
+                                />
+                              );
+                            })}
+                            <Line 
+                              type="monotone" 
+                              dataKey="sales" 
+                              stroke="#2563eb" 
+                              strokeWidth={3}
+                              dot={false}
+                              name="Sales"
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="settlement" 
+                              stroke="#10b981" 
+                              strokeWidth={3}
+                              dot={false}
+                              name="Settlement"
+                            />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        );
+                      } catch (error) {
+                        console.error('[MonthOnMonthGrowth] Error rendering D2C sales graph:', error);
+                        return (
+                          <Box sx={{ p: 3, textAlign: 'center' }}>
+                            <Alert severity="error">
+                              Error rendering graph: {error instanceof Error ? error.message : String(error)}
+                            </Alert>
+                          </Box>
+                        );
+                      }
+                    })()}
                   </Box>
                 )}
               </Box>
 
-              {/* Vendor Settlement Graph - All Vendors Combined */}
-              <Box>
+              {/* Vendor Settlement Graphs - COD and Non-COD */}
+              
+              {/* COD Vendor Settlement Graph */}
+              <Box sx={{ mb: 6 }}>
                 <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600, mb: 3 }}>
-                  Vendor Settlement - Month on Month
+                  COD Vendor Settlement - Month on Month
                 </Typography>
                 {monthOnMonthGrowthLoading ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 800 }}>
                     <CircularProgress />
                     <Typography variant="body1" sx={{ ml: 2, color: '#6b7280' }}>
-                      Loading vendor data...
+                      Loading COD vendor data...
                     </Typography>
                   </Box>
                 ) : monthOnMonthGrowthError ? (
                   <Box sx={{ p: 3, textAlign: 'center' }}>
                     <Alert severity="error">{monthOnMonthGrowthError}</Alert>
                   </Box>
-                ) : d2cVendorSettlementCombinedData.length === 0 ? (
+                ) : d2cCodVendorSettlementCombinedData.length === 0 ? (
                   <Box sx={{ p: 3, textAlign: 'center' }}>
                     <Typography variant="body1" sx={{ color: '#6b7280' }}>
-                      No vendor settlement data available
+                      No COD vendor settlement data available
                     </Typography>
                   </Box>
                 ) : (
                   <Box sx={{ width: '100%', height: 800 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
-                        data={d2cVendorSettlementCombinedData}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-                      >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis 
-                        dataKey="month" 
-                        tick={{ fontSize: 12, fill: '#6b7280' }}
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 12, fill: '#6b7280' }}
-                        tickFormatter={(value) => `₹${(value / 100000).toFixed(0)}L`}
-                        ticks={calculateYAxisTicks(d2cVendorSettlementCombinedData, Object.keys(d2cVendorSettlementData).map(v => v.replace(/\s+/g, '_')))}
-                        domain={[0, 'auto']}
-                      />
-                      <RechartsTooltip 
-                        formatter={(value: number, name: string) => {
-                          // Convert dataKey back to display name
-                          const displayName = name.replace(/_/g, ' ');
-                          return [formatCurrency(value), displayName];
-                        }}
-                        labelStyle={{ color: '#1f2937', fontWeight: 600 }}
-                        contentStyle={{ 
-                          backgroundColor: '#ffffff', 
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '8px'
-                        }}
-                      />
-                      {/* Vertical reference lines for each month */}
-                      {d2cVendorSettlementCombinedData.map((dataPoint) => (
-                        <ReferenceLine
-                          key={dataPoint.month}
-                          x={dataPoint.month}
-                          stroke="#e5e7eb"
-                          strokeWidth={1}
-                          strokeDasharray="2 2"
-                        />
-                      ))}
-                      <Legend 
-                        wrapperStyle={{ paddingTop: 20 }}
-                        iconType="line"
-                        formatter={(value: string) => value.replace(/_/g, ' ')}
-                      />
-                      {Object.keys(d2cVendorSettlementData).map((vendor) => {
-                        const dataKey = vendor.replace(/\s+/g, '_');
-                        const color = getVendorColor(vendor);
+                    {(() => {
+                      try {
+                        // Validate data before rendering
+                        if (!Array.isArray(d2cCodVendorSettlementCombinedData) || d2cCodVendorSettlementCombinedData.length === 0) {
+                          console.warn('[MonthOnMonthGrowth] Invalid d2cCodVendorSettlementCombinedData for rendering:', d2cCodVendorSettlementCombinedData);
+                          return (
+                            <Box sx={{ p: 3, textAlign: 'center' }}>
+                              <Typography variant="body1" sx={{ color: '#6b7280' }}>
+                                Invalid COD vendor settlement data format received
+                              </Typography>
+                            </Box>
+                          );
+                        }
+                        
+                        const codVendorKeys = Object.keys(d2cVendorSettlementData?.cod || {});
+                        const codDataKeys = codVendorKeys.map(v => v.replace(/\s+/g, '_'));
+                        const yAxisTicks = calculateYAxisTicks(d2cCodVendorSettlementCombinedData, codDataKeys);
+                        
+                        console.log('[MonthOnMonthGrowth] Rendering COD vendor settlement graph with', {
+                          dataPoints: d2cCodVendorSettlementCombinedData.length,
+                          vendors: codVendorKeys.length,
+                          vendorKeys: codVendorKeys,
+                        });
+                        
                         return (
-                          <Line 
-                            key={vendor}
-                            type="monotone" 
-                            dataKey={dataKey} 
-                            stroke={color}
-                            strokeWidth={3}
-                            dot={false}
-                            name={vendor}
-                          />
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart
+                              data={d2cCodVendorSettlementCombinedData}
+                              margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                            >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis 
+                              dataKey="month" 
+                              tick={{ fontSize: 12, fill: '#6b7280' }}
+                              angle={-45}
+                              textAnchor="end"
+                              height={80}
+                            />
+                            <YAxis 
+                              tick={{ fontSize: 12, fill: '#6b7280' }}
+                              tickFormatter={(value) => `₹${(value / 10000000).toFixed(0)}cr`}
+                              ticks={yAxisTicks}
+                              domain={[0, 'auto']}
+                            />
+                            <RechartsTooltip content={<VendorSettlementTooltip />} />
+                            {/* Vertical reference lines for each month */}
+                            {d2cCodVendorSettlementCombinedData.map((dataPoint, index) => {
+                              if (!dataPoint || !dataPoint.month) {
+                                console.warn('[MonthOnMonthGrowth] Invalid COD vendor dataPoint at index', index, dataPoint);
+                                return null;
+                              }
+                              return (
+                                <ReferenceLine
+                                  key={dataPoint.month || `cod-ref-${index}`}
+                                  x={dataPoint.month}
+                                  stroke="#e5e7eb"
+                                  strokeWidth={1}
+                                  strokeDasharray="2 2"
+                                />
+                              );
+                            })}
+                            <Legend 
+                              wrapperStyle={{ paddingTop: 20 }}
+                              iconType="line"
+                              formatter={(value: string) => {
+                                try {
+                                  return value.replace(/_/g, ' ');
+                                } catch (e) {
+                                  console.error('[MonthOnMonthGrowth] Error formatting legend:', e, value);
+                                  return value;
+                                }
+                              }}
+                            />
+                            {codVendorKeys.map((vendor) => {
+                              try {
+                                const dataKey = vendor.replace(/\s+/g, '_');
+                                const color = getCodVendorColor(vendor);
+                                return (
+                                  <Line 
+                                    key={vendor}
+                                    type="monotone" 
+                                    dataKey={dataKey} 
+                                    stroke={color}
+                                    strokeWidth={3}
+                                    dot={false}
+                                    name={vendor}
+                                  />
+                                );
+                              } catch (e) {
+                                console.error('[MonthOnMonthGrowth] Error rendering COD vendor line:', e, vendor);
+                                return null;
+                              }
+                            })}
+                          </LineChart>
+                        </ResponsiveContainer>
                         );
-                      })}
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Box>
+                      } catch (error) {
+                        console.error('[MonthOnMonthGrowth] Error rendering COD vendor settlement graph:', error);
+                        return (
+                          <Box sx={{ p: 3, textAlign: 'center' }}>
+                            <Alert severity="error">
+                              Error rendering COD graph: {error instanceof Error ? error.message : String(error)}
+                            </Alert>
+                          </Box>
+                        );
+                      }
+                    })()}
+                  </Box>
+                )}
+              </Box>
+
+              {/* Non-COD Vendor Settlement Graph */}
+              <Box>
+                <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600, mb: 3 }}>
+                  Non-COD Vendor Settlement - Month on Month
+                </Typography>
+                {monthOnMonthGrowthLoading ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 800 }}>
+                    <CircularProgress />
+                    <Typography variant="body1" sx={{ ml: 2, color: '#6b7280' }}>
+                      Loading non-COD vendor data...
+                    </Typography>
+                  </Box>
+                ) : monthOnMonthGrowthError ? (
+                  <Box sx={{ p: 3, textAlign: 'center' }}>
+                    <Alert severity="error">{monthOnMonthGrowthError}</Alert>
+                  </Box>
+                ) : d2cNonCodVendorSettlementCombinedData.length === 0 ? (
+                  <Box sx={{ p: 3, textAlign: 'center' }}>
+                    <Typography variant="body1" sx={{ color: '#6b7280' }}>
+                      No non-COD vendor settlement data available
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box sx={{ width: '100%', height: 800 }}>
+                    {(() => {
+                      try {
+                        // Validate data before rendering
+                        if (!Array.isArray(d2cNonCodVendorSettlementCombinedData) || d2cNonCodVendorSettlementCombinedData.length === 0) {
+                          console.warn('[MonthOnMonthGrowth] Invalid d2cNonCodVendorSettlementCombinedData for rendering:', d2cNonCodVendorSettlementCombinedData);
+                          return (
+                            <Box sx={{ p: 3, textAlign: 'center' }}>
+                              <Typography variant="body1" sx={{ color: '#6b7280' }}>
+                                Invalid non-COD vendor settlement data format received
+                              </Typography>
+                            </Box>
+                          );
+                        }
+                        
+                        const nonCodVendorKeys = Object.keys(d2cVendorSettlementData?.noncod || {});
+                        const nonCodDataKeys = nonCodVendorKeys.map(v => v.replace(/\s+/g, '_'));
+                        const yAxisTicks = calculateYAxisTicks(d2cNonCodVendorSettlementCombinedData, nonCodDataKeys);
+                        
+                        console.log('[MonthOnMonthGrowth] Rendering non-COD vendor settlement graph with', {
+                          dataPoints: d2cNonCodVendorSettlementCombinedData.length,
+                          vendors: nonCodVendorKeys.length,
+                          vendorKeys: nonCodVendorKeys,
+                        });
+                        
+                        return (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart
+                              data={d2cNonCodVendorSettlementCombinedData}
+                              margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                            >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis 
+                              dataKey="month" 
+                              tick={{ fontSize: 12, fill: '#6b7280' }}
+                              angle={-45}
+                              textAnchor="end"
+                              height={80}
+                            />
+                            <YAxis 
+                              tick={{ fontSize: 12, fill: '#6b7280' }}
+                              tickFormatter={(value) => `₹${(value / 10000000).toFixed(0)}cr`}
+                              ticks={yAxisTicks}
+                              domain={[0, 'auto']}
+                            />
+                            <RechartsTooltip content={<VendorSettlementTooltip />} />
+                            {/* Vertical reference lines for each month */}
+                            {d2cNonCodVendorSettlementCombinedData.map((dataPoint, index) => {
+                              if (!dataPoint || !dataPoint.month) {
+                                console.warn('[MonthOnMonthGrowth] Invalid non-COD vendor dataPoint at index', index, dataPoint);
+                                return null;
+                              }
+                              return (
+                                <ReferenceLine
+                                  key={dataPoint.month || `noncod-ref-${index}`}
+                                  x={dataPoint.month}
+                                  stroke="#e5e7eb"
+                                  strokeWidth={1}
+                                  strokeDasharray="2 2"
+                                />
+                              );
+                            })}
+                            <Legend 
+                              wrapperStyle={{ paddingTop: 20 }}
+                              iconType="line"
+                              formatter={(value: string) => {
+                                try {
+                                  return value.replace(/_/g, ' ');
+                                } catch (e) {
+                                  console.error('[MonthOnMonthGrowth] Error formatting legend:', e, value);
+                                  return value;
+                                }
+                              }}
+                            />
+                            {nonCodVendorKeys.map((vendor) => {
+                              try {
+                                const dataKey = vendor.replace(/\s+/g, '_');
+                                const color = getNonCodVendorColor(vendor);
+                                return (
+                                  <Line 
+                                    key={vendor}
+                                    type="monotone" 
+                                    dataKey={dataKey} 
+                                    stroke={color}
+                                    strokeWidth={3}
+                                    dot={false}
+                                    name={vendor}
+                                  />
+                                );
+                              } catch (e) {
+                                console.error('[MonthOnMonthGrowth] Error rendering non-COD vendor line:', e, vendor);
+                                return null;
+                              }
+                            })}
+                          </LineChart>
+                        </ResponsiveContainer>
+                        );
+                      } catch (error) {
+                        console.error('[MonthOnMonthGrowth] Error rendering non-COD vendor settlement graph:', error);
+                        return (
+                          <Box sx={{ p: 3, textAlign: 'center' }}>
+                            <Alert severity="error">
+                              Error rendering non-COD graph: {error instanceof Error ? error.message : String(error)}
+                            </Alert>
+                          </Box>
+                        );
+                      }
+                    })()}
+                  </Box>
                 )}
               </Box>
             </Box>
