@@ -1328,19 +1328,6 @@ const MarketplaceReconciliation: React.FC = () => {
     }
   };
 
-  // Fetch upload list to get member name
-  const fetchUploadList = async () => {
-    try {
-      const response = await apiIndex.uploadList.getUploadList({ report_type: 'D2C-DirectUpload' });
-      if (response.success && response.data?.memberName) {
-        setMemberName(response.data.memberName);
-      }
-    } catch (error) {
-      console.error('Error fetching upload list:', error);
-      // Non-fatal - don't set member name if API fails
-    }
-  };
-
   // Platform selector state - load from localStorage if available
   const loadPlatformFromStorage = (): Platform => {
     try {
@@ -1374,8 +1361,8 @@ const MarketplaceReconciliation: React.FC = () => {
         'amazon': 'Amazon',
       };
       const platformParam = selectedPlatform ? platformMap[selectedPlatform] : undefined;
-      
-      const response = await apiIndex.uploadList.getUploadList({ 
+
+      const response = await apiIndex.uploadList.getUploadList({
         report_type: 'D2C-DirectUpload',
         platform: platformParam,
       });
@@ -1383,13 +1370,13 @@ const MarketplaceReconciliation: React.FC = () => {
         if (response.data.memberName) {
           setMemberName(response.data.memberName);
         }
-        
+
         if (response.data.reconciliation_status) {
           // Use functional state update to capture previous processing_count without dependency
           setReconciliationStatus((prevStatus) => {
             const previousProcessingCount = prevStatus?.processing_count ?? 0;
             const newStatus = response.data.reconciliation_status;
-            
+
             // If status changed from processing to processed (processing_count went from >0 to 0), refresh all data APIs
             if (previousProcessingCount > 0 && newStatus.processing_count === 0) {
               console.log('✅ Reconciliation completed! Refreshing main summary, ageing analysis, and upload list...');
@@ -1411,7 +1398,7 @@ const MarketplaceReconciliation: React.FC = () => {
                 fetchUploadList();
               }, 100);
             }
-            
+
             return newStatus;
           });
         } else {
@@ -2951,13 +2938,13 @@ const MarketplaceReconciliation: React.FC = () => {
 
         {/* Reconciliation Status Message - only show when reconciliation_status exists from backend */}
         {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processing' && (
-          <Alert 
-            severity="info" 
+          <Alert
+            severity="info"
             icon={<ScheduleIcon />}
-            sx={{ 
-              mb: 3, 
-              bgcolor: '#f0f9ff', 
-              color: '#0c4a6e', 
+            sx={{
+              mb: 3,
+              bgcolor: '#f0f9ff',
+              color: '#0c4a6e',
               border: '1px solid #bae6fd',
               borderRadius: '8px',
               display: 'flex',
@@ -2972,20 +2959,20 @@ const MarketplaceReconciliation: React.FC = () => {
               }
             }}
           >
-            {normalizedReconciliationStatus.processing_count === 1 
+            {normalizedReconciliationStatus.processing_count === 1
               ? '1 file is still processing. Results will update automatically.'
               : `${normalizedReconciliationStatus.processing_count} files are still processing. Results will update automatically.`
             }
           </Alert>
         )}
         {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at && (
-          <Alert 
-            severity="success" 
+          <Alert
+            severity="success"
             icon={<CheckCircleIcon />}
-            sx={{ 
-              mb: 3, 
-              bgcolor: '#f0fdf4', 
-              color: '#166534', 
+            sx={{
+              mb: 3,
+              bgcolor: '#f0fdf4',
+              color: '#166534',
               border: '1px solid #bbf7d0',
               borderRadius: '8px',
               display: 'flex',
