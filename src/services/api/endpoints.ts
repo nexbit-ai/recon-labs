@@ -159,9 +159,15 @@ export const ageingAnalysisAPI = {
     apiService.get<any>(API_CONFIG.ENDPOINTS.AGEING_ANALYSIS, params),
 };
 
+// Month on Month Growth API
+export const monthOnMonthGrowthAPI = {
+  getMonthOnMonthGrowth: (params: { platform: 'amazon' | 'flipkart' | 'd2c'; start_date: string; end_date: string }) =>
+    apiService.get<any>(API_CONFIG.ENDPOINTS.MONTH_ON_MONTH_GROWTH, params),
+};
+
 // Upload List API
 export const uploadListAPI = {
-  getUploadList: (params: { report_type: string }) =>
+  getUploadList: (params: { report_type: string; platform?: string }) =>
     apiService.get<any>('/recon/upload-list', params),
 };
 
@@ -299,6 +305,7 @@ export const api = {
   stats: statsAPI,
   mainSummary: mainSummaryAPI,
   ageingAnalysis: ageingAnalysisAPI,
+  monthOnMonthGrowth: monthOnMonthGrowthAPI,
   uploadList: uploadListAPI,
   reports: reportsAPI,
   dataSources: dataSourcesAPI,
