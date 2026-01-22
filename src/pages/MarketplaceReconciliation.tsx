@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -194,13 +194,14 @@ import {
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
 import { apiService } from '../services/api/apiService';
-import { MarketplaceReconciliationResponse, MainSummaryResponse, ProviderAgeingData, AgeingAnalysisResponse } from '../services/api/types';
+import { MarketplaceReconciliationResponse, MainSummaryResponse, ProviderAgeingData, AgeingAnalysisResponse, ReconciliationStatus } from '../services/api/types';
 import { api as apiIndex } from '../services/api';
 import { mockReconciliationData, getSafeReconciliationData, isValidReconciliationData } from '../data/mockReconciliationData';
 import { Platform } from '../data/mockData';
 import { padding } from '@mui/system';
 import { useUser } from '../contexts/UserContext';
 import { useOrganization } from '../hooks/useOrganization';
+import { useReconciliationStatus, formatReconciliationTimestamp } from '../hooks/useReconciliationStatus';
 
 const MarketplaceReconciliation: React.FC = () => {
   const { setMemberName } = useUser();
@@ -214,9 +215,11 @@ const MarketplaceReconciliation: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
   const [reconciliationData, setReconciliationData] = useState<MarketplaceReconciliationResponse>(mockReconciliationData);
   const [mainSummary, setMainSummary] = useState<MainSummaryResponse | null>(null);
+  const [reconciliationStatus, setReconciliationStatus] = useState<ReconciliationStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(false);
+  const normalizedReconciliationStatus = useReconciliationStatus(reconciliationStatus);
   const [isCodExpanded, setIsCodExpanded] = useState(false);
   const [expandedProviderKey, setExpandedProviderKey] = useState<string | null>(null);
   const getSettlementProviderCode = (providerKey?: string | null, providerName?: string | null) => {
@@ -1361,6 +1364,76 @@ const MarketplaceReconciliation: React.FC = () => {
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [tempSelectedPlatform, setTempSelectedPlatform] = useState<Platform | null>(null);
 
+  // Fetch upload list to get member name and reconciliation status
+  const fetchUploadList = useCallback(async () => {
+    try {
+      // Map platform value to capitalized format for API
+      const platformMap: Record<string, string> = {
+        'd2c': 'D2C',
+        'flipkart': 'Flipkart',
+        'amazon': 'Amazon',
+      };
+      const platformParam = selectedPlatform ? platformMap[selectedPlatform] : undefined;
+      
+      const response = await apiIndex.uploadList.getUploadList({ 
+        report_type: 'D2C-DirectUpload',
+        platform: platformParam,
+      });
+      if (response.success && response.data) {
+        if (response.data.memberName) {
+          setMemberName(response.data.memberName);
+        }
+        
+        if (response.data.reconciliation_status) {
+          // Use functional state update to capture previous processing_count without dependency
+          setReconciliationStatus((prevStatus) => {
+            const previousProcessingCount = prevStatus?.processing_count ?? 0;
+            const newStatus = response.data.reconciliation_status;
+            
+            // If status changed from processing to processed (processing_count went from >0 to 0), refresh all data APIs
+            if (previousProcessingCount > 0 && newStatus.processing_count === 0) {
+              console.log('✅ Reconciliation completed! Refreshing main summary, ageing analysis, and upload list...');
+              // Refresh main summary to get updated reconciliation results
+              if (selectedDateRange === 'custom') {
+                if (customStartDate && customEndDate) {
+                  fetchReconciliationDataByDateRangeWithDates(customStartDate, customEndDate);
+                }
+              } else {
+                fetchReconciliationDataByDateRange(selectedDateRange);
+              }
+              // Refresh ageing analysis
+              if (selectedDateRange !== 'custom' || (customStartDate && customEndDate)) {
+                fetchAgeingAnalysis();
+              }
+              // Refresh upload list to get any updated upload data
+              // Note: This won't trigger the refresh logic again since previousProcessingCount will be 0
+              setTimeout(() => {
+                fetchUploadList();
+              }, 100);
+            }
+            
+            return newStatus;
+          });
+        } else {
+          // No reconciliation_status from backend - handle gracefully by not showing any status
+          setReconciliationStatus(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching upload list:', error);
+      // Non-fatal - don't set member name if API fails
+      setReconciliationStatus(null);
+    }
+  }, [
+    selectedDateRange,
+    customStartDate,
+    customEndDate,
+    selectedPlatform,
+    fetchReconciliationDataByDateRangeWithDates,
+    fetchReconciliationDataByDateRange,
+    fetchAgeingAnalysis,
+  ]);
+
   // Persist platform to localStorage whenever it changes
   useEffect(() => {
     try {
@@ -1869,6 +1942,25 @@ const MarketplaceReconciliation: React.FC = () => {
   useEffect(() => {
     fetchSalesOverview();
   }, []);
+
+  // Auto-poll upload-list API when reconciliation is processing
+  useEffect(() => {
+    // Only poll if reconciliation_status exists and processing_count > 0 (still processing)
+    if (!normalizedReconciliationStatus || normalizedReconciliationStatus.processing_count === 0) {
+      return;
+    }
+
+    // Poll upload-list API every 30 seconds while processing
+    const pollInterval = setInterval(() => {
+      console.log('🔄 Polling upload-list API for reconciliation status update...');
+      fetchUploadList();
+    }, 30000); // Poll every 30 seconds
+
+    // Cleanup interval on unmount or when processing_count changes
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [normalizedReconciliationStatus?.processing_count, fetchUploadList]);
 
   // Open Transaction Sheet overlay when query params indicate so
   useEffect(() => {
@@ -2856,6 +2948,61 @@ const MarketplaceReconciliation: React.FC = () => {
             )}
           </Box>
         </Fade>
+
+        {/* Reconciliation Status Message - only show when reconciliation_status exists from backend */}
+        {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processing' && (
+          <Alert 
+            severity="info" 
+            icon={<ScheduleIcon />}
+            sx={{ 
+              mb: 3, 
+              bgcolor: '#f0f9ff', 
+              color: '#0c4a6e', 
+              border: '1px solid #bae6fd',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              '& .MuiAlert-icon': {
+                alignItems: 'center',
+                display: 'flex'
+              },
+              '& .MuiAlert-message': {
+                display: 'flex',
+                alignItems: 'center'
+              }
+            }}
+          >
+            {normalizedReconciliationStatus.processing_count === 1 
+              ? '1 file is still processing. Results will update automatically.'
+              : `${normalizedReconciliationStatus.processing_count} files are still processing. Results will update automatically.`
+            }
+          </Alert>
+        )}
+        {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at && (
+          <Alert 
+            severity="success" 
+            icon={<CheckCircleIcon />}
+            sx={{ 
+              mb: 3, 
+              bgcolor: '#f0fdf4', 
+              color: '#166534', 
+              border: '1px solid #bbf7d0',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              '& .MuiAlert-icon': {
+                alignItems: 'center',
+                display: 'flex'
+              },
+              '& .MuiAlert-message': {
+                display: 'flex',
+                alignItems: 'center'
+              }
+            }}
+          >
+            Last updated at {formatReconciliationTimestamp(normalizedReconciliationStatus.last_completed_at)}
+          </Alert>
+        )}
 
         <Grid container spacing={3} alignItems="stretch" sx={{ mb: 6 }}>
           <Grid item xs={12} md={7}>

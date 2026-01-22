@@ -491,3 +491,16 @@ export interface ExportListResponse {
     total_pages: number;
   };
 }
+
+// Reconciliation Status Types
+export interface ReconciliationStatus {
+  platform: string;
+  processing_count: number;
+  last_completed_at: string | null; // ISO timestamp
+}
+
+export interface UploadListResponse {
+  memberName?: string;
+  uploads: any[];
+  reconciliation_status?: ReconciliationStatus;
+}
