@@ -162,7 +162,7 @@ export const ageingAnalysisAPI = {
 // Month on Month Growth API
 export const monthOnMonthGrowthAPI = {
   getMonthOnMonthGrowth: (params: { platform: 'amazon' | 'flipkart' | 'd2c'; start_date: string; end_date: string }) =>
-    apiService.get<any>(API_CONFIG.ENDPOINTS.MONTH_ON_MONTH_GROWTH, params),
+    apiService.get<any>(API_CONFIG.ENDPOINTS.MONTH_ON_MONTH_GROWTH, { ...params, date_field: 'settlement_date' }),
 };
 
 // Upload List API
