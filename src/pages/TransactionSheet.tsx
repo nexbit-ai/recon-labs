@@ -4213,14 +4213,49 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setError(null);
 
     try {
-      // Build query params using the same logic as getTotalTransactions
-      // But exclude pagination params (page, limit)
-      const queryParams = buildQueryParams(1);
+      let exportParams: any = {};
 
-      // Remove pagination params for export
-      const exportParams: any = { ...queryParams };
-      delete exportParams.page;
-      delete exportParams.limit;
+      // Handle Sales Report tab (activeTab === 4) differently
+      if (activeTab === 4) {
+        // Build export params for Sales Report
+        if (!dateRange.start || !dateRange.end) {
+          throw new Error('Please select a date range to export sales report');
+        }
+
+        exportParams = {
+          platform: selectedPlatform,
+          order_date_from: dateRange.start,
+          order_date_to: dateRange.end,
+        };
+
+        // Add business mode for Amazon
+        if (selectedPlatform === 'amazon' && amazonBusinessMode) {
+          exportParams.business_mode = amazonBusinessMode;
+        }
+
+        // Add sorting if configured
+        if (salesReportSortConfig) {
+          const sortByValue = getSalesReportSortBy(salesReportSortConfig.key);
+          if (sortByValue) {
+            exportParams.sort_by = sortByValue;
+            exportParams.sort_order = salesReportSortConfig.direction || 'asc';
+          }
+        }
+
+        // Add search if configured
+        if (salesReportSearch && salesReportSearch.trim()) {
+          exportParams.search = salesReportSearch.trim();
+        }
+      } else {
+        // Build query params using the same logic as getTotalTransactions
+        // But exclude pagination params (page, limit)
+        const queryParams = buildQueryParams(1);
+
+        // Remove pagination params for export
+        exportParams = { ...queryParams };
+        delete exportParams.page;
+        delete exportParams.limit;
+      }
 
       // Filter out undefined/null/empty values
       const cleanParams: any = {};
@@ -4862,7 +4897,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     variant="contained"
                     size="small"
                     onClick={openExportDrawer}
-                    disabled={activeTab === 4}
                     sx={{
                       textTransform: 'none',
                       fontWeight: 500,
