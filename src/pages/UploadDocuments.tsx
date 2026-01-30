@@ -33,6 +33,8 @@ interface UploadedDocument {
   year: string;
   month: string;
   upload_date: string;
+  inactive?: boolean;
+  sync_status?: string;
 }
 
 interface UploadListResponse {
@@ -56,6 +58,8 @@ const vendors: Vendor[] = [
   { id: 'payu', name: 'PayU' },
   // D2C payment gateway partner - uses report_type "cashfree"
   { id: 'cashfree', name: 'Cashfree' },
+  // D2C logistics partner - uses report_type "zippee"
+  { id: 'zippee', name: 'Zippee' },
 ];
 
 const months = [
@@ -76,6 +80,8 @@ const getFormatLabelForVendor = (vendorId?: string | null) =>
   isFlipkartVendor(vendorId) ? 'CSV/XLSX' : 'CSV only';
 
 type ViewType = 'years' | 'marketplace' | 'd2c';
+
+type UploadProcessingStatus = 'none' | 'pending' | 'processing';
 
 const UploadDocuments: React.FC = () => {
   const { session } = useStytchMemberSession();
@@ -776,24 +782,45 @@ const UploadDocuments: React.FC = () => {
     }
   };
 
-  // Check if a vendor already has an uploaded document
-  const isVendorUploaded = (vendorId: string, kind?: 'sales' | 'sales_b2b' | 'settlement'): boolean => {
+  const findUploadForVendor = (
+    vendorId: string,
+    kind?: 'sales' | 'sales_b2b' | 'settlement'
+  ): UploadedDocument | undefined => {
     const key = kind ? `${vendorId}_${kind}` : vendorId;
     const expected = getReportType(vendorId, kind);
-    return uploadedDocuments.some(doc => {
+    const matching = uploadedDocuments.filter((doc) => {
       const rt = doc.report_type.toLowerCase();
       return rt === key.toLowerCase() || rt === expected.toLowerCase();
     });
+
+    if (!matching.length) return undefined;
+
+    // Prefer active document if available
+    const active = matching.find((doc) => doc.inactive === false);
+    return active || matching[0];
+  };
+
+  // Check if a vendor already has an uploaded document
+  const isVendorUploaded = (vendorId: string, kind?: 'sales' | 'sales_b2b' | 'settlement'): boolean => {
+    return !!findUploadForVendor(vendorId, kind);
   };
 
   // Get uploaded document for a vendor
   const getUploadedDocument = (vendorId: string, kind?: 'sales' | 'sales_b2b' | 'settlement'): UploadedDocument | undefined => {
-    const key = kind ? `${vendorId}_${kind}` : vendorId;
-    const expected = getReportType(vendorId, kind);
-    return uploadedDocuments.find(doc => {
-      const rt = doc.report_type.toLowerCase();
-      return rt === key.toLowerCase() || rt === expected.toLowerCase();
-    });
+    return findUploadForVendor(vendorId, kind);
+  };
+
+  const getUploadProcessingStatus = (doc?: UploadedDocument): UploadProcessingStatus => {
+    if (!doc) return 'none';
+
+    // Only consider active documents for status
+    if (doc.inactive) return 'none';
+
+    if (!doc.sync_status) {
+      return 'pending';
+    }
+
+    return doc.sync_status === 'DONE' ? 'processing' : 'pending';
   };
 
   return (
@@ -2266,16 +2293,27 @@ const UploadDocuments: React.FC = () => {
                         const isSettlementUploaded = isVendorUploaded(vendor.id, 'settlement');
                         const uploadedSettlementDoc = getUploadedDocument(vendor.id, 'settlement');
                         const isSettlementUploading = uploadingVendor === `${vendor.id}_settlement`;
+                        const settlementStatus = getUploadProcessingStatus(uploadedSettlementDoc);
+                        const isSettlementProcessing = settlementStatus === 'processing';
+                        const isSettlementPending = settlementStatus === 'pending';
 
                         return (
                           <Paper
                             key={vendor.id}
                             elevation={0}
                             sx={{ 
-                              p: 1.5, 
-                              border: isSettlementUploaded ? '1px solid #dcfce7' : '1px solid #e5e7eb', 
-                              borderRadius: '8px', 
-                              background: isSettlementUploaded ? '#f0fdf4' : '#ffffff' 
+                              p: 1.5,
+                              border: isSettlementProcessing
+                                ? '1px solid #dcfce7'
+                                : isSettlementPending
+                                  ? '1px solid #fef3c7'
+                                  : '1px solid #e5e7eb',
+                              borderRadius: '8px',
+                              background: isSettlementProcessing
+                                ? '#f0fdf4'
+                                : isSettlementPending
+                                  ? '#fffbeb'
+                                  : '#ffffff'
                             }}
                           >
                             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
@@ -2284,13 +2322,21 @@ const UploadDocuments: React.FC = () => {
                                   <Typography variant="caption" fontWeight={600} color="#111111" sx={{ fontSize: '0.7rem' }}>
                                     {vendor.name}
                                   </Typography>
-                                  {isSettlementUploaded && (
+                                  {isSettlementProcessing && (
                                     <CheckCircleIcon sx={{ fontSize: 14, color: '#16a34a' }} />
                                   )}
+                                  {isSettlementPending && (
+                                    <ScheduleIcon sx={{ fontSize: 14, color: '#f59e0b' }} />
+                                  )}
                                 </Box>
-                                {isSettlementUploaded && uploadedSettlementDoc ? (
-                                  <Typography variant="caption" color="#16a34a" sx={{ display: 'block', fontSize: '9px' }}>
-                                    {uploadedSettlementDoc.filename}
+                                {uploadedSettlementDoc && settlementStatus !== 'none' ? (
+                                  <Typography
+                                    variant="caption"
+                                    color={isSettlementProcessing ? '#16a34a' : '#b45309'}
+                                    sx={{ display: 'block', fontSize: '9px' }}
+                                  >
+                                    {uploadedSettlementDoc.filename} •{' '}
+                                    {isSettlementProcessing ? 'Processing' : 'Pending'}
                                   </Typography>
                                 ) : (
                                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: '9px' }}>
