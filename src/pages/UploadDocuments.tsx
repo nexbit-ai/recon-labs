@@ -60,6 +60,8 @@ const vendors: Vendor[] = [
   { id: 'cashfree', name: 'Cashfree' },
   // D2C logistics partner - uses report_type "zippee"
   { id: 'zippee', name: 'Zippee' },
+  // D2C logistics partner - uses report_type "ekart"
+  { id: 'ekart', name: 'Ekart' },
 ];
 
 const months = [
