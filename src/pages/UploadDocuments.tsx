@@ -797,9 +797,14 @@ const UploadDocuments: React.FC = () => {
 
     if (!matching.length) return undefined;
 
-    // Prefer active document if available
-    const active = matching.find((doc) => doc.inactive === false);
-    return active || matching[0];
+    // Only consider active uploads (inactive === true means ignore)
+    const activeMatching = matching.filter((doc) => doc.inactive !== true);
+    if (!activeMatching.length) return undefined;
+
+    // Prefer newest active document
+    return activeMatching
+      .slice()
+      .sort((a, b) => new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime())[0];
   };
 
   // Check if a vendor already has an uploaded document
@@ -824,6 +829,30 @@ const UploadDocuments: React.FC = () => {
 
     return doc.sync_status === 'DONE' ? 'processing' : 'pending';
   };
+
+  const flipkartSalesDoc = getUploadedDocument('flipkart', 'sales');
+  const flipkartSalesStatus = getUploadProcessingStatus(flipkartSalesDoc);
+  const flipkartSettlementDoc = getUploadedDocument('flipkart', 'settlement');
+  const flipkartSettlementStatus = getUploadProcessingStatus(flipkartSettlementDoc);
+
+  const amazonSalesDoc = getUploadedDocument('amazon', 'sales');
+  const amazonSalesStatus = getUploadProcessingStatus(amazonSalesDoc);
+  const amazonSalesB2BDoc = getUploadedDocument('amazon', 'sales_b2b');
+  const amazonSalesB2BStatus = getUploadProcessingStatus(amazonSalesB2BDoc);
+  const amazonSettlementDoc = getUploadedDocument('amazon', 'settlement');
+  const amazonSettlementStatus = getUploadProcessingStatus(amazonSettlementDoc);
+
+  const unicommerceDoc = getUploadedDocument('unicommerce');
+  const unicommerceStatus = getUploadProcessingStatus(unicommerceDoc);
+  const lastmileDoc = getUploadedDocument('lastmile');
+  const lastmileStatus = getUploadProcessingStatus(lastmileDoc);
+
+  const drawerSalesDoc = rightPanelVendor ? getUploadedDocument(rightPanelVendor, 'sales') : undefined;
+  const drawerSalesStatus = getUploadProcessingStatus(drawerSalesDoc);
+  const drawerSalesB2BDoc = rightPanelVendor === 'amazon' ? getUploadedDocument('amazon', 'sales_b2b') : undefined;
+  const drawerSalesB2BStatus = getUploadProcessingStatus(drawerSalesB2BDoc);
+  const drawerSettlementDoc = rightPanelVendor ? getUploadedDocument(rightPanelVendor, 'settlement') : undefined;
+  const drawerSettlementStatus = getUploadProcessingStatus(drawerSettlementDoc);
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
@@ -1164,9 +1193,17 @@ const UploadDocuments: React.FC = () => {
                         flex: '0 0 auto',
                         width: 220,
                         p: 2,
-                        border: isVendorUploaded('flipkart', 'sales') ? '2px solid #16a34a' : '2px solid #e5e7eb',
+                        border: flipkartSalesStatus === 'processing'
+                          ? '2px solid #16a34a'
+                          : flipkartSalesStatus === 'pending'
+                            ? '2px solid #f59e0b'
+                            : '2px solid #e5e7eb',
                         borderRadius: '12px',
-                        background: isVendorUploaded('flipkart', 'sales') ? '#f0fdf4' : '#ffffff',
+                        background: flipkartSalesStatus === 'processing'
+                          ? '#f0fdf4'
+                          : flipkartSalesStatus === 'pending'
+                            ? '#fffbeb'
+                            : '#ffffff',
                         position: 'relative',
                         zIndex: 2
                       }}
@@ -1177,14 +1214,20 @@ const UploadDocuments: React.FC = () => {
                           width: 32, 
                           height: 32, 
                           borderRadius: '50%', 
-                          background: isVendorUploaded('flipkart', 'sales') ? '#16a34a' : '#f3f4f6',
+                          background: flipkartSalesStatus === 'processing'
+                            ? '#16a34a'
+                            : flipkartSalesStatus === 'pending'
+                              ? '#f59e0b'
+                              : '#f3f4f6',
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          border: isVendorUploaded('flipkart', 'sales') ? 'none' : '2px solid #d1d5db'
+                          border: flipkartSalesStatus !== 'none' ? 'none' : '2px solid #d1d5db'
                         }}>
-                          {isVendorUploaded('flipkart', 'sales') ? (
+                          {flipkartSalesStatus === 'processing' ? (
                             <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : flipkartSalesStatus === 'pending' ? (
+                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
                           ) : (
                             <Typography variant="body2" fontWeight={700} color="#6b7280">1</Typography>
                           )}
@@ -1196,11 +1239,15 @@ const UploadDocuments: React.FC = () => {
                         </Typography>
                         
                         {/* Uploaded File Info */}
-                      {isVendorUploaded('flipkart', 'sales') && getUploadedDocument('flipkart', 'sales') && (
-                          <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
-                            {getUploadedDocument('flipkart', 'sales')?.filename}
-                        </Typography>
-                      )}
+                        {flipkartSalesDoc && flipkartSalesStatus !== 'none' && (
+                          <Typography
+                            variant="caption"
+                            color={flipkartSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            {flipkartSalesDoc.filename} • {flipkartSalesStatus === 'processing' ? 'Processing' : 'Pending'}
+                          </Typography>
+                        )}
                         
                         {/* File Input */}
                         <input
@@ -1235,8 +1282,8 @@ const UploadDocuments: React.FC = () => {
                               minWidth: 120,
                               fontSize: '0.75rem',
                               py: 0.75,
-                              borderColor: '#16a34a',
-                              color: '#16a34a'
+                              borderColor: flipkartSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                              color: flipkartSalesStatus === 'pending' ? '#b45309' : '#16a34a'
                             }}
                           >
                             {uploadingVendor === 'flipkart_sales' ? 'Uploading...' : marketplaceFiles.flipkart?.sales ? 'Upload' : 'Choose File'}
@@ -1277,13 +1324,15 @@ const UploadDocuments: React.FC = () => {
                     <Box sx={{ 
                       width: 80,
                       height: '3px',
-                      background: isVendorUploaded('flipkart', 'sales') 
-                        ? 'linear-gradient(to right, #16a34a, #16a34a)' 
-                        : 'linear-gradient(to right, #d1d5db, #d1d5db)',
+                      background: flipkartSalesStatus === 'processing'
+                        ? 'linear-gradient(to right, #16a34a, #16a34a)'
+                        : flipkartSalesStatus === 'pending'
+                          ? 'linear-gradient(to right, #f59e0b, #f59e0b)'
+                          : 'linear-gradient(to right, #d1d5db, #d1d5db)',
                       position: 'relative',
                       zIndex: 3
                     }}>
-                      {isVendorUploaded('flipkart', 'sales') && (
+                      {flipkartSalesStatus !== 'none' && (
                         <Box sx={{
                           position: 'absolute',
                           right: -8,
@@ -1292,7 +1341,7 @@ const UploadDocuments: React.FC = () => {
                           width: 16,
                           height: 16,
                           borderRadius: '50%',
-                          background: '#16a34a',
+                          background: flipkartSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1310,12 +1359,16 @@ const UploadDocuments: React.FC = () => {
                         flex: '0 0 auto',
                         width: 220,
                         p: 2,
-                        border: isVendorUploaded('flipkart', 'settlement') 
-                          ? '2px solid #16a34a' 
+                        border: flipkartSettlementStatus === 'processing'
+                          ? '2px solid #16a34a'
+                          : flipkartSettlementStatus === 'pending'
+                            ? '2px solid #f59e0b'
                           : (!isVendorUploaded('flipkart', 'sales') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
                         borderRadius: '12px',
-                        background: isVendorUploaded('flipkart', 'settlement') 
-                          ? '#f0fdf4' 
+                        background: flipkartSettlementStatus === 'processing'
+                          ? '#f0fdf4'
+                          : flipkartSettlementStatus === 'pending'
+                            ? '#fffbeb'
                           : (!isVendorUploaded('flipkart', 'sales') ? '#f9fafb' : '#ffffff'),
                         position: 'relative',
                         zIndex: 2,
@@ -1328,19 +1381,23 @@ const UploadDocuments: React.FC = () => {
                           width: 32, 
                           height: 32, 
                           borderRadius: '50%', 
-                          background: isVendorUploaded('flipkart', 'settlement') 
-                            ? '#16a34a' 
+                          background: flipkartSettlementStatus === 'processing'
+                            ? '#16a34a'
+                            : flipkartSettlementStatus === 'pending'
+                              ? '#f59e0b'
                             : (!isVendorUploaded('flipkart', 'sales') ? '#f3f4f6' : '#f3f4f6'),
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          border: isVendorUploaded('flipkart', 'settlement') 
-                            ? 'none' 
+                          border: flipkartSettlementStatus !== 'none'
+                            ? 'none'
                             : (!isVendorUploaded('flipkart', 'sales') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
                           position: 'relative'
                         }}>
-                          {isVendorUploaded('flipkart', 'settlement') ? (
+                          {flipkartSettlementStatus === 'processing' ? (
                             <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : flipkartSettlementStatus === 'pending' ? (
+                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
                           ) : !isVendorUploaded('flipkart', 'sales') ? (
                             <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
                           ) : (
@@ -1354,11 +1411,16 @@ const UploadDocuments: React.FC = () => {
                         </Typography>
                         
                         {/* Uploaded File Info */}
-                      {isVendorUploaded('flipkart', 'settlement') && getUploadedDocument('flipkart', 'settlement') && (
-                          <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
-                            {getUploadedDocument('flipkart', 'settlement')?.filename}
-                      </Typography>
-                      )}
+                        {flipkartSettlementDoc && flipkartSettlementStatus !== 'none' && (
+                          <Typography
+                            variant="caption"
+                            color={flipkartSettlementStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            {flipkartSettlementDoc.filename} •{' '}
+                            {flipkartSettlementStatus === 'processing' ? 'Processing' : 'Pending'}
+                          </Typography>
+                        )}
                         
                         {/* File Input */}
                         <input
@@ -1402,8 +1464,8 @@ const UploadDocuments: React.FC = () => {
                                   background: '#f3f4f6',
                                 }
                               }),
-                              borderColor: '#16a34a',
-                              color: '#16a34a'
+                              borderColor: flipkartSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                              color: flipkartSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
                             }}
                           >
                             {uploadingVendor === 'flipkart_settlement' ? 'Uploading...' : marketplaceFiles.flipkart?.settlement ? 'Upload' : 'Choose File'}
@@ -1466,9 +1528,17 @@ const UploadDocuments: React.FC = () => {
                         flex: '0 0 auto',
                         width: 200,
                         p: 2,
-                        border: isVendorUploaded('amazon', 'sales') ? '2px solid #16a34a' : '2px solid #e5e7eb',
+                        border: amazonSalesStatus === 'processing'
+                          ? '2px solid #16a34a'
+                          : amazonSalesStatus === 'pending'
+                            ? '2px solid #f59e0b'
+                            : '2px solid #e5e7eb',
                         borderRadius: '12px',
-                        background: isVendorUploaded('amazon', 'sales') ? '#f0fdf4' : '#ffffff',
+                        background: amazonSalesStatus === 'processing'
+                          ? '#f0fdf4'
+                          : amazonSalesStatus === 'pending'
+                            ? '#fffbeb'
+                            : '#ffffff',
                         position: 'relative',
                         zIndex: 2
                       }}
@@ -1479,14 +1549,20 @@ const UploadDocuments: React.FC = () => {
                           width: 32, 
                           height: 32, 
                           borderRadius: '50%', 
-                          background: isVendorUploaded('amazon', 'sales') ? '#16a34a' : '#f3f4f6',
+                          background: amazonSalesStatus === 'processing'
+                            ? '#16a34a'
+                            : amazonSalesStatus === 'pending'
+                              ? '#f59e0b'
+                              : '#f3f4f6',
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          border: isVendorUploaded('amazon', 'sales') ? 'none' : '2px solid #d1d5db'
+                          border: amazonSalesStatus !== 'none' ? 'none' : '2px solid #d1d5db'
                         }}>
-                          {isVendorUploaded('amazon', 'sales') ? (
+                          {amazonSalesStatus === 'processing' ? (
                             <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : amazonSalesStatus === 'pending' ? (
+                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
                           ) : (
                             <Typography variant="body2" fontWeight={700} color="#6b7280">1</Typography>
                           )}
@@ -1498,11 +1574,15 @@ const UploadDocuments: React.FC = () => {
                         </Typography>
                         
                         {/* Uploaded File Info */}
-                      {isVendorUploaded('amazon', 'sales') && getUploadedDocument('amazon', 'sales') && (
-                          <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
-                            {getUploadedDocument('amazon', 'sales')?.filename}
-                        </Typography>
-                      )}
+                        {amazonSalesDoc && amazonSalesStatus !== 'none' && (
+                          <Typography
+                            variant="caption"
+                            color={amazonSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            {amazonSalesDoc.filename} • {amazonSalesStatus === 'processing' ? 'Processing' : 'Pending'}
+                          </Typography>
+                        )}
                         
                         {/* File Input */}
                 <input
@@ -1537,8 +1617,8 @@ const UploadDocuments: React.FC = () => {
                               minWidth: 120,
                               fontSize: '0.75rem',
                               py: 0.75,
-                              borderColor: '#16a34a',
-                              color: '#16a34a'
+                              borderColor: amazonSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                              color: amazonSalesStatus === 'pending' ? '#b45309' : '#16a34a'
                             }}
                           >
                             {uploadingVendor === 'amazon_sales' ? 'Uploading...' : marketplaceFiles.amazon?.sales ? 'Upload' : 'Choose File'}
@@ -1579,13 +1659,15 @@ const UploadDocuments: React.FC = () => {
                     <Box sx={{ 
                       width: 60,
                       height: '3px',
-                      background: isVendorUploaded('amazon', 'sales') 
-                        ? 'linear-gradient(to right, #16a34a, #16a34a)' 
-                        : 'linear-gradient(to right, #d1d5db, #d1d5db)',
+                      background: amazonSalesStatus === 'processing'
+                        ? 'linear-gradient(to right, #16a34a, #16a34a)'
+                        : amazonSalesStatus === 'pending'
+                          ? 'linear-gradient(to right, #f59e0b, #f59e0b)'
+                          : 'linear-gradient(to right, #d1d5db, #d1d5db)',
                       position: 'relative',
                       zIndex: 3
                     }}>
-                      {isVendorUploaded('amazon', 'sales') && (
+                      {amazonSalesStatus !== 'none' && (
                         <Box sx={{
                           position: 'absolute',
                           right: -8,
@@ -1594,7 +1676,7 @@ const UploadDocuments: React.FC = () => {
                           width: 16,
                           height: 16,
                           borderRadius: '50%',
-                          background: '#16a34a',
+                          background: amazonSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1612,12 +1694,16 @@ const UploadDocuments: React.FC = () => {
                         flex: '0 0 auto',
                         width: 200,
                         p: 2,
-                        border: isVendorUploaded('amazon', 'sales_b2b') 
-                          ? '2px solid #16a34a' 
+                        border: amazonSalesB2BStatus === 'processing'
+                          ? '2px solid #16a34a'
+                          : amazonSalesB2BStatus === 'pending'
+                            ? '2px solid #f59e0b'
                           : (!isVendorUploaded('amazon', 'sales') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
                         borderRadius: '12px',
-                        background: isVendorUploaded('amazon', 'sales_b2b') 
-                          ? '#f0fdf4' 
+                        background: amazonSalesB2BStatus === 'processing'
+                          ? '#f0fdf4'
+                          : amazonSalesB2BStatus === 'pending'
+                            ? '#fffbeb'
                           : (!isVendorUploaded('amazon', 'sales') ? '#f9fafb' : '#ffffff'),
                         position: 'relative',
                         zIndex: 2,
@@ -1630,19 +1716,23 @@ const UploadDocuments: React.FC = () => {
                           width: 32, 
                           height: 32, 
                           borderRadius: '50%', 
-                          background: isVendorUploaded('amazon', 'sales_b2b') 
-                            ? '#16a34a' 
+                          background: amazonSalesB2BStatus === 'processing'
+                            ? '#16a34a'
+                            : amazonSalesB2BStatus === 'pending'
+                              ? '#f59e0b'
                             : (!isVendorUploaded('amazon', 'sales') ? '#f3f4f6' : '#f3f4f6'),
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          border: isVendorUploaded('amazon', 'sales_b2b') 
-                            ? 'none' 
+                          border: amazonSalesB2BStatus !== 'none'
+                            ? 'none'
                             : (!isVendorUploaded('amazon', 'sales') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
                           position: 'relative'
                         }}>
-                          {isVendorUploaded('amazon', 'sales_b2b') ? (
+                          {amazonSalesB2BStatus === 'processing' ? (
                             <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : amazonSalesB2BStatus === 'pending' ? (
+                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
                           ) : !isVendorUploaded('amazon', 'sales') ? (
                             <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
                           ) : (
@@ -1656,11 +1746,15 @@ const UploadDocuments: React.FC = () => {
                         </Typography>
                         
                         {/* Uploaded File Info */}
-                      {isVendorUploaded('amazon', 'sales_b2b') && getUploadedDocument('amazon', 'sales_b2b') && (
-                          <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
-                            {getUploadedDocument('amazon', 'sales_b2b')?.filename}
-                        </Typography>
-                      )}
+                        {amazonSalesB2BDoc && amazonSalesB2BStatus !== 'none' && (
+                          <Typography
+                            variant="caption"
+                            color={amazonSalesB2BStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            {amazonSalesB2BDoc.filename} • {amazonSalesB2BStatus === 'processing' ? 'Processing' : 'Pending'}
+                          </Typography>
+                        )}
                         
                         {/* File Input */}
                         <input
@@ -1704,8 +1798,8 @@ const UploadDocuments: React.FC = () => {
                                   background: '#f3f4f6',
                                 }
                               }),
-                              borderColor: '#16a34a',
-                              color: '#16a34a'
+                              borderColor: amazonSalesB2BStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                              color: amazonSalesB2BStatus === 'pending' ? '#b45309' : '#16a34a'
                             }}
                           >
                             {uploadingVendor === 'amazon_sales_b2b' ? 'Uploading...' : marketplaceFiles.amazon?.sales_b2b ? 'Upload' : 'Choose File'}
@@ -1755,13 +1849,15 @@ const UploadDocuments: React.FC = () => {
                     <Box sx={{ 
                       width: 60,
                       height: '3px',
-                      background: isVendorUploaded('amazon', 'sales_b2b') 
-                        ? 'linear-gradient(to right, #16a34a, #16a34a)' 
-                        : 'linear-gradient(to right, #d1d5db, #d1d5db)',
+                      background: amazonSalesB2BStatus === 'processing'
+                        ? 'linear-gradient(to right, #16a34a, #16a34a)'
+                        : amazonSalesB2BStatus === 'pending'
+                          ? 'linear-gradient(to right, #f59e0b, #f59e0b)'
+                          : 'linear-gradient(to right, #d1d5db, #d1d5db)',
                       position: 'relative',
                       zIndex: 3
                     }}>
-                      {isVendorUploaded('amazon', 'sales_b2b') && (
+                      {amazonSalesB2BStatus !== 'none' && (
                         <Box sx={{
                           position: 'absolute',
                           right: -8,
@@ -1770,7 +1866,7 @@ const UploadDocuments: React.FC = () => {
                           width: 16,
                           height: 16,
                           borderRadius: '50%',
-                          background: '#16a34a',
+                          background: amazonSalesB2BStatus === 'pending' ? '#f59e0b' : '#16a34a',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1788,12 +1884,16 @@ const UploadDocuments: React.FC = () => {
                         flex: '0 0 auto',
                         width: 200,
                         p: 2,
-                        border: isVendorUploaded('amazon', 'settlement') 
-                          ? '2px solid #16a34a' 
+                        border: amazonSettlementStatus === 'processing'
+                          ? '2px solid #16a34a'
+                          : amazonSettlementStatus === 'pending'
+                            ? '2px solid #f59e0b'
                           : (!isVendorUploaded('amazon', 'sales_b2b') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
                         borderRadius: '12px',
-                        background: isVendorUploaded('amazon', 'settlement') 
-                          ? '#f0fdf4' 
+                        background: amazonSettlementStatus === 'processing'
+                          ? '#f0fdf4'
+                          : amazonSettlementStatus === 'pending'
+                            ? '#fffbeb'
                           : (!isVendorUploaded('amazon', 'sales_b2b') ? '#f9fafb' : '#ffffff'),
                         position: 'relative',
                         zIndex: 2,
@@ -1806,19 +1906,23 @@ const UploadDocuments: React.FC = () => {
                           width: 32, 
                           height: 32, 
                           borderRadius: '50%', 
-                          background: isVendorUploaded('amazon', 'settlement') 
-                            ? '#16a34a' 
+                          background: amazonSettlementStatus === 'processing'
+                            ? '#16a34a'
+                            : amazonSettlementStatus === 'pending'
+                              ? '#f59e0b'
                             : (!isVendorUploaded('amazon', 'sales_b2b') ? '#f3f4f6' : '#f3f4f6'),
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          border: isVendorUploaded('amazon', 'settlement') 
-                            ? 'none' 
+                          border: amazonSettlementStatus !== 'none'
+                            ? 'none'
                             : (!isVendorUploaded('amazon', 'sales_b2b') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
                           position: 'relative'
                         }}>
-                          {isVendorUploaded('amazon', 'settlement') ? (
+                          {amazonSettlementStatus === 'processing' ? (
                             <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : amazonSettlementStatus === 'pending' ? (
+                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
                           ) : !isVendorUploaded('amazon', 'sales_b2b') ? (
                             <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
                           ) : (
@@ -1832,11 +1936,15 @@ const UploadDocuments: React.FC = () => {
                         </Typography>
                         
                         {/* Uploaded File Info */}
-                      {isVendorUploaded('amazon', 'settlement') && getUploadedDocument('amazon', 'settlement') && (
-                          <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
-                            {getUploadedDocument('amazon', 'settlement')?.filename}
-                        </Typography>
-                      )}
+                        {amazonSettlementDoc && amazonSettlementStatus !== 'none' && (
+                          <Typography
+                            variant="caption"
+                            color={amazonSettlementStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            {amazonSettlementDoc.filename} • {amazonSettlementStatus === 'processing' ? 'Processing' : 'Pending'}
+                          </Typography>
+                        )}
                         
                         {/* File Input */}
                         <input
@@ -1880,8 +1988,8 @@ const UploadDocuments: React.FC = () => {
                                   background: '#f3f4f6',
                                 }
                               }),
-                              borderColor: '#16a34a',
-                              color: '#16a34a'
+                              borderColor: amazonSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                              color: amazonSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
                             }}
                           >
                             {uploadingVendor === 'amazon_settlement' ? 'Uploading...' : marketplaceFiles.amazon?.settlement ? 'Upload' : 'Choose File'}
@@ -1994,9 +2102,17 @@ const UploadDocuments: React.FC = () => {
                   flex: '0 0 auto',
                   width: 200,
                   p: 2,
-                  border: isVendorUploaded('unicommerce') ? '2px solid #16a34a' : '2px solid #e5e7eb',
+                  border: unicommerceStatus === 'processing'
+                    ? '2px solid #16a34a'
+                    : unicommerceStatus === 'pending'
+                      ? '2px solid #f59e0b'
+                      : '2px solid #e5e7eb',
                   borderRadius: '12px',
-                  background: isVendorUploaded('unicommerce') ? '#f0fdf4' : '#ffffff',
+                  background: unicommerceStatus === 'processing'
+                    ? '#f0fdf4'
+                    : unicommerceStatus === 'pending'
+                      ? '#fffbeb'
+                      : '#ffffff',
                   position: 'relative',
                   zIndex: 2
                 }}
@@ -2007,14 +2123,20 @@ const UploadDocuments: React.FC = () => {
                     width: 32, 
                     height: 32, 
                     borderRadius: '50%', 
-                    background: isVendorUploaded('unicommerce') ? '#16a34a' : '#f3f4f6',
+                    background: unicommerceStatus === 'processing'
+                      ? '#16a34a'
+                      : unicommerceStatus === 'pending'
+                        ? '#f59e0b'
+                        : '#f3f4f6',
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
-                    border: isVendorUploaded('unicommerce') ? 'none' : '2px solid #d1d5db'
+                    border: unicommerceStatus !== 'none' ? 'none' : '2px solid #d1d5db'
                   }}>
-                      {isVendorUploaded('unicommerce') ? (
+                      {unicommerceStatus === 'processing' ? (
                       <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                      ) : unicommerceStatus === 'pending' ? (
+                      <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
                       ) : (
                         <Typography variant="body2" fontWeight={700} color="#6b7280">1</Typography>
                         )}
@@ -2026,9 +2148,13 @@ const UploadDocuments: React.FC = () => {
                       </Typography>
                   
                   {/* Uploaded File Info */}
-                  {isVendorUploaded('unicommerce') && getUploadedDocument('unicommerce') && (
-                    <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
-                      {getUploadedDocument('unicommerce')?.filename}
+                  {unicommerceDoc && unicommerceStatus !== 'none' && (
+                    <Typography
+                      variant="caption"
+                      color={unicommerceStatus === 'processing' ? '#16a34a' : '#b45309'}
+                      sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                    >
+                      {unicommerceDoc.filename} • {unicommerceStatus === 'processing' ? 'Processing' : 'Pending'}
                     </Typography>
                   )}
                   
@@ -2065,8 +2191,8 @@ const UploadDocuments: React.FC = () => {
                         fontSize: '0.75rem',
                         py: 0.75,
                         ...(isVendorUploaded('unicommerce') && {
-                          borderColor: '#16a34a',
-                          color: '#16a34a'
+                          borderColor: unicommerceStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                          color: unicommerceStatus === 'pending' ? '#b45309' : '#16a34a'
                         })
                       }}
                     >
@@ -2080,14 +2206,16 @@ const UploadDocuments: React.FC = () => {
               <Box sx={{ 
                 width: 60,
                 height: '3px',
-                background: isVendorUploaded('unicommerce') 
-                  ? 'linear-gradient(to right, #16a34a, #16a34a)' 
-                  : 'linear-gradient(to right, #d1d5db, #d1d5db)',
+                background: unicommerceStatus === 'processing'
+                  ? 'linear-gradient(to right, #16a34a, #16a34a)'
+                  : unicommerceStatus === 'pending'
+                    ? 'linear-gradient(to right, #f59e0b, #f59e0b)'
+                    : 'linear-gradient(to right, #d1d5db, #d1d5db)',
                 position: 'relative',
                 zIndex: 3,
                 alignSelf: 'center'
               }}>
-                {isVendorUploaded('unicommerce') && (
+                {unicommerceStatus !== 'none' && (
                   <Box sx={{
                     position: 'absolute',
                     right: -8,
@@ -2096,7 +2224,7 @@ const UploadDocuments: React.FC = () => {
                     width: 16,
                     height: 16,
                     borderRadius: '50%',
-                    background: '#16a34a',
+                    background: unicommerceStatus === 'pending' ? '#f59e0b' : '#16a34a',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -2114,12 +2242,16 @@ const UploadDocuments: React.FC = () => {
                   flex: '0 0 auto',
                   width: 200,
                   p: 2,
-                  border: isVendorUploaded('lastmile') 
-                    ? '2px solid #16a34a' 
+                  border: lastmileStatus === 'processing'
+                    ? '2px solid #16a34a'
+                    : lastmileStatus === 'pending'
+                      ? '2px solid #f59e0b'
                     : (!isVendorUploaded('unicommerce') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
                   borderRadius: '12px',
-                  background: isVendorUploaded('lastmile') 
-                    ? '#f0fdf4' 
+                  background: lastmileStatus === 'processing'
+                    ? '#f0fdf4'
+                    : lastmileStatus === 'pending'
+                      ? '#fffbeb'
                     : (!isVendorUploaded('unicommerce') ? '#f9fafb' : '#ffffff'),
                   position: 'relative',
                   zIndex: 2,
@@ -2132,19 +2264,23 @@ const UploadDocuments: React.FC = () => {
                     width: 32, 
                     height: 32, 
                     borderRadius: '50%', 
-                    background: isVendorUploaded('lastmile') 
-                      ? '#16a34a' 
+                    background: lastmileStatus === 'processing'
+                      ? '#16a34a'
+                      : lastmileStatus === 'pending'
+                        ? '#f59e0b'
                       : (!isVendorUploaded('unicommerce') ? '#f3f4f6' : '#f3f4f6'),
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
-                    border: isVendorUploaded('lastmile') 
-                      ? 'none' 
+                    border: lastmileStatus !== 'none'
+                      ? 'none'
                       : (!isVendorUploaded('unicommerce') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
                     position: 'relative'
                   }}>
-                    {isVendorUploaded('lastmile') ? (
+                    {lastmileStatus === 'processing' ? (
                       <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                    ) : lastmileStatus === 'pending' ? (
+                      <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
                     ) : !isVendorUploaded('unicommerce') ? (
                       <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
                     ) : (
@@ -2158,11 +2294,15 @@ const UploadDocuments: React.FC = () => {
                       </Typography>
                   
                   {/* Uploaded File Info */}
-                  {isVendorUploaded('lastmile') && getUploadedDocument('lastmile') && (
-                    <Typography variant="caption" color="#16a34a" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
-                      {getUploadedDocument('lastmile')?.filename}
-                      </Typography>
-                    )}
+                  {lastmileDoc && lastmileStatus !== 'none' && (
+                    <Typography
+                      variant="caption"
+                      color={lastmileStatus === 'processing' ? '#16a34a' : '#b45309'}
+                      sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                    >
+                      {lastmileDoc.filename} • {lastmileStatus === 'processing' ? 'Processing' : 'Pending'}
+                    </Typography>
+                  )}
                   
                   {/* File Input */}
                 <input
@@ -2206,8 +2346,8 @@ const UploadDocuments: React.FC = () => {
                           }
                         }),
                         ...(isVendorUploaded('lastmile') && {
-                          borderColor: '#16a34a',
-                          color: '#16a34a'
+                          borderColor: lastmileStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                          color: lastmileStatus === 'pending' ? '#b45309' : '#16a34a'
                         })
                       }}
                     >
@@ -2221,14 +2361,16 @@ const UploadDocuments: React.FC = () => {
               <Box sx={{ 
                 width: 60,
                 height: '3px',
-                background: isVendorUploaded('lastmile') 
-                  ? 'linear-gradient(to right, #16a34a, #16a34a)' 
-                  : 'linear-gradient(to right, #d1d5db, #d1d5db)',
+                background: lastmileStatus === 'processing'
+                  ? 'linear-gradient(to right, #16a34a, #16a34a)'
+                  : lastmileStatus === 'pending'
+                    ? 'linear-gradient(to right, #f59e0b, #f59e0b)'
+                    : 'linear-gradient(to right, #d1d5db, #d1d5db)',
                 position: 'relative',
                 zIndex: 3,
                 alignSelf: 'center'
               }}>
-                {isVendorUploaded('lastmile') && (
+                {lastmileStatus !== 'none' && (
                   <Box sx={{
                     position: 'absolute',
                     right: -8,
@@ -2237,7 +2379,7 @@ const UploadDocuments: React.FC = () => {
                     width: 16,
                     height: 16,
                     borderRadius: '50%',
-                    background: '#16a34a',
+                    background: lastmileStatus === 'pending' ? '#f59e0b' : '#16a34a',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -2429,18 +2571,35 @@ const UploadDocuments: React.FC = () => {
                     <Typography variant="subtitle2">
                       {`B2C Sales report (${getFormatLabelForVendor(rightPanelVendor)})`}
                     </Typography>
-                    {isVendorUploaded(rightPanelVendor, 'sales') && (
+                    {drawerSalesStatus !== 'none' && (
                       <Chip 
-                        label="Uploaded" 
+                        label={drawerSalesStatus === 'processing' ? 'Processing' : 'Pending'}
                         size="small" 
-                        icon={<CheckCircleIcon sx={{ fontSize: 14, color: '#16a34a !important' }} />}
-                        sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} 
+                        icon={
+                          drawerSalesStatus === 'processing' ? (
+                            <CheckCircleIcon sx={{ fontSize: 14, color: '#ffffff !important' }} />
+                          ) : (
+                            <ScheduleIcon sx={{ fontSize: 14, color: '#ffffff !important' }} />
+                          )
+                        }
+                        sx={{
+                          background: drawerSalesStatus === 'processing' ? '#16a34a' : '#f59e0b',
+                          color: '#ffffff',
+                          fontWeight: 600,
+                          fontSize: '10px',
+                          height: '20px',
+                        }} 
                       />
                     )}
                   </Box>
-                  {isVendorUploaded(rightPanelVendor, 'sales') && getUploadedDocument(rightPanelVendor, 'sales') && (
-                    <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mb: 1 }}>
-                      {getUploadedDocument(rightPanelVendor, 'sales')?.filename} • {new Date(getUploadedDocument(rightPanelVendor, 'sales')!.upload_date).toLocaleDateString()}
+                  {drawerSalesDoc && drawerSalesStatus !== 'none' && (
+                    <Typography
+                      variant="caption"
+                      color={drawerSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
+                      sx={{ display: 'block', mb: 1 }}
+                    >
+                      {drawerSalesDoc.filename} • {drawerSalesStatus === 'processing' ? 'Processing' : 'Pending'} •{' '}
+                      {new Date(drawerSalesDoc.upload_date).toLocaleDateString()}
                     </Typography>
                   )}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -2523,18 +2682,35 @@ const UploadDocuments: React.FC = () => {
                       <Typography variant="subtitle2">
                         {`B2B Sales report (${getFormatLabelForVendor('amazon')})`}
                       </Typography>
-                      {isVendorUploaded(rightPanelVendor, 'sales_b2b') && (
+                      {drawerSalesB2BStatus !== 'none' && (
                         <Chip 
-                          label="Uploaded" 
+                          label={drawerSalesB2BStatus === 'processing' ? 'Processing' : 'Pending'}
                           size="small" 
-                          icon={<CheckCircleIcon sx={{ fontSize: 14, color: '#16a34a !important' }} />}
-                          sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} 
+                          icon={
+                            drawerSalesB2BStatus === 'processing' ? (
+                              <CheckCircleIcon sx={{ fontSize: 14, color: '#ffffff !important' }} />
+                            ) : (
+                              <ScheduleIcon sx={{ fontSize: 14, color: '#ffffff !important' }} />
+                            )
+                          }
+                          sx={{
+                            background: drawerSalesB2BStatus === 'processing' ? '#16a34a' : '#f59e0b',
+                            color: '#ffffff',
+                            fontWeight: 600,
+                            fontSize: '10px',
+                            height: '20px',
+                          }} 
                         />
                       )}
                     </Box>
-                    {isVendorUploaded(rightPanelVendor, 'sales_b2b') && getUploadedDocument(rightPanelVendor, 'sales_b2b') && (
-                      <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mb: 1 }}>
-                        {getUploadedDocument(rightPanelVendor, 'sales_b2b')?.filename} • {new Date(getUploadedDocument(rightPanelVendor, 'sales_b2b')!.upload_date).toLocaleDateString()}
+                    {drawerSalesB2BDoc && drawerSalesB2BStatus !== 'none' && (
+                      <Typography
+                        variant="caption"
+                        color={drawerSalesB2BStatus === 'processing' ? '#16a34a' : '#b45309'}
+                        sx={{ display: 'block', mb: 1 }}
+                      >
+                        {drawerSalesB2BDoc.filename} • {drawerSalesB2BStatus === 'processing' ? 'Processing' : 'Pending'} •{' '}
+                        {new Date(drawerSalesB2BDoc.upload_date).toLocaleDateString()}
                       </Typography>
                     )}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -2616,18 +2792,35 @@ const UploadDocuments: React.FC = () => {
                     <Typography variant="subtitle2">
                       {`Settlement report (${getFormatLabelForVendor(rightPanelVendor)})`}
                     </Typography>
-                    {isVendorUploaded(rightPanelVendor, 'settlement') && (
+                    {drawerSettlementStatus !== 'none' && (
                       <Chip 
-                        label="Uploaded" 
+                        label={drawerSettlementStatus === 'processing' ? 'Processing' : 'Pending'}
                         size="small" 
-                        icon={<CheckCircleIcon sx={{ fontSize: 14, color: '#16a34a !important' }} />}
-                        sx={{ background: '#16a34a', color: '#ffffff', fontWeight: 600, fontSize: '10px', height: '20px' }} 
+                        icon={
+                          drawerSettlementStatus === 'processing' ? (
+                            <CheckCircleIcon sx={{ fontSize: 14, color: '#ffffff !important' }} />
+                          ) : (
+                            <ScheduleIcon sx={{ fontSize: 14, color: '#ffffff !important' }} />
+                          )
+                        }
+                        sx={{
+                          background: drawerSettlementStatus === 'processing' ? '#16a34a' : '#f59e0b',
+                          color: '#ffffff',
+                          fontWeight: 600,
+                          fontSize: '10px',
+                          height: '20px',
+                        }} 
                       />
                     )}
                   </Box>
-                  {isVendorUploaded(rightPanelVendor, 'settlement') && getUploadedDocument(rightPanelVendor, 'settlement') && (
-                    <Typography variant="caption" color="#16a34a" sx={{ display: 'block', mb: 1 }}>
-                      {getUploadedDocument(rightPanelVendor, 'settlement')?.filename} • {new Date(getUploadedDocument(rightPanelVendor, 'settlement')!.upload_date).toLocaleDateString()}
+                  {drawerSettlementDoc && drawerSettlementStatus !== 'none' && (
+                    <Typography
+                      variant="caption"
+                      color={drawerSettlementStatus === 'processing' ? '#16a34a' : '#b45309'}
+                      sx={{ display: 'block', mb: 1 }}
+                    >
+                      {drawerSettlementDoc.filename} • {drawerSettlementStatus === 'processing' ? 'Processing' : 'Pending'} •{' '}
+                      {new Date(drawerSettlementDoc.upload_date).toLocaleDateString()}
                     </Typography>
                   )}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
