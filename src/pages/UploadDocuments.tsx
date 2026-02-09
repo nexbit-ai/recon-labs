@@ -62,6 +62,8 @@ const vendors: Vendor[] = [
   { id: 'zippee', name: 'Zippee' },
   // D2C logistics partner - uses report_type "ekart"
   { id: 'ekart', name: 'Ekart' },
+  // Portal partner - uses report_types "cred_sales" and "cred_settlement"
+  { id: 'cred', name: 'CRED' },
 ];
 
 const months = [
@@ -69,7 +71,7 @@ const months = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-const years = [2024, 2025];
+const years = [2025, 2026];
 
 const CSV_ONLY_EXTENSIONS = ['.csv'];
 const FLIPKART_EXTENSIONS = ['.csv', '.xlsx', '.xls'];
@@ -155,6 +157,12 @@ const UploadDocuments: React.FC = () => {
         return 'amazon_sales_b2b';
       }
       return kind ? `${vendorIdLower}_${kind}` : vendorIdLower;
+    }
+    // CRED: explicit mapping for sales vs settlement
+    if (vendorIdLower === 'cred') {
+      if (kind === 'sales') return 'cred_sales';
+      if (kind === 'settlement') return 'cred_settlement';
+      return vendorIdLower;
     }
     // All other vendors: just return vendor name in lowercase
     return vendorIdLower;
@@ -842,6 +850,11 @@ const UploadDocuments: React.FC = () => {
   const amazonSettlementDoc = getUploadedDocument('amazon', 'settlement');
   const amazonSettlementStatus = getUploadProcessingStatus(amazonSettlementDoc);
 
+  const credSalesDoc = getUploadedDocument('cred', 'sales');
+  const credSalesStatus = getUploadProcessingStatus(credSalesDoc);
+  const credSettlementDoc = getUploadedDocument('cred', 'settlement');
+  const credSettlementStatus = getUploadProcessingStatus(credSettlementDoc);
+
   const unicommerceDoc = getUploadedDocument('unicommerce');
   const unicommerceStatus = getUploadProcessingStatus(unicommerceDoc);
   const lastmileDoc = getUploadedDocument('lastmile');
@@ -1125,7 +1138,7 @@ const UploadDocuments: React.FC = () => {
         )}
 
 
-        {/* Marketplace View - Flipkart and Amazon side by side */}
+        {/* Marketplace View - Flipkart, Amazon, CRED */}
         {currentView === 'marketplace' && selectedMonth !== null && (
           <Paper 
             elevation={0} 
@@ -2033,6 +2046,283 @@ const UploadDocuments: React.FC = () => {
                           </Typography>
                         )}
             </Box>
+                    </Paper>
+                  </Box>
+                </Paper>
+              </Grid>
+
+              {/* CRED */}
+              <Grid item xs={12}>
+                <Paper elevation={0} sx={{ p: 3, border: '2px solid #e5e7eb', borderRadius: '12px' }}>
+                  <Typography variant="h6" fontWeight={700} color="#111111" mb={4}>
+                    CRED
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: { xs: 'column', md: 'row' },
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: { xs: 3, md: 6 },
+                      maxWidth: 800,
+                      mx: 'auto',
+                    }}
+                  >
+                    {/* CRED Sales */}
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        flex: '0 0 auto',
+                        width: 220,
+                        p: 2,
+                        border:
+                          credSalesStatus === 'processing'
+                            ? '2px solid #16a34a'
+                            : credSalesStatus === 'pending'
+                              ? '2px solid #f59e0b'
+                              : '2px solid #e5e7eb',
+                        borderRadius: '12px',
+                        background:
+                          credSalesStatus === 'processing'
+                            ? '#f0fdf4'
+                            : credSalesStatus === 'pending'
+                              ? '#fffbeb'
+                              : '#ffffff',
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                        <Box
+                          sx={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            background:
+                              credSalesStatus === 'processing'
+                                ? '#16a34a'
+                                : credSalesStatus === 'pending'
+                                  ? '#f59e0b'
+                                  : '#f3f4f6',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: credSalesStatus !== 'none' ? 'none' : '2px solid #d1d5db',
+                          }}
+                        >
+                          {credSalesStatus === 'processing' ? (
+                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : credSalesStatus === 'pending' ? (
+                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
+                          ) : (
+                            <Typography variant="body2" fontWeight={700} color="#6b7280">
+                              1
+                            </Typography>
+                          )}
+                        </Box>
+
+                        <Typography variant="body2" fontWeight={600} color="#111111" textAlign="center">
+                          Sales File
+                        </Typography>
+
+                        {credSalesDoc && credSalesStatus !== 'none' && (
+                          <Typography
+                            variant="caption"
+                            color={credSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            {credSalesDoc.filename} • {credSalesStatus === 'processing' ? 'Processing' : 'Pending'}
+                          </Typography>
+                        )}
+
+                        <input
+                          accept={getAcceptForVendor('cred')}
+                          style={{ display: 'none' }}
+                          id="cred-sales-upload"
+                          type="file"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0] || null;
+                            if (file) {
+                              if (!validateFileType(file, 'cred', 'CRED sales')) {
+                                e.target.value = '';
+                                return;
+                              }
+                              setD2cFile('cred', 'sales', file);
+                              await handleD2cUpload('cred', 'sales', file);
+                            }
+                            e.target.value = '';
+                          }}
+                          disabled={!!uploadingVendor}
+                        />
+                        <label htmlFor="cred-sales-upload">
+                          <Button
+                            variant={isVendorUploaded('cred', 'sales') ? 'outlined' : 'contained'}
+                            component="span"
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'cred_sales'}
+                            endIcon={uploadingVendor === 'cred_sales' ? <CircularProgress size={14} /> : null}
+                            sx={{
+                              minWidth: 120,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                            }}
+                          >
+                            {uploadingVendor === 'cred_sales'
+                              ? 'Uploading...'
+                              : isVendorUploaded('cred', 'sales')
+                                ? 'Re-upload'
+                                : 'Upload'}
+                          </Button>
+                        </label>
+                        {d2cFiles.cred?.sales && (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            {d2cFiles.cred.sales.name}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Paper>
+
+                    {/* CRED Settlement */}
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        flex: '0 0 auto',
+                        width: 220,
+                        p: 2,
+                        border:
+                          credSettlementStatus === 'processing'
+                            ? '2px solid #16a34a'
+                            : credSettlementStatus === 'pending'
+                              ? '2px solid #f59e0b'
+                              : '2px solid #e5e7eb',
+                        borderRadius: '12px',
+                        background:
+                          credSettlementStatus === 'processing'
+                            ? '#f0fdf4'
+                            : credSettlementStatus === 'pending'
+                              ? '#fffbeb'
+                              : '#ffffff',
+                        opacity: credSalesStatus !== 'processing' ? 0.6 : 1,
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                        <Box
+                          sx={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            background:
+                              credSettlementStatus === 'processing'
+                                ? '#16a34a'
+                                : credSettlementStatus === 'pending'
+                                  ? '#f59e0b'
+                                  : '#f3f4f6',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: credSettlementStatus !== 'none' ? 'none' : '2px solid #d1d5db',
+                          }}
+                        >
+                          {credSettlementStatus === 'processing' ? (
+                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : credSettlementStatus === 'pending' ? (
+                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
+                          ) : credSalesStatus !== 'processing' ? (
+                            <LockIcon sx={{ fontSize: 18, color: '#9ca3af' }} />
+                          ) : (
+                            <Typography variant="body2" fontWeight={700} color="#6b7280">
+                              2
+                            </Typography>
+                          )}
+                        </Box>
+
+                        <Typography variant="body2" fontWeight={600} color="#111111" textAlign="center">
+                          Settlement File
+                        </Typography>
+
+                        {credSalesStatus !== 'processing' && (
+                          <Typography
+                            variant="caption"
+                            color="#9ca3af"
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            Complete CRED Sales first
+                          </Typography>
+                        )}
+
+                        {credSettlementDoc && credSettlementStatus !== 'none' && (
+                          <Typography
+                            variant="caption"
+                            color={credSettlementStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            {credSettlementDoc.filename} •{' '}
+                            {credSettlementStatus === 'processing' ? 'Processing' : 'Pending'}
+                          </Typography>
+                        )}
+
+                        <input
+                          accept={getAcceptForVendor('cred')}
+                          style={{ display: 'none' }}
+                          id="cred-settlement-upload"
+                          type="file"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0] || null;
+                            if (file) {
+                              if (!validateFileType(file, 'cred', 'CRED settlement')) {
+                                e.target.value = '';
+                                return;
+                              }
+                              setD2cFile('cred', 'settlement', file);
+                              await handleD2cUpload('cred', 'settlement', file);
+                            }
+                            e.target.value = '';
+                          }}
+                          disabled={!!uploadingVendor || credSalesStatus !== 'processing'}
+                        />
+                        <label htmlFor="cred-settlement-upload">
+                          <Button
+                            variant={isVendorUploaded('cred', 'settlement') ? 'outlined' : 'contained'}
+                            component="span"
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'cred_settlement' || credSalesStatus !== 'processing'}
+                            endIcon={uploadingVendor === 'cred_settlement' ? <CircularProgress size={14} /> : null}
+                            sx={{
+                              minWidth: 120,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              ...(credSalesStatus !== 'processing' && {
+                                background: '#f3f4f6',
+                                color: '#9ca3af',
+                                cursor: 'not-allowed',
+                                border: 'none',
+                                '&:hover': {
+                                  background: '#f3f4f6',
+                                }
+                              })
+                            }}
+                          >
+                            {uploadingVendor === 'cred_settlement'
+                              ? 'Uploading...'
+                              : isVendorUploaded('cred', 'settlement')
+                                ? 'Re-upload'
+                                : 'Upload'}
+                          </Button>
+                        </label>
+                        {d2cFiles.cred?.settlement && (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            {d2cFiles.cred.settlement.name}
+                          </Typography>
+                        )}
+                      </Box>
                     </Paper>
                   </Box>
                 </Paper>
