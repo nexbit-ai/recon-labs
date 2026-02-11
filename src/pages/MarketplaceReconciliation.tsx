@@ -211,7 +211,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
   const [initialTsFilters, setInitialTsFilters] = useState<{ [key: string]: any } | undefined>(undefined);
   const [initialTsTab, setInitialTsTab] = useState<number>(0);
-  const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'amazon' | 'd2c' | undefined>(undefined);
+  const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'amazon' | 'd2c' | 'other' | undefined>(undefined);
   const location = useLocation();
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
@@ -272,7 +272,7 @@ const MarketplaceReconciliation: React.FC = () => {
       setShowTransactionSheet(true);
     }
   };
-  const getPlatformForProvider = (providerKey: string, providerName: string): 'flipkart' | 'amazon' | 'd2c' => {
+  const getPlatformForProvider = (providerKey: string, providerName: string): 'flipkart' | 'amazon' | 'd2c' | 'other' => {
     const key = providerKey?.toLowerCase?.() || '';
     const name = providerName?.toLowerCase?.() || '';
     if (key === 'amazon' || name.includes('amazon')) {
@@ -1200,7 +1200,10 @@ const MarketplaceReconciliation: React.FC = () => {
 
   // Fetch month on month growth data
   const fetchMonthOnMonthGrowth = async () => {
-    if (!selectedPlatform || (selectedPlatform !== 'amazon' && selectedPlatform !== 'flipkart' && selectedPlatform !== 'd2c')) {
+    if (
+      !selectedPlatform ||
+      (selectedPlatform !== 'amazon' && selectedPlatform !== 'flipkart' && selectedPlatform !== 'd2c' && selectedPlatform !== 'other')
+    ) {
       console.log('[MonthOnMonthGrowth] Skipping fetch - invalid platform:', selectedPlatform);
       return;
     }
@@ -1246,8 +1249,8 @@ const MarketplaceReconciliation: React.FC = () => {
         });
 
         try {
-          if (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart') {
-            // For Amazon/Flipkart: expect { data: [{ month, sales, settlement }, ...] }
+          if (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'other') {
+            // For Amazon/Flipkart/Other (CRED): expect { data: [{ month, sales, settlement }, ...] }
             const marketplaceData = data.data || data || [];
             console.log('[MonthOnMonthGrowth] Setting marketplace data:', {
               dataLength: Array.isArray(marketplaceData) ? marketplaceData.length : 'not an array',
@@ -1339,7 +1342,7 @@ const MarketplaceReconciliation: React.FC = () => {
         // Handle both old array format and new single value format
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed[0] as Platform;
-        } else if (typeof parsed === 'string' && ['flipkart', 'amazon', 'd2c'].includes(parsed)) {
+        } else if (typeof parsed === 'string' && ['flipkart', 'amazon', 'd2c', 'other'].includes(parsed)) {
           return parsed as Platform;
         }
       }
@@ -1361,6 +1364,7 @@ const MarketplaceReconciliation: React.FC = () => {
         'd2c': 'D2C',
         'flipkart': 'Flipkart',
         'amazon': 'Amazon',
+        'other': 'Other',
       };
       const platformParam = selectedPlatform ? platformMap[selectedPlatform] : undefined;
 
@@ -1436,7 +1440,8 @@ const MarketplaceReconciliation: React.FC = () => {
   const availablePlatforms = [
     { value: 'flipkart' as Platform, label: 'Flipkart' },
     { value: 'amazon' as Platform, label: 'Amazon' },
-    { value: 'd2c' as Platform, label: 'D2C' }
+    { value: 'd2c' as Platform, label: 'D2C' },
+    { value: 'other' as Platform, label: 'Other (CRED)' },
   ];
 
   // Generate D2C dummy data
@@ -1920,7 +1925,7 @@ const MarketplaceReconciliation: React.FC = () => {
       fetchAgeingAnalysis();
     }
     // Fetch month on month growth data when platform is selected
-    if (selectedPlatform && (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'd2c')) {
+    if (selectedPlatform && (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'd2c' || selectedPlatform === 'other')) {
       fetchMonthOnMonthGrowth();
     }
     // Call upload-list API at the same time as main-summary and ageing-analysis
@@ -5395,12 +5400,12 @@ const MarketplaceReconciliation: React.FC = () => {
             Month on Month Growth
           </Typography>
 
-          {selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' ? (
-            // Amazon/Flipkart: Sales vs Settlement Table
+          {selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'other' ? (
+            // Amazon/Flipkart/Other (CRED): Sales vs Settlement Table
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600 }}>
-                  {selectedPlatform === 'amazon' ? 'Amazon' : 'Flipkart'} - Sales vs Settlement
+                  {selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'flipkart' ? 'Flipkart' : 'Other (CRED)'} - Sales vs Settlement
                 </Typography>
                 {marketplaceGrowthData.length > 0 && (
                   <Button
@@ -5415,7 +5420,7 @@ const MarketplaceReconciliation: React.FC = () => {
                         difference: row.sales - row.settlement,
                         settlementPercentage: row.sales > 0 ? ((row.settlement / row.sales) * 100).toFixed(2) : '0.00'
                       }));
-                      downloadCSV(tableData, `${selectedPlatform}_month_on_month`, [
+                      downloadCSV(tableData, `${selectedPlatform === 'other' ? 'cred' : selectedPlatform}_month_on_month`, [
                         { key: 'month', label: 'Month' },
                         { key: 'sales', label: 'Sales (₹)' },
                         { key: 'settlement', label: 'Settlement (₹)' },
@@ -6027,7 +6032,7 @@ const MarketplaceReconciliation: React.FC = () => {
             // Default/All platforms view - show combined or placeholder
             <Box sx={{ textAlign: 'center', py: 8 }}>
               <Typography variant="h6" sx={{ color: '#6b7280' }}>
-                Please select a platform (Amazon, Flipkart, or D2C) to view Month on Month Growth
+                Please select a platform (Amazon, Flipkart, D2C, or Other) to view Month on Month Growth
               </Typography>
             </Box>
           )}
@@ -6146,7 +6151,12 @@ const MarketplaceReconciliation: React.FC = () => {
             statsData={reconciliationData}
             initialTab={initialTsTab}
             dateRange={effectiveDateRangeForTs}
-            initialPlatforms={selectedPlatform && (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'd2c') ? [selectedPlatform as 'flipkart' | 'amazon' | 'd2c'] : undefined}
+            initialPlatforms={
+              selectedPlatform &&
+              (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'd2c' || selectedPlatform === 'other')
+                ? [selectedPlatform as 'flipkart' | 'amazon' | 'd2c' | 'other']
+                : undefined
+            }
             initialFilters={initialTsFilters}
           />
         </Box>

@@ -1871,7 +1871,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [headerDateRange, setHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   // Platform filter state - single selection only
-  const availablePlatforms = ['flipkart', 'amazon', 'd2c'] as const;
+  const availablePlatforms = ['flipkart', 'amazon', 'd2c', 'other'] as const;
   type Platform = typeof availablePlatforms[number];
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Default: flipkart only
   const [pendingSelectedPlatform, setPendingSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Pending platform before apply
