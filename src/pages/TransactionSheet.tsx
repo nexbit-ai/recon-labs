@@ -1790,7 +1790,7 @@ interface TransactionSheetProps {
   statsData?: MarketplaceReconciliationResponse | null;
   initialTab?: number;
   dateRange?: { start: string; end: string };
-  initialPlatforms?: ('flipkart' | 'd2c' | 'amazon')[];
+  initialPlatforms?: ('flipkart' | 'd2c' | 'amazon' | 'other')[];
   initialFilters?: { [key: string]: any };
 }
 
