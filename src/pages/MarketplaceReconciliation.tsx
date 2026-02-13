@@ -660,8 +660,19 @@ const MarketplaceReconciliation: React.FC = () => {
       const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       endDate = endOfMonth.toISOString().split('T')[0];
     } else if (selectedDateRange === 'this-year') {
-      startDate = `${today.getFullYear()}-01-01`;
-      endDate = `${today.getFullYear()}-12-31`;
+      // Financial year: April 1 to March 31
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth(); // 0-11 (Jan=0, Apr=3, Dec=11)
+      
+      if (currentMonth >= 3) {
+        // April onwards: FY starts April 1 of current year, ends March 31 of next year
+        startDate = `${currentYear}-04-01`;
+        endDate = `${currentYear + 1}-03-31`;
+      } else {
+        // Jan, Feb, Mar: FY starts April 1 of previous year, ends March 31 of current year
+        startDate = `${currentYear - 1}-04-01`;
+        endDate = `${currentYear}-03-31`;
+      }
     }
 
     return startDate && endDate ? `${startDate} to ${endDate}` : 'Select date';
@@ -987,8 +998,19 @@ const MarketplaceReconciliation: React.FC = () => {
         endDate = endOfMonth.toISOString().split('T')[0];
       } else if (dateRange === 'this-year') {
         const today = new Date();
-        startDate = `${today.getFullYear()}-01-01`;
-        endDate = `${today.getFullYear()}-12-31`;
+        // Financial year: April 1 to March 31
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth(); // 0-11 (Jan=0, Apr=3, Dec=11)
+        
+        if (currentMonth >= 3) {
+          // April onwards: FY starts April 1 of current year, ends March 31 of next year
+          startDate = `${currentYear}-04-01`;
+          endDate = `${currentYear + 1}-03-31`;
+        } else {
+          // Jan, Feb, Mar: FY starts April 1 of previous year, ends March 31 of current year
+          startDate = `${currentYear - 1}-04-01`;
+          endDate = `${currentYear}-03-31`;
+        }
       } else {
         // Fallback to current month
         const today = new Date();
@@ -1090,8 +1112,19 @@ const MarketplaceReconciliation: React.FC = () => {
         const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         endDate = endOfMonth.toISOString().split('T')[0];
       } else if (dateRange === 'this-year') {
-        startDate = `${today.getFullYear()}-01-01`;
-        endDate = `${today.getFullYear()}-12-31`;
+        // Financial year: April 1 to March 31
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth(); // 0-11 (Jan=0, Apr=3, Dec=11)
+        
+        if (currentMonth >= 3) {
+          // April onwards: FY starts April 1 of current year, ends March 31 of next year
+          startDate = `${currentYear}-04-01`;
+          endDate = `${currentYear + 1}-03-31`;
+        } else {
+          // Jan, Feb, Mar: FY starts April 1 of previous year, ends March 31 of current year
+          startDate = `${currentYear - 1}-04-01`;
+          endDate = `${currentYear}-03-31`;
+        }
       } else {
         startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
         const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -1172,8 +1205,19 @@ const MarketplaceReconciliation: React.FC = () => {
         const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         endDate = endOfMonth.toISOString().split('T')[0];
       } else if (selectedDateRange === 'this-year') {
-        startDate = `${today.getFullYear()}-01-01`;
-        endDate = `${today.getFullYear()}-12-31`;
+        // Financial year: April 1 to March 31
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth(); // 0-11 (Jan=0, Apr=3, Dec=11)
+        
+        if (currentMonth >= 3) {
+          // April onwards: FY starts April 1 of current year, ends March 31 of next year
+          startDate = `${currentYear}-04-01`;
+          endDate = `${currentYear + 1}-03-31`;
+        } else {
+          // Jan, Feb, Mar: FY starts April 1 of previous year, ends March 31 of current year
+          startDate = `${currentYear - 1}-04-01`;
+          endDate = `${currentYear}-03-31`;
+        }
       } else {
         // Fallback to current month
         startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
@@ -1618,8 +1662,19 @@ const MarketplaceReconciliation: React.FC = () => {
         startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
         endDate = format(endOfMonth);
       } else if (selectedDateRange === 'this-year') {
-        startDate = `${today.getFullYear()}-01-01`;
-        endDate = `${today.getFullYear()}-12-31`;
+        // Financial year: April 1 to March 31
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth(); // 0-11 (Jan=0, Apr=3, Dec=11)
+        
+        if (currentMonth >= 3) {
+          // April onwards: FY starts April 1 of current year, ends March 31 of next year
+          startDate = `${currentYear}-04-01`;
+          endDate = `${currentYear + 1}-03-31`;
+        } else {
+          // Jan, Feb, Mar: FY starts April 1 of previous year, ends March 31 of current year
+          startDate = `${currentYear - 1}-04-01`;
+          endDate = `${currentYear}-03-31`;
+        }
       }
     }
 
@@ -2009,8 +2064,19 @@ const MarketplaceReconciliation: React.FC = () => {
         start = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
         end = fmt(endOfMonth);
       } else if (selectedDateRange === 'this-year') {
-        start = `${today.getFullYear()}-01-01`;
-        end = `${today.getFullYear()}-12-31`;
+        // Financial year: April 1 to March 31
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth(); // 0-11 (Jan=0, Apr=3, Dec=11)
+        
+        if (currentMonth >= 3) {
+          // April onwards: FY starts April 1 of current year, ends March 31 of next year
+          start = `${currentYear}-04-01`;
+          end = `${currentYear + 1}-03-31`;
+        } else {
+          // Jan, Feb, Mar: FY starts April 1 of previous year, ends March 31 of current year
+          start = `${currentYear - 1}-04-01`;
+          end = `${currentYear}-03-31`;
+        }
       }
     }
     return { start, end };
