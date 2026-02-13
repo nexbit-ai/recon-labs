@@ -5422,16 +5422,14 @@ const MarketplaceReconciliation: React.FC = () => {
                     startIcon={<DownloadIcon />}
                     onClick={() => {
                       const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart';
-                      const tableData = marketplaceGrowthData.map(row => ({
-                        month: row.month,
-                        sales: row.sales,
-                        settlement: row.settlement,
-                        ...(showCommissionColumn && {
-                          commission: row.comissionData ?? 0,
-                        }),
-                        difference: row.sales - row.settlement,
-                        settlementPercentage: row.sales > 0 ? ((row.settlement / row.sales) * 100).toFixed(2) : '0.00',
-                      }));
+                        const tableData = marketplaceGrowthData.map(row => ({
+                          month: row.month,
+                          sales: row.sales,
+                          settlement: row.settlement,
+                          ...(showCommissionColumn && {
+                            commission: row.comissionData ?? 0,
+                          }),
+                        }));
 
                       const csvColumns: Array<{ key: string; label: string }> = [
                         { key: 'month', label: 'Month' },
@@ -5443,10 +5441,6 @@ const MarketplaceReconciliation: React.FC = () => {
                         csvColumns.push({ key: 'commission', label: 'Commission (₹)' });
                       }
 
-                      csvColumns.push(
-                        { key: 'difference', label: 'Difference (₹)' },
-                        { key: 'settlementPercentage', label: 'Settlement %' },
-                      );
 
                       downloadCSV(
                         tableData,
@@ -5534,33 +5528,12 @@ const MarketplaceReconciliation: React.FC = () => {
                             Commission (₹)
                           </TableCell>
                         )}
-                        <TableCell
-                          align="right"
-                          sx={{
-                            backgroundColor: '#f8fafc',
-                            fontWeight: 700,
-                            color: '#6b7280',
-                            borderBottom: '2px solid #e5e7eb',
-                          }}
-                        >
-                          Difference (₹)
-                        </TableCell>
-                        <TableCell align="right" sx={{
-                          backgroundColor: '#f8fafc',
-                          fontWeight: 700,
-                          color: '#6b7280',
-                          borderBottom: '2px solid #e5e7eb'
-                        }}>
-                          Settlement %
-                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {marketplaceGrowthData.map((row, index) => {
                         const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart';
-                        const difference = row.sales - row.settlement;
                         const commissionValue = showCommissionColumn ? (row.comissionData ?? 0) : 0;
-                        const settlementPct = row.sales > 0 ? (row.settlement / row.sales) * 100 : 0;
                         return (
                           <TableRow
                             key={row.month}
@@ -5583,25 +5556,6 @@ const MarketplaceReconciliation: React.FC = () => {
                                 {formatCurrency(commissionValue)}
                               </TableCell>
                             )}
-                            <TableCell
-                              align="right"
-                              sx={{
-                                color: difference >= 0 ? '#ef4444' : '#10b981',
-                                fontWeight: 500,
-                              }}
-                            >
-                              {difference >= 0 ? '+' : ''}
-                              {formatCurrency(difference)}
-                            </TableCell>
-                            <TableCell
-                              align="right"
-                              sx={{
-                                color: settlementPct >= 95 ? '#10b981' : settlementPct >= 80 ? '#eab308' : '#ef4444',
-                                fontWeight: 600,
-                              }}
-                            >
-                              {settlementPct.toFixed(2)}%
-                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -5634,34 +5588,6 @@ const MarketplaceReconciliation: React.FC = () => {
                             )}
                           </TableCell>
                         )}
-                        <TableCell
-                          align="right"
-                          sx={{
-                            fontWeight: 700,
-                            color:
-                              marketplaceGrowthData.reduce(
-                                (sum, r) => sum + r.sales - r.settlement,
-                                0,
-                              ) >= 0
-                                ? '#ef4444'
-                                : '#10b981',
-                            borderTop: '2px solid #e5e7eb',
-                          }}
-                        >
-                          {formatCurrency(
-                            marketplaceGrowthData.reduce(
-                              (sum, r) => sum + r.sales - r.settlement,
-                              0,
-                            ),
-                          )}
-                        </TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700, color: '#6b7280', borderTop: '2px solid #e5e7eb' }}>
-                          {(() => {
-                            const totalSales = marketplaceGrowthData.reduce((sum, r) => sum + r.sales, 0);
-                            const totalSettlement = marketplaceGrowthData.reduce((sum, r) => sum + r.settlement, 0);
-                            return totalSales > 0 ? ((totalSettlement / totalSales) * 100).toFixed(2) : '0.00';
-                          })()}%
-                        </TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
@@ -5687,15 +5613,11 @@ const MarketplaceReconciliation: React.FC = () => {
                           month: row.month,
                           sales: row.sales,
                           settlement: row.settlement,
-                          difference: row.sales - row.settlement,
-                          settlementPercentage: row.sales > 0 ? ((row.settlement / row.sales) * 100).toFixed(2) : '0.00'
                         }));
                         downloadCSV(tableData, 'd2c_sales_settlement', [
                           { key: 'month', label: 'Month' },
                           { key: 'sales', label: 'Sales (₹)' },
-                          { key: 'settlement', label: 'Settlement (₹)' },
-                          { key: 'difference', label: 'Difference (₹)' },
-                          { key: 'settlementPercentage', label: 'Settlement %' }
+                          { key: 'settlement', label: 'Settlement (₹)' }
                         ]);
                       }}
                       sx={{
@@ -5741,14 +5663,10 @@ const MarketplaceReconciliation: React.FC = () => {
                           <TableCell sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb' }}>Month</TableCell>
                           <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#2563eb', borderBottom: '2px solid #e5e7eb' }}>Sales (₹)</TableCell>
                           <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#10b981', borderBottom: '2px solid #e5e7eb' }}>Settlement (₹)</TableCell>
-                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#6b7280', borderBottom: '2px solid #e5e7eb' }}>Difference (₹)</TableCell>
-                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#6b7280', borderBottom: '2px solid #e5e7eb' }}>Settlement %</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {d2cSalesGrowthData.map((row, index) => {
-                          const difference = row.sales - row.settlement;
-                          const settlementPct = row.sales > 0 ? (row.settlement / row.sales) * 100 : 0;
                           return (
                             <TableRow
                               key={row.month}
@@ -5760,12 +5678,6 @@ const MarketplaceReconciliation: React.FC = () => {
                               <TableCell sx={{ fontWeight: 500, color: '#1f2937' }}>{row.month}</TableCell>
                               <TableCell align="right" sx={{ color: '#2563eb', fontWeight: 600 }}>{formatCurrency(row.sales)}</TableCell>
                               <TableCell align="right" sx={{ color: '#10b981', fontWeight: 600 }}>{formatCurrency(row.settlement)}</TableCell>
-                              <TableCell align="right" sx={{ color: difference >= 0 ? '#ef4444' : '#10b981', fontWeight: 500 }}>
-                                {difference >= 0 ? '+' : ''}{formatCurrency(difference)}
-                              </TableCell>
-                              <TableCell align="right" sx={{ color: settlementPct >= 95 ? '#10b981' : settlementPct >= 80 ? '#eab308' : '#ef4444', fontWeight: 600 }}>
-                                {settlementPct.toFixed(2)}%
-                              </TableCell>
                             </TableRow>
                           );
                         })}
@@ -5777,20 +5689,6 @@ const MarketplaceReconciliation: React.FC = () => {
                           </TableCell>
                           <TableCell align="right" sx={{ fontWeight: 700, color: '#10b981', borderTop: '2px solid #e5e7eb' }}>
                             {formatCurrency(d2cSalesGrowthData.reduce((sum, r) => sum + r.settlement, 0))}
-                          </TableCell>
-                          <TableCell align="right" sx={{
-                            fontWeight: 700,
-                            color: d2cSalesGrowthData.reduce((sum, r) => sum + r.sales - r.settlement, 0) >= 0 ? '#ef4444' : '#10b981',
-                            borderTop: '2px solid #e5e7eb'
-                          }}>
-                            {formatCurrency(d2cSalesGrowthData.reduce((sum, r) => sum + r.sales - r.settlement, 0))}
-                          </TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 700, color: '#6b7280', borderTop: '2px solid #e5e7eb' }}>
-                            {(() => {
-                              const totalSales = d2cSalesGrowthData.reduce((sum, r) => sum + r.sales, 0);
-                              const totalSettlement = d2cSalesGrowthData.reduce((sum, r) => sum + r.settlement, 0);
-                              return totalSales > 0 ? ((totalSettlement / totalSales) * 100).toFixed(2) : '0.00';
-                            })()}%
                           </TableCell>
                         </TableRow>
                       </TableBody>
