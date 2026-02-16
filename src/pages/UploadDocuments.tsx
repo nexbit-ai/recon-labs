@@ -1258,7 +1258,7 @@ const UploadDocuments: React.FC = () => {
                             color={flipkartSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
                             sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
                           >
-                            {flipkartSalesDoc.filename} • {flipkartSalesStatus === 'processing' ? 'Processing' : 'Pending'}
+                            {flipkartSalesDoc.filename} • {flipkartSalesStatus === 'processing' ? 'Processed' : 'Pending'}
                           </Typography>
                         )}
                         
@@ -1431,7 +1431,7 @@ const UploadDocuments: React.FC = () => {
                             sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
                           >
                             {flipkartSettlementDoc.filename} •{' '}
-                            {flipkartSettlementStatus === 'processing' ? 'Processing' : 'Pending'}
+                            {flipkartSettlementStatus === 'processing' ? 'Processed' : 'Pending'}
                           </Typography>
                         )}
                         
@@ -1593,7 +1593,7 @@ const UploadDocuments: React.FC = () => {
                             color={amazonSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
                             sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
                           >
-                            {amazonSalesDoc.filename} • {amazonSalesStatus === 'processing' ? 'Processing' : 'Pending'}
+                            {amazonSalesDoc.filename} • {amazonSalesStatus === 'processing' ? 'Processed' : 'Pending'}
                           </Typography>
                         )}
                         
@@ -1765,7 +1765,7 @@ const UploadDocuments: React.FC = () => {
                             color={amazonSalesB2BStatus === 'processing' ? '#16a34a' : '#b45309'}
                             sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
                           >
-                            {amazonSalesB2BDoc.filename} • {amazonSalesB2BStatus === 'processing' ? 'Processing' : 'Pending'}
+                            {amazonSalesB2BDoc.filename} • {amazonSalesB2BStatus === 'processing' ? 'Processed' : 'Pending'}
                           </Typography>
                         )}
                         
@@ -1955,7 +1955,7 @@ const UploadDocuments: React.FC = () => {
                             color={amazonSettlementStatus === 'processing' ? '#16a34a' : '#b45309'}
                             sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
                           >
-                            {amazonSettlementDoc.filename} • {amazonSettlementStatus === 'processing' ? 'Processing' : 'Pending'}
+                            {amazonSettlementDoc.filename} • {amazonSettlementStatus === 'processing' ? 'Processed' : 'Pending'}
                           </Typography>
                         )}
                         
@@ -2129,7 +2129,7 @@ const UploadDocuments: React.FC = () => {
                             color={credSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
                             sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
                           >
-                            {credSalesDoc.filename} • {credSalesStatus === 'processing' ? 'Processing' : 'Pending'}
+                            {credSalesDoc.filename} • {credSalesStatus === 'processing' ? 'Processed' : 'Pending'}
                           </Typography>
                         )}
 
@@ -2260,7 +2260,7 @@ const UploadDocuments: React.FC = () => {
                             sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
                           >
                             {credSettlementDoc.filename} •{' '}
-                            {credSettlementStatus === 'processing' ? 'Processing' : 'Pending'}
+                            {credSettlementStatus === 'processing' ? 'Processed' : 'Pending'}
                           </Typography>
                         )}
 
@@ -2444,7 +2444,7 @@ const UploadDocuments: React.FC = () => {
                       color={unicommerceStatus === 'processing' ? '#16a34a' : '#b45309'}
                       sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
                     >
-                      {unicommerceDoc.filename} • {unicommerceStatus === 'processing' ? 'Processing' : 'Pending'}
+                      {unicommerceDoc.filename} • {unicommerceStatus === 'processing' ? 'Processed' : 'Pending'}
                     </Typography>
                   )}
                   
@@ -2590,7 +2590,7 @@ const UploadDocuments: React.FC = () => {
                       color={lastmileStatus === 'processing' ? '#16a34a' : '#b45309'}
                       sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
                     >
-                      {lastmileDoc.filename} • {lastmileStatus === 'processing' ? 'Processing' : 'Pending'}
+                      {lastmileDoc.filename} • {lastmileStatus === 'processing' ? 'Processed' : 'Pending'}
                     </Typography>
                   )}
                   
@@ -2770,7 +2770,7 @@ const UploadDocuments: React.FC = () => {
                                     sx={{ display: 'block', fontSize: '9px' }}
                                   >
                                     {uploadedSettlementDoc.filename} •{' '}
-                                    {isSettlementProcessing ? 'Processing' : 'Pending'}
+                                    {isSettlementProcessing ? 'Processed' : 'Pending'}
                                   </Typography>
                                 ) : (
                                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: '9px' }}>
@@ -2863,7 +2863,7 @@ const UploadDocuments: React.FC = () => {
                     </Typography>
                     {drawerSalesStatus !== 'none' && (
                       <Chip 
-                        label={drawerSalesStatus === 'processing' ? 'Processing' : 'Pending'}
+                        label={drawerSalesStatus === 'processing' ? 'Processed' : 'Pending'}
                         size="small" 
                         icon={
                           drawerSalesStatus === 'processing' ? (
@@ -2888,7 +2888,7 @@ const UploadDocuments: React.FC = () => {
                       color={drawerSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
                       sx={{ display: 'block', mb: 1 }}
                     >
-                      {drawerSalesDoc.filename} • {drawerSalesStatus === 'processing' ? 'Processing' : 'Pending'} •{' '}
+                      {drawerSalesDoc.filename} • {drawerSalesStatus === 'processing' ? 'Processed' : 'Pending'} •{' '}
                       {new Date(drawerSalesDoc.upload_date).toLocaleDateString()}
                     </Typography>
                   )}
@@ -2974,7 +2974,7 @@ const UploadDocuments: React.FC = () => {
                       </Typography>
                       {drawerSalesB2BStatus !== 'none' && (
                         <Chip 
-                          label={drawerSalesB2BStatus === 'processing' ? 'Processing' : 'Pending'}
+                          label={drawerSalesB2BStatus === 'processing' ? 'Processed' : 'Pending'}
                           size="small" 
                           icon={
                             drawerSalesB2BStatus === 'processing' ? (
@@ -2999,7 +2999,7 @@ const UploadDocuments: React.FC = () => {
                         color={drawerSalesB2BStatus === 'processing' ? '#16a34a' : '#b45309'}
                         sx={{ display: 'block', mb: 1 }}
                       >
-                        {drawerSalesB2BDoc.filename} • {drawerSalesB2BStatus === 'processing' ? 'Processing' : 'Pending'} •{' '}
+                        {drawerSalesB2BDoc.filename} • {drawerSalesB2BStatus === 'processing' ? 'Processed' : 'Pending'} •{' '}
                         {new Date(drawerSalesB2BDoc.upload_date).toLocaleDateString()}
                       </Typography>
                     )}
@@ -3084,7 +3084,7 @@ const UploadDocuments: React.FC = () => {
                     </Typography>
                     {drawerSettlementStatus !== 'none' && (
                       <Chip 
-                        label={drawerSettlementStatus === 'processing' ? 'Processing' : 'Pending'}
+                        label={drawerSettlementStatus === 'processing' ? 'Processed' : 'Pending'}
                         size="small" 
                         icon={
                           drawerSettlementStatus === 'processing' ? (
@@ -3109,7 +3109,7 @@ const UploadDocuments: React.FC = () => {
                       color={drawerSettlementStatus === 'processing' ? '#16a34a' : '#b45309'}
                       sx={{ display: 'block', mb: 1 }}
                     >
-                      {drawerSettlementDoc.filename} • {drawerSettlementStatus === 'processing' ? 'Processing' : 'Pending'} •{' '}
+                      {drawerSettlementDoc.filename} • {drawerSettlementStatus === 'processing' ? 'Processed' : 'Pending'} •{' '}
                       {new Date(drawerSettlementDoc.upload_date).toLocaleDateString()}
                     </Typography>
                   )}
