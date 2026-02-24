@@ -2331,7 +2331,7 @@ const UploadDocuments: React.FC = () => {
           </Paper>
         )}
 
-        {/* D2C View - 3 steps: Sales file, Last Mile Status, D2C Settlement */}
+        {/* D2C View - 2 steps: Sales file, D2C Settlement */}
         {currentView === 'd2c' && selectedMonth !== null && (
                   <Paper
                     elevation={0}
@@ -2492,7 +2492,7 @@ const UploadDocuments: React.FC = () => {
             </Box>
                 </Paper>
 
-              {/* Connector Line 1 */}
+              {/* Connector Line between Sales and Settlement */}
               <Box sx={{ 
                 width: 60,
                 height: '3px',
@@ -2525,174 +2525,19 @@ const UploadDocuments: React.FC = () => {
                 )}
               </Box>
 
-                {/* Step 2: Last Mile Status */}
-              <Paper 
-                elevation={0}
-                sx={{ 
-                  flex: '0 0 auto',
-                  width: 200,
-                  p: 2,
-                  border: lastmileStatus === 'processing'
-                    ? '2px solid #16a34a'
-                    : lastmileStatus === 'pending'
-                      ? '2px solid #f59e0b'
-                    : (!isVendorUploaded('unicommerce') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
-                  borderRadius: '12px',
-                  background: lastmileStatus === 'processing'
-                    ? '#f0fdf4'
-                    : lastmileStatus === 'pending'
-                      ? '#fffbeb'
-                    : (!isVendorUploaded('unicommerce') ? '#f9fafb' : '#ffffff'),
-                  position: 'relative',
-                  zIndex: 2,
-                  opacity: isVendorUploaded('unicommerce') ? 1 : 0.6
-                }}
-              >
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                  {/* Step Number Circle */}
-                  <Box sx={{ 
-                    width: 32, 
-                    height: 32, 
-                    borderRadius: '50%', 
-                    background: lastmileStatus === 'processing'
-                      ? '#16a34a'
-                      : lastmileStatus === 'pending'
-                        ? '#f59e0b'
-                      : (!isVendorUploaded('unicommerce') ? '#f3f4f6' : '#f3f4f6'),
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    border: lastmileStatus !== 'none'
-                      ? 'none'
-                      : (!isVendorUploaded('unicommerce') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
-                    position: 'relative'
-                  }}>
-                    {lastmileStatus === 'processing' ? (
-                      <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
-                    ) : lastmileStatus === 'pending' ? (
-                      <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
-                    ) : !isVendorUploaded('unicommerce') ? (
-                      <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
-                    ) : (
-                        <Typography variant="body2" fontWeight={700} color="#6b7280">2</Typography>
-                    )}
-                  </Box>
-                  
-                  {/* Step Title */}
-                  <Typography variant="body2" fontWeight={600} color={isVendorUploaded('unicommerce') ? '#111111' : '#9ca3af'} textAlign="center">
-                    Last Mile Status
-                      </Typography>
-                  
-                  {/* Uploaded File Info */}
-                  {lastmileDoc && lastmileStatus !== 'none' && (
-                    <Typography
-                      variant="caption"
-                      color={lastmileStatus === 'processing' ? '#16a34a' : '#b45309'}
-                      sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
-                    >
-                      {lastmileDoc.filename} • {lastmileStatus === 'processing' ? 'Processed' : 'Pending'}
-                    </Typography>
-                  )}
-                  
-                  {/* File Input */}
-                <input
-                  accept={getAcceptForVendor('lastmile')}
-                  style={{ display: 'none' }}
-                      id="d2c-lastmile-status-upload"
-                  type="file"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0] || null;
-                    if (file) {
-                      if (!validateFileType(file, 'lastmile', 'Last Mile Status')) {
-                        e.target.value = '';
-                        return;
-                      }
-                      setLastMileStatusFile(file);
-                      handleLastMileStatusUpload(file);
-                    }
-                    e.target.value = '';
-                  }}
-                    disabled={uploadingVendor === 'lastmile_status' || !isVendorUploaded('unicommerce')}
-                />
-                    <label htmlFor="d2c-lastmile-status-upload">
-                  <Button
-                    variant={isVendorUploaded('lastmile') ? 'outlined' : 'contained'}
-                    component="span"
-                      size="small"
-                        startIcon={<CloudUploadIcon />}
-                      disabled={uploadingVendor === 'lastmile_status' || !isVendorUploaded('unicommerce')}
-                      endIcon={uploadingVendor === 'lastmile_status' ? <CircularProgress size={14} /> : null}
-                      sx={{ 
-                        minWidth: 120,
-                        fontSize: '0.75rem',
-                        py: 0.75,
-                        ...(!isVendorUploaded('unicommerce') && {
-                          background: '#f3f4f6',
-                          color: '#9ca3af',
-                          cursor: 'not-allowed',
-                          border: 'none',
-                          '&:hover': {
-                            background: '#f3f4f6',
-                          }
-                        }),
-                        ...(isVendorUploaded('lastmile') && {
-                          borderColor: lastmileStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                          color: lastmileStatus === 'pending' ? '#b45309' : '#16a34a'
-                        })
-                      }}
-                    >
-                      {uploadingVendor === 'lastmile_status' ? 'Uploading...' : 'Choose File'}
-                  </Button>
-                </label>
-                  </Box>
-              </Paper>
-
-              {/* Connector Line 2 */}
-              <Box sx={{ 
-                width: 60,
-                height: '3px',
-                background: lastmileStatus === 'processing'
-                  ? 'linear-gradient(to right, #16a34a, #16a34a)'
-                  : lastmileStatus === 'pending'
-                    ? 'linear-gradient(to right, #f59e0b, #f59e0b)'
-                    : 'linear-gradient(to right, #d1d5db, #d1d5db)',
-                position: 'relative',
-                zIndex: 3,
-                alignSelf: 'center'
-              }}>
-                {lastmileStatus !== 'none' && (
-                  <Box sx={{
-                    position: 'absolute',
-                    right: -8,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    width: 16,
-                    height: 16,
-                    borderRadius: '50%',
-                    background: lastmileStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 4
-                  }}>
-                    <ArrowForwardIcon sx={{ fontSize: 12, color: '#ffffff' }} />
-                  </Box>
-                )}
-              </Box>
-
-                {/* Step 3: D2C Settlement List */}
+                {/* Step 2: D2C Settlement List */}
               <Paper 
                 elevation={0}
                 sx={{ 
                   flex: '0 0 auto',
                   width: 400,
                   p: 2,
-                  border: !isVendorUploaded('lastmile') ? '2px dashed #d1d5db' : '2px solid #e5e7eb',
+                  border: '2px solid #e5e7eb',
                   borderRadius: '12px',
-                  background: !isVendorUploaded('lastmile') ? '#f9fafb' : '#ffffff',
+                  background: '#ffffff',
                   position: 'relative',
                   zIndex: 2,
-                  opacity: isVendorUploaded('lastmile') ? 1 : 0.6
+                  opacity: 1
                 }}
               >
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
@@ -2701,29 +2546,25 @@ const UploadDocuments: React.FC = () => {
                     width: 32, 
                     height: 32, 
                     borderRadius: '50%', 
-                    background: !isVendorUploaded('lastmile') ? '#f3f4f6' : '#f3f4f6',
+                    background: '#f3f4f6',
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
-                    border: !isVendorUploaded('lastmile') ? '2px dashed #d1d5db' : '2px solid #d1d5db',
+                    border: '2px solid #d1d5db',
                     position: 'relative'
                   }}>
-                    {!isVendorUploaded('lastmile') ? (
-                      <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
-                    ) : (
-                      <Typography variant="body2" fontWeight={700} color="#6b7280">3</Typography>
-                    )}
+                    <Typography variant="body2" fontWeight={700} color="#6b7280">2</Typography>
                     </Box>
                   
                   {/* Step Title */}
-                  <Typography variant="body2" fontWeight={600} color={isVendorUploaded('lastmile') ? '#111111' : '#9ca3af'} textAlign="center">
+                  <Typography variant="body2" fontWeight={600} color="#111111" textAlign="center">
                     D2C Settlement
                       </Typography>
                   
                   {/* Settlement Providers List */}
                   <Box sx={{ width: '100%', mt: 1 }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                      {vendors.filter(v => v.id !== 'amazon' && v.id !== 'flipkart').map((vendor) => {
+                      {vendors.filter(v => v.id !== 'amazon' && v.id !== 'flipkart' && v.id !== 'cred').map((vendor) => {
                         const isSettlementUploaded = isVendorUploaded(vendor.id, 'settlement');
                         const uploadedSettlementDoc = getUploadedDocument(vendor.id, 'settlement');
                         const isSettlementUploading = uploadingVendor === `${vendor.id}_settlement`;
@@ -2795,29 +2636,20 @@ const UploadDocuments: React.FC = () => {
                                   }
                                   e.target.value = '';
                                 }}
-                                disabled={isSettlementUploading || !isVendorUploaded('lastmile')}
+                                disabled={isSettlementUploading}
                               />
                               <label htmlFor={`d2c-settlement-upload-${vendor.id}`}>
                                 <Button
                                   variant={isSettlementUploaded ? 'outlined' : 'contained'}
                                   component="span"
                                   size="small"
-                                  disabled={isSettlementUploading || !isVendorUploaded('lastmile')}
+                                  disabled={isSettlementUploading}
                                   endIcon={isSettlementUploading ? <CircularProgress size={12} /> : null}
                                   sx={{ 
                                     minWidth: 70,
                                     fontSize: '0.7rem',
                                     py: 0.5,
                                     px: 1,
-                                    ...(!isVendorUploaded('lastmile') && {
-                                      background: '#f3f4f6',
-                                      color: '#9ca3af',
-                                      cursor: 'not-allowed',
-                                      border: 'none',
-                                      '&:hover': {
-                                        background: '#f3f4f6',
-                                      }
-                                    }),
                                     ...(isSettlementUploaded && {
                                       borderColor: '#16a34a',
                                       color: '#16a34a',
