@@ -4095,8 +4095,8 @@ const MarketplaceReconciliation: React.FC = () => {
                           {(() => {
                             // Use API mainSummary.Unsettled for this section
                             const unsettled = (mainSummary as any)?.Unsettled as any;
-                            const pendingPaymentAmount = Number(unsettled?.summary?.pending_payment_amount || 0);
-                            const pendingPaymentCount = Number(unsettled?.summary?.pending_payment_orders || 0);
+                            const pendingPaymentAmount = Number(unsettled?.summary?.total_amount || 0);
+                            const pendingPaymentCount = Number(unsettled?.summary?.total_order_count || 0);
                             const totalUnsettledAmount = pendingPaymentAmount;
 
                             // Split providers into gateways and COD using helpers
