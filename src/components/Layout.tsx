@@ -237,17 +237,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {/* Data Sources nav commented out: only upload is now shown to user. */}
         <ListItem disablePadding>
           <ListItemButton onClick={handleSettingsClick} sx={{ borderRadius: 0, mr: 2, my: 0.25 }}>
-            <ListItemIcon sx={{ minWidth: 36 }}>
-              <Avatar 
-                sx={{ 
-                  width: 32, 
-                  height: 32,
-                  bgcolor: 'primary.main',
-                }}
-              >
-                <PersonIcon sx={{ fontSize: 20 }} />
-              </Avatar>
-            </ListItemIcon>
             <ListItemText 
               primary={
                 <Typography sx={{ 
@@ -262,7 +251,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   <Box
                     component="span"
                     sx={{
-                      backgroundColor: 'error.main',
+                      backgroundColor: 'success.main',
                       color: 'common.white',
                       fontSize: '9px',
                       fontWeight: 600,
@@ -276,7 +265,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       letterSpacing: 0.3,
                     }}
                   >
-                    Trial User
+                    Subscribed
                   </Box>
                   <KeyboardArrowUpIcon sx={{ fontSize: '16px', color: 'text.primary', fontWeight: 'bold' }} />
                 </Typography>
