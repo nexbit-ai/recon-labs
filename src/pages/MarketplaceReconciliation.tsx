@@ -5499,12 +5499,12 @@ const MarketplaceReconciliation: React.FC = () => {
 
                       const csvColumns: Array<{ key: string; label: string }> = [
                         { key: 'month', label: 'Month' },
-                        { key: 'sales', label: 'Sales (₹)' },
-                        { key: 'settlement', label: 'Settlement (₹)' },
+                        { key: 'sales', label: 'Sales (Invoice Date)' },
+                        { key: 'settlement', label: 'Settlement (Settlement Date)' },
                       ];
 
                       if (showCommissionColumn) {
-                        csvColumns.push({ key: 'commission', label: 'Commission (₹)' });
+                        csvColumns.push({ key: 'commission', label: 'Commission (Settlement Date)' });
                       }
 
 
@@ -5568,7 +5568,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           color: '#2563eb',
                           borderBottom: '2px solid #e5e7eb'
                         }}>
-                          Sales (₹)
+                          Sales (Invoice Date)
                         </TableCell>
                         <TableCell
                           align="right"
@@ -5579,7 +5579,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             borderBottom: '2px solid #e5e7eb',
                           }}
                         >
-                          Settlement (₹)
+                          Settlement (Settlement Date)
                         </TableCell>
                         {(selectedPlatform === 'amazon' || selectedPlatform === 'flipkart') && (
                           <TableCell
@@ -5591,7 +5591,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               borderBottom: '2px solid #e5e7eb',
                             }}
                           >
-                            Commission (₹)
+                            Commission (Settlement Date)
                           </TableCell>
                         )}
                       </TableRow>

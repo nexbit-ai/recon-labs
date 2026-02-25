@@ -3055,7 +3055,7 @@ const UploadDocuments: React.FC = () => {
           <Button onClick={handleCancelReupload} color="inherit">
             Cancel
           </Button>
-          <Button onClick={handleConfirmReupload} variant="contained" color="error" autoFocus>
+          <Button onClick={handleConfirmReupload} variant="contained" color="success" autoFocus>
             Continue
           </Button>
         </DialogActions>
