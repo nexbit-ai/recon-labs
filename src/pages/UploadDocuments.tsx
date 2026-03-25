@@ -56,6 +56,8 @@ const vendors: Vendor[] = [
   { id: 'dtdc', name: 'DTDC' },
   { id: 'paytm', name: 'Paytm' },
   { id: 'payu', name: 'PayU' },
+  // D2C logistics partner - uses report_type "amazon_logistics"
+  { id: 'amazon_logistics', name: 'Amazon Logistics' },
   // D2C payment gateway partner - uses report_type "cashfree"
   { id: 'cashfree', name: 'Cashfree' },
   // D2C logistics partner - uses report_type "zippee"
@@ -163,6 +165,10 @@ const UploadDocuments: React.FC = () => {
       if (kind === 'sales') return 'cred_sales';
       if (kind === 'settlement') return 'cred_settlement';
       return vendorIdLower;
+    }
+    // Cashfree settlement exports now use the new report_type
+    if (vendorIdLower === 'cashfree') {
+      return 'cashfree_payments';
     }
     // All other vendors: just return vendor name in lowercase
     return vendorIdLower;
