@@ -27,6 +27,7 @@ import AIWorkflows from './pages/AIWorkflows';
 import Assistant from './pages/Assistant';
 import AIReconciliation from './pages/AIReconciliation';
 import Bookkeeping from './pages/Bookkeeping';
+import Logistics from './pages/Logistics';
 
 // Components
 import Layout from './components/Layout';
@@ -453,6 +454,11 @@ function App() {
             <Route path="/bookkeeping" element={
               <ProtectedRoute>
                 <Layout><Bookkeeping /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/logistics" element={
+              <ProtectedRoute>
+                <Layout><Logistics /></Layout>
               </ProtectedRoute>
             } />
           </Routes>

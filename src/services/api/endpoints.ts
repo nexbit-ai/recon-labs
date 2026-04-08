@@ -142,6 +142,35 @@ export const ordersAPI = {
     apiService.get<any>(`${API_CONFIG.ENDPOINTS.ORDERS}/${id}`),
 };
 
+// Logistics API
+export const logisticsAPI = {
+  getLogisticCostDashboard: (params?: {
+    provider?: string;
+    page?: number;
+    limit?: number;
+    view?: 'all' | 'mismatch';
+    start_date?: string;
+    end_date?: string;
+    search?: string;
+    reason?: string;
+  }) =>
+    apiService.get<any>(API_CONFIG.ENDPOINTS.LOGISTIC_DELHIVERY_COST, params),
+
+  getRateCardConfig: (params?: {
+    provider?: string;
+    start_date?: string;
+    end_date?: string;
+  }) =>
+    apiService.get<any>(API_CONFIG.ENDPOINTS.LOGISTIC_RATE_CARD, params),
+
+  updateRateCardConfig: (payload: {
+    updates: Array<{ id: string; raw_value: string }>;
+  }) => apiService.post<any>(API_CONFIG.ENDPOINTS.LOGISTIC_RATE_CARD_UPDATE, payload),
+
+  uploadMasterWeight: (file: File) =>
+    apiService.upload<any>(API_CONFIG.ENDPOINTS.LOGISTIC_MASTER_WEIGHT_UPLOAD, file, undefined),
+};
+
 // Stats API
 export const statsAPI = {
   // Deprecated: removed legacy stats API
@@ -287,7 +316,7 @@ export const settingsAPI = {
 export const fileAPI = {
   // Upload file
   uploadFile: (file: File, onProgress?: (progress: number) => void) =>
-    apiService.upload<{ fileId: string; url: string }>('/upload', file, onProgress),
+    apiService.upload<{ fileId: string; url: string }>('/upload', file, undefined, onProgress),
 
   // Download file
   downloadFile: (fileId: string, filename?: string) =>
@@ -302,6 +331,7 @@ export const api = {
   transactions: transactionsAPI,
   manualActions: manualActionsAPI,
   orders: ordersAPI,
+  logistics: logisticsAPI,
   stats: statsAPI,
   mainSummary: mainSummaryAPI,
   ageingAnalysis: ageingAnalysisAPI,

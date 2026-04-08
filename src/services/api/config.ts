@@ -67,6 +67,11 @@ export const API_CONFIG = {
     
     // Orders
     ORDERS: '/recon/orders',
+    LOGISTIC_DELHIVERY_COST: '/logistic/delhivery-cost',
+    LOGISTIC_RATE_CARD: '/logistic/rate-card',
+    LOGISTIC_RATE_CARD_UPDATE: '/logistic/rate-card/update',
+    LOGISTIC_MASTER_WEIGHT_UPLOAD: '/logistic/master-weight/upload',
+    LOGISTIC_UPLOAD: '/logistic/upload',
     
     // Stats (legacy removed)
     

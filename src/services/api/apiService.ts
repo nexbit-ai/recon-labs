@@ -30,7 +30,16 @@ class ApiService {
 
     // Add body for non-GET requests
     if (method !== 'GET' && data) {
-      requestOptions.body = JSON.stringify(data);
+      if (data instanceof FormData) {
+        requestOptions.body = data;
+        // Let browser set content-type with boundary for FormData
+        const headersObj = requestOptions.headers as Record<string, string>;
+        if (headersObj) {
+          delete headersObj['Content-Type'];
+        }
+      } else {
+        requestOptions.body = JSON.stringify(data);
+      }
     }
 
     // Add timeout
@@ -369,10 +378,19 @@ class ApiService {
   async upload<T = any>(
     url: string, 
     file: File, 
+    extraData?: Record<string, any>,
     onProgress?: (progress: number) => void
   ): Promise<ApiResponse<T>> {
     const formData = new FormData();
     formData.append('file', file);
+    
+    if (extraData) {
+      Object.entries(extraData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, String(value));
+        }
+      });
+    }
 
     const headers = await this.buildHeaders();
     const headersObj = headers as Record<string, string>;
