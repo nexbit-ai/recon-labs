@@ -445,18 +445,19 @@ const Logistics: React.FC = () => {
                 const resp = await api.logistics.getLogisticCostDashboard(params);
                 const allOrders = (resp.data?.orders || []) as LogisticOrder[];
 
-                const headers = ['Order ID', 'Order Date', 'Zone', 'Item Qty', 'SKUs', 'Billed Wt', 'Expected Cost', 'Actual Cost', 'Difference', 'Breakup'];
+                const headers = ['Order ID', 'Order Date', 'Zone', 'Item Qty', 'SKUs', 'Billed Wt', 'Expected Cost', 'Actual Cost', 'Difference', 'Reason', 'Breakup Trace'];
                 const csvContent = allOrders.map(o => [
                   o.display_order_code,
                   o.order_date,
                   o.uploaded_pincode_zone,
                   o.items_quantity,
-                  `"${o.product_sku_code}"`,
+                  `"${(o.product_sku_code || '').replace(/"/g, '""')}"`,
                   o.charged_weight,
                   o.expected_cost,
                   o.total_cost,
                   o.difference,
-                  `"${o.reason}"`
+                  `"${(o.reason || '').replace(/"/g, '""')}"`,
+                  `"${(o.breakups || '').replace(/"/g, '""')}"`
                 ].join(',')).join('\n');
 
                 const blob = new Blob([[headers.join(','), csvContent].join('\n')], { type: 'text/csv' });
