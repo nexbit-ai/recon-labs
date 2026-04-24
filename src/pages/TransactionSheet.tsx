@@ -3815,10 +3815,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS,
         params,
         {
-          headers: {
-            'X-Org-ID': '612cd642-c2ce-49da-b535-be35442cecfa',
-            'X-API-Key': 'kapiva-7b485b6a865b2b4a3d728ef2fd4f3'
-          }
+          headers: {}
         }
       );
 

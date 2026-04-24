@@ -91,10 +91,6 @@ class TokenManager {
         'Content-Type': 'application/json'
       };
       
-      // Add organization ID header if available (prefer from token)
-      if (organizationId) {
-        headers['X-Org-ID'] = organizationId;
-      }
       
       return headers;
     }
@@ -105,7 +101,6 @@ class TokenManager {
     if (apiKey && orgId) {
       return {
         'X-API-Key': apiKey,
-        'X-Org-ID': orgId,
         'Content-Type': 'application/json'
       };
     }
@@ -131,20 +126,14 @@ class TokenManager {
     };
     
     // Always include API key and org ID if available
-    if (apiKey && orgId) {
+    if (apiKey) {
       headers['X-API-Key'] = apiKey;
-      headers['X-Org-ID'] = orgId;
     }
     
     // Also include Authorization header if JWT token is available
     if (jwtToken && !JWTService.isTokenExpired(jwtToken)) {
       headers['Authorization'] = `Bearer ${jwtToken}`;
       
-      // Prefer organization ID from token if available
-      const decoded = JWTService.decodeToken(jwtToken);
-      if (decoded?.organization_id) {
-        headers['X-Org-ID'] = decoded.organization_id;
-      }
     }
     
     // If we have at least API key or JWT, return headers
