@@ -169,6 +169,9 @@ export const logisticsAPI = {
 
   uploadMasterWeight: (file: File) =>
     apiService.upload<any>(API_CONFIG.ENDPOINTS.LOGISTIC_MASTER_WEIGHT_UPLOAD, file, undefined),
+
+  recalculate: (params: { provider: string }) =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.LOGISTIC_RECALCULATE, params),
 };
 
 // Stats API
