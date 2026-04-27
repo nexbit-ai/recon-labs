@@ -1,12 +1,11 @@
-import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import {
   Box,
   Typography,
   Paper,
   List,
   ListItem,
-  ListItemText,
   ListItemIcon,
   Chip,
   Avatar,
@@ -17,1081 +16,837 @@ import {
   Button,
   Divider,
   Grid,
-  Tabs,
-  Tab,
-  Drawer,
-  CircularProgress,
-  List as MUIList,
-  ListItem as MUIListItem,
-  ListItemText as MUIListItemText,
   Select,
   FormControl,
-  Input,
-  InputAdornment,
-  Link,
-  ButtonBase,
   MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControlLabel,
-  Switch,
+  AvatarGroup,
+  InputAdornment,
+  Fade,
 } from '@mui/material';
-import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
-import Badge from '@mui/material/Badge';
-import Popover from '@mui/material/Popover';
 import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  FilterList as FilterListIcon,
   CalendarToday as CalendarTodayIcon,
-  ErrorOutline as ErrorOutlineIcon,
-  CheckCircle as CheckCircleIcon,
   RadioButtonUnchecked as RadioButtonUncheckedIcon,
-  Share as ShareIcon,
-  Close as CloseIcon,
+  CheckCircle as CheckCircleIcon,
   Add as AddIcon,
-  Flag as FlagIcon,
-  TableChart as TableIcon,
-  OpenInNew as OpenInNewIcon,
+  Send as SendIcon,
+  History as HistoryIcon,
+  AutoAwesome as AIIcon,
+  AttachFile as AttachFileIcon,
+  PsychologyAlt as BrainIcon,
+  PsychologyAlt as AssistantIcon,
 } from '@mui/icons-material';
-import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+} from 'recharts';
 
-// Mock users
-const users = [
+const AI_AVATAR_URL = '/ai_avatar.png';
+
+const AI_VIDEO_URL = '/ai_avatar.webm';
+
+const AnimatedAIAvatar: React.FC<{ size?: number, animated?: boolean }> = ({ size = 44, animated = true }) => (
+  <Box
+    sx={{ 
+      width: size, 
+      height: size, 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      position: 'relative',
+      overflow: 'hidden',
+      borderRadius: '50%',
+      p: 0, 
+      m: 0,
+    }}
+  >
+    <Box
+      component="video"
+      autoPlay={animated}
+      loop={animated}
+      muted
+      playsInline
+      src={AI_VIDEO_URL}
+      sx={{ 
+        width: '180%', 
+        height: '180%', 
+        objectFit: 'contain',
+        display: 'block',
+      }}
+    />
+  </Box>
+);
+
+// --- Types & Interfaces ---
+
+interface User {
+  id: number;
+  name: string;
+  avatar: string;
+}
+
+interface Task {
+  id: number;
+  title: string;
+  tag: string;
+  due: string;
+  users: User[];
+  status: 'overdue' | 'upcoming' | 'completed';
+}
+
+interface Message {
+  id: string;
+  text: string;
+  sender: 'user' | 'assistant';
+  timestamp: Date;
+  chartData?: any[];
+  chartType?: 'bar' | 'line';
+}
+
+// --- Mock Data ---
+
+const users: User[] = [
   { id: 1, name: 'Alice', avatar: 'https://randomuser.me/api/portraits/women/1.jpg' },
   { id: 2, name: 'Bob', avatar: 'https://randomuser.me/api/portraits/men/2.jpg' },
   { id: 3, name: 'Carol', avatar: 'https://randomuser.me/api/portraits/women/3.jpg' },
   { id: 4, name: 'Dan', avatar: 'https://randomuser.me/api/portraits/men/4.jpg' },
-  { id: 5, name: 'Eve', avatar: 'https://randomuser.me/api/portraits/women/5.jpg' },
 ];
 
-// Mock tasks
-const overdueTasks = [
+const initialTasks: Task[] = [
   {
     id: 1,
-    title: 'Reconcile HSBC operating bank account #100013',
-    tag: 'INC.',
-    due: '2 Feb',
-    users: [users[2], users[3]],
+    title: 'Reconcile March Flipkart orders for Pilgrim',
+    tag: 'FLIPKART',
+    due: 'Today',
+    users: [users[0], users[1]],
     status: 'overdue',
   },
   {
     id: 2,
-    title: 'Post payroll and benefits from payroll system',
-    tag: 'INC.',
-    due: '2 Feb',
-    users: [users[1], users[0]],
-    status: 'overdue',
+    title: 'Verify Amazon payment disputes for April',
+    tag: 'AMAZON',
+    due: '2 days left',
+    users: [users[2]],
+    status: 'upcoming',
   },
-];
-
-const upcomingTasks = [
   {
     id: 3,
-    title: 'Reconcile March flipkart orders',
-    tag: 'LTD',
-    due: '3 Feb',
-    users: [users[0], users[4]],
+    title: 'Match website sales with Razorpay settlements',
+    tag: 'D2C',
+    due: 'Tomorrow',
+    users: [users[3], users[0]],
     status: 'upcoming',
   },
   {
     id: 4,
-    title: 'Reconcile April flipkart orders',
-    tag: 'INC.',
-    due: '3 Feb',
-    users: [users[2], users[3], users[1]],
-    status: 'upcoming',
-  },
-  {
-    id: 5,
-    title: 'Reconcile Website orders',
-    tag: 'INC.',
-    due: '3 Feb',
-    users: [users[4], users[0]],
-    status: 'upcoming',
-  },
-];
-
-const completedTasks = [
-  {
-    id: 6,
-    title: 'Reconcile February flipkart orders',
-    tag: 'INC.',
-    completedDate: '1 Feb',
-    users: [users[2], users[3]],
-    status: 'completed',
-  },
-  {
-    id: 7,
-    title: 'Reconcile February website orders',
-    tag: 'INC.',
-    completedDate: '31 Jan',
-    users: [users[1], users[0]],
+    title: 'Download Amazon logistics report for auditing',
+    tag: 'LOGISTICS',
+    due: 'Completed',
+    users: [users[1]],
     status: 'completed',
   },
 ];
 
-// Mock progress data
-const progressData = [
-  { name: 'Jan 1', completed: 10 },
-  { name: 'Jan 5', completed: 30 },
-  { name: 'Jan 10', completed: 50 },
-  { name: 'Jan 15', completed: 70 },
-  { name: 'Jan 20', completed: 90 },
-  { name: 'Jan 25', completed: 100 },
-  { name: 'Jan 31', completed: 113 },
+const suggestedQueries = [
+  "Do a flipkart Recon for march 26",
+  "Is 2025 complete recon completed",
+  "Analyze Amazon TAT for Q3",
+  "Explain Flipkart fee hike in May",
 ];
-
-// Mock links for tasks
-interface TaskLink {
-  label: string;
-  url: string;
-  icon: string;
-}
-
-const taskLinks: { [key: number]: TaskLink[] } = {
-  2: [
-    {
-      label: 'Netsuite - Journal entries',
-      url: 'www.netsuite.com/journal_entry?=44/43828394900202',
-      icon: 'netsuite',
-    },
-    {
-      label: 'Drive - Invoices',
-      url: 'www.drive.google.com/mydrive_invoices234?',
-      icon: 'drive',
-    },
-  ],
-};
 
 const monthNames = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-// Add mock comments data
-const initialComments = [
-  {
-    id: 1,
-    user: users[0],
-    text: 'Please double-check the supporting document.',
-    timestamp: '2024-06-01T10:15:00Z',
-  },
-  {
-    id: 2,
-    user: users[1],
-    text: 'Reviewed and looks good to me.',
-    timestamp: '2024-06-01T12:30:00Z',
-  },
-];
+// --- Sub-Components ---
 
-const Checklist: React.FC = () => {
-  const [showUpcoming, setShowUpcoming] = useState(true);
-  const [showCompleted, setShowCompleted] = useState(true);
-  const [search, setSearch] = useState('');
-  const [expandedTask, setExpandedTask] = useState<number | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth()); // default to current month
-  const [comments, setComments] = useState<{ [taskId: number]: typeof initialComments }>({});
-  const [newComment, setNewComment] = useState<{ [taskId: number]: string }>({});
-  const [aiPanel, setAIPanel] = useState<{ open: boolean; taskId: number | null; loading: boolean; answer: string[]; prompt: string; generated: boolean }>({ open: false, taskId: null, loading: false, answer: [], prompt: '', generated: false });
+const Typewriter: React.FC<{ text: string; speed?: number; onComplete?: () => void }> = ({ 
+  text, 
+  speed = 25, 
+  onComplete 
+}) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const [index, setIndex] = useState(0);
 
-  // Task creation modal state
-  type TaskType = 'manual_recon' | 'exception_review' | 'data_validation' | 'custom';
-  const [createOpen, setCreateOpen] = useState(false);
-  const [taskType, setTaskType] = useState<TaskType>('manual_recon');
-  const [taskTitle, setTaskTitle] = useState<string>('');
-  const [period, setPeriod] = useState(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    return `${y}-${m}`; // YYYY-MM
-  });
-  const [marketplace, setMarketplace] = useState<string>('flipkart');
-  const [amountMin, setAmountMin] = useState<string>('');
-  const [amountMax, setAmountMax] = useState<string>('');
-  const [remark, setRemark] = useState<string>('');
-  const [assignee, setAssignee] = useState<number | ''>('');
-  const [dueDate, setDueDate] = useState<string>('');
-  const [priority, setPriority] = useState<'urgent' | 'high' | 'medium' | 'low'>('medium');
-  const [instructions, setInstructions] = useState<string>('');
-  const [autoClose, setAutoClose] = useState<boolean>(true);
-  const [customTitle, setCustomTitle] = useState<string>('');
-  const [customDescription, setCustomDescription] = useState<string>('');
-  const [subtasks, setSubtasks] = useState<string[]>([]);
-  const [newSubtask, setNewSubtask] = useState<string>('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [newTag, setNewTag] = useState<string>('');
-  const [fetchingUnreconciled, setFetchingUnreconciled] = useState<boolean>(false);
-  const [unreconciledCount, setUnreconciledCount] = useState<number | null>(null);
-  const [notifAnchor, setNotifAnchor] = useState<HTMLElement | null>(null);
-
-  // Notifications persisted by Dispute page
-  const [notifications, setNotifications] = useState<Array<{id:number;text:string;time:string;meta?:any}>>([]);
-  const [nudgeCount, setNudgeCount] = useState<number>(0);
-
-  React.useEffect(() => {
-    try {
-      const notifKey = 'recon_notifications';
-      const nudgeKey = 'recon_nudge_count';
-      const stored = JSON.parse(localStorage.getItem(notifKey) || '[]');
-      setNotifications(Array.isArray(stored) ? stored : []);
-      const count = parseInt(localStorage.getItem(nudgeKey) || '0', 10) || 0;
-      setNudgeCount(count);
-    } catch (_) {
-      setNotifications([]);
-      setNudgeCount(0);
+  useEffect(() => {
+    // Type out the first 50% of the message
+    if (index < text.length / 2) {
+      const timeout = setTimeout(() => {
+        setDisplayedText(prev => prev + text[index]);
+        setIndex(prev => prev + 1);
+      }, speed);
+      return () => clearTimeout(timeout);
+    } else {
+      // Once 50% is reached, show the rest immediately
+      setDisplayedText(text);
+      if (onComplete) onComplete();
     }
-    const onNudge = () => {
-      try {
-        const notifKey = 'recon_notifications';
-        const nudgeKey = 'recon_nudge_count';
-        const stored = JSON.parse(localStorage.getItem(notifKey) || '[]');
-        setNotifications(Array.isArray(stored) ? stored : []);
-        const count = parseInt(localStorage.getItem(nudgeKey) || '0', 10) || 0;
-        setNudgeCount(count);
-      } catch (_) {
-        // ignore
-      }
-    };
-    window.addEventListener('recon_nudge_updated', onNudge as EventListener);
-    return () => window.removeEventListener('recon_nudge_updated', onNudge as EventListener);
-  }, []);
+  }, [index, text, speed, onComplete]);
 
-  const navigate = useNavigate();
+  return <>{displayedText}</>;
+};
 
-  const assigneeOptions = useMemo(() => users.map(u => ({ id: u.id, name: u.name })), []);
-
-  const resetCreateForm = () => {
-    setTaskType('manual_recon');
-    setTaskTitle('');
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    setPeriod(`${y}-${m}`);
-    setMarketplace('flipkart');
-    setAmountMin('');
-    setAmountMax('');
-    setRemark('');
-    setAssignee('');
-    setDueDate('');
-    setPriority('medium');
-    setInstructions('');
-    setAutoClose(true);
-    setCustomTitle('');
-    setCustomDescription('');
-    setSubtasks([]);
-    setNewSubtask('');
-    setTags([]);
-    setNewTag('');
-  };
-
-  const handleCreateTasks = () => {
-    // Stub: Replace with API call POST /tasks/bulk
-    console.log('Create tasks payload', {
-      taskType,
-      period,
-      filters: { marketplace, amountMin, amountMax, remark },
-      assignee,
-      dueDate,
-      priority,
-      instructions,
-      autoClose,
-    });
-    // Add a new pending task locally
-    const newTask = {
-      id: Date.now(),
-      title: (taskType === 'custom' ? customTitle : taskTitle) || 'Untitled task',
-      tag: marketplace?.toUpperCase?.().slice(0, 3) || 'GEN',
-      due: dueDate ? new Date(dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'No due',
-      users: assignee ? [users.find((u) => u.id === assignee) || users[0]] : [users[0]],
-      status: 'upcoming',
-    } as any;
-    upcomingTasks.push(newTask);
-    setShowUpcoming(true);
-    setCreateOpen(false);
-    resetCreateForm();
-  };
-
-  // For demo, use same tasks for all months
-  const getMonthTasks = (monthIdx: number) => ({ upcoming: upcomingTasks });
-  const { upcoming: monthUpcoming } = getMonthTasks(selectedMonth);
-  const filteredUpcoming = monthUpcoming.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()));
-
-  // Helper for rendering links
-  const renderLinkIcon = (icon: string) => {
-    if (icon === 'netsuite') return <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/Oracle_NetSuite_logo.png" alt="netsuite" style={{ height: 20, marginLeft: 8 }} />;
-    if (icon === 'drive') return <img src="https://upload.wikimedia.org/wikipedia/commons/1/1d/Google_Drive_logo.png" alt="drive" style={{ height: 20, marginLeft: 8 }} />;
-    return null;
-  };
-
-  const handleAddComment = (taskId: number) => {
-    const text = newComment[taskId]?.trim();
-    if (!text) return;
-    const comment = {
-      id: Date.now(),
-      user: users[0], // Assume current user is users[0] for demo
-      text,
-      timestamp: new Date().toISOString(),
-    };
-    setComments((prev) => ({
-      ...prev,
-      [taskId]: [...(prev[taskId] || initialComments), comment],
-    }));
-    setNewComment((prev) => ({ ...prev, [taskId]: '' }));
-  };
-
-  const handleAskAI = (task: any) => {
-    setAIPanel({ open: true, taskId: task.id, loading: false, answer: [], prompt: task.title, generated: false });
-  };
-
-  const handleGenerateAIAnswer = () => {
-    setAIPanel((prev) => ({ ...prev, loading: true }));
-    setTimeout(() => {
-      setAIPanel((prev) => ({
-        ...prev,
-        loading: false,
-        generated: true,
-        answer: [
-          '1. Review the supporting documents attached to the task.',
-          '2. Verify the transaction details with the bank statement.',
-          '3. Ensure all discrepancies are noted and explained.',
-          '4. Mark the checklist as complete once all steps are done.'
-        ],
-      }));
-    }, 1800);
-  };
-
-  const handleEditAIPrompt = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAIPanel((prev) => ({ ...prev, prompt: e.target.value }));
-  };
-
-  const handleCloseAIPanel = () => setAIPanel({ open: false, taskId: null, loading: false, answer: [], prompt: '', generated: false });
-
-  // Helper to get the current expanded task object
-  const allTasks = [...overdueTasks, ...upcomingTasks];
-  const currentTask = allTasks.find((t) => t.id === aiPanel.taskId);
-
+const MessageBubble: React.FC<{ msg: Message; isLatestAssistant?: boolean; onStreamingComplete?: () => void }> = ({ 
+  msg, 
+  isLatestAssistant,
+  onStreamingComplete 
+}) => {
+  const isAssistant = msg.sender === 'assistant';
+  const shouldType = isAssistant && isLatestAssistant;
+  
   return (
-    <Box sx={{ p: { xs: 1, md: 3 } }}>
-      {/* Title Row and Actions */}
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, mt: 1 }}>
-        <Typography variant="h4" sx={{ 
-          fontWeight: 700, 
-          color: '#1a1a1a',
-          letterSpacing: '-0.01em',
-          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-          mr: 2 
-        }}>
-          Checklist
-        </Typography>
-        <Box sx={{ flex: 1 }} />
-        <IconButton color="inherit" sx={{ mr: 1 }} onClick={(e) => setNotifAnchor(e.currentTarget)}>
-          <Badge color="error" badgeContent={nudgeCount} overlap="circular">
-            <NotificationsNoneIcon />
-          </Badge>
-        </IconButton>
-        <FormControl size="small" sx={{ mr: 2, minWidth: 120 }}>
-          <Select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value as number)}
-            displayEmpty
-            sx={{ 
-              borderRadius: '6px',
-              borderColor: '#6B7280',
-              '& .MuiOutlinedInput-root': {
-                height: 20, 
-                color: '#6B7280',
-                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                fontWeight: 500,
-                minHeight: 36,
-                fontSize: '0.7875rem',
-              },
-              '& .MuiSelect-select': {
-                paddingY: 0.3,               // control vertical spacing of text
-                paddingX: 1,                 // control horizontal padding
-                minHeight: 'unset !important', // remove default min height
-              },
+    <Fade in={true} timeout={400}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: isAssistant ? 'row' : 'row-reverse',
+          gap: 1.25,
+          mb: 2,
+          alignItems: 'flex-start',
+        }}
+      >
+        <AnimatedAIAvatar size={28} animated={isAssistant && isLatestAssistant} />
+        <Box sx={{ maxWidth: '80%', display: 'flex', flexDirection: 'column', alignItems: isAssistant ? 'flex-start' : 'flex-end' }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 1.75,
+              borderRadius: isAssistant ? '0 12px 12px 12px' : '12px 0 12px 12px',
+              bgcolor: '#fcfdfe',
+              color: '#1e293b',
+              border: '1px solid #eef2f6',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.01)',
             }}
           >
-            {monthNames.map((month, index) => (
-              <MenuItem key={index} value={index}>
-                {month} {new Date().getFullYear()}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Button 
-          startIcon={<AddIcon />} 
-          variant="outlined" 
-          onClick={() => setCreateOpen(true)}
-          sx={{
-            borderRadius: '6px',
-            borderColor: '#6B7280',
-            color: '#6B7280',
-            textTransform: 'none',
-            fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-            fontWeight: 500,
-            minHeight: 36,
-            px: 1.5,
-            fontSize: '0.7875rem',
-            '&:hover': {
-              borderColor: '#4B5563',
-              backgroundColor: 'rgba(107, 114, 128, 0.04)',
-            },
-          }}
-        >
-          Create New Task
-        </Button>
+            <Typography variant="body2" sx={{ lineHeight: 1.5, whiteSpace: 'pre-line', fontSize: '0.88rem', fontWeight: 450 }}>
+              {shouldType ? (
+                <Typewriter text={msg.text} onComplete={onStreamingComplete} />
+              ) : (
+                msg.text
+              )}
+            </Typography>
+            
+            {(msg.chartData && !shouldType) && (
+              <Box sx={{ mt: 2.5, height: 240, width: '100%', minWidth: 340 }}>
+                <Typography variant="caption" sx={{ mb: 1.5, display: 'block', fontWeight: 700, color: '#94a3b8', fontSize: '0.72rem', letterSpacing: '0.02em' }}>
+                  WEEKLY PERFORMANCE ANALYSIS
+                </Typography>
+                <ResponsiveContainer width="100%" height="100%">
+                  {msg.chartType === 'bar' ? (
+                    <BarChart data={msg.chartData} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 9, fill: "#94a3b8", fontWeight: 600 }} 
+                      />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#94a3b8" }} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '0.7rem' }} 
+                      />
+                      <Bar dataKey="value" fill="#3b82f6" radius={[3, 3, 0, 0]} barSize={20} />
+                    </BarChart>
+                  ) : (
+                    <LineChart data={msg.chartData} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 9, fill: "#94a3b8", fontWeight: 600 }} 
+                      />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#94a3b8" }} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '0.7rem' }} 
+                      />
+                      <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: "#3b82f6", strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                    </LineChart>
+                  )}
+                </ResponsiveContainer>
+              </Box>
+            )}
+
+            {/* Timestamp removed */}
+          </Paper>
+        </Box>
       </Box>
-      <Popover
-        open={Boolean(notifAnchor)}
-        anchorEl={notifAnchor}
-        onClose={() => setNotifAnchor(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        sx={{ '& .MuiPaper-root': { p: 2, borderRadius: 2, minWidth: 600 } }}
-      >
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Notifications</Typography>
-        <List dense sx={{ width: 600 }}>
-          {notifications.length === 0 ? (
-            <ListItem sx={{ px: 0 }}>
-              <ListItemText primary="No notifications" />
-            </ListItem>
-          ) : (
-            notifications.map((n) => (
-              <ListItem
-                key={n.id}
-                sx={{ px: 0, cursor: 'pointer' }}
-                onClick={() => { 
-                  setNotifAnchor(null);
-                  // Get platforms from localStorage (set by main reconciliation page)
-                  try {
-                    const stored = localStorage.getItem('recon_selected_platforms');
-                    let platformsParam = '';
-                    if (stored) {
-                      const parsed = JSON.parse(stored);
-                      // Handle both array format (old) and single string format (current)
-                      if (Array.isArray(parsed) && parsed.length > 0) {
-                        platformsParam = `?platforms=${parsed.join(',')}`;
-                      } else if (typeof parsed === 'string' && ['flipkart', 'amazon', 'd2c'].includes(parsed)) {
-                        platformsParam = `?platforms=${parsed}`;
-                      }
-                    }
-                    // Also include date range if available from localStorage
-                    const from = localStorage.getItem('recon_selected_date_from');
-                    const to = localStorage.getItem('recon_selected_date_to');
-                    let sep = platformsParam ? '&' : '?';
-                    let dateQuery = '';
-                    if (from && to) {
-                      dateQuery = `${sep}from=${from}&to=${to}`;
-                    }
-                    navigate(`/operations-centre${platformsParam}${dateQuery}`);
-                  } catch (e) {
-                    navigate('/operations-centre');
+    </Fade>
+  );
+};
+
+// --- Main Checklist Page ---
+
+const Checklist: React.FC = () => {
+  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [expandedTask, setExpandedTask] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  
+  // Chat state
+  const [chatMessage, setChatMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [loadingStep, setLoadingStep] = useState('');
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      text: "Hello! I'm Nex, your Finance Assistant. I can help you with your tasks, analyze discrepancies with professional charts, or explain reconciliation steps.",
+      sender: 'assistant',
+      timestamp: new Date(),
+    }
+  ]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const getLoadingSteps = (query: string): string[] => {
+    const q = query.toLowerCase();
+    if (q.includes('flipkart recon') || q.includes('march 26')) {
+      return [
+        "Scanning Flipkart March settlement data...",
+        "Fetching sales manifest from ledger...",
+        "Cross-referencing Order IDs against settlements...",
+        "Identifying fee and discount discrepancies...",
+        "Running reconciliation engine benchmarks...",
+      ];
+    }
+    if (q.includes('2025') || q.includes('completed')) {
+      return [
+        "Accessing FY 2025 marketplace archives...",
+        "Aggregating monthly settlement reports...",
+        "Verifying Amazon pending dispute counts...",
+        "Scanning D2C gateway logs for Sept-Dec...",
+        "Validating net-to-gross revenue mapping...",
+      ];
+    }
+    if (q.includes('tat') || q.includes('amazon')) {
+      return [
+        "Fetching provider settlement ageing logs...",
+        "Calculating weighted average TAT for Q3...",
+        "Aggregating COD partner performance metrics...",
+        "Compiling quarterly trend distribution...",
+      ];
+    }
+    if (q.includes('fee') || q.includes('may')) {
+      return [
+        "Retrieving Flipkart historical rate cards...",
+        "Detecting marketplace fee structure changes...",
+        "Calculating commission impact on beauty categories...",
+        "Benchmarking net settlement vs expected sales...",
+      ];
+    }
+    return [
+      "Accessing financial data vault...",
+      "Cross-referencing transaction logs...",
+      "Anonymizing sensitive customer profiles...",
+      "Generating operations summary...",
+    ];
+  };
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isTyping, loadingStep]);
+
+  const handleSendMessage = (textOverride?: string) => {
+    const text = textOverride || chatMessage;
+    if (!text.trim()) return;
+
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      text,
+      sender: 'user',
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMsg]);
+    setChatMessage('');
+    setIsTyping(true);
+
+    const steps = getLoadingSteps(text);
+    let stepIdx = 0;
+    setLoadingStep(steps[0]);
+
+    const interval = setInterval(() => {
+      stepIdx++;
+      if (stepIdx < steps.length) {
+        setLoadingStep(steps[stepIdx]);
+      } else {
+        clearInterval(interval);
+      }
+    }, 750);
+
+    // Simulated AI response with artificial delay
+    setTimeout(() => {
+      clearInterval(interval);
+      setIsTyping(false);
+      setLoadingStep('');
+      const data = getAIResponse(text);
+      const assistantMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        text: data.text,
+        sender: 'assistant',
+        timestamp: new Date(),
+        chartData: data.chartData,
+        chartType: data.chartType,
+      };
+      setMessages(prev => [...prev, assistantMsg]);
+      setStreamingMessageId(assistantMsg.id);
+    }, 4000);
+  };
+
+  const getAIResponse = (query: string): { text: string; chartData?: any[]; chartType?: 'bar' | 'line' } => {
+    const q = query.toLowerCase();
+    
+    if (q.includes('flipkart recon') || q.includes('march 26')) {
+      return {
+        text: "I've initiated the Flipkart reconciliation for March 2026. Data ingestion is 100% complete. I found a gross discrepancy of ₹12,45,600 across 114 transactions, primarily due to 'Seller Share Discount' mismatches.\n\nMatching the dashboard figures: Gross Revenue is recorded at ₹4.41 Cr with Net settlement at ₹3.70 Cr.\n\nWould you like me to flag these 114 items for dispute?",
+        chartType: 'bar',
+        chartData: [
+          { name: 'Matched', value: 2450 },
+          { name: 'Mismatch', value: 114 },
+          { name: 'Pending', value: 12 },
+        ]
+      };
+    }
+
+    if (q.includes('2025') && q.includes('completed')) {
+      return {
+        text: "Summary for FY 2025 (Dashboard Integrety):\n\n• Flipkart: 100% Completed\n• Amazon: 98.2% Completed (Sept pending)\n• D2C/Razorpay: 100% Completed\n\nTotal Net Revenue: ₹3,85,76,000 (₹3.85 Cr)\nTotal Gross Revenue: ₹4,03,00,000 (₹4.03 Cr)\nTotal Returns: ₹82,90,258\n\nThe 8.2% leakage is primarily attributed to unrecovered Amazon RTO claims.",
+      };
+    }
+
+    if (q.includes('tat') || q.includes('amazon')) {
+      return {
+        text: "Amazon TAT analysis compared to platform benchmarks:\n\nAverage settlement is 2.3 days. Razorpay is leading at 1.8d. Current pending settlements for Q3 total ₹12.4 Lakh. Here is the ageing trend for the last 3 months:",
+        chartType: 'line',
+        chartData: [
+          { name: 'July', value: 2.1 },
+          { name: 'Aug', value: 2.5 },
+          { name: 'Sept', value: 2.3 },
+        ]
+      };
+    }
+    
+    if (q.includes('fee') || q.includes('may')) {
+      return {
+        text: "In May 2025, the rate card shift (+5% Fixed Fee) impacted 14% of Beauty category orders. This aligns with the dashboard dip in Net Revenue for that period. Impact analysis:\n\nExpected Fees: ₹32,00,000\nActual Charged: ₹34,20,000\nVariance: ₹2,20,000",
+        chartType: 'bar',
+        chartData: [
+          { name: 'Apr Fees', value: 32.0 },
+          { name: 'May Fees', value: 34.2 },
+          { name: 'Jun Fees', value: 34.0 },
+        ]
+      };
+    }
+    
+    if (q.includes('amazon') || q.includes('trend')) {
+      return {
+        text: "Amazon payments are trending positive compared to February. Your settlement-to-sale ratio has improved by 4.2% across major categories.",
+        chartType: 'line',
+        chartData: [
+          { name: 'Feb W1', value: 85 },
+          { name: 'Feb W2', value: 87 },
+          { name: 'Feb W3', value: 86 },
+          { name: 'Feb W4', value: 88 },
+          { name: 'Mar W1', value: 90 },
+          { name: 'Mar W2', value: 92.2 },
+        ]
+      };
+    }
+
+    return {
+      text: "I'm on it. I've scanned the relevant reports. Most operations are within tolerance levels. I recommend focusing on the Amazon weight disputes for this peak period.",
+    };
+  };
+
+  const handleAskAI = (task: Task) => {
+    handleSendMessage(`Help me with this task: "${task.title}"`);
+  };
+
+  const handleToggleTask = (id: number) => {
+    setTasks(prev => prev.map(t => 
+      t.id === id 
+        ? { ...t, status: t.status === 'completed' ? 'upcoming' : 'completed' } 
+        : t
+    ));
+  };
+
+  return (
+    <Box sx={{ 
+      height: 'calc(100vh - 64px)', 
+      display: 'flex', 
+      flexDirection: 'column',
+      bgcolor: '#fff',
+      pt: 0.75,
+    }}>
+      {/* Page Header */}
+      <Box sx={{ 
+        px: 3, 
+        py: 1, 
+        borderBottom: '1px solid #f1f5f9', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        bgcolor: '#fcfdfe'
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography sx={{ fontWeight: 800, color: '#111', letterSpacing: '-0.02em', fontSize: '1.15rem' }}>
+            Operations Center
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Chip label="5 Pending" size="small" sx={{ bgcolor: '#111', color: '#fff', fontWeight: 700, fontSize: '0.6rem', height: 16 }} />
+            <Chip label="1 Urgent" size="small" sx={{ bgcolor: '#fef2f2', color: '#dc2626', fontWeight: 700, fontSize: '0.6rem', height: 16, border: '1px solid #fee2e2' }} />
+          </Box>
+        </Box>
+        
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+          <FormControl size="small" variant="standard">
+            <Select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              sx={{ fontWeight: 700, fontSize: '0.75rem' }}
+              disableUnderline
+            >
+              {monthNames.map((m, i) => (
+                <MenuItem key={m} value={i} sx={{ fontSize: '0.75rem' }}>{m} 2026</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<AddIcon sx={{ fontSize: 14 }} />}
+            sx={{ borderRadius: '6px', color: '#111', borderColor: '#e2e8f0', textTransform: 'none', px: 1.5, py: 0.25, fontSize: '0.7rem', fontWeight: 700 }}
+          >
+             New Task
+          </Button>
+        </Stack>
+      </Box>
+
+      <Grid container sx={{ flex: 1, overflow: 'hidden' }}>
+        {/* Left Column: Task List */}
+        <Grid item xs={12} md={6} sx={{ 
+          height: '100%', 
+          borderRight: '1px solid #f1f5f9',
+          overflowY: 'auto',
+          px: 4,
+          py: 3,
+        }}>
+          {/* Overdue Section */}
+          <Box sx={{ mb: 4 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#dc2626', letterSpacing: '0.05em', fontSize: '0.6rem' }}>
+                OVERDUE
+              </Typography>
+              <Box sx={{ flex: 1, height: '1px', bgcolor: '#fee2e2' }} />
+            </Box>
+            <List sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {tasks.filter(t => t.status === 'overdue').map(task => (
+                <TaskItem 
+                  key={task.id} 
+                  task={task} 
+                  isExpanded={expandedTask === task.id}
+                  onExpand={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
+                  onToggle={() => handleToggleTask(task.id)}
+                  onAskAI={() => handleAskAI(task)}
+                />
+              ))}
+            </List>
+          </Box>
+
+          {/* Pending Section */}
+          <Box sx={{ mb: 4 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', fontSize: '0.66rem' }}>
+                FOR REVIEW
+              </Typography>
+              <Box sx={{ flex: 1, height: '1px', bgcolor: '#f1f5f9' }} />
+            </Box>
+            <List sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {tasks.filter(t => t.status === 'upcoming').map(task => (
+                <TaskItem 
+                  key={task.id} 
+                  task={task} 
+                  isExpanded={expandedTask === task.id}
+                  onExpand={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
+                  onToggle={() => handleToggleTask(task.id)}
+                  onAskAI={() => handleAskAI(task)}
+                />
+              ))}
+            </List>
+          </Box>
+
+          {/* Completed Section */}
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: '#22c55e', letterSpacing: '0.05em', fontSize: '0.66rem' }}>
+                COMPLETED
+              </Typography>
+              <Box sx={{ flex: 1, height: '1px', bgcolor: '#f0fdf4' }} />
+            </Box>
+            <List sx={{ display: 'flex', flexDirection: 'column', gap: 1, opacity: 0.6 }}>
+              {tasks.filter(t => t.status === 'completed').map(task => (
+                <TaskItem 
+                  key={task.id} 
+                  task={task} 
+                  isExpanded={expandedTask === task.id}
+                  onExpand={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
+                  onToggle={() => handleToggleTask(task.id)}
+                  onAskAI={() => handleAskAI(task)}
+                />
+              ))}
+            </List>
+          </Box>
+        </Grid>
+
+        {/* Right Column: Nex Assistant */}
+        <Grid item xs={12} md={6} sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#fcfdfe' }}>
+          {/* Chat Header */}
+          <Box sx={{ px: 3, py: 1.5, borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#fff' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+              <AnimatedAIAvatar size={42} animated={true} />
+              <Box>
+                <Typography sx={{ fontWeight: 800, letterSpacing: '-0.01em', fontSize: '0.88rem' }}>
+                  Nex AI Assistant
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton size="small"><HistoryIcon sx={{ fontSize: 16 }} /></IconButton>
+          </Box>
+
+          {/* Chat Body */}
+          <Box sx={{ px: 3, pt: 3, pb: 2, flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+            {messages.map(msg => (
+              <MessageBubble 
+                key={msg.id} 
+                msg={msg} 
+                isLatestAssistant={msg.id === streamingMessageId}
+                onStreamingComplete={() => setStreamingMessageId(null)}
+              />
+            ))}
+            {isTyping && (
+              <Box sx={{ display: 'flex', gap: 1.25, mb: 2 }}>
+                <AnimatedAIAvatar size={28} animated={true} />
+                <Paper elevation={0} sx={{ p: 1.25, px: 1.75, borderRadius: '0 10px 10px 10px', bgcolor: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
+                  <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box component="span" sx={{ display: 'flex', gap: 0.5 }}>
+                      <Box sx={{ width: 4, height: 4, bgcolor: '#0ea5e9', borderRadius: '50%', animation: 'pulse 1.5s infinite 0s' }} />
+                      <Box sx={{ width: 4, height: 4, bgcolor: '#0ea5e9', borderRadius: '50%', animation: 'pulse 1.5s infinite 0.3s' }} />
+                      <Box sx={{ width: 4, height: 4, bgcolor: '#0ea5e9', borderRadius: '50%', animation: 'pulse 1.5s infinite 0.6s' }} />
+                    </Box>
+                    {loadingStep}
+                  </Typography>
+                </Paper>
+              </Box>
+            )}
+            <style>{`
+              @keyframes pulse {
+                0% { opacity: 0.3; transform: scale(1); }
+                50% { opacity: 1; transform: scale(1.2); }
+                100% { opacity: 0.3; transform: scale(1); }
+              }
+            `}</style>
+            <div ref={messagesEndRef} />
+          </Box>
+
+          {/* Input Area (Pinned to Bottom) */}
+          <Box sx={{ bgcolor: '#fcfdfe', borderTop: 'none', px: 3, pb: 0, pt: 0 }}>
+            {/* Suggested Queries */}
+            <Box sx={{ pb: 1, display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+              {suggestedQueries.map((q, i) => (
+                <Chip 
+                  key={i} 
+                  label={q} 
+                  size="small"
+                  onClick={() => handleSendMessage(q)}
+                  sx={{ 
+                    bgcolor: '#fff', 
+                    border: '1px solid #e2e8f0', 
+                    '&:hover': { bgcolor: '#f8fafc', borderColor: '#111' },
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    height: 24
+                  }} 
+                />
+              ))}
+            </Box>
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1,
+                borderRadius: '10px',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.25,
+                bgcolor: '#fff',
+                mb: 0,
+                '&:focus-within': { borderColor: '#111' }
+              }}
+            >
+              <IconButton size="small"><AttachFileIcon sx={{ fontSize: 16 }} /></IconButton>
+              <TextField
+                fullWidth
+                placeholder="Type a message..."
+                variant="standard"
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
                   }
                 }}
-                secondaryAction={
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      color="inherit"
-                      sx={{ px: 1, py: 0.25, minHeight: 0, borderColor: '#111', color: '#111' }}
-                      onClick={(e) => { e.stopPropagation(); /* TODO: handle approve */ }}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      color="inherit"
-                      sx={{ px: 1, py: 0.25, minHeight: 0, borderColor: '#111', color: '#111' }}
-                      onClick={(e) => { e.stopPropagation(); /* TODO: handle reject */ }}
-                    >
-                      Reject
-                    </Button>
-                  </Box>
-                }
+                InputProps={{ disableUnderline: true, sx: { fontSize: '0.785rem' } }}
+              />
+              <IconButton
+                size="small"
+                onClick={() => handleSendMessage()}
+                sx={{
+                  bgcolor: chatMessage.trim() ? '#111' : 'transparent',
+                  color: chatMessage.trim() ? '#fff' : '#cbd5e1',
+                  '&:hover': { bgcolor: '#000' },
+                  width: 30,
+                  height: 30,
+                }}
               >
-                <ListItemIcon sx={{ minWidth: 28 }}>
-                  <RadioButtonUncheckedIcon fontSize="small" color="disabled" />
-                </ListItemIcon>
-                <ListItemText primary={n.text} secondary={new Date(n.time).toLocaleString()} sx={{ pr: 10 }} />
-              </ListItem>
-            ))
-          )}
-        </List>
-      </Popover>
-      <Grid container spacing={3}>
-        {/* Left side - Pending Tasks (reduced width) */}
-        <Grid item xs={12} md={7}>
-          <Paper sx={{ p: 0, overflow: 'hidden' }}>
-            {/* Upcoming Group */}
-            <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, bgcolor: '#fafbfc', cursor: 'pointer' }} onClick={() => setShowUpcoming((v) => !v)}>
-                <IconButton size="small">
-                  {showUpcoming ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                </IconButton>
-                <Typography sx={{ fontWeight: 600 }}>Pending {filteredUpcoming.length}</Typography>
-              </Box>
-              <Collapse in={showUpcoming}>
-                <List disablePadding>
-                  {filteredUpcoming.map((task) => (
-                    <React.Fragment key={task.id}>
-                      <ListItem
-                        sx={{ pl: 8, pr: 2, py: 1, borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
-                        onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
-                        secondaryAction={
-                          <IconButton edge="end" size="small" onClick={(e) => { e.stopPropagation(); setExpandedTask(expandedTask === task.id ? null : task.id); }}>
-                            {expandedTask === task.id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                          </IconButton>
-                        }
-                      >
-                        <ListItemIcon sx={{ minWidth: 32 }}>
-                          <RadioButtonUncheckedIcon color="disabled" />
-                        </ListItemIcon>
-                        <ListItemText primary={task.title} />
-                        <Chip label={task.tag} size="small" sx={{ mr: 1, bgcolor: '#f5f5f7', fontWeight: 500 }} />
-                        <Chip icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />} label={task.due} size="small" sx={{ mr: 1, bgcolor: '#f5f5f7' }} />
-                        <Stack direction="row" spacing={-1} sx={{ mr: 1 }}>
-                          {task.users.map((user) => (
-                            <Avatar key={user.id} src={user.avatar} sx={{ width: 28, height: 28, border: '2px solid #fff' }} />
-                          ))}
-                        </Stack>
-                      </ListItem>
-                      <Collapse in={expandedTask === task.id} timeout="auto" unmountOnExit>
-                        <Box sx={{ mx: 8, my: 2, p: 2, bgcolor: '#fff', borderRadius: 2, boxShadow: 1 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                            <Typography variant="h6" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
-                              {task.title}
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                              <Button variant="outlined" color="inherit">Reject</Button>
-                              <Button variant="contained" color="primary" sx={{ boxShadow: 'none' }}>Approve</Button>
-                              <Button variant="outlined" color="secondary" onClick={() => handleAskAI(task)}>
-                                AskAI
-                              </Button>
-                            </Box>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                            <Chip label="Waiting for review" color="info" />
-                            <Chip label="Assigned to you" color="success" size="small" sx={{ fontWeight: 600, bgcolor: '#e6f4ea', color: '#15803d' }} />
-                            <Chip icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />} label={task.due} size="small" sx={{ bgcolor: '#f5f5f7' }} />
-                          </Box>
-                          <Divider sx={{ mb: 2 }} />
-                          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Links</Typography>
-                          <Box>
-                            {(taskLinks[task.id] || []).map((link, idx) => (
-                              <Paper key={idx} sx={{ display: 'flex', alignItems: 'center', p: 1.5, mb: 1, borderRadius: 2, boxShadow: 0 }}>
-                                <Box sx={{ flex: 1 }}>
-                                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{link.label}</Typography>
-                                  <Typography variant="body2" color="text.secondary">{link.url}</Typography>
-                                </Box>
-                                {renderLinkIcon(link.icon)}
-                              </Paper>
-                            ))}
-                            <Button startIcon={<AddIcon />} variant="text" sx={{ mt: 1 }}>
-                              Add link
-                            </Button>
-                          </Box>
-                          {/* Comments Section */}
-                          <Box sx={{ mt: 3 }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Comments</Typography>
-                            <Box sx={{ maxHeight: 180, overflowY: 'auto', mb: 2 }}>
-                              {(comments[task.id] || initialComments).map((comment) => (
-                                <Box key={comment.id} sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
-                                  <Avatar src={comment.user.avatar} sx={{ width: 32, height: 32, mr: 1 }} />
-                                  <Box sx={{ flex: 1 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mr: 1 }}>{comment.user.name}</Typography>
-                                      <Typography variant="caption" color="text.secondary">
-                                        {new Date(comment.timestamp).toLocaleString()}
-                                      </Typography>
-                                    </Box>
-                                    <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>{comment.text}</Typography>
-                                  </Box>
-                                </Box>
-                              ))}
-                            </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1 }}>
-                              <Avatar src={users[0].avatar} sx={{ width: 32, height: 32 }} />
-                              <TextField
-                                fullWidth
-                                multiline
-                                minRows={1}
-                                maxRows={4}
-                                placeholder="Add a comment..."
-                                value={newComment[task.id] || ''}
-                                onChange={(e) => setNewComment((prev) => ({ ...prev, [task.id]: e.target.value }))}
-                                sx={{ flex: 1 }}
-                                size="small"
-                              />
-                              <Button
-                                variant="contained"
-                                sx={{ minWidth: 0, px: 2, py: 1, borderRadius: 2 }}
-                                disabled={!(newComment[task.id] && newComment[task.id].trim())}
-                                onClick={() => handleAddComment(task.id)}
-                              >
-                                Post
-                              </Button>
-                            </Box>
-                          </Box>
-                        </Box>
-                      </Collapse>
-                    </React.Fragment>
-                  ))}
-                </List>
-              </Collapse>
-            </Box>
-          </Paper>
-
-          {/* Completed Tasks Group */}
-          <Paper sx={{ p: 0, overflow: 'hidden' }}>
-            <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, bgcolor: '#f0fdf4', cursor: 'pointer' }} onClick={() => setShowCompleted((v) => !v)}>
-                <IconButton size="small">
-                  {showCompleted ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                </IconButton>
-                <Typography sx={{ fontWeight: 600, color: '#15803d' }}>Completed {completedTasks.length}</Typography>
-              </Box>
-              <Collapse in={showCompleted}>
-                <List disablePadding>
-                  {completedTasks.map((task) => (
-                    <React.Fragment key={task.id}>
-                      <ListItem
-                        sx={{ pl: 8, pr: 2, py: 1, borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
-                        onClick={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
-                        secondaryAction={
-                          <IconButton edge="end" size="small" onClick={(e) => { e.stopPropagation(); setExpandedTask(expandedTask === task.id ? null : task.id); }}>
-                            {expandedTask === task.id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                          </IconButton>
-                        }
-                      >
-                        <ListItemIcon sx={{ minWidth: 32 }}>
-                          <CheckCircleIcon sx={{ color: '#10b981' }} />
-                        </ListItemIcon>
-                        <ListItemText primary={task.title} />
-                        <Chip label={task.tag} size="small" sx={{ mr: 1, bgcolor: '#f0fdf4', color: '#15803d', fontWeight: 500 }} />
-                        <Chip icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />} label={task.completedDate} size="small" sx={{ mr: 1, bgcolor: '#f0fdf4', color: '#15803d' }} />
-                        <Stack direction="row" spacing={-1} sx={{ mr: 1 }}>
-                          {task.users.map((user) => (
-                            <Avatar key={user.id} src={user.avatar} sx={{ width: 28, height: 28, border: '2px solid #fff' }} />
-                          ))}
-                        </Stack>
-                      </ListItem>
-                      <Collapse in={expandedTask === task.id} timeout="auto" unmountOnExit>
-                        <Box sx={{ mx: 8, my: 2, p: 2, bgcolor: '#fff', borderRadius: 2, boxShadow: 1 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                            <Typography variant="h6" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
-                              {task.title}
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                              <Chip label="Completed" color="success" size="small" />
-                              <Button variant="outlined" color="secondary" onClick={() => handleAskAI(task)}>
-                                AskAI
-                              </Button>
-                            </Box>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                            <Chip label="Completed on time" color="success" size="small" sx={{ fontWeight: 600, bgcolor: '#f0fdf4', color: '#15803d' }} />
-                            <Chip icon={<CalendarTodayIcon sx={{ fontSize: 16 }} />} label={task.completedDate} size="small" sx={{ mr: 1, bgcolor: '#f0fdf4', color: '#15803d' }} />
-                          </Box>
-                          <Divider sx={{ mb: 2 }} />
-                          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Completion Summary</Typography>
-                          <Box sx={{ mb: 2 }}>
-                            <Typography variant="body2" color="text.secondary">
-                              Task was completed successfully within the allocated timeframe. All required documentation and approvals have been obtained.
-                            </Typography>
-                          </Box>
-                          {/* Comments Section */}
-                          <Box sx={{ mt: 3 }}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Comments</Typography>
-                            <Box sx={{ maxHeight: 180, overflowY: 'auto', mb: 2 }}>
-                              {(comments[task.id] || initialComments).map((comment) => (
-                                <Box key={comment.id} sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
-                                  <Avatar src={comment.user.avatar} sx={{ width: 32, height: 32, mr: 1 }} />
-                                  <Box sx={{ flex: 1 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mr: 1 }}>{comment.user.name}</Typography>
-                                      <Typography variant="caption" color="text.secondary">
-                                        {new Date(comment.timestamp).toLocaleString() }
-                                      </Typography>
-                                    </Box>
-                                    <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>{comment.text}</Typography>
-                                  </Box>
-                                </Box>
-                              ))}
-                            </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1 }}>
-                              <Avatar src={users[0].avatar} sx={{ width: 32, height: 32 }} />
-                              <TextField
-                                fullWidth
-                                multiline
-                                minRows={1}
-                                maxRows={4}
-                                placeholder="Add a comment..."
-                                value={newComment[task.id] || ''}
-                                onChange={(e) => setNewComment((prev) => ({ ...prev, [task.id]: e.target.value }))}
-                                sx={{ flex: 1 }}
-                                size="small"
-                              />
-                              <Button
-                                variant="contained"
-                                sx={{ minWidth: 0, px: 2, py: 1, borderRadius: 2 }}
-                                disabled={!(newComment[task.id] && newComment[task.id].trim())}
-                                onClick={() => handleAddComment(task.id)}
-                              >
-                                Post
-                              </Button>
-                            </Box>
-                          </Box>
-                        </Box>
-                      </Collapse>
-                    </React.Fragment>
-                  ))}
-                </List>
-              </Collapse>
-            </Box>
-          </Paper>
-        </Grid>
-
-        {/* Right side - Task Tracker and Recent Activities */}
-        <Grid item xs={12} md={5}>
-          {/* Task Tracker Donut Graph */}
-          <Paper sx={{ 
-            p: 3, 
-            mb: 3,
-            background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
-            borderRadius: '16px',
-            border: '1px solid #f1f3f4',
-            boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-              transform: 'translateY(-2px)',
-            }
-          }}>
-            <Typography variant="h6" sx={{ 
-              fontWeight: 600, 
-              color: '#1a1a1a',
-              mb: 2,
-              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-            }}>
-              Progress
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
-              <Box sx={{ position: 'relative', width: 140, height: 140 }}>
-                <CircularProgress
-                  variant="determinate"
-                  value={50}
-                  size={140}
-                  thickness={2}
-                  sx={{
-                    color: '#3b82f6',
-                    position: 'absolute',
-                    left: 0,
-                    '& .MuiCircularProgress-circle': {
-                      strokeLinecap: 'round',
-                    },
-                  }}
-                />
-                <Box sx={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  textAlign: 'center',
-                }}>
-                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#1a1a1a' }}>
-                    1/4
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
-                    tasks
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
-              <Box>
-                <Typography variant="h6" sx={{ fontWeight: 600, color: '#3b82f6' }}>
-                  1
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                  Pending
-                </Typography>
-              </Box>
-              <Box>
-                <Typography variant="h6" sx={{ fontWeight: 600, color: '#10b981' }}>
-                  3
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                  Completed
-                </Typography>
-              </Box>
-            </Box>
-          </Paper>
-
-          {/* Recent Activities */}
-          <Paper sx={{ 
-            p: 3,
-            background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
-            borderRadius: '16px',
-            border: '1px solid #f1f3f4',
-            boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-              transform: 'translateY(-2px)',
-            }
-          }}>
-            <Typography variant="h6" sx={{ 
-              fontWeight: 600, 
-              color: '#1a1a1a',
-              mb: 2,
-              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-            }}>
-              Recent Activities
-            </Typography>
-            <Stack spacing={2}>
-              {[
-                { text: 'fetch April sales data from flipkart', time: '4 hours ago', icon: <TableIcon sx={{ color: '#8b5cf6', fontSize: 20 }} /> },
-                { text: 'fetch march sales data from flipkart ', time: '6 hours ago', icon: <TableIcon sx={{ color: '#8b5cf6', fontSize: 20 }} />},
-                { text: 'fetch April sales data from flipkart ', time: '1 day ago', icon: <TableIcon sx={{ color: '#8b5cf6', fontSize: 20 }} /> },
-                { text: 'fetch march sales data from flipkart ', time: '2 days ago', icon: <TableIcon sx={{ color: '#8b5cf6', fontSize: 20 }} /> },
-              ].map((activity, idx) => (
-                <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                  <Box sx={{ mt: 0.5 }}>
-                    {activity.icon}
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" sx={{ color: '#374151', lineHeight: 1.4 }}>
-                      {activity.text}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                      {activity.time}
-                    </Typography>
-                  </Box>
-                </Box>
-              ))}
-            </Stack>
-          </Paper>
+                <SendIcon sx={{ fontSize: 14 }} />
+              </IconButton>
+            </Paper>
+          </Box>
         </Grid>
       </Grid>
-      {/* Drawer for AskAI */}
-      {currentTask && (
-        <Drawer
-          anchor="right"
-          open={aiPanel.open}
-          onClose={handleCloseAIPanel}
-          PaperProps={{ sx: { width: 400, p: 3 } }}
-        >
-          <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Ask AI</Typography>
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Task</Typography>
-            <TextField
-              value={aiPanel.prompt}
-              onChange={handleEditAIPrompt}
-              fullWidth
-              multiline
-              minRows={2}
-              maxRows={4}
-              sx={{ mb: 2, bgcolor: '#f5f5f7' }}
-              size="small"
-            />
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>AI Answer</Typography>
-            {aiPanel.loading ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
-                <CircularProgress size={24} />
-                <Typography>Answer is generating...</Typography>
-              </Box>
-            ) : aiPanel.generated ? (
-              <MUIList>
-                {aiPanel.answer.map((step, idx) => (
-                  <MUIListItem key={idx}>
-                    <MUIListItemText primary={step} />
-                  </MUIListItem>
-                ))}
-              </MUIList>
-            ) : (
-              <Typography color="text.secondary" sx={{ mb: 2 }}>No answer generated yet.</Typography>
-            )}
-            <Box sx={{ flex: 1 }} />
-            {!aiPanel.generated ? (
-              <Button variant="contained" onClick={handleGenerateAIAnswer} sx={{ mt: 2 }} disabled={aiPanel.loading || !aiPanel.prompt.trim()}>
-                Just Ask
-              </Button>
-            ) : (
-              <>
-                <Button variant="contained" color="success" sx={{ mb: 1 }}>
-                  Execute
-                </Button>
-                <Button variant="outlined" onClick={handleCloseAIPanel} sx={{ mt: 0 }}>Close</Button>
-              </>
-            )}
-          </Box>
-        </Drawer>
-      )}
-
-      {/* Create Task Modal */}
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 1 } }}>
-        <DialogTitle sx={{ py: 2, px: 3, position: 'sticky', top: 0, zIndex: 2, bgcolor: 'background.paper', borderBottom: '1px solid #eee' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, mr: 1, whiteSpace: 'nowrap' }}>Create New Task </Typography>
-              <Input
-                placeholder="Add title"
-                value={taskType === 'custom' ? customTitle : taskTitle}
-                onChange={(e) => taskType === 'custom' ? setCustomTitle(e.target.value) : setTaskTitle(e.target.value)}
-                sx={{ flex: 1 }}
-                disableUnderline
-              />
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Button onClick={() => setCreateOpen(false)} color="inherit">Cancel</Button>
-              <Button
-                variant="contained"
-                onClick={handleCreateTasks}
-                disabled={(taskType === 'manual_recon' && (!assignee || !dueDate))}
-              >
-                Save
-              </Button>
-            </Box>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 0 }}>
-          {/* Two-column layout inspired by reference */}
-          <Grid container spacing={8}>
-            <Grid item xs={12} md={7}>
-              {/* Task type selector moved into left column to allow sidebar to sit at top */}
-              <Box sx={{ mb: 2, mt: 1 }}>
-                <FormControl  size="small" variant="standard" sx={{ p: 1 }}>
-                  <Select value={taskType} onChange={(e) => setTaskType(e.target.value as TaskType)} displayEmpty disableUnderline>
-                    <MenuItem value={'manual_recon'}> Manual Reconciliation</MenuItem>
-                    <MenuItem value={'exception_review'}>Exception Review</MenuItem>
-                    <MenuItem value={'journal_entry'}>Journal Entry</MenuItem>
-                    <MenuItem value={'custom'}>Custom</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-
-                <TextField placeholder="Details"value={customDescription} onChange={(e) => setCustomDescription(e.target.value)} fullWidth multiline minRows={4}  variant="standard"   InputProps={{
-    disableUnderline: true,   // ✅ removes the underline
-  }} sx={{ mb: 2, p: 1, '& .MuiInputBase-input': {
-      padding: '2px',   // inner padding for textarea
-    }, }} />
-
-          
-                <Box sx={{ mb: 2, p: 1 }}>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mt: 1 }}>
-                    <TextField type="month"  InputProps={{
-    disableUnderline: true,   // ✅ removes the underline
-  }} value={period} onChange={(e) => { setPeriod(e.target.value); setFetchingUnreconciled(true); setUnreconciledCount(null); setTimeout(() => { setFetchingUnreconciled(false); setUnreconciledCount(1000); }, 1200); }} variant="standard" InputLabelProps={{ shrink: true }} />
-                    <FormControl fullWidth variant="standard">
-                      <Select value={marketplace} onChange={(e) => setMarketplace(e.target.value)} displayEmpty disableUnderline>
-                        <MenuItem value="flipkart">Flipkart</MenuItem>
-                        <MenuItem value="amazon">Amazon</MenuItem>
-                        <MenuItem value="website">Website</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Box>
-                  {fetchingUnreconciled && (
-                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
-                      <CircularProgress size={14} />
-                      <Typography variant="caption" color="text.secondary">Fetching orders...</Typography>
-                    </Stack>
-                  )}
-                  {unreconciledCount !== null && (
-                    <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1.5} sx={{ mt: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>Total {unreconciledCount.toLocaleString()} unreconciled orders found</Typography>
-                      <ButtonBase onClick={() => navigate('/marketplace-reconciliation?openTs=1&tab=unreconciled')} sx={{ borderRadius: 1 }}>
-                        <Stack direction="row" spacing={1} alignItems="center" sx={{ p: 1, pr: 1.25, bgcolor: '#F3F4F6', borderRadius: 1, '&:hover': { bgcolor: '#E5E7EB' } }}>
-                          <Box sx={{ width: 28, height: 20, borderRadius: 0.5, bgcolor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e5e7eb' }}>
-                            <TableIcon sx={{ fontSize: 14, color: '#6b7280' }} />
-                          </Box>
-                          <Typography variant="body2" sx={{ color: '#111827', fontWeight: 600 }}>Open in Transaction Sheet</Typography>
-                          <OpenInNewIcon sx={{ fontSize: 16, color: '#6b7280' }} />
-                        </Stack>
-                      </ButtonBase>
-                    </Stack>
-                  )}
-                </Box>
-
-
-              {/* Comment input */}
-              <TextField placeholder="Add a comment" fullWidth multiline minRows={2} sx={{ p: 1 }} variant='standard' InputProps={{
-    disableUnderline: true,   // ✅ removes the underline
-  }} />
-              <FormControlLabel sx={{ mt: 1 }} control={<Switch checked={autoClose} onChange={(e) => setAutoClose(e.target.checked)} />} label="Auto-close task on resolution" />
-            
-            </Grid>
-
-            <Grid item xs={12} md={5}>
-              <Box sx={{ p: 4, borderRadius: 1, position: 'sticky', bgcolor: '#F9FAFB' }}>
-                {/* Created by */}
-                <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-                  <Avatar src={users[0].avatar} sx={{ width: 32, height:32 }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">Created by</Typography>
-                    <Typography variant="body2">{users[0].name}</Typography>
-                  </Box>
-                </Stack>
-                <Divider sx={{ my: 2, borderColor: '#eee' }} />
-
-                {/* Assignee */}
-                <Typography variant="caption" color="text.secondary" sx={{ p: 2 }}>Assignee</Typography>
-                <FormControl fullWidth sx={{ mt: 0.5, mb: 2 }} variant="standard">
-                  <Select value={assignee} onChange={(e) => setAssignee(e.target.value as number | '')} displayEmpty disableUnderline>
-                    <MenuItem value=""><em>Select assignee</em></MenuItem>
-                    {assigneeOptions.map(a => (
-                      <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Divider sx={{ my: 2, borderColor: '#eee' }} />
-
-                {/* Due date */}
-                <Typography variant="caption" color="text.secondary" sx={{ p: 2 }}>Due Date</Typography>
-                <TextField
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  fullWidth
-                  variant="standard"
-                  InputLabelProps={{ shrink: true }}
-                  InputProps={{
-                    disableUnderline: true, 
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <CalendarTodayIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{ mt: 0.5, mb: 2 }}
-                />
-                <Divider sx={{ my: 2, borderColor: '#eee' }} />
-
-                {/* Priority */}
-                <Typography variant="caption" color="text.secondary" sx={{ p: 2 }}>Set Priority</Typography>
-                <FormControl fullWidth sx={{ mt: 0.5, mb: 2 }} variant="standard">
-                  <Select value={priority} onChange={(e) => setPriority(e.target.value as any)} displayEmpty disableUnderline>
-                    <MenuItem value={'urgent'}><FlagIcon sx={{ mr: 1, color: '#ef4444' }} />Urgent</MenuItem>
-                    <MenuItem value={'high'}><FlagIcon sx={{ mr: 1, color: '#f59e0b' }} />High</MenuItem>
-                    <MenuItem value={'medium'}><FlagIcon sx={{ mr: 1, color: '#3b82f6' }} />Medium</MenuItem>
-                    <MenuItem value={'low'}><FlagIcon sx={{ mr: 1, color: '#10b981' }} />Low</MenuItem>
-                  </Select>
-                </FormControl>
-                <Divider sx={{ my: 2, borderColor: '#eee' }} />
-
-              </Box>
-            </Grid>
-          </Grid>
-        </DialogContent>
-        
-      </Dialog>
     </Box>
   );
 };
 
-export default Checklist; 
+// --- Task Item Sub-component ---
+
+const TaskItem: React.FC<{ 
+  task: Task; 
+  isExpanded: boolean; 
+  onExpand: () => void;
+  onToggle: () => void;
+  onAskAI: () => void;
+}> = ({ task, isExpanded, onExpand, onToggle, onAskAI }) => {
+  const isCompleted = task.status === 'completed';
+  const isOverdue = task.status === 'overdue';
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        borderRadius: '10px',
+        border: '1px solid',
+        borderColor: isExpanded ? '#111' : '#f1f5f9',
+        bgcolor: '#fff',
+        transition: 'all 0.15s ease',
+        '&:hover': {
+          borderColor: isExpanded ? '#111' : '#e2e8f0',
+        }
+      }}
+    >
+      <Box
+        sx={{
+          p: 1.75,
+          display: 'flex',
+          alignItems: 'center',
+          cursor: 'pointer',
+        }}
+        onClick={onExpand}
+      >
+        <ListItemIcon 
+          sx={{ minWidth: 32 }}
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+        >
+          {isCompleted ? (
+            <CheckCircleIcon sx={{ color: '#22c55e', fontSize: 18 }} />
+          ) : (
+            <RadioButtonUncheckedIcon sx={{ color: isOverdue ? '#dc2626' : '#cbd5e1', fontSize: 18 }} />
+          )}
+        </ListItemIcon>
+        
+        <Box sx={{ flex: 1 }}>
+          <Typography
+            sx={{
+              fontWeight: 700,
+              color: isCompleted ? '#94a3b8' : '#1e293b',
+              textDecoration: isCompleted ? 'line-through' : 'none',
+              fontSize: '0.86rem',
+              letterSpacing: '-0.01em'
+            }}
+          >
+            {task.title}
+          </Typography>
+          <Stack direction="row" spacing={0.75} sx={{ mt: 0.25 }}>
+            <Chip 
+              label={task.tag} 
+              size="small" 
+              sx={{ 
+                fontSize: '0.62rem', 
+                height: 16, 
+                bgcolor: isOverdue ? '#fef2f2' : '#f1f5f9', 
+                color: isOverdue ? '#dc2626' : '#64748b',
+                fontWeight: 800,
+                borderRadius: '3px'
+              }} 
+            />
+            <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.35, fontWeight: 600, fontSize: '0.66rem', color: isOverdue ? '#dc2626' : '#94a3b8' }}>
+              <CalendarTodayIcon sx={{ fontSize: 10 }} />
+              {task.due}
+            </Typography>
+          </Stack>
+        </Box>
+
+        <AvatarGroup max={2} sx={{ '& .MuiAvatar-root': { width: 22, height: 22, fontSize: 8, border: '1.5px solid #fff' }, mr: 1 }}>
+          {task.users.map(u => (
+            <Avatar key={u.id} src={u.avatar} title={u.name} />
+          ))}
+        </AvatarGroup>
+
+        <IconButton size="small">
+          {isExpanded ? <ExpandLessIcon sx={{ fontSize: 16 }} /> : <ExpandMoreIcon sx={{ fontSize: 16 }} />}
+        </IconButton>
+      </Box>
+
+      <Collapse in={isExpanded}>
+        <Box sx={{ px: 5.75, pb: 2, pt: 0.25 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.75, lineHeight: 1.5, fontSize: '0.80rem' }}>
+            Run the automated reconciliation engine. Review mismatch flag if discrepancy {'>'} 2%. 
+          </Typography>
+          
+          <Stack direction="row" spacing={1}>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<AnimatedAIAvatar size={20} animated={false} />}
+              sx={{ borderRadius: '6px', color: '#111', borderColor: '#111', textTransform: 'none', fontWeight: 700, px: 2, height: 28, fontSize: '0.72rem' }}
+              onClick={(e) => { e.stopPropagation(); onAskAI(); }}
+            >
+              Ask Nex
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              sx={{ borderRadius: '6px', color: '#64748b', borderColor: '#e2e8f0', textTransform: 'none', fontWeight: 700, px: 2, height: 28, fontSize: '0.72rem' }}
+              onClick={(e) => { e.stopPropagation(); onToggle(); }}
+            >
+              {isCompleted ? 'Pending' : 'Done'}
+            </Button>
+          </Stack>
+        </Box>
+      </Collapse>
+    </Paper>
+  );
+};
+
+export default Checklist;

@@ -50,7 +50,7 @@ const menuItems = [
   { text: 'Operations', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
   { text: 'logistic', icon: <StorageIcon />, path: '/logistics', upcoming: false },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping', upcoming: true },
-  { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist', upcoming: true },
+  { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist', upcoming: false },
   // { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
 ];
 
