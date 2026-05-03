@@ -66,6 +66,7 @@ const vendors: Vendor[] = [
   { id: 'ekart', name: 'Ekart' },
   // Portal partner - uses report_types "cred_sales" and "cred_settlement"
   { id: 'cred', name: 'CRED' },
+  { id: 'elastic_logistics', name: 'Elastic Logistics' },
 ];
 
 const months = [
