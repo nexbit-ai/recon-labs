@@ -38,6 +38,7 @@ import {
   LogoutOutlined as LogoutIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
   PersonOutlined as PersonIcon,
+  ExtensionOutlined as ExtensionIcon,
 } from '@mui/icons-material';
 // import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
 // @ts-ignore
@@ -48,8 +49,8 @@ const drawerWidth = 240;
 const menuItems = [
   { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation', upcoming: false },
   { text: 'Operations', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
-  { text: 'logistic', icon: <StorageIcon />, path: '/logistics', upcoming: false },
-  { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping', upcoming: true },
+  { text: 'Logistics', icon: <StorageIcon />, path: '/logistics', upcoming: false },
+  { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping', upcoming: false },
   { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist', upcoming: false },
   // { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
 ];
@@ -208,6 +209,33 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         ))}
       </List>
       <Box sx={{ mb: 2 }}>
+        {/* Integrations nav button */}
+        <ListItem disablePadding>
+          <ListItemButton
+            onClick={() => navigate('/integrations')}
+            selected={location.pathname === '/integrations'}
+            sx={{
+              borderRadius: 0,
+              mr: 2,
+              my: 0.25,
+              '&.Mui-selected': {
+                backgroundColor: theme.palette.primary.main + '15',
+                '&:hover': {
+                  backgroundColor: theme.palette.primary.main + '25',
+                },
+              },
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 36 }}>
+              <ExtensionIcon />
+            </ListItemIcon>
+            <ListItemText
+              primary={<Typography sx={{ fontWeight: 500 }}>Integrations</Typography>}
+              sx={{ color: location.pathname === '/integrations' ? theme.palette.primary.main : 'inherit' }}
+            />
+          </ListItemButton>
+        </ListItem>
+
         {/* Upload nav button added instead of Data Sources (was here) */}
         <ListItem disablePadding>
           <ListItemButton
@@ -248,7 +276,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   color: 'text.primary',
                   fontSize: '14px'
                 }}>
-                  Hi, {displayName}
+                  Hey Demo User
                   <Box
                     component="span"
                     sx={{
@@ -266,7 +294,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       letterSpacing: 0.3,
                     }}
                   >
-                    Subscribed
+                    Demo
                   </Box>
                   <KeyboardArrowUpIcon sx={{ fontSize: '16px', color: 'text.primary', fontWeight: 'bold' }} />
                 </Typography>
