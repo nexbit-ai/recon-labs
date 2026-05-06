@@ -466,6 +466,8 @@ function App() {
             <Route path="/money" element={
               <ProtectedRoute>
                 <Layout><Pricing /></Layout>
+              </ProtectedRoute>
+            } />
             <Route path="/integrations" element={
               <ProtectedRoute>
                 <Layout><Integrations /></Layout>
