@@ -29,6 +29,7 @@ import AIReconciliation from './pages/AIReconciliation';
 import Bookkeeping from './pages/Bookkeeping';
 import Logistics from './pages/Logistics';
 import Pricing from './pages/Pricing';
+import Integrations from './pages/Integrations';
 
 // Components
 import Layout from './components/Layout';
@@ -465,6 +466,9 @@ function App() {
             <Route path="/money" element={
               <ProtectedRoute>
                 <Layout><Pricing /></Layout>
+            <Route path="/integrations" element={
+              <ProtectedRoute>
+                <Layout><Integrations /></Layout>
               </ProtectedRoute>
             } />
           </Routes>
