@@ -27,6 +27,8 @@ import AIWorkflows from './pages/AIWorkflows';
 import Assistant from './pages/Assistant';
 import AIReconciliation from './pages/AIReconciliation';
 import Bookkeeping from './pages/Bookkeeping';
+import Integrations from './pages/Integrations';
+import ShopifyCallback from './pages/ShopifyCallback';
 
 // Components
 import Layout from './components/Layout';
@@ -453,6 +455,16 @@ function App() {
             <Route path="/bookkeeping" element={
               <ProtectedRoute>
                 <Layout><Bookkeeping /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/integrations" element={
+              <ProtectedRoute>
+                <Layout><Integrations /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/integrations/shopify/callback" element={
+              <ProtectedRoute>
+                <Layout><ShopifyCallback /></Layout>
               </ProtectedRoute>
             } />
           </Routes>

@@ -294,6 +294,102 @@ export const fileAPI = {
     apiService.download(`/files/${fileId}`, filename),
 };
 
+// Amazon Auth API
+export const amazonAuthAPI = {
+  saveConfig: (config: {
+    client_id: string;
+    client_secret: string;
+    redirect_uri: string;
+    seller_central_domain?: string;
+    region_base_url?: string;
+  }) =>
+    apiService.post<{ message: string }>('/amazon/auth/config', config),
+
+  start: (state?: string) =>
+    apiService.get<{ authorization_url: string; state: string }>(API_CONFIG.ENDPOINTS.AMAZON_AUTH_START, { state }),
+};
+
+// Shopify Auth API
+export const shopifyAuthAPI = {
+  start: (shop: string) =>
+    apiService.get<{ authorization_url: string }>(API_CONFIG.ENDPOINTS.SHOPIFY_AUTH_START, { shop }),
+
+  callback: (shop: string, code: string, state?: string | null) =>
+    apiService.get<any>(API_CONFIG.ENDPOINTS.SHOPIFY_AUTH_CALLBACK, { shop, code, state }),
+
+  getStatus: () =>
+    apiService.get<{ stores: any[] }>(API_CONFIG.ENDPOINTS.SHOPIFY_STATUS),
+
+  testFetch: (shopDomain: string) =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.SHOPIFY_TEST_FETCH, { shop_domain: shopDomain }),
+};
+
+export const razorpayAuthAPI = {
+  saveConfig: (keyId: string, keySecret: string) =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.RAZORPAY_CONFIG, { key_id: keyId, key_secret: keySecret }),
+
+  getStatus: () =>
+    apiService.get<{ connected: boolean, key_id?: string }>(API_CONFIG.ENDPOINTS.RAZORPAY_STATUS),
+
+  testFetch: (year: string, month: string, day: string) =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.RAZORPAY_TEST_FETCH, { year, month, day }),
+};
+
+export const clickpostAuthAPI = {
+  saveConfig: (password: string, username: string) =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.CLICKPOST_CONFIG, { password, username }),
+
+  getStatus: () =>
+    apiService.get<{ connected: boolean, username?: string }>(API_CONFIG.ENDPOINTS.CLICKPOST_STATUS),
+
+  testFetch: () =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.CLICKPOST_TEST_FETCH, {}),
+};
+
+export const payuAuthAPI = {
+  saveConfig: (merchant_key: string, merchant_salt: string, client_id: string, client_secret: string) =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.PAYU_CONFIG, { merchant_key, merchant_salt, client_id, client_secret }),
+
+  getStatus: () =>
+    apiService.get<{ connected: boolean, merchant_key?: string }>(API_CONFIG.ENDPOINTS.PAYU_STATUS),
+
+  testFetch: () =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.PAYU_TEST_FETCH, {}),
+};
+
+export const paytmAuthAPI = {
+  saveConfig: (client_id: string, client_secret: string, merchant_id: string) =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.PAYTM_CONFIG, { client_id, client_secret, merchant_id }),
+
+  getStatus: () =>
+    apiService.get<{ connected: boolean, merchant_id?: string }>(API_CONFIG.ENDPOINTS.PAYTM_STATUS),
+
+  testFetch: () =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.PAYTM_TEST_FETCH, {}),
+};
+
+export const shiprocketAuthAPI = {
+  saveConfig: (email: string, password: string) =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.SHIPROCKET_CONFIG, { email, password }),
+
+  getStatus: () =>
+    apiService.get<{ connected: boolean, email?: string }>(API_CONFIG.ENDPOINTS.SHIPROCKET_STATUS),
+
+  testFetch: () =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.SHIPROCKET_TEST_FETCH, {}),
+};
+
+export const unicommerceAuthAPI = {
+  saveConfig: (config: { tenant: string, username: string, password: string, client_id?: string }) =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.UNICOMMERCE_CONFIG, config),
+
+  getStatus: () =>
+    apiService.get<{ connected: boolean, tenant?: string, username?: string }>(API_CONFIG.ENDPOINTS.UNICOMMERCE_STATUS),
+
+  testFetch: () =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.UNICOMMERCE_TEST_FETCH, {}),
+};
+
 // Export all APIs
 export const api = {
   auth: authAPI,
@@ -312,6 +408,14 @@ export const api = {
   ai: aiAPI,
   settings: settingsAPI,
   files: fileAPI,
+  amazonAuth: amazonAuthAPI,
+  shopifyAuth: shopifyAuthAPI,
+  razorpayAuth: razorpayAuthAPI,
+  clickpostAuth: clickpostAuthAPI,
+  payuAuth: payuAuthAPI,
+  paytmAuth: paytmAuthAPI,
+  shiprocketAuth: shiprocketAuthAPI,
+  unicommerceAuth: unicommerceAuthAPI,
 };
 
 export default api; 

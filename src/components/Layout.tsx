@@ -38,6 +38,7 @@ import {
   LogoutOutlined as LogoutIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
   PersonOutlined as PersonIcon,
+  LinkOutlined as IntegrationsIcon,
 } from '@mui/icons-material';
 // import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
 // @ts-ignore
@@ -207,6 +208,33 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         ))}
       </List>
       <Box sx={{ mb: 2 }}>
+        {/* Integrations nav button */}
+        <ListItem disablePadding>
+          <ListItemButton
+            onClick={() => navigate('/integrations')}
+            selected={location.pathname === '/integrations'}
+            sx={{
+              borderRadius: 0,
+              mr: 2,
+              my: 0.25,
+              '&.Mui-selected': {
+                backgroundColor: theme.palette.primary.main + '15',
+                '&:hover': {
+                  backgroundColor: theme.palette.primary.main + '25',
+                },
+              },
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 36 }}>
+              <IntegrationsIcon />
+            </ListItemIcon>
+            <ListItemText
+              primary={<Typography sx={{ fontWeight: 500 }}>Integrations</Typography>}
+              sx={{ color: location.pathname === '/integrations' ? theme.palette.primary.main : 'inherit' }}
+            />
+          </ListItemButton>
+        </ListItem>
+
         {/* Upload nav button added instead of Data Sources (was here) */}
         <ListItem disablePadding>
           <ListItemButton
