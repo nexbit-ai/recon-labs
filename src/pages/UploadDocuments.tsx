@@ -60,6 +60,7 @@ const vendors: Vendor[] = [
   { id: 'amazon_logistics', name: 'Amazon Logistics' },
   // D2C payment gateway partner - uses report_type "cashfree"
   { id: 'cashfree', name: 'Cashfree' },
+  { id: 'cashfree_payments', name: 'Cashfree Payments' },
   // D2C logistics partner - uses report_type "zippee"
   { id: 'zippee', name: 'Zippee' },
   // D2C logistics partner - uses report_type "ekart"
@@ -167,10 +168,6 @@ const UploadDocuments: React.FC = () => {
       if (kind === 'sales') return 'cred_sales';
       if (kind === 'settlement') return 'cred_settlement';
       return vendorIdLower;
-    }
-    // Cashfree settlement exports now use the new report_type
-    if (vendorIdLower === 'cashfree') {
-      return 'cashfree_payments';
     }
     // All other vendors: just return vendor name in lowercase
     return vendorIdLower;
@@ -2728,7 +2725,7 @@ const UploadDocuments: React.FC = () => {
                   {/* Settlement Providers List */}
                   <Box sx={{ width: '100%', mt: 1 }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                      {vendors.filter(v => v.id !== 'amazon' && v.id !== 'flipkart' && v.id !== 'cred').map((vendor) => {
+                      {vendors.filter(v => v.id !== 'amazon' && v.id !== 'flipkart' && v.id !== 'cred' && v.id !== 'amazon_uk').map((vendor) => {
                         const isSettlementUploaded = isVendorUploaded(vendor.id, 'settlement');
                         const uploadedSettlementDoc = getUploadedDocument(vendor.id, 'settlement');
                         const isSettlementUploading = uploadingVendor === `${vendor.id}_settlement`;
