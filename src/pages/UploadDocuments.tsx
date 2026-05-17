@@ -117,7 +117,7 @@ const UploadDocuments: React.FC = () => {
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [rightPanelVendor, setRightPanelVendor] = useState<'amazon' | 'flipkart' | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [pendingUpload, setPendingUpload] = useState<{ vendorId: 'amazon' | 'flipkart'; kind: 'sales' | 'sales_b2b' | 'settlement' } | null>(null);
+  const [pendingUpload, setPendingUpload] = useState<{ vendorId: string; kind: string } | null>(null);
   const [pendingFileInputId, setPendingFileInputId] = useState<string | null>(null);
   const [hoveredYear, setHoveredYear] = useState<number | null>(null);
   const [hoveredMonth, setHoveredMonth] = useState<{ year: number; month: number } | null>(null);
@@ -385,13 +385,13 @@ const UploadDocuments: React.FC = () => {
       if (vendorId === 'unicommerce') {
         hasPendingFile = !!unicommerceFile;
       } else if (vendorId === 'amazon' || vendorId === 'flipkart' || vendorId === 'amazon_uk') {
-        hasPendingFile = !!marketplaceFiles[vendorId]?.[kind as any];
+        hasPendingFile = !!(marketplaceFiles as any)[vendorId]?.[kind];
       } else {
-        hasPendingFile = !!d2cFiles[vendorId]?.[kind as any];
+        hasPendingFile = !!(d2cFiles as any)[vendorId]?.[kind];
       }
 
       if (hasPendingFile) {
-        setPendingUpload({ vendorId: vendorId as any, kind: kind as any });
+        setPendingUpload({ vendorId, kind });
       } else {
         // Just open file selector after confirmation (no pending upload)
         setPendingUpload(null);
@@ -428,7 +428,7 @@ const UploadDocuments: React.FC = () => {
     
     // If there's a pending upload (file already selected), proceed with upload
     if (pendingUpload) {
-      performMarketplaceUpload(pendingUpload.vendorId, pendingUpload.kind);
+      performMarketplaceUpload(pendingUpload.vendorId as any, pendingUpload.kind as any);
       setPendingUpload(null);
     }
     
@@ -3126,9 +3126,9 @@ const UploadDocuments: React.FC = () => {
         </DialogTitle>
         <DialogContent>
           <DialogContentText id="confirm-reupload-dialog-description">
-            {pendingUpload && getUploadedDocument(pendingUpload.vendorId, pendingUpload.kind) ? (
+            {pendingUpload && getUploadedDocument(pendingUpload.vendorId, pendingUpload.kind as any) ? (
               <>
-                The previous file <strong>{getUploadedDocument(pendingUpload.vendorId, pendingUpload.kind)?.filename}</strong> will be deleted and all its related data will be permanently removed.
+                The previous file <strong>{getUploadedDocument(pendingUpload.vendorId, pendingUpload.kind as any)?.filename}</strong> will be deleted and all its related data will be permanently removed.
                 <br /><br />
                 Do you want to continue?
               </>
