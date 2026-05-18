@@ -232,7 +232,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
 
     // Convert to string and clean it
     const cleanedValue = String(value)
-      .replace(/[₹$,\s]/g, '') // Remove currency symbols, commas, and spaces
+      .replace(/[£₹$,\s]/g, '') // Remove currency symbols, commas, and spaces
       .replace(/[^\d.-]/g, '') // Keep only digits, dots, and minus signs
       .trim();
 
@@ -1318,7 +1318,8 @@ const BreakupsModal: React.FC<{
   breakups: any; // This is now the full row
   orderId: string;
   anchorEl: HTMLElement | null;
-}> = ({ open, onClose, breakups, orderId, anchorEl }) => {
+  formatCurrency: (amount: number) => string;
+}> = ({ open, onClose, breakups, orderId, anchorEl, formatCurrency }) => {
   if (!open || !breakups || !anchorEl) return null;
 
   // Extract metadata from the row (check both originalData.metadata and metadata)
@@ -1338,15 +1339,7 @@ const BreakupsModal: React.FC<{
       .join(' ');
   };
 
-  // Format currency value
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  };
+
 
   // Format value based on type
   const formatValue = (value: any): string => {
@@ -1790,7 +1783,7 @@ interface TransactionSheetProps {
   statsData?: MarketplaceReconciliationResponse | null;
   initialTab?: number;
   dateRange?: { start: string; end: string };
-  initialPlatforms?: ('flipkart' | 'd2c' | 'amazon' | 'other')[];
+  initialPlatforms?: ('flipkart' | 'd2c' | 'amazon' | 'other' | 'amazon_uk')[];
   initialFilters?: { [key: string]: any };
 }
 
@@ -1798,7 +1791,7 @@ interface TransactionSheetProps {
 const COLUMN_TO_API_PARAM_MAP: Record<string, {
   apiParam: string;
   type: 'string' | 'number' | 'date' | 'enum';
-  supportedPlatforms?: ('flipkart' | 'amazon' | 'd2c' | 'all')[];
+  supportedPlatforms?: ('flipkart' | 'amazon' | 'd2c' | 'all' | 'amazon_uk')[];
   usesInSuffix?: boolean; // For CSV filters like status_in
 }> = {
   // Common filters (both platforms)
@@ -1871,7 +1864,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [headerDateRange, setHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   // Platform filter state - single selection only
-  const availablePlatforms = ['flipkart', 'amazon', 'd2c', 'other'] as const;
+  const availablePlatforms = ['flipkart', 'amazon', 'amazon_uk', 'd2c', 'other'] as const;
   type Platform = typeof availablePlatforms[number];
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Default: flipkart only
   const [pendingSelectedPlatform, setPendingSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Pending platform before apply
@@ -2182,9 +2175,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Dropdown menu state for Status column
 
 
+  const getCurrencySymbol = () => selectedPlatform === 'amazon_uk' ? '£' : '₹';
+  const getCurrencyLocale = () => selectedPlatform === 'amazon_uk' ? 'en-GB' : 'en-IN';
+
   // Format currency values
   const formatCurrency = (amount: number) => {
-    return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    return `${getCurrencySymbol()}${amount.toLocaleString(getCurrencyLocale(), { minimumFractionDigits: 2 })}`;
   };
 
   // Helper function to format date in "17th March, 2025" format
@@ -5618,7 +5614,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       }
                                     } else if (columnType === 'number') {
                                       const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
-                                      displayValue = numericValue !== null && !Number.isNaN(numericValue) ? numericValue.toLocaleString('en-IN') : '';
+                                      displayValue = numericValue !== null && !Number.isNaN(numericValue) ? numericValue.toLocaleString(getCurrencyLocale()) : '';
                                     } else {
                                       displayValue = value !== undefined && value !== null ? String(value) : '';
                                     }
@@ -5684,7 +5680,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       if (column === 'Order Value' || column === 'Settlement Value' || column === 'Difference') {
                                         displayValue = formatCurrency(value);
                                       } else {
-                                        displayValue = value.toLocaleString('en-IN');
+                                        displayValue = value.toLocaleString(getCurrencyLocale());
                                       }
                                     } else if (column.includes('Date')) {
                                       // Don't format "NA" as a date
@@ -5879,7 +5875,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           anchorEl={anchorEl}
         />
 
-        {/* Breakups Modal */}
         <BreakupsModal
           open={breakupsModalOpen}
           onClose={() => {
@@ -5891,6 +5886,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           breakups={selectedBreakups}
           orderId={breakupsOrderId}
           anchorEl={breakupsAnchorEl}
+          formatCurrency={formatCurrency}
         />
 
         {/* Export Drawer */}

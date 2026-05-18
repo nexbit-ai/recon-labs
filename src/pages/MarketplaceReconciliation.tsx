@@ -211,7 +211,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
   const [initialTsFilters, setInitialTsFilters] = useState<{ [key: string]: any } | undefined>(undefined);
   const [initialTsTab, setInitialTsTab] = useState<number>(0);
-  const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'amazon' | 'd2c' | 'other' | undefined>(undefined);
+  const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other' | undefined>(undefined);
   const location = useLocation();
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
@@ -272,9 +272,12 @@ const MarketplaceReconciliation: React.FC = () => {
       setShowTransactionSheet(true);
     }
   };
-  const getPlatformForProvider = (providerKey: string, providerName: string): 'flipkart' | 'amazon' | 'd2c' | 'other' => {
+  const getPlatformForProvider = (providerKey: string, providerName: string): 'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other' => {
     const key = providerKey?.toLowerCase?.() || '';
     const name = providerName?.toLowerCase?.() || '';
+    if (key === 'amazon_uk' || name.includes('amazon uk') || name.includes('amazon_uk')) {
+      return 'amazon_uk';
+    }
     if (key === 'amazon' || name.includes('amazon')) {
       return 'amazon';
     }
@@ -1254,7 +1257,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const fetchMonthOnMonthGrowth = async () => {
     if (
       !selectedPlatform ||
-      (selectedPlatform !== 'amazon' && selectedPlatform !== 'flipkart' && selectedPlatform !== 'd2c' && selectedPlatform !== 'other')
+      (selectedPlatform !== 'amazon' && selectedPlatform !== 'flipkart' && selectedPlatform !== 'amazon_uk' && selectedPlatform !== 'd2c' && selectedPlatform !== 'other')
     ) {
       console.log('[MonthOnMonthGrowth] Skipping fetch - invalid platform:', selectedPlatform);
       return;
@@ -1301,7 +1304,7 @@ const MarketplaceReconciliation: React.FC = () => {
         });
 
         try {
-          if (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'other') {
+          if (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'other') {
             // For Amazon/Flipkart/Other (CRED): expect { data: [{ month, sales, settlement }, ...] }
             const marketplaceData = data.data || data || [];
             console.log('[MonthOnMonthGrowth] Setting marketplace data:', {
@@ -1492,6 +1495,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const availablePlatforms = [
     { value: 'flipkart' as Platform, label: 'Flipkart' },
     { value: 'amazon' as Platform, label: 'Amazon' },
+    { value: 'amazon_uk' as Platform, label: 'Amazon UK' },
     { value: 'd2c' as Platform, label: 'D2C' },
     { value: 'other' as Platform, label: 'Other (CRED)' },
   ];
@@ -1597,8 +1601,16 @@ const MarketplaceReconciliation: React.FC = () => {
 
   const availableMonths = generateAvailableMonths();
 
-  const formatCurrency = (amount: number) => {
-    return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+  const getCurrencySymbol = () => selectedPlatform === 'amazon_uk' ? '£' : '₹';
+  const getCurrencyLocale = () => selectedPlatform === 'amazon_uk' ? 'en-GB' : 'en-IN';
+
+  const formatCurrency = (amount: number, noFractions: boolean = false) => {
+    const symbol = getCurrencySymbol();
+    const locale = getCurrencyLocale();
+    if (noFractions) {
+      return `${symbol}${amount.toLocaleString(locale)}`;
+    }
+    return `${symbol}${amount.toLocaleString(locale, { minimumFractionDigits: 2 })}`;
   };
 
   const formatPercentage = (value: number) => {
@@ -1988,7 +2000,7 @@ const MarketplaceReconciliation: React.FC = () => {
       fetchAgeingAnalysis();
     }
     // Fetch month on month growth data when platform is selected
-    if (selectedPlatform && (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'd2c' || selectedPlatform === 'other')) {
+    if (selectedPlatform && (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || selectedPlatform === 'other')) {
       fetchMonthOnMonthGrowth();
     }
     // Call upload-list API at the same time as main-summary and ageing-analysis
@@ -3008,7 +3020,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       Mock Data Values:
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#666666', fontSize: '0.875rem', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                      Gross Sales: ₹12,00,000 • Orders Delivered: 480 orders (₹12,30,000) • Returns: 12 orders (-₹30,000)
+                      Gross Sales: {getCurrencySymbol()}12,00,000 • Orders Delivered: 480 orders ({getCurrencySymbol()}12,30,000) • Returns: 12 orders (-{getCurrencySymbol()}30,000)
                     </Typography>
                   </Box>
                 )}
@@ -3142,7 +3154,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           {label}
                         </Typography>
                         <Typography sx={{ fontSize: '1.5rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
-                          ₹{Math.round(Number(amount || 0)).toLocaleString('en-IN')}
+                          {getCurrencySymbol()}{Math.round(Number(amount || 0)).toLocaleString(getCurrencyLocale())}
                         </Typography>
                         <Typography sx={{ fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
                           {Number(count || 0).toLocaleString('en-IN')} orders
@@ -3185,7 +3197,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                 Previous Return/Cancellations
                               </Typography>
                               <Typography sx={{ fontSize: '1rem', fontWeight: 400, color: '#111827' }}>
-                                ₹{Math.round(prevReturnOrCancelledAmount).toLocaleString('en-IN')} • {Number(prevReturnOrCancelledCount || 0).toLocaleString('en-IN')} orders
+                                {getCurrencySymbol()}{Math.round(prevReturnOrCancelledAmount).toLocaleString(getCurrencyLocale())} • {Number(prevReturnOrCancelledCount || 0).toLocaleString('en-IN')} orders
                               </Typography>
                             </Box>
                           </Box>
@@ -5474,12 +5486,12 @@ const MarketplaceReconciliation: React.FC = () => {
             Month on Month Growth
           </Typography>
 
-          {selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'other' ? (
+          {selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'other' ? (
             // Amazon/Flipkart/Other (CRED): Sales vs Settlement (and Commission for Amazon/Flipkart) Table
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600 }}>
-                  {selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'flipkart' ? 'Flipkart' : 'Other (CRED)'} - Sales vs Settlement
+                  {selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : selectedPlatform === 'flipkart' ? 'Flipkart' : 'Other (CRED)'} - Sales vs Settlement
                 </Typography>
                 {marketplaceGrowthData.length > 0 && (
                   <Button
@@ -5487,7 +5499,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     size="small"
                     startIcon={<DownloadIcon />}
                     onClick={() => {
-                      const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart';
+                      const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk';
                         const tableData = marketplaceGrowthData.map(row => ({
                           month: row.month,
                           sales: row.sales,
@@ -5581,7 +5593,7 @@ const MarketplaceReconciliation: React.FC = () => {
                         >
                           Settlement (Settlement Date)
                         </TableCell>
-                        {(selectedPlatform === 'amazon' || selectedPlatform === 'flipkart') && (
+                        {(selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk') && (
                           <TableCell
                             align="right"
                             sx={{
@@ -5598,7 +5610,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     </TableHead>
                     <TableBody>
                       {marketplaceGrowthData.map((row, index) => {
-                        const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart';
+                        const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk';
                         const commissionValue = showCommissionColumn ? (row.comissionData ?? 0) : 0;
                         return (
                           <TableRow
@@ -5641,7 +5653,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             marketplaceGrowthData.reduce((sum, r) => sum + r.settlement, 0),
                           )}
                         </TableCell>
-                        {(selectedPlatform === 'amazon' || selectedPlatform === 'flipkart') && (
+                        {(selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk') && (
                           <TableCell
                             align="right"
                             sx={{ fontWeight: 700, color: '#f97316', borderTop: '2px solid #e5e7eb' }}
@@ -5682,8 +5694,8 @@ const MarketplaceReconciliation: React.FC = () => {
                         }));
                         downloadCSV(tableData, 'd2c_sales_settlement', [
                           { key: 'month', label: 'Month' },
-                          { key: 'sales', label: 'Sales (₹)' },
-                          { key: 'settlement', label: 'Settlement (₹)' }
+                          { key: 'sales', label: `Sales (${getCurrencySymbol()})` },
+                          { key: 'settlement', label: `Settlement (${getCurrencySymbol()})` }
                         ]);
                       }}
                       sx={{
@@ -5727,8 +5739,8 @@ const MarketplaceReconciliation: React.FC = () => {
                       <TableHead>
                         <TableRow>
                           <TableCell sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb' }}>Month</TableCell>
-                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#2563eb', borderBottom: '2px solid #e5e7eb' }}>Sales (₹)</TableCell>
-                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#10b981', borderBottom: '2px solid #e5e7eb' }}>Settlement (₹)</TableCell>
+                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#2563eb', borderBottom: '2px solid #e5e7eb' }}>{`Sales (${getCurrencySymbol()})`}</TableCell>
+                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#10b981', borderBottom: '2px solid #e5e7eb' }}>{`Settlement (${getCurrencySymbol()})`}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -6208,8 +6220,8 @@ const MarketplaceReconciliation: React.FC = () => {
             dateRange={effectiveDateRangeForTs}
             initialPlatforms={
               selectedPlatform &&
-              (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'd2c' || selectedPlatform === 'other')
-                ? [selectedPlatform as 'flipkart' | 'amazon' | 'd2c' | 'other']
+              (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || selectedPlatform === 'other')
+                ? [selectedPlatform as 'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other']
                 : undefined
             }
             initialFilters={initialTsFilters}
