@@ -141,7 +141,8 @@ const getProviderDisplayName = (code: string): string => {
     'payu': 'PayU',
     'shadowfax': 'Shadowfax',
     'shiprocket': 'Shiprocket',
-    'zippee': 'Zippee',
+    'zippee-loginext': 'Zippee Loginext',
+    'zippee-blaze': 'Zippee Blaze',
     'ekart': 'Ekart',
   };
   return displayMap[code.toLowerCase()] || code;
