@@ -4590,7 +4590,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 fontSize: { xs: '0.65rem', sm: '0.7rem' },
                                 whiteSpace: 'nowrap'
                               }}>
-                                {platform === 'flipkart' ? 'Flipkart' : platform === 'amazon' ? 'Amazon' : 'D2C'}
+                                {platform === 'flipkart'
+                                  ? 'Flipkart'
+                                  : platform === 'amazon'
+                                    ? 'Amazon'
+                                    : platform === 'amazon_uk'
+                                      ? 'Amazon UK'
+                                      : platform === 'd2c'
+                                        ? 'D2C'
+                                        : 'Other'}
                               </Typography>
                             </Box>
                           ))}
