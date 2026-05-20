@@ -988,11 +988,6 @@ const MarketplaceReconciliation: React.FC = () => {
         const today = new Date();
         startDate = today.toISOString().split('T')[0];
         endDate = today.toISOString().split('T')[0];
-      } else if (dateRange === 'this-week') {
-        const today = new Date();
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        const endOfWeek = new Date(startOfWeek);
       } else if (dateRange === 'this-month') {
         const today = new Date();
         startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
@@ -1109,9 +1104,6 @@ const MarketplaceReconciliation: React.FC = () => {
       } else if (dateRange === 'today') {
         startDate = today.toISOString().split('T')[0];
         endDate = today.toISOString().split('T')[0];
-      } else if (dateRange === 'this-week') {
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
       } else if (dateRange === 'this-month') {
         startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
         const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
