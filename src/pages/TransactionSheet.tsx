@@ -4396,7 +4396,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               borderRadius: '12px',
               border: '1px solid #e5e7eb'
             }}>
-              <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+              <CardContent sx={{ p: { xs: 1.5, sm: 2 }, pb: { xs: '12px !important', sm: '16px !important' } }}>
                 {/* Main Header Row - Responsive Layout */}
                 <Box sx={{
                   display: 'flex',
@@ -4815,7 +4815,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       display: 'none'
                     },
                     scrollbarWidth: 'none',
-                    pb: { xs: 0, sm: 0.5 }
+                    pb: { xs: 0, sm: 0.5 },
+                    display: 'flex',
+                    alignItems: 'center'
                   }}>
                     <Box sx={{
                       display: 'inline-block',
@@ -4841,8 +4843,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             color: '#6b7280',
                             px: { xs: 1, sm: 1.5, md: 2.5 },
                             py: { xs: 0.75, sm: 1 },
-                            minWidth: { xs: 'auto', sm: 'fit-content' },
-                            maxWidth: { xs: '45%', sm: 'none' },
+                            width: { xs: 'auto', sm: '180px' },
+                            minWidth: { xs: 'auto', sm: '180px' },
+                            maxWidth: { xs: '45%', sm: '180px' },
                             whiteSpace: { xs: 'normal', sm: 'nowrap' },
                             textAlign: { xs: 'center', sm: 'left' },
                             overflow: 'hidden',
@@ -4868,9 +4871,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 display: 'flex',
                                 flexDirection: { xs: 'column', sm: 'row' },
                                 alignItems: 'center',
-                                gap: { xs: 0, sm: 0.25 },
+                                gap: { xs: 0, sm: 0.5 },
                                 width: '100%',
-                                justifyContent: 'center'
+                                justifyContent: { xs: 'center', sm: 'flex-start' }
                               }}>
                                 <Box component="span">{label}</Box>
                                 {count !== null && count !== undefined && (
@@ -4892,6 +4895,56 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         ))}
                       </Tabs>
                     </Box>
+                    
+                    {/* Active filter chips inline with Tabs */}
+                    {(!!Object.keys(columnFilters).filter(k => columnFilters[k]).length || orderIdChips.length > 0) && (
+                      <Box sx={{
+                        display: 'flex',
+                        gap: { xs: 0.5, sm: 0.75 },
+                        flexWrap: 'nowrap',
+                        ml: { xs: 1, sm: 2 },
+                        alignItems: 'center'
+                      }}>
+                        {/* Order ID chips */}
+                        {orderIdChips.length > 0 && (
+                          <Chip
+                            key="order-ids-filter"
+                            label={`Order IDs: ${orderIdChips.length} selected`}
+                            onDelete={() => {
+                              setOrderIdChips([]);
+                              setOrderIdSearch('');
+                              setShowOrderIdSearch(false);
+                              setPage(0);
+                              setCurrentPage(1);
+                              fetchQuadTransactions(1, columnFilters, dateRange, selectedPlatform, []);
+                            }}
+                            size="small"
+                            sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600, flexShrink: 0 }}
+                          />
+                        )}
+                        {Object.entries(columnFilters).filter(([_, v]) => !!v).map(([key, val]) => (
+                          <Chip
+                            key={key}
+                            size="small"
+                            label={`${key}: ${typeof val === 'object' ? (Array.isArray(val) ? val.join(',') : Object.values(val).filter(Boolean).join('~')) : val}`}
+                            onDelete={() => {
+                              const next = { ...columnFilters } as any;
+                              delete next[key as any];
+                              setColumnFilters(next);
+                              // Also update pending to reflect removal
+                              setPendingColumnFilters((prev) => {
+                                const p = { ...prev } as any;
+                                delete p[key as any];
+                                return p;
+                              });
+                              // Re-apply after deletion
+                              fetchQuadTransactions(1, next, pendingDateRange, selectedPlatform);
+                            }}
+                            sx={{ flexShrink: 0 }}
+                          />
+                        ))}
+                      </Box>
+                    )}
                   </Box>
 
                   <Button
@@ -5123,54 +5176,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   </Box>
                 )}
 
-                {/* Active filter chips row directly under the header row, aligned under back button - Responsive */}
-                {(!!Object.keys(columnFilters).filter(k => columnFilters[k]).length || orderIdChips.length > 0) && (
-                  <Box sx={{
-                    ml: { xs: 0, sm: 6 },
-                    mt: { xs: 1, sm: 0 },
-                    display: 'flex',
-                    gap: { xs: 0.5, sm: 0.75 },
-                    flexWrap: 'wrap'
-                  }}>
-                    {/* Order ID chips */}
-                    {orderIdChips.length > 0 && (
-                      <Chip
-                        key="order-ids-filter"
-                        label={`Order IDs: ${orderIdChips.length} selected`}
-                        onDelete={() => {
-                          setOrderIdChips([]);
-                          setOrderIdSearch('');
-                          setShowOrderIdSearch(false);
-                          setPage(0);
-                          setCurrentPage(1);
-                          fetchQuadTransactions(1, columnFilters, dateRange, selectedPlatform, []);
-                        }}
-                        size="small"
-                        sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600 }}
-                      />
-                    )}
-                    {Object.entries(columnFilters).filter(([_, v]) => !!v).map(([key, val]) => (
-                      <Chip
-                        key={key}
-                        size="small"
-                        label={`${key}: ${typeof val === 'object' ? (Array.isArray(val) ? val.join(',') : Object.values(val).filter(Boolean).join('~')) : val}`}
-                        onDelete={() => {
-                          const next = { ...columnFilters } as any;
-                          delete next[key as any];
-                          setColumnFilters(next);
-                          // Also update pending to reflect removal
-                          setPendingColumnFilters((prev) => {
-                            const p = { ...prev } as any;
-                            delete p[key as any];
-                            return p;
-                          });
-                          // Re-apply after deletion
-                          fetchQuadTransactions(1, next, pendingDateRange, selectedPlatform);
-                        }}
-                      />
-                    ))}
-                  </Box>
-                )}
+
               </CardContent>
             </Card>
           </Fade>
@@ -5192,52 +5198,39 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
             </Alert>
           )}
 
-          {/* Loading Indicator */}
-          {(loading || quadApiLoading || salesReportLoading) && !isSorting && (
-            <LinearProgress
-              sx={{
-                mb: 2,
-                borderRadius: '8px',
-                height: 4,
-                background: '#f3f4f6',
-                '& .MuiLinearProgress-bar': {
-                  background: '#1f2937',
-                },
-              }}
-            />
-          )}
-
-          {/* Pagination Loading Indicator */}
-          {paginationLoading && !isSorting && (
-            <LinearProgress
-              sx={{
-                mb: 2,
-                borderRadius: '8px',
-                height: 2,
-                background: '#f3f4f6',
-                '& .MuiLinearProgress-bar': {
-                  background: '#3b82f6',
-                },
-              }}
-            />
-          )}
-
           {/* Transaction Table */}
           <Fade in timeout={1000}>
             <Card sx={{
               background: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #e5e7eb',
-              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-              overflow: 'hidden',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+              position: 'relative',
+              overflow: 'hidden'
             }}>
+              {/* Unified Premium Loading Indicator */}
+              <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, height: 3 }}>
+                {(loading || quadApiLoading || salesReportLoading || paginationLoading) && !isSorting && (
+                  <LinearProgress
+                    sx={{
+                      height: 3,
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      '& .MuiLinearProgress-bar': {
+                        background: 'linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)',
+                      },
+                    }}
+                  />
+                )}
+              </Box>
               <TableContainer sx={{
-                maxHeight: 'calc(100vh - 200px)',
+                height: 'calc(100vh - 200px)',
                 overflowX: 'auto',
+                overflowY: 'scroll',
                 position: 'relative',
                 zIndex: 1,
               }}>
                 <Table stickyHeader sx={{
+                  tableLayout: 'fixed',
                   borderCollapse: 'separate',
                   borderSpacing: 0,
                   '& .MuiTableCell-root': {
@@ -5268,6 +5261,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             background: '#f3f4f6',
                             textAlign: 'center',
                             py: 0.75,
+                            width: '160px',
                             minWidth: 160,
                             transition: 'all 0.3s ease',
                             position: 'relative',
@@ -5368,17 +5362,27 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 </>
                               )}
                             </Box>
-                            {/* Order ID Search Bar - Expandable */}
+                            {/* Order ID Search Bar - Floating Popover */}
                             {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && (
                               <Box
                                 sx={{
+                                  position: 'absolute',
+                                  top: 'calc(100% + 4px)',
+                                  left: 0,
+                                  zIndex: 20,
+                                  background: '#ffffff',
+                                  borderRadius: '8px',
+                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                  padding: '4px',
+                                  border: '1px solid #e5e7eb',
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: 0.5,
-                                  animation: 'expand 0.3s ease-in-out',
-                                  '@keyframes expand': {
-                                    '0%': { width: '0', opacity: 0 },
-                                    '100%': { width: '280px', opacity: 1 }
+                                  width: 'calc(100% - 16px)',
+                                  animation: 'slideDown 0.2s ease-out forwards',
+                                  '@keyframes slideDown': {
+                                    '0%': { transform: 'translateY(-10px)', opacity: 0 },
+                                    '100%': { transform: 'translateY(0)', opacity: 1 }
                                   }
                                 }}
                               >
@@ -5417,7 +5421,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     ),
                                   }}
                                   sx={{
-                                    width: '280px',
+                                    width: '100%',
                                     '& .MuiOutlinedInput-root': {
                                       height: '32px',
                                       fontSize: '0.75rem',
@@ -5427,20 +5431,30 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 />
                               </Box>
                             )}
-                            {/* Sales Report Search Bar - Expandable */}
+                            {/* Sales Report Search Bar - Floating Popover */}
                             {activeTab === 4 && showSalesReportSearch &&
                               ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
                                 (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
                                 (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
                                 <Box
                                   sx={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 4px)',
+                                    left: 0,
+                                    zIndex: 20,
+                                    background: '#ffffff',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                    padding: '4px',
+                                    border: '1px solid #e5e7eb',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 0.5,
-                                    animation: 'expand 0.3s ease-in-out',
-                                    '@keyframes expand': {
-                                      '0%': { width: '0', opacity: 0 },
-                                      '100%': { width: '280px', opacity: 1 }
+                                    width: 'calc(100% - 16px)',
+                                    animation: 'slideDown 0.2s ease-out forwards'
+                                    , '@keyframes slideDown': {
+                                      '0%': { transform: 'translateY(-10px)', opacity: 0 },
+                                      '100%': { transform: 'translateY(0)', opacity: 1 }
                                     }
                                   }}
                                 >
