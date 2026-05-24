@@ -3524,21 +3524,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       ] = await Promise.all(apiCalls);
 
       // Enhance unsettled response for D2C with courier provider column/value
-      const processedUnsettledData = unsettledResponse.success && !unsettledResponse.skipped
+      const processedUnsettledData = (unsettledResponse as any).success && !(unsettledResponse as any).skipped
         ? addCourierProviderColumn(unsettledResponse.data as TotalTransactionsResponse, platformToUse)
         : unsettledData;
 
       // Use the first successful response that contains column metadata to populate filters
       const responseWithColumns = [matchedResponse, mismatchedLessReceivedResponse, mismatchedMoreReceivedResponse, unsettledResponse, allResponse].find(
-        (res) => res.success && !res.skipped && (res.data as TotalTransactionsResponse | undefined)?.columns
+        (res) => (res as any).success && !(res as any).skipped && (res.data as TotalTransactionsResponse | undefined)?.columns
       );
       if (responseWithColumns?.data) {
         setTotalTransactionsData(responseWithColumns.data as TotalTransactionsResponse);
       }
 
       // Process matched response (Tab 0)
-      if (matchedResponse.success && !matchedResponse.skipped) {
-        setMatchedData(matchedResponse.data);
+      if ((matchedResponse as any).success && !(matchedResponse as any).skipped) {
+        setMatchedData(matchedResponse.data as any);
         if (matchedResponse.data?.pagination) {
           setMatchedTotalCount(matchedResponse.data.pagination.total_count);
         }
@@ -3547,8 +3547,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
 
       // Process mismatched less received response (Tab 1 - sub-tab 1)
-      if (mismatchedLessReceivedResponse.success && !mismatchedLessReceivedResponse.skipped) {
-        setMismatchedLessReceivedData(mismatchedLessReceivedResponse.data);
+      if ((mismatchedLessReceivedResponse as any).success && !(mismatchedLessReceivedResponse as any).skipped) {
+        setMismatchedLessReceivedData(mismatchedLessReceivedResponse.data as any);
         if (mismatchedLessReceivedResponse.data?.pagination) {
           setMismatchedLessReceivedTotalCount(mismatchedLessReceivedResponse.data.pagination.total_count);
         }
@@ -3557,8 +3557,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
 
       // Process mismatched more received response (Tab 1 - sub-tab 2)
-      if (mismatchedMoreReceivedResponse.success && !mismatchedMoreReceivedResponse.skipped) {
-        setMismatchedMoreReceivedData(mismatchedMoreReceivedResponse.data);
+      if ((mismatchedMoreReceivedResponse as any).success && !(mismatchedMoreReceivedResponse as any).skipped) {
+        setMismatchedMoreReceivedData(mismatchedMoreReceivedResponse.data as any);
         if (mismatchedMoreReceivedResponse.data?.pagination) {
           setMismatchedMoreReceivedTotalCount(mismatchedMoreReceivedResponse.data.pagination.total_count);
         }
@@ -3567,7 +3567,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
 
       // Process unsettled response (Tab 2)
-      if (unsettledResponse.success && !unsettledResponse.skipped) {
+      if ((unsettledResponse as any).success && !(unsettledResponse as any).skipped) {
         setUnsettledData(processedUnsettledData);
         if (processedUnsettledData?.pagination) {
           setUnsettledTotalCount(processedUnsettledData.pagination.total_count);
@@ -3577,8 +3577,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
 
       // Process all response (Tab 3)
-      if (allResponse.success && !allResponse.skipped) {
-        setAllData(allResponse.data);
+      if ((allResponse as any).success && !(allResponse as any).skipped) {
+        setAllData(allResponse.data as any);
         if (allResponse.data?.pagination) {
           setAllTotalCount(allResponse.data.pagination.total_count);
         }
@@ -3587,7 +3587,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
 
       // Process sales report response
-      if (salesReportResponse.success && !salesReportResponse.skipped) {
+      if ((salesReportResponse as any).success && !(salesReportResponse as any).skipped) {
         // Cast to any to avoid strict TS property checks
         const responseData = salesReportResponse.data as any;
         let totalCountVal = 0;
@@ -3609,24 +3609,24 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Update totalCount based on current active tab
       if (activeTab === 0 && matchedResponse.success && (matchedResponse.data?.pagination || matchedData?.pagination)) {
         const pag = matchedResponse.data?.pagination || matchedData?.pagination;
-        if (pag) setTotalCount(pag.total_count ?? 0);
+        if (pag) setTotalCount((pag.total_count ?? 0) as number);
       } else if (activeTab === 1) {
         // For mismatched tab, use the appropriate sub-tab data
         if (mismatchedSubTab === 'less_received' && mismatchedLessReceivedResponse.success && (mismatchedLessReceivedResponse.data?.pagination || mismatchedLessReceivedData?.pagination)) {
           const pag = mismatchedLessReceivedResponse.data?.pagination || mismatchedLessReceivedData?.pagination;
-          if (pag) setTotalCount(pag.total_count ?? 0);
+          if (pag) setTotalCount((pag.total_count ?? 0) as number);
         } else if (mismatchedSubTab === 'more_received' && mismatchedMoreReceivedResponse.success && (mismatchedMoreReceivedResponse.data?.pagination || mismatchedMoreReceivedData?.pagination)) {
           const pag = mismatchedMoreReceivedResponse.data?.pagination || mismatchedMoreReceivedData?.pagination;
-          if (pag) setTotalCount(pag.total_count ?? 0);
+          if (pag) setTotalCount((pag.total_count ?? 0) as number);
         }
       } else if (activeTab === 2 && unsettledResponse.success && (processedUnsettledData?.pagination || unsettledData?.pagination)) {
         const unsettledPagination = processedUnsettledData?.pagination || unsettledData?.pagination;
         if (unsettledPagination) {
-          setTotalCount(unsettledPagination.total_count ?? 0);
+          setTotalCount((unsettledPagination.total_count ?? 0) as number);
         }
       } else if (activeTab === 3 && allResponse.success && (allResponse.data?.pagination || allData?.pagination)) {
         const pag = allResponse.data?.pagination || allData?.pagination;
-        if (pag) setTotalCount(pag.total_count);
+        if (pag) setTotalCount((pag.total_count ?? 0) as number);
       }
 
       setCurrentPage(pageNumber);
