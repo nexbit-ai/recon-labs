@@ -1932,12 +1932,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   const isFetchingRef = React.useRef(false);
   const lastQuadParamsRef = React.useRef<string | null>(null);
+  const lastBaseParamsSignatureRef = React.useRef<string | null>(null);
 
   // Mismatched sub-tab state (Less Received / More Received)
   const [mismatchedSubTab, setMismatchedSubTab] = useState<'less_received' | 'more_received'>('less_received');
 
   // Sales Report state management
   const [salesReportData, setSalesReportData] = useState<SalesTransactionsResponse | null>(null);
+  const [salesReportTotalCount, setSalesReportTotalCount] = useState<number | null>(null);
   const [salesReportLoading, setSalesReportLoading] = useState(false);
   const [lastSalesReportDateRange, setLastSalesReportDateRange] = useState<{ start: string, end: string } | null>(null);
   const [salesReportPagination, setSalesReportPagination] = useState<SalesTransactionsPagination | null>(null);
@@ -3126,6 +3128,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setHasInitialLoad(true);
   }, []);
 
+  // Lazy-load data when active tab or mismatched sub-tab changes after initial load
+  useEffect(() => {
+    if (!hasInitialLoad) return;
+    if (activeTab === 4) return; // Sales Report tab is fetched separately in handleTabChange
+    fetchQuadTransactions(currentPage);
+  }, [activeTab, mismatchedSubTab, hasInitialLoad]);
+
+
   // Apply filters function - called when Apply button is clicked
   const applyFilters = () => {
     // Copy pending filters to active filters
@@ -3300,6 +3310,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
 
     const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
+    const filtersToUse = filters !== undefined ? filters : columnFilters;
+    const dateRangeToUse = dateRangeFilter !== undefined ? dateRangeFilter : dateRange;
 
     // Create base API call parameters
     const baseParams: any = {
@@ -3308,8 +3320,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     };
 
     // Convert filters to API parameters (Status filter has been removed)
-    if (filters && Object.keys(filters).length > 0) {
-      Object.entries(filters).forEach(([columnKey, filterValue]) => {
+    if (filtersToUse && Object.keys(filtersToUse).length > 0) {
+      Object.entries(filtersToUse).forEach(([columnKey, filterValue]) => {
         if (!filterValue) return;
         // Skip Status filter - it has been removed
         if (columnKey === 'Status') return;
@@ -3389,9 +3401,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
 
     // Add date range parameters with correct keys
-    if (dateRangeFilter?.start && dateRangeFilter?.end) {
-      baseParams.order_date_from = dateRangeFilter.start;
-      baseParams.order_date_to = dateRangeFilter.end;
+    if (dateRangeToUse?.start && dateRangeToUse?.end) {
+      baseParams.order_date_from = dateRangeToUse.start;
+      baseParams.order_date_to = dateRangeToUse.end;
     }
 
     // Add platform parameter
@@ -3413,12 +3425,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       baseParams.order_id = orderIdsCsv;
     }
 
-    const paramsSignature = createQuadParamsSignature(baseParams);
+    // Include activeTab and mismatchedSubTab in the signature so lazy-loading triggers when switching tabs
+    const paramsSignature = createQuadParamsSignature(baseParams) + `_tab_${activeTab}_sub_${mismatchedSubTab}`;
     const hasExistingQuadData = matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null;
 
     if (!forceRefetch && hasExistingQuadData && lastQuadParamsRef.current === paramsSignature) {
       return;
     }
+
+    const baseParamsSignature = createQuadParamsSignature(baseParams);
+    const isTabSwitchOnly = lastBaseParamsSignatureRef.current === baseParamsSignature && lastBaseParamsSignatureRef.current !== null;
 
     // Set the flag to prevent duplicate calls
     isFetchingRef.current = true;
@@ -3434,137 +3450,206 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Tab 0: Matched - settlement_matched
       const matchedParams = { ...baseParams };
       matchedParams.status_in = 'settlement_matched';
+      if (activeTab !== 0) matchedParams.count_only = 'true';
 
       // Tab 1: Mismatched - two separate calls for less_received and more_received
       const mismatchedLessReceivedParams = { ...baseParams };
       mismatchedLessReceivedParams.status = 'less_payment_received';
+      if (activeTab !== 1 || mismatchedSubTab !== 'less_received') mismatchedLessReceivedParams.count_only = 'true';
 
       const mismatchedMoreReceivedParams = { ...baseParams };
       mismatchedMoreReceivedParams.status = 'more_payment_received';
+      if (activeTab !== 1 || mismatchedSubTab !== 'more_received') mismatchedMoreReceivedParams.count_only = 'true';
 
       // Tab 2: Unsettled - unsettled
       const unsettledParams = { ...baseParams };
       unsettledParams.status = 'unsettled';
+      if (activeTab !== 2) unsettledParams.count_only = 'true';
 
       // Tab 3: All - no status filter
       const allParams = { ...baseParams };
       // No status filter applied
+      if (activeTab !== 3) allParams.count_only = 'true';
 
-      // Make all 5 API calls simultaneously
+      const salesReportParams: any = {
+        platform: platformToUse,
+        order_date_from: dateRangeToUse.start,
+        order_date_to: dateRangeToUse.end,
+        limit: 100,
+        page: 1,
+        count_only: 'true',
+      };
+
+      // Make only the active tab's API call if only switching tabs (to optimize network usage)
+      const matchedCall = (isTabSwitchOnly && activeTab !== 0)
+        ? Promise.resolve({ success: true, data: matchedData, skipped: true })
+        : api.transactions.getTotalTransactions(matchedParams);
+
+      const mismatchedLessReceivedCall = (isTabSwitchOnly && (activeTab !== 1 || mismatchedSubTab !== 'less_received'))
+        ? Promise.resolve({ success: true, data: mismatchedLessReceivedData, skipped: true })
+        : api.transactions.getTotalTransactions(mismatchedLessReceivedParams);
+
+      const mismatchedMoreReceivedCall = (isTabSwitchOnly && (activeTab !== 1 || mismatchedSubTab !== 'more_received'))
+        ? Promise.resolve({ success: true, data: mismatchedMoreReceivedData, skipped: true })
+        : api.transactions.getTotalTransactions(mismatchedMoreReceivedParams);
+
+      const unsettledCall = (isTabSwitchOnly && activeTab !== 2)
+        ? Promise.resolve({ success: true, data: unsettledData, skipped: true })
+        : api.transactions.getTotalTransactions(unsettledParams);
+
+      const allCall = (isTabSwitchOnly && activeTab !== 3)
+        ? Promise.resolve({ success: true, data: allData, skipped: true })
+        : api.transactions.getTotalTransactions(allParams);
+
+      const salesReportCall = (isTabSwitchOnly)
+        ? Promise.resolve({ success: true, data: { pagination: { total_count: salesReportTotalCount } }, skipped: true })
+        : api.transactions.getSalesTransactions(salesReportParams);
+
       const apiCalls = [
-        api.transactions.getTotalTransactions(matchedParams),
-        api.transactions.getTotalTransactions(mismatchedLessReceivedParams),
-        api.transactions.getTotalTransactions(mismatchedMoreReceivedParams),
-        api.transactions.getTotalTransactions(unsettledParams),
-        api.transactions.getTotalTransactions(allParams),
+        matchedCall,
+        mismatchedLessReceivedCall,
+        mismatchedMoreReceivedCall,
+        unsettledCall,
+        allCall,
+        salesReportCall,
       ];
 
-      const [matchedResponse, mismatchedLessReceivedResponse, mismatchedMoreReceivedResponse, unsettledResponse, allResponse] = await Promise.all(apiCalls);
+      const [
+        matchedResponse,
+        mismatchedLessReceivedResponse,
+        mismatchedMoreReceivedResponse,
+        unsettledResponse,
+        allResponse,
+        salesReportResponse,
+      ] = await Promise.all(apiCalls);
 
       // Enhance unsettled response for D2C with courier provider column/value
-      const processedUnsettledData = unsettledResponse.success
+      const processedUnsettledData = unsettledResponse.success && !unsettledResponse.skipped
         ? addCourierProviderColumn(unsettledResponse.data as TotalTransactionsResponse, platformToUse)
-        : null;
+        : unsettledData;
 
       // Use the first successful response that contains column metadata to populate filters
       const responseWithColumns = [matchedResponse, mismatchedLessReceivedResponse, mismatchedMoreReceivedResponse, unsettledResponse, allResponse].find(
-        (res) => res.success && (res.data as TotalTransactionsResponse | undefined)?.columns
+        (res) => res.success && !res.skipped && (res.data as TotalTransactionsResponse | undefined)?.columns
       );
       if (responseWithColumns?.data) {
         setTotalTransactionsData(responseWithColumns.data as TotalTransactionsResponse);
       }
 
       // Process matched response (Tab 0)
-      if (matchedResponse.success) {
+      if (matchedResponse.success && !matchedResponse.skipped) {
         setMatchedData(matchedResponse.data);
         if (matchedResponse.data?.pagination) {
           setMatchedTotalCount(matchedResponse.data.pagination.total_count);
         }
-      } else {
+      } else if (!matchedResponse.success) {
         console.error('[fetchQuadTransactions] Matched API failed:', matchedResponse);
       }
 
       // Process mismatched less received response (Tab 1 - sub-tab 1)
-      if (mismatchedLessReceivedResponse.success) {
+      if (mismatchedLessReceivedResponse.success && !mismatchedLessReceivedResponse.skipped) {
         setMismatchedLessReceivedData(mismatchedLessReceivedResponse.data);
         if (mismatchedLessReceivedResponse.data?.pagination) {
           setMismatchedLessReceivedTotalCount(mismatchedLessReceivedResponse.data.pagination.total_count);
         }
-      } else {
+      } else if (!mismatchedLessReceivedResponse.success) {
         console.error('[fetchQuadTransactions] Mismatched Less Received API failed:', mismatchedLessReceivedResponse);
       }
 
       // Process mismatched more received response (Tab 1 - sub-tab 2)
-      if (mismatchedMoreReceivedResponse.success) {
+      if (mismatchedMoreReceivedResponse.success && !mismatchedMoreReceivedResponse.skipped) {
         setMismatchedMoreReceivedData(mismatchedMoreReceivedResponse.data);
         if (mismatchedMoreReceivedResponse.data?.pagination) {
           setMismatchedMoreReceivedTotalCount(mismatchedMoreReceivedResponse.data.pagination.total_count);
         }
-      } else {
+      } else if (!mismatchedMoreReceivedResponse.success) {
         console.error('[fetchQuadTransactions] Mismatched More Received API failed:', mismatchedMoreReceivedResponse);
       }
 
       // Process unsettled response (Tab 2)
-      if (unsettledResponse.success) {
+      if (unsettledResponse.success && !unsettledResponse.skipped) {
         setUnsettledData(processedUnsettledData);
         if (processedUnsettledData?.pagination) {
           setUnsettledTotalCount(processedUnsettledData.pagination.total_count);
         }
-      } else {
+      } else if (!unsettledResponse.success) {
         console.error('[fetchQuadTransactions] Unsettled API failed:', unsettledResponse);
       }
 
       // Process all response (Tab 3)
-      if (allResponse.success) {
+      if (allResponse.success && !allResponse.skipped) {
         setAllData(allResponse.data);
         if (allResponse.data?.pagination) {
           setAllTotalCount(allResponse.data.pagination.total_count);
         }
-      } else {
+      } else if (!allResponse.success) {
         console.error('[fetchQuadTransactions] All API failed:', allResponse);
       }
 
+      // Process sales report response
+      if (salesReportResponse.success && !salesReportResponse.skipped) {
+        const responseData = salesReportResponse.data;
+        let totalCountVal = 0;
+        if (responseData?.pagination) {
+          totalCountVal = responseData.pagination.total_count ?? responseData.count ?? 0;
+        } else {
+          totalCountVal = responseData?.count ?? responseData?.transactions?.length ?? 0;
+        }
+        setSalesReportTotalCount(totalCountVal);
+      } else if (!salesReportResponse.success) {
+        console.error('[fetchQuadTransactions] Sales Report count API failed:', salesReportResponse);
+      }
+
       // Update totalCount based on current active tab
-      if (activeTab === 0 && matchedResponse.success && matchedResponse.data?.pagination) {
-        setTotalCount(matchedResponse.data.pagination.total_count);
+      if (activeTab === 0 && matchedResponse.success && (matchedResponse.data?.pagination || matchedData?.pagination)) {
+        const pag = matchedResponse.data?.pagination || matchedData?.pagination;
+        if (pag) setTotalCount(pag.total_count);
       } else if (activeTab === 1) {
         // For mismatched tab, use the appropriate sub-tab data
-        if (mismatchedSubTab === 'less_received' && mismatchedLessReceivedResponse.success && mismatchedLessReceivedResponse.data?.pagination) {
-          setTotalCount(mismatchedLessReceivedResponse.data.pagination.total_count);
-        } else if (mismatchedSubTab === 'more_received' && mismatchedMoreReceivedResponse.success && mismatchedMoreReceivedResponse.data?.pagination) {
-          setTotalCount(mismatchedMoreReceivedResponse.data.pagination.total_count);
+        if (mismatchedSubTab === 'less_received' && mismatchedLessReceivedResponse.success && (mismatchedLessReceivedResponse.data?.pagination || mismatchedLessReceivedData?.pagination)) {
+          const pag = mismatchedLessReceivedResponse.data?.pagination || mismatchedLessReceivedData?.pagination;
+          if (pag) setTotalCount(pag.total_count);
+        } else if (mismatchedSubTab === 'more_received' && mismatchedMoreReceivedResponse.success && (mismatchedMoreReceivedResponse.data?.pagination || mismatchedMoreReceivedData?.pagination)) {
+          const pag = mismatchedMoreReceivedResponse.data?.pagination || mismatchedMoreReceivedData?.pagination;
+          if (pag) setTotalCount(pag.total_count);
         }
-      } else if (activeTab === 2 && unsettledResponse.success && (processedUnsettledData?.pagination || unsettledResponse.data?.pagination)) {
-        const unsettledPagination = processedUnsettledData?.pagination || unsettledResponse.data?.pagination;
+      } else if (activeTab === 2 && unsettledResponse.success && (processedUnsettledData?.pagination || unsettledData?.pagination)) {
+        const unsettledPagination = processedUnsettledData?.pagination || unsettledData?.pagination;
         if (unsettledPagination) {
           setTotalCount(unsettledPagination.total_count);
         }
-      } else if (activeTab === 3 && allResponse.success && allResponse.data?.pagination) {
-        setTotalCount(allResponse.data.pagination.total_count);
+      } else if (activeTab === 3 && allResponse.success && (allResponse.data?.pagination || allData?.pagination)) {
+        const pag = allResponse.data?.pagination || allData?.pagination;
+        if (pag) setTotalCount(pag.total_count);
       }
 
       setCurrentPage(pageNumber);
 
-      const allSucceeded = matchedResponse.success && mismatchedLessReceivedResponse.success && mismatchedMoreReceivedResponse.success && unsettledResponse.success && allResponse.success;
+      const allSucceeded = matchedResponse.success && mismatchedLessReceivedResponse.success && mismatchedMoreReceivedResponse.success && unsettledResponse.success && allResponse.success && salesReportResponse.success;
       if (allSucceeded) {
         lastQuadParamsRef.current = paramsSignature;
+        lastBaseParamsSignatureRef.current = baseParamsSignature;
       } else {
         lastQuadParamsRef.current = null;
+        lastBaseParamsSignatureRef.current = null;
       }
 
-      // Update tab counts based on the actual data received
-      const lessReceivedCount = mismatchedLessReceivedResponse.success ? (mismatchedLessReceivedResponse.data?.data?.length || 0) : 0;
-      const moreReceivedCount = mismatchedMoreReceivedResponse.success ? (mismatchedMoreReceivedResponse.data?.data?.length || 0) : 0;
-      setTabCounts({
-        matched: matchedResponse.success ? (matchedResponse.data?.data?.length || 0) : null,
-        mismatched: lessReceivedCount + moreReceivedCount > 0 ? lessReceivedCount + moreReceivedCount : null,
-        unsettled: unsettledResponse.success ? (unsettledResponse.data?.data?.length || 0) : null,
-        all: allResponse.success ? (allResponse.data?.data?.length || 0) : null,
-      });
+      // Update tab counts based on the actual data received (only on initial load or base param change)
+      if (!isTabSwitchOnly) {
+        const lessReceivedCount = mismatchedLessReceivedResponse.success ? (mismatchedLessReceivedResponse.data?.data?.length || 0) : 0;
+        const moreReceivedCount = mismatchedMoreReceivedResponse.success ? (mismatchedMoreReceivedResponse.data?.data?.length || 0) : 0;
+        setTabCounts({
+          matched: matchedResponse.success ? (matchedResponse.data?.data?.length || 0) : null,
+          mismatched: lessReceivedCount + moreReceivedCount > 0 ? lessReceivedCount + moreReceivedCount : null,
+          unsettled: unsettledResponse.success ? (unsettledResponse.data?.data?.length || 0) : null,
+          all: allResponse.success ? (allResponse.data?.data?.length || 0) : null,
+        });
+      }
     } catch (err: any) {
       console.error('[fetchQuadTransactions] Error:', err);
       setError(err?.message || 'Failed to fetch transactions');
       lastQuadParamsRef.current = null;
+      lastBaseParamsSignatureRef.current = null;
     } finally {
       setQuadApiLoading(false);
       setPaginationLoading(false);
@@ -3677,6 +3762,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
         const totalRecords = pagination.total_count ?? responseData.count ?? responseData.transactions?.length ?? 0;
         setTotalCount(totalRecords);
+        setSalesReportTotalCount(totalRecords);
         setRowsPerPage(pagination.limit ?? requestedLimit);
         setPage((pagination.page ?? requestedPage) - 1);
         setCurrentPage(pagination.page ?? requestedPage);
@@ -4190,8 +4276,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       setTotalCount(allTotalCount);
     }
 
-    // No API call needed - just switch the displayed data
-    // The data is already loaded from quad API calls
+    // The activeTab useEffect hook will automatically trigger lazy-loading of the actual data for this tab,
+    // while keeping background tab counts cached.
   };
 
   // Handle transaction row click
@@ -4356,13 +4442,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   };
 
   const visibleColumns = getVisibleColumns();
-  const salesTabTotalCount = salesReportPagination?.total_count ?? salesReportData?.count ?? null;
   const tabDefinitions = [
     { label: 'Matched', count: matchedTotalCount },
     { label: 'Mismatched', count: mismatchedTotalCount },
     { label: 'Unsettled', count: unsettledTotalCount },
     { label: 'All', count: allTotalCount },
-    { label: 'Sales Report', count: activeTab === 4 ? salesTabTotalCount : null },
+    { label: 'Sales Report', count: salesReportTotalCount },
   ];
 
   const selectedDateRangeLabel = useMemo(() => {
@@ -5866,7 +5951,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 <TablePagination
                   rowsPerPageOptions={[100]}
                   component="div"
-                  count={activeTab === 4 ? (salesTabTotalCount ?? 0) : (totalCount || filteredData.length)}
+                  count={activeTab === 4 ? (salesReportTotalCount ?? 0) : (totalCount || filteredData.length)}
                   rowsPerPage={rowsPerPage}
                   page={page}
                   onPageChange={handleChangePage}
