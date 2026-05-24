@@ -3588,12 +3588,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       // Process sales report response
       if (salesReportResponse.success && !salesReportResponse.skipped) {
-        const responseData = salesReportResponse.data;
+        // Cast to any to avoid strict TS property checks
+        const responseData = salesReportResponse.data as any;
         let totalCountVal = 0;
-        if (responseData?.pagination) {
-          totalCountVal = responseData.pagination.total_count ?? responseData.count ?? 0;
-        } else {
-          totalCountVal = responseData?.count ?? responseData?.transactions?.length ?? 0;
+        // Resolve total count from possible response shapes
+        if (responseData?.pagination?.total_count != null) {
+          totalCountVal = responseData.pagination.total_count;
+        } else if (typeof responseData?.count === 'number') {
+          totalCountVal = responseData.count;
+        } else if (Array.isArray(responseData?.transactions)) {
+          totalCountVal = responseData.transactions.length;
+        } else if (Array.isArray(responseData?.data)) {
+          totalCountVal = responseData.data.length;
         }
         setSalesReportTotalCount(totalCountVal);
       } else if (!salesReportResponse.success) {
@@ -3603,20 +3609,20 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Update totalCount based on current active tab
       if (activeTab === 0 && matchedResponse.success && (matchedResponse.data?.pagination || matchedData?.pagination)) {
         const pag = matchedResponse.data?.pagination || matchedData?.pagination;
-        if (pag) setTotalCount(pag.total_count);
+        if (pag) setTotalCount(pag.total_count ?? 0);
       } else if (activeTab === 1) {
         // For mismatched tab, use the appropriate sub-tab data
         if (mismatchedSubTab === 'less_received' && mismatchedLessReceivedResponse.success && (mismatchedLessReceivedResponse.data?.pagination || mismatchedLessReceivedData?.pagination)) {
           const pag = mismatchedLessReceivedResponse.data?.pagination || mismatchedLessReceivedData?.pagination;
-          if (pag) setTotalCount(pag.total_count);
+          if (pag) setTotalCount(pag.total_count ?? 0);
         } else if (mismatchedSubTab === 'more_received' && mismatchedMoreReceivedResponse.success && (mismatchedMoreReceivedResponse.data?.pagination || mismatchedMoreReceivedData?.pagination)) {
           const pag = mismatchedMoreReceivedResponse.data?.pagination || mismatchedMoreReceivedData?.pagination;
-          if (pag) setTotalCount(pag.total_count);
+          if (pag) setTotalCount(pag.total_count ?? 0);
         }
       } else if (activeTab === 2 && unsettledResponse.success && (processedUnsettledData?.pagination || unsettledData?.pagination)) {
         const unsettledPagination = processedUnsettledData?.pagination || unsettledData?.pagination;
         if (unsettledPagination) {
-          setTotalCount(unsettledPagination.total_count);
+          setTotalCount(unsettledPagination.total_count ?? 0);
         }
       } else if (activeTab === 3 && allResponse.success && (allResponse.data?.pagination || allData?.pagination)) {
         const pag = allResponse.data?.pagination || allData?.pagination;
@@ -3636,13 +3642,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       // Update tab counts based on the actual data received (only on initial load or base param change)
       if (!isTabSwitchOnly) {
-        const lessReceivedCount = mismatchedLessReceivedResponse.success ? (mismatchedLessReceivedResponse.data?.data?.length || 0) : 0;
-        const moreReceivedCount = mismatchedMoreReceivedResponse.success ? (mismatchedMoreReceivedResponse.data?.data?.length || 0) : 0;
+        const lessReceivedCount = mismatchedLessReceivedResponse.success ? ((mismatchedLessReceivedResponse.data as any)?.data?.length || 0) : 0;
+        const moreReceivedCount = mismatchedMoreReceivedResponse.success ? ((mismatchedMoreReceivedResponse.data as any)?.data?.length || 0) : 0;
         setTabCounts({
-          matched: matchedResponse.success ? (matchedResponse.data?.data?.length || 0) : null,
+          matched: matchedResponse.success ? ((matchedResponse.data as any)?.data?.length || 0) : null,
           mismatched: lessReceivedCount + moreReceivedCount > 0 ? lessReceivedCount + moreReceivedCount : null,
-          unsettled: unsettledResponse.success ? (unsettledResponse.data?.data?.length || 0) : null,
-          all: allResponse.success ? (allResponse.data?.data?.length || 0) : null,
+          unsettled: unsettledResponse.success ? ((unsettledResponse.data as any)?.data?.length || 0) : null,
+          all: allResponse.success ? ((allResponse.data as any)?.data?.length || 0) : null,
         });
       }
     } catch (err: any) {
