@@ -5995,7 +5995,7 @@ const MarketplaceReconciliation: React.FC = () => {
               <Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                   <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600 }}>
-                    Prepaid  Settlement Data - Payment Date
+                    Prepaid Settlement Data - Payment Date
                   </Typography>
                   {d2cNonCodVendorSettlementCombinedData.length > 0 && (
                     <Button
