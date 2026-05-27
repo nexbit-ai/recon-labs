@@ -4470,14 +4470,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   }, [dateRange.start, dateRange.end]);
 
   return (
-    <Slide direction="left" in mountOnEnter unmountOnExit>
-      <Box sx={{
-        width: '100%',
-        height: '100%',
-        background: '#fafafa',
-        position: 'relative',
-        overflow: 'auto',
-      }}>
+    <Box sx={{
+      width: '100%',
+      height: '100%',
+      background: '#fafafa',
+      position: 'relative',
+      overflow: 'auto',
+    }}>
         <Box sx={{ p: { xs: 1, md: 2 }, position: 'relative', zIndex: 1 }}>
           {/* Header */}
           <Fade in timeout={800}>
@@ -6448,7 +6447,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
             </Portal>
           )}
       </Box>
-    </Slide>
   );
 };
 

@@ -54,6 +54,8 @@ import {
   ListItemSecondaryAction,
   Menu,
   TextField,
+  Skeleton,
+  Drawer,
 } from '@mui/material';
 import {
   PieChart,
@@ -2668,24 +2670,26 @@ const MarketplaceReconciliation: React.FC = () => {
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
               mb: 2,
             }}>
-              <Typography variant="h4" sx={{
-                fontWeight: 700,
-                color: '#1a1a1a',
-                letterSpacing: '-0.01em',
-                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-              }}>
-                Reconciliation
-              </Typography>
-
               {/* Date Range Filter */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {loading && (
-                  <CircularProgress size={24} sx={{ color: '#1a1a1a' }} />
-                )}
+                <Box sx={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {loading && (
+                    <CircularProgress size={24} sx={{ color: '#1a1a1a' }} />
+                  )}
+                </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
+                  {/* Last updated timestamp - inline left of date filter */}
+                  {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mr: 0.5 }}>
+                      <CheckCircleIcon sx={{ fontSize: 13, color: '#16a34a' }} />
+                      <Typography sx={{ fontSize: '0.72rem', color: '#6b7280', fontWeight: 400, whiteSpace: 'nowrap' }}>
+                        Last updated at {formatReconciliationTimestamp(normalizedReconciliationStatus.last_completed_at)}
+                      </Typography>
+                    </Box>
+                  )}
                   <Button
                     variant="outlined"
                     endIcon={<KeyboardArrowDownIcon />}
@@ -3028,7 +3032,7 @@ const MarketplaceReconciliation: React.FC = () => {
           </Box>
         </Fade>
 
-        {/* Reconciliation Status Message - only show when reconciliation_status exists from backend */}
+        {/* Status Message - only show when reconciliation_status exists from backend */}
         {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processing' && (
           <Alert
             severity="info"
@@ -3055,31 +3059,6 @@ const MarketplaceReconciliation: React.FC = () => {
               ? '1 file is still processing. Results will update automatically.'
               : `${normalizedReconciliationStatus.processing_count} files are still processing. Results will update automatically.`
             }
-          </Alert>
-        )}
-        {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at && (
-          <Alert
-            severity="success"
-            icon={<CheckCircleIcon />}
-            sx={{
-              mb: 3,
-              bgcolor: '#f0fdf4',
-              color: '#166534',
-              border: '1px solid #bbf7d0',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              '& .MuiAlert-icon': {
-                alignItems: 'center',
-                display: 'flex'
-              },
-              '& .MuiAlert-message': {
-                display: 'flex',
-                alignItems: 'center'
-              }
-            }}
-          >
-            Last updated at {formatReconciliationTimestamp(normalizedReconciliationStatus.last_completed_at)}
           </Alert>
         )}
 
@@ -3208,7 +3187,7 @@ const MarketplaceReconciliation: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
-          {/* Reconciliation Status */}
+          {/* Status */}
           <Grid item xs={12} md={5}>
             <Card
               sx={{
@@ -5560,34 +5539,40 @@ const MarketplaceReconciliation: React.FC = () => {
                   maxHeight: 600,
                   borderRadius: '12px',
                   border: '1px solid #e5e7eb',
-                  '& .MuiTable-root': { minWidth: 700 }
+                  overflowX: 'auto',
+                  pb: 1,
+                  '& .MuiTable-root': { minWidth: 700 },
+                  '&::-webkit-scrollbar': { height: '4px' },
+                  '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+                  '&::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: '4px' },
+                  '&::-webkit-scrollbar-thumb:hover': { backgroundColor: 'rgba(0,0,0,0.2)' }
                 }}>
-                  <Table stickyHeader>
+                  <Table stickyHeader size="small">
                     <TableHead>
                       <TableRow>
                         <TableCell sx={{
-                          backgroundColor: '#f8fafc',
-                          fontWeight: 700,
+                          backgroundColor: '#ffffff',
+                                fontWeight: 600,
                           color: '#374151',
-                          borderBottom: '2px solid #e5e7eb'
+                                borderBottom: '1px solid #f1f3f4'
                         }}>
                           Month
                         </TableCell>
                         <TableCell align="right" sx={{
-                          backgroundColor: '#f8fafc',
-                          fontWeight: 700,
+                          backgroundColor: '#ffffff',
+                                fontWeight: 600,
                           color: '#2563eb',
-                          borderBottom: '2px solid #e5e7eb'
+                                borderBottom: '1px solid #f1f3f4'
                         }}>
                           Sales (Invoice Date)
                         </TableCell>
                         <TableCell
                           align="right"
                           sx={{
-                            backgroundColor: '#f8fafc',
-                            fontWeight: 700,
+                            backgroundColor: '#ffffff',
+                                fontWeight: 600,
                             color: '#10b981',
-                            borderBottom: '2px solid #e5e7eb',
+                                borderBottom: '1px solid #f1f3f4',
                           }}
                         >
                           Settlement (Settlement Date)
@@ -5596,10 +5581,10 @@ const MarketplaceReconciliation: React.FC = () => {
                           <TableCell
                             align="right"
                             sx={{
-                              backgroundColor: '#f8fafc',
-                              fontWeight: 700,
+                              backgroundColor: '#ffffff',
+                                fontWeight: 600,
                               color: '#f97316',
-                              borderBottom: '2px solid #e5e7eb',
+                                borderBottom: '1px solid #f1f3f4',
                             }}
                           >
                             Commission (Settlement Date)
@@ -5732,14 +5717,26 @@ const MarketplaceReconciliation: React.FC = () => {
                     maxHeight: 600,
                     borderRadius: '12px',
                     border: '1px solid #e5e7eb',
-                    '& .MuiTable-root': { minWidth: 700 }
+                    overflowX: 'auto',
+                    pb: 1,
+                    '& .MuiTable-root': { minWidth: 700 },
+                    '&::-webkit-scrollbar': { height: '4px' },
+                    '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+                    '&::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: '4px' },
+                    '&::-webkit-scrollbar-thumb:hover': { backgroundColor: 'rgba(0,0,0,0.2)' }
                   }}>
-                    <Table stickyHeader>
+                    <Table stickyHeader size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb' }}>Month</TableCell>
-                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#2563eb', borderBottom: '2px solid #e5e7eb' }}>{`Sales (${getCurrencySymbol()})`}</TableCell>
-                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#10b981', borderBottom: '2px solid #e5e7eb' }}>{`Settlement (${getCurrencySymbol()})`}</TableCell>
+                          <TableCell sx={{ backgroundColor: '#ffffff',
+                                fontWeight: 600, color: '#374151',
+                                borderBottom: '1px solid #f1f3f4' }}>Month</TableCell>
+                          <TableCell align="right" sx={{ backgroundColor: '#ffffff',
+                                fontWeight: 600, color: '#2563eb',
+                                borderBottom: '1px solid #f1f3f4' }}>{`Sales (${getCurrencySymbol()})`}</TableCell>
+                          <TableCell align="right" sx={{ backgroundColor: '#ffffff',
+                                fontWeight: 600, color: '#10b981',
+                                borderBottom: '1px solid #f1f3f4' }}>{`Settlement (${getCurrencySymbol()})`}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -5752,7 +5749,17 @@ const MarketplaceReconciliation: React.FC = () => {
                                 '&:hover': { backgroundColor: '#f0f9ff' }
                               }}
                             >
-                              <TableCell sx={{ fontWeight: 500, color: '#1f2937' }}>{row.month}</TableCell>
+                              <TableCell sx={{
+                                fontWeight: 500,
+                                color: '#1f2937',
+                                position: 'sticky',
+                                left: 0,
+                                backgroundColor: 'inherit',
+                                borderRight: '1px solid #e5e7eb',
+                                zIndex: 1
+                              }}>
+                                {row.month}
+                              </TableCell>
                               <TableCell align="right" sx={{ color: '#2563eb', fontWeight: 600 }}>{formatCurrency(row.sales)}</TableCell>
                               <TableCell align="right" sx={{ color: '#10b981', fontWeight: 600 }}>{formatCurrency(row.settlement)}</TableCell>
                             </TableRow>
@@ -5760,7 +5767,18 @@ const MarketplaceReconciliation: React.FC = () => {
                         })}
                         {/* Summary Row */}
                         <TableRow sx={{ backgroundColor: '#f1f5f9' }}>
-                          <TableCell sx={{ fontWeight: 700, color: '#1f2937', borderTop: '2px solid #e5e7eb' }}>Total</TableCell>
+                          <TableCell sx={{
+                            fontWeight: 700,
+                            color: '#1f2937',
+                            borderTop: '2px solid #e5e7eb',
+                            borderRight: '1px solid #e5e7eb',
+                            position: 'sticky',
+                            left: 0,
+                            backgroundColor: 'inherit',
+                            zIndex: 2
+                          }}>
+                            Total
+                          </TableCell>
                           <TableCell align="right" sx={{ fontWeight: 700, color: '#2563eb', borderTop: '2px solid #e5e7eb' }}>
                             {formatCurrency(d2cSalesGrowthData.reduce((sum, r) => sum + r.sales, 0))}
                           </TableCell>
@@ -5843,12 +5861,27 @@ const MarketplaceReconciliation: React.FC = () => {
                     maxHeight: 600,
                     borderRadius: '12px',
                     border: '1px solid #e5e7eb',
-                    overflowX: 'auto'
+                    overflowX: 'auto',
+                    pb: 1,
+                    '&::-webkit-scrollbar': { height: '4px' },
+                    '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+                    '&::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: '4px' },
+                    '&::-webkit-scrollbar-thumb:hover': { backgroundColor: 'rgba(0,0,0,0.2)' }
                   }}>
                     <Table stickyHeader size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', minWidth: 100 }}>
+                          <TableCell sx={{
+                            backgroundColor: '#ffffff',
+                            fontWeight: 600,
+                            color: '#64748b',
+                            borderBottom: '1px solid #f1f3f4',
+                            borderRight: '1px solid #e5e7eb',
+                            minWidth: 100,
+                            position: 'sticky',
+                            left: 0,
+                            zIndex: 3
+                          }}>
                             Month
                           </TableCell>
                           {Object.keys(d2cVendorSettlementData?.cod || {}).map((vendor, idx) => (
@@ -5856,17 +5889,19 @@ const MarketplaceReconciliation: React.FC = () => {
                               key={vendor}
                               align="right"
                               sx={{
-                                backgroundColor: '#f8fafc',
-                                fontWeight: 700,
+                                backgroundColor: '#ffffff',
+                                fontWeight: 600,
                                 color: getCodVendorColor(vendor),
-                                borderBottom: '2px solid #e5e7eb',
+                                borderBottom: '1px solid #f1f3f4',
                                 minWidth: 120
                               }}
                             >
                               {vendor}
                             </TableCell>
                           ))}
-                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#1f2937', borderBottom: '2px solid #e5e7eb', minWidth: 120 }}>
+                          <TableCell align="right" sx={{ backgroundColor: '#ffffff',
+                                fontWeight: 600, color: '#1f2937',
+                                borderBottom: '1px solid #f1f3f4', minWidth: 120 }}>
                             Total
                           </TableCell>
                         </TableRow>
@@ -5887,7 +5922,17 @@ const MarketplaceReconciliation: React.FC = () => {
                                 '&:hover': { backgroundColor: '#fff7ed' }
                               }}
                             >
-                              <TableCell sx={{ fontWeight: 500, color: '#1f2937' }}>{row.month}</TableCell>
+                              <TableCell sx={{
+                                fontWeight: 500,
+                                color: '#1f2937',
+                                position: 'sticky',
+                                left: 0,
+                                backgroundColor: 'inherit',
+                                borderRight: '1px solid #e5e7eb',
+                                zIndex: 1
+                              }}>
+                                {row.month}
+                              </TableCell>
                               {codVendorKeys.map(vendor => {
                                 const key = vendor.replace(/\s+/g, '_');
                                 const value = (row as any)[key] || 0;
@@ -5905,7 +5950,18 @@ const MarketplaceReconciliation: React.FC = () => {
                         })}
                         {/* Summary Row */}
                         <TableRow sx={{ backgroundColor: '#fef3c7' }}>
-                          <TableCell sx={{ fontWeight: 700, color: '#1f2937', borderTop: '2px solid #e5e7eb' }}>Total</TableCell>
+                          <TableCell sx={{
+                            fontWeight: 700,
+                            color: '#1f2937',
+                            borderTop: '2px solid #e5e7eb',
+                            borderRight: '1px solid #e5e7eb',
+                            position: 'sticky',
+                            left: 0,
+                            backgroundColor: 'inherit',
+                            zIndex: 2
+                          }}>
+                            Total
+                          </TableCell>
                           {Object.keys(d2cVendorSettlementData?.cod || {}).map(vendor => {
                             const key = vendor.replace(/\s+/g, '_');
                             const vendorTotal = d2cCodVendorSettlementCombinedData.reduce((sum, r) => sum + ((r as any)[key] || 0), 0);
@@ -6002,12 +6058,27 @@ const MarketplaceReconciliation: React.FC = () => {
                     maxHeight: 600,
                     borderRadius: '12px',
                     border: '1px solid #e5e7eb',
-                    overflowX: 'auto'
+                    overflowX: 'auto',
+                    pb: 1,
+                    '&::-webkit-scrollbar': { height: '4px' },
+                    '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+                    '&::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: '4px' },
+                    '&::-webkit-scrollbar-thumb:hover': { backgroundColor: 'rgba(0,0,0,0.2)' }
                   }}>
                     <Table stickyHeader size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', minWidth: 100 }}>
+                          <TableCell sx={{
+                            backgroundColor: '#ffffff',
+                            fontWeight: 600,
+                            color: '#64748b',
+                            borderBottom: '1px solid #f1f3f4',
+                            borderRight: '1px solid #e5e7eb',
+                            minWidth: 100,
+                            position: 'sticky',
+                            left: 0,
+                            zIndex: 3
+                          }}>
                             Month
                           </TableCell>
                           {Object.keys(d2cVendorSettlementData?.noncod || {}).map((vendor, idx) => (
@@ -6015,17 +6086,19 @@ const MarketplaceReconciliation: React.FC = () => {
                               key={vendor}
                               align="right"
                               sx={{
-                                backgroundColor: '#f8fafc',
-                                fontWeight: 700,
+                                backgroundColor: '#ffffff',
+                                fontWeight: 600,
                                 color: getNonCodVendorColor(vendor),
-                                borderBottom: '2px solid #e5e7eb',
+                                borderBottom: '1px solid #f1f3f4',
                                 minWidth: 120
                               }}
                             >
                               {vendor}
                             </TableCell>
                           ))}
-                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#1f2937', borderBottom: '2px solid #e5e7eb', minWidth: 120 }}>
+                          <TableCell align="right" sx={{ backgroundColor: '#ffffff',
+                                fontWeight: 600, color: '#1f2937',
+                                borderBottom: '1px solid #f1f3f4', minWidth: 120 }}>
                             Total
                           </TableCell>
                         </TableRow>
@@ -6042,11 +6115,21 @@ const MarketplaceReconciliation: React.FC = () => {
                             <TableRow
                               key={row.month}
                               sx={{
-                                backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9fafb',
-                                '&:hover': { backgroundColor: '#f5f3ff' }
+                                backgroundColor: '#ffffff',
+                                '&:hover': { backgroundColor: '#f1f5f9' }
                               }}
                             >
-                              <TableCell sx={{ fontWeight: 500, color: '#1f2937' }}>{row.month}</TableCell>
+                              <TableCell sx={{
+                                fontWeight: 500,
+                                color: '#1f2937',
+                                position: 'sticky',
+                                left: 0,
+                                backgroundColor: 'inherit',
+                                borderRight: '1px solid #e5e7eb',
+                                zIndex: 1
+                              }}>
+                                {row.month}
+                              </TableCell>
                               {nonCodVendorKeys.map(vendor => {
                                 const key = vendor.replace(/\s+/g, '_');
                                 const value = (row as any)[key] || 0;
@@ -6064,7 +6147,18 @@ const MarketplaceReconciliation: React.FC = () => {
                         })}
                         {/* Summary Row */}
                         <TableRow sx={{ backgroundColor: '#ede9fe' }}>
-                          <TableCell sx={{ fontWeight: 700, color: '#1f2937', borderTop: '2px solid #e5e7eb' }}>Total</TableCell>
+                          <TableCell sx={{
+                            fontWeight: 700,
+                            color: '#1f2937',
+                            borderTop: '2px solid #e5e7eb',
+                            borderRight: '1px solid #e5e7eb',
+                            position: 'sticky',
+                            left: 0,
+                            backgroundColor: 'inherit',
+                            zIndex: 2
+                          }}>
+                            Total
+                          </TableCell>
                           {Object.keys(d2cVendorSettlementData?.noncod || {}).map(vendor => {
                             const key = vendor.replace(/\s+/g, '_');
                             const vendorTotal = d2cNonCodVendorSettlementCombinedData.reduce((sum, r) => sum + ((r as any)[key] || 0), 0);
@@ -6196,37 +6290,38 @@ const MarketplaceReconciliation: React.FC = () => {
       {/* Sync modal removed; animation shown on the button icon itself */}
 
       {/* TransactionSheet Overlay */}
-      {showTransactionSheet && (
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 9999,
-            background: 'rgba(0, 0, 0, 0.5)',
+      <Drawer
+        anchor="right"
+        open={showTransactionSheet}
+        onClose={() => {
+          setShowTransactionSheet(false);
+          setSelectedProviderPlatform(undefined);
+          setInitialTsFilters(undefined);
+        }}
+        PaperProps={{
+          sx: { width: '100%', maxWidth: '100vw' }
+        }}
+        transitionDuration={350}
+        keepMounted={false}
+      >
+        <TransactionSheet
+          onBack={() => {
+            setShowTransactionSheet(false);
+            setSelectedProviderPlatform(undefined);
+            setInitialTsFilters(undefined);
           }}
-        >
-          <TransactionSheet
-            onBack={() => {
-              setShowTransactionSheet(false);
-              setSelectedProviderPlatform(undefined);
-              setInitialTsFilters(undefined);
-            }}
-            statsData={reconciliationData}
-            initialTab={initialTsTab}
-            dateRange={effectiveDateRangeForTs}
-            initialPlatforms={
-              selectedPlatform &&
-              (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || selectedPlatform === 'other')
-                ? [selectedPlatform as 'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other']
-                : undefined
-            }
-            initialFilters={initialTsFilters}
-          />
-        </Box>
-      )}
+          statsData={reconciliationData}
+          initialTab={initialTsTab}
+          dateRange={effectiveDateRangeForTs}
+          initialPlatforms={
+            selectedPlatform &&
+            (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || selectedPlatform === 'other')
+              ? [selectedPlatform as 'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other']
+              : undefined
+          }
+          initialFilters={initialTsFilters}
+        />
+      </Drawer>
 
 
     </Box>
