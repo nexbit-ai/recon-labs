@@ -3904,7 +3904,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS,
         params,
         {
-          headers: {}
+          headers: {},
+          useCache: true,
+          cacheTimeMs: 300000 // 5 minutes cache
         }
       );
 

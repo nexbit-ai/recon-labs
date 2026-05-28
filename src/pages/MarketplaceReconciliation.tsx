@@ -199,6 +199,7 @@ import {
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
 import { apiService } from '../services/api/apiService';
+import { API_CONFIG } from '../services/api/config';
 import { MarketplaceReconciliationResponse, MainSummaryResponse, ProviderAgeingData, AgeingAnalysisResponse, ReconciliationStatus } from '../services/api/types';
 import { api as apiIndex } from '../services/api';
 import { mockReconciliationData, getSafeReconciliationData, isValidReconciliationData } from '../data/mockReconciliationData';
@@ -2106,6 +2107,40 @@ const MarketplaceReconciliation: React.FC = () => {
       // ignore storage errors
     }
   }, [effectiveDateRangeForTs.start, effectiveDateRangeForTs.end]);
+
+  // --- EAGER PREFETCHING FOR TRANSACTION SHEET ---
+  // This is a senior-level performance optimization. We silently fetch the first page of transactions 
+  // into our custom cache while the user is looking at the dashboard. 
+  // When they click "View Transactions", the latency will be completely hidden.
+  useEffect(() => {
+    // Debounce the prefetch to prevent spamming the database during rapid filter changes
+    const prefetchTimer = setTimeout(() => {
+      const params: Record<string, any> = {
+        page: 1,
+        limit: 100, // Matches the default rowsPerPage in TransactionSheet
+        sort_by: 'order_date',
+        sort_order: 'desc',
+      };
+      
+      if (selectedPlatform) {
+        params.platform = selectedPlatform;
+      }
+      
+      if (effectiveDateRangeForTs.start && effectiveDateRangeForTs.end) {
+        params.order_date_from = effectiveDateRangeForTs.start;
+        params.order_date_to = effectiveDateRangeForTs.end;
+      }
+
+      console.log('🔄 [Prefetch] Eagerly background fetching TransactionSheet data...');
+      apiService.get(API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS, params, { 
+        useCache: true, 
+        cacheTimeMs: 300000 // Cache lives for 5 minutes
+      }).catch(() => { /* Ignore errors on background prefetch */ });
+      
+    }, 1500); // 1.5s debounce wait time
+
+    return () => clearTimeout(prefetchTimer);
+  }, [selectedPlatform, effectiveDateRangeForTs.start, effectiveDateRangeForTs.end]);
 
   // Helper function to generate last 12 months labels
   const generateLast12Months = () => {

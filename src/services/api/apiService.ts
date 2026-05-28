@@ -3,11 +3,18 @@ import { API_CONFIG, buildApiUrl, buildAuthUrl, replaceUrlParams, DEBUG_CONFIG }
 import { ApiResponse, ApiError, ApiRequestConfig, RequestConfig } from './types';
 import JWTService from '../auth/jwtService';
 
+interface CacheEntry<T> {
+  data?: ApiResponse<T>;
+  promise?: Promise<ApiResponse<T>>;
+  timestamp: number;
+}
+
 class ApiService {
   private baseURL: string;
   private authURL: string;
   private requestQueue: Array<() => void> = [];
   private isRefreshing = false;
+  private cache = new Map<string, CacheEntry<any>>();
 
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
@@ -20,6 +27,35 @@ class ApiService {
     
     // Build full URL
     const fullUrl = this.buildFullUrl(url, params);
+    
+    // Check cache for GET requests
+    if (method === 'GET' && requestConfig.useCache) {
+      const cacheKey = fullUrl;
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        const cacheTimeMs = requestConfig.cacheTimeMs || 60000; // default 60s
+        
+        // If there's an in-flight promise, wait for it instead of firing a new request!
+        if (cached.promise) {
+          if (DEBUG_CONFIG.LOG_REQUESTS) {
+            console.log(`🚀 API Request (AWAITING IN-FLIGHT): ${method} ${fullUrl}`);
+          }
+          const resolvedData = await cached.promise;
+          return JSON.parse(JSON.stringify(resolvedData));
+        }
+
+        // If we have resolved data and it's fresh
+        if (cached.data && Date.now() - cached.timestamp < cacheTimeMs) {
+          if (DEBUG_CONFIG.LOG_REQUESTS) {
+            console.log(`🚀 API Request (CACHED): ${method} ${fullUrl}`);
+          }
+          // Return a deeply cloned response so mutating it doesn't corrupt the cache
+          return JSON.parse(JSON.stringify(cached.data));
+        } else {
+          this.cache.delete(cacheKey);
+        }
+      }
+    }
     
     // Prepare request configuration
     const requestOptions: RequestInit = {
@@ -38,24 +74,43 @@ class ApiService {
     const timeoutId = setTimeout(() => controller.abort(), requestConfig.timeout || API_CONFIG.REQUEST_TIMEOUT);
     requestOptions.signal = controller.signal;
 
-    try {
-      // Log request in development
-      if (DEBUG_CONFIG.LOG_REQUESTS) {
-        console.log(`🚀 API Request: ${method} ${fullUrl}`, { data, params });
-      }
+    const requestPromise = (async () => {
+      try {
+        // Log request in development
+        if (DEBUG_CONFIG.LOG_REQUESTS) {
+          console.log(`🚀 API Request: ${method} ${fullUrl}`, { data, params });
+        }
 
-      // Make the request with retry logic
-      const response = await this.makeRequestWithRetry(fullUrl, requestOptions, requestConfig);
+        // Make the request with retry logic
+        const response = await this.makeRequestWithRetry(fullUrl, requestOptions, requestConfig);
+        
+        clearTimeout(timeoutId);
+        
+        // Handle response
+        return await this.handleResponse<T>(response);
+        
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw this.handleError(error);
+      }
+    })();
+
+    // Save promise to cache for deduplication
+    if (method === 'GET' && requestConfig.useCache) {
+      const cacheKey = fullUrl;
+      this.cache.set(cacheKey, { promise: requestPromise, timestamp: Date.now() });
       
-      clearTimeout(timeoutId);
-      
-      // Handle response
-      return await this.handleResponse<T>(response);
-      
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw this.handleError(error);
+      requestPromise.then(data => {
+        // Replace promise with actual resolved data
+        this.cache.set(cacheKey, { data, timestamp: Date.now() });
+      }).catch(() => {
+        // Clear cache if request fails
+        this.cache.delete(cacheKey);
+      });
     }
+
+    const responseData = await requestPromise;
+    return responseData;
   }
 
   // Retry logic for failed requests
