@@ -2665,8 +2665,7 @@ const MarketplaceReconciliation: React.FC = () => {
 
       <Box sx={{ p: { xs: 2, md: 3 }, position: 'relative', zIndex: 1 }}>
         {/* Header */}
-        <Fade in timeout={800}>
-          <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: 2 }}>
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
@@ -2682,14 +2681,26 @@ const MarketplaceReconciliation: React.FC = () => {
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
                   {/* Last updated timestamp - inline left of date filter */}
-                  {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mr: 0.5 }}>
-                      <CheckCircleIcon sx={{ fontSize: 13, color: '#16a34a' }} />
-                      <Typography sx={{ fontSize: '0.72rem', color: '#6b7280', fontWeight: 400, whiteSpace: 'nowrap' }}>
-                        Last updated at {formatReconciliationTimestamp(normalizedReconciliationStatus.last_completed_at)}
-                      </Typography>
-                    </Box>
-                  )}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'flex-end',
+                    gap: 0.5, 
+                    mr: 0.5, 
+                    minWidth: 210,
+                    opacity: (normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at) ? 1 : 0,
+                    visibility: (normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at) ? 'visible' : 'hidden',
+                    transition: 'opacity 0.3s ease'
+                  }}>
+                    {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at && (
+                      <>
+                        <CheckCircleIcon sx={{ fontSize: 13, color: '#16a34a' }} />
+                        <Typography sx={{ fontSize: '0.72rem', color: '#6b7280', fontWeight: 400, whiteSpace: 'nowrap' }}>
+                          Last updated at {formatReconciliationTimestamp(normalizedReconciliationStatus.last_completed_at)}
+                        </Typography>
+                      </>
+                    )}
+                  </Box>
                   <Button
                     variant="outlined"
                     endIcon={<KeyboardArrowDownIcon />}
@@ -3030,7 +3041,6 @@ const MarketplaceReconciliation: React.FC = () => {
               </Alert>
             )}
           </Box>
-        </Fade>
 
         {/* Status Message - only show when reconciliation_status exists from backend */}
         {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processing' && (
@@ -3124,7 +3134,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
-                          minWidth: 140,
+                          width: 160,
                           cursor: onClick ? 'pointer' : 'default'
                         }}
                       >
@@ -3134,9 +3144,14 @@ const MarketplaceReconciliation: React.FC = () => {
                         <Typography sx={{ fontSize: '1.5rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
                           {getCurrencySymbol()}{Math.round(Number(amount || 0)).toLocaleString(getCurrencyLocale())}
                         </Typography>
-                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
-                          {Number(count || 0).toLocaleString('en-IN')} orders
-                        </Typography>
+                        <Box sx={{ display: 'flex', width: '100%', alignItems: 'baseline' }}>
+                          <Typography sx={{ flex: 1, textAlign: 'right', pr: 0.5, fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.025em', fontVariantNumeric: 'tabular-nums' }}>
+                            {Number(count || 0).toLocaleString('en-IN')}
+                          </Typography>
+                          <Typography sx={{ flex: 1, textAlign: 'left', pl: 0, fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
+                            orders
+                          </Typography>
+                        </Box>
                       </Box>
                     );
 
@@ -3771,9 +3786,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                     }}>
                                       {formatCurrency(settledAmount)}
                                     </Typography>
-                                    <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
-                                      {(matchedCount).toLocaleString('en-IN')} Orders Matched
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'baseline', color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
+                                      <Typography sx={{ width: 85, textAlign: 'left', fontWeight: 'inherit', fontSize: 'inherit', fontVariantNumeric: 'tabular-nums' }}>
+                                        {(matchedCount).toLocaleString('en-IN')}
+                                      </Typography>
+                                      <Typography sx={{ fontWeight: 'inherit', fontSize: 'inherit' }}>
+                                        Orders Matched
+                                      </Typography>
+                                    </Box>
                                   </Box>
                                   <Box sx={{ textAlign: 'right' }}>
                                     {/* <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>
@@ -3788,9 +3808,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                           {formatCurrency(expectedSalesAmount)}
                                         </Typography>
                                       </Box>
-                                      <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
-                                        {(expectedSalesCount).toLocaleString('en-IN')} Orders
-                                      </Typography>
+                                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', color: '#6b7280' }}>
+                                        <Typography variant="caption" sx={{ width: 85, textAlign: 'right', pr: 0.5, fontVariantNumeric: 'tabular-nums' }}>
+                                          {(expectedSalesCount).toLocaleString('en-IN')}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ textAlign: 'left', width: 45 }}>
+                                          Orders
+                                        </Typography>
+                                      </Box>
                                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                                         {/* <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
                                           Settled&nbsp;<span style={{ marginLeft: 130 }}>{percentSettled.toFixed(1)}%</span>
@@ -4287,9 +4312,14 @@ const MarketplaceReconciliation: React.FC = () => {
                               }}>
                                 {formatCurrency(Math.abs(totalUnrecAmount))}
                               </Typography>
-                              <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
-                                {(totalUnrecCount).toLocaleString('en-IN')} Orders
-                              </Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'baseline', color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
+                                <Typography sx={{ width: 85, textAlign: 'left', fontWeight: 'inherit', fontSize: 'inherit', fontVariantNumeric: 'tabular-nums' }}>
+                                  {(totalUnrecCount).toLocaleString('en-IN')}
+                                </Typography>
+                                <Typography sx={{ fontWeight: 'inherit', fontSize: 'inherit' }}>
+                                  Orders
+                                </Typography>
+                              </Box>
                             </Box>
                             <Box sx={{ textAlign: 'right' }}>
                               {/* <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>
@@ -4304,9 +4334,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                     {formatCurrency(Math.abs(lessPaymentAmount))}
                                   </Typography>
                                 </Box>
-                                <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
-                                  {lessPaymentCount.toLocaleString('en-IN')} Orders
-                                </Typography>
+                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', color: '#6b7280' }}>
+                                  <Typography variant="caption" sx={{ width: 85, textAlign: 'right', pr: 0.5, fontVariantNumeric: 'tabular-nums' }}>
+                                    {lessPaymentCount.toLocaleString('en-IN')}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ textAlign: 'left', width: 45 }}>
+                                    Orders
+                                  </Typography>
+                                </Box>
                                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                                   <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
                                     More Payment Received
@@ -4315,9 +4350,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                     {formatCurrency(Math.abs(morePaymentAmount))}
                                   </Typography>
                                 </Box>
-                                <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
-                                  {morePaymentCount.toLocaleString('en-IN')} Orders
-                                </Typography>
+                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', color: '#6b7280' }}>
+                                  <Typography variant="caption" sx={{ width: 85, textAlign: 'right', pr: 0.5, fontVariantNumeric: 'tabular-nums' }}>
+                                    {morePaymentCount.toLocaleString('en-IN')}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ textAlign: 'left', width: 45 }}>
+                                    Orders
+                                  </Typography>
+                                </Box>
                               </Box>
                             </Box>
                           </Box>
