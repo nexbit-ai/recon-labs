@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { TableVirtuoso } from 'react-virtuoso';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -5319,7 +5320,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 position: 'relative',
                 zIndex: 1,
               }}>
-                <Table stickyHeader sx={{
+                
+                  {(paginationLoading && !isSorting) ? (
+                    <Table stickyHeader sx={{
                   tableLayout: 'fixed',
                   borderCollapse: 'separate',
                   borderSpacing: 0,
@@ -5340,8 +5343,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     // paddingBottom: '2px',
                   }
                 }}>
-                  <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
-                    <TableRow>
+                      <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
+                        <TableRow>
                       {getCurrentColumns().map((column, index) => (
                         <TableCell
                           key={`header-${column}`}
@@ -5597,35 +5600,338 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         </TableCell>
                       ))}
                     </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {(paginationLoading && !isSorting) ? (
-                      <TableRow>
-                        <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                            <CircularProgress size={30} sx={{ color: '#3b82f6' }} />
-                            <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>
-                              Loading page {currentPage}...
-                            </Typography>
+                      </TableHead>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                              <CircularProgress size={30} sx={{ color: '#3b82f6' }} />
+                              <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>
+                                Loading page {currentPage}...
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  ) : getCurrentData().length === 0 ? (
+                    <Table stickyHeader sx={{
+                  tableLayout: 'fixed',
+                  borderCollapse: 'separate',
+                  borderSpacing: 0,
+                  '& .MuiTableCell-root': {
+                    border: 'none !important',
+                  },
+                  '& .MuiTableCell-head': {
+                    border: 'none !important',
+                    borderBottom: '0.5px solid #e5e7eb !important',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 2,
+                  },
+                  '& .MuiTableCell-body': {
+                    border: 'none !important',
+                    borderBottom: '0.5px solid #e5e7eb !important',
+                    // paddingTop: '2px',
+                    // paddingBottom: '2px',
+                  }
+                }}>
+                      <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
+                        <TableRow>
+                      {getCurrentColumns().map((column, index) => (
+                        <TableCell
+                          key={`header-${column}`}
+                          sx={{
+                            fontWeight: 700,
+                            color: '#111827',
+                            background: '#f3f4f6',
+                            textAlign: 'center',
+                            py: 0.75,
+                            width: '160px',
+                            minWidth: 160,
+                            transition: 'all 0.3s ease',
+                            position: 'relative',
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            {/* Column Header */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
+                                {column === 'Status' ? 'Status' : column}
+                              </Typography>
+                              {/* Sorting button - different handlers for Sales Report vs other tabs */}
+                              {activeTab === 4 ? (
+                                // Sales Report tab sorting
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSalesReportSort(column);
+                                    }}
+                                    sx={{
+                                      ml: 0.5,
+                                      color: salesReportSortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                      background: salesReportSortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                      '&:hover': { background: '#f3f4f6' },
+                                    }}
+                                    disabled={!getSalesReportSortBy(column)}
+                                    aria-label={`Sort ${column}`}
+                                  >
+                                    {getSalesReportSortIcon(column)}
+                                  </IconButton>
+                                  {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
+                                  {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                    (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
+                                    (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setShowSalesReportSearch(!showSalesReportSearch);
+                                        }}
+                                        sx={{
+                                          ml: 0.5,
+                                          color: showSalesReportSearch ? '#1f2937' : '#6b7280',
+                                          background: showSalesReportSearch ? '#e5e7eb' : 'transparent',
+                                          '&:hover': { background: '#f3f4f6' },
+                                        }}
+                                        aria-label="Toggle search"
+                                      >
+                                        <SearchIcon sx={{ fontSize: '1rem' }} />
+                                      </IconButton>
+                                    )}
+                                </>
+                              ) : (
+                                // Other tabs sorting
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSort(column);
+                                    }}
+                                    sx={{
+                                      ml: 0.5,
+                                      color: sortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                      background: sortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                      '&:hover': { background: '#f3f4f6' },
+                                    }}
+                                    disabled={!COLUMN_TO_SORT_BY_MAP[column]}
+                                    aria-label={`Sort ${column}`}
+                                  >
+                                    {getSortIcon(column)}
+                                  </IconButton>
+                                  {/* Magnifying glass button for Order ID search */}
+                                  {column === 'Order ID' && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowOrderIdSearch(!showOrderIdSearch);
+                                      }}
+                                      sx={{
+                                        ml: 0.5,
+                                        color: showOrderIdSearch ? '#1f2937' : '#6b7280',
+                                        background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
+                                        '&:hover': { background: '#f3f4f6' },
+                                      }}
+                                      aria-label="Toggle search"
+                                    >
+                                      <SearchIcon sx={{ fontSize: '1rem' }} />
+                                    </IconButton>
+                                  )}
+                                </>
+                              )}
+                            </Box>
+                            {/* Order ID Search Bar - Floating Popover */}
+                            {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 'calc(100% + 4px)',
+                                  left: 0,
+                                  zIndex: 20,
+                                  background: '#ffffff',
+                                  borderRadius: '8px',
+                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                  padding: '4px',
+                                  border: '1px solid #e5e7eb',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.5,
+                                  width: 'calc(100% - 16px)',
+                                  animation: 'slideDown 0.2s ease-out forwards',
+                                  '@keyframes slideDown': {
+                                    '0%': { transform: 'translateY(-10px)', opacity: 0 },
+                                    '100%': { transform: 'translateY(0)', opacity: 1 }
+                                  }
+                                }}
+                              >
+                                <TextField
+                                  size="small"
+                                  value={orderIdSearch}
+                                  onChange={handleOrderIdSearchChange}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleOrderIdSearchClick();
+                                    }
+                                  }}
+                                  InputProps={{
+                                    endAdornment: (
+                                      <InputAdornment position="end">
+                                        {orderIdSearch?.trim() && (
+                                          <IconButton
+                                            size="small"
+                                            onClick={handleOrderIdSearchClear}
+                                            disabled={(loading || quadApiLoading) && !isSorting}
+                                            sx={{ p: 0.5, mr: 0.25 }}
+                                          >
+                                            <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
+                                          </IconButton>
+                                        )}
+                                        <IconButton
+                                          size="small"
+                                          onClick={handleOrderIdSearchClick}
+                                          disabled={(loading || quadApiLoading) && !isSorting}
+                                          sx={{ p: 0.5 }}
+                                        >
+                                          <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                        </IconButton>
+                                      </InputAdornment>
+                                    ),
+                                  }}
+                                  sx={{
+                                    width: '100%',
+                                    '& .MuiOutlinedInput-root': {
+                                      height: '32px',
+                                      fontSize: '0.75rem',
+                                      background: 'white',
+                                    }
+                                  }}
+                                />
+                              </Box>
+                            )}
+                            {/* Sales Report Search Bar - Floating Popover */}
+                            {activeTab === 4 && showSalesReportSearch &&
+                              ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
+                                (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                <Box
+                                  sx={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 4px)',
+                                    left: 0,
+                                    zIndex: 20,
+                                    background: '#ffffff',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                    padding: '4px',
+                                    border: '1px solid #e5e7eb',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.5,
+                                    width: 'calc(100% - 16px)',
+                                    animation: 'slideDown 0.2s ease-out forwards'
+                                    , '@keyframes slideDown': {
+                                      '0%': { transform: 'translateY(-10px)', opacity: 0 },
+                                      '100%': { transform: 'translateY(0)', opacity: 1 }
+                                    }
+                                  }}
+                                >
+                                  <TextField
+                                    size="small"
+                                    value={salesReportSearch}
+                                    onChange={handleSalesReportSearchChange}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSalesReportSearchClick();
+                                      }
+                                    }}
+                                    InputProps={{
+                                      endAdornment: (
+                                        <InputAdornment position="end">
+                                          {salesReportSearch?.trim() && (
+                                            <IconButton
+                                              size="small"
+                                              onClick={handleSalesReportSearchClear}
+                                              disabled={salesReportLoading && !isSorting}
+                                              sx={{ p: 0.5, mr: 0.25 }}
+                                            >
+                                              <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
+                                            </IconButton>
+                                          )}
+                                          <IconButton
+                                            size="small"
+                                            onClick={handleSalesReportSearchClick}
+                                            disabled={salesReportLoading && !isSorting}
+                                            sx={{ p: 0.5 }}
+                                          >
+                                            <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                          </IconButton>
+                                        </InputAdornment>
+                                      ),
+                                    }}
+                                    sx={{
+                                      width: '280px',
+                                      '& .MuiOutlinedInput-root': {
+                                        height: '32px',
+                                        fontSize: '0.75rem',
+                                        background: 'white',
+                                      }
+                                    }}
+                                  />
+                                </Box>
+                              )}
                           </Box>
                         </TableCell>
-                      </TableRow>
-                    ) : getCurrentData().length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
-                          <Typography variant="body2" sx={{ color: '#6b7280' }}>
-                            {totalTransactionsData ? 'No transactions found.' : 'No data available.'}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      getCurrentData()
-                        .map((row, rowIndex) => {
-                          const isSelected = (selectedTransaction?.["Order ID"] || selectedTransaction?.["Order Item ID"]) === (row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"]);
-                          return (
-                            <React.Fragment key={rowIndex}>
-                              <TableRow
-                                sx={{
+                      ))}
+                    </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
+                            <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                              {totalTransactionsData ? 'No transactions found.' : 'No data available.'}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <TableVirtuoso
+                      data={getCurrentData()}
+                      useWindowScroll={false}
+                      components={{
+                        Table: (props) => <Table {...props} stickyHeader sx={{
+                  tableLayout: 'fixed',
+                  borderCollapse: 'separate',
+                  borderSpacing: 0,
+                  '& .MuiTableCell-root': {
+                    border: 'none !important',
+                  },
+                  '& .MuiTableCell-head': {
+                    border: 'none !important',
+                    borderBottom: '0.5px solid #e5e7eb !important',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 2,
+                  },
+                  '& .MuiTableCell-body': {
+                    border: 'none !important',
+                    borderBottom: '0.5px solid #e5e7eb !important',
+                    // paddingTop: '2px',
+                    // paddingBottom: '2px',
+                  }
+                }} />,
+                        TableHead: React.forwardRef((props, ref) => <TableHead {...props} ref={ref} sx={{ '& .MuiTableCell-root': { border: 'none !important' } }} />),
+                        TableRow: (props) => <TableRow {...props} sx={{
                                   borderLeft: `4px solid ${activeTab === 0 ? '#10b981' : // Matched - green
                                       activeTab === 1 ? '#f59e0b' : // Mismatched - orange
                                         activeTab === 2 ? '#ef4444' : // Unsettled - red
@@ -5634,8 +5940,275 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     }`,
                                   background: '#ffffff',
                                   position: 'relative',
+                                }} />,
+                        TableBody: React.forwardRef((props, ref) => <TableBody {...props} ref={ref} />),
+                      }}
+                      fixedHeaderContent={() => (
+                        <TableRow>
+                          
+                      {getCurrentColumns().map((column, index) => (
+                        <TableCell
+                          key={`header-${column}`}
+                          sx={{
+                            fontWeight: 700,
+                            color: '#111827',
+                            background: '#f3f4f6',
+                            textAlign: 'center',
+                            py: 0.75,
+                            width: '160px',
+                            minWidth: 160,
+                            transition: 'all 0.3s ease',
+                            position: 'relative',
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            {/* Column Header */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
+                                {column === 'Status' ? 'Status' : column}
+                              </Typography>
+                              {/* Sorting button - different handlers for Sales Report vs other tabs */}
+                              {activeTab === 4 ? (
+                                // Sales Report tab sorting
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSalesReportSort(column);
+                                    }}
+                                    sx={{
+                                      ml: 0.5,
+                                      color: salesReportSortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                      background: salesReportSortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                      '&:hover': { background: '#f3f4f6' },
+                                    }}
+                                    disabled={!getSalesReportSortBy(column)}
+                                    aria-label={`Sort ${column}`}
+                                  >
+                                    {getSalesReportSortIcon(column)}
+                                  </IconButton>
+                                  {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
+                                  {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                    (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
+                                    (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setShowSalesReportSearch(!showSalesReportSearch);
+                                        }}
+                                        sx={{
+                                          ml: 0.5,
+                                          color: showSalesReportSearch ? '#1f2937' : '#6b7280',
+                                          background: showSalesReportSearch ? '#e5e7eb' : 'transparent',
+                                          '&:hover': { background: '#f3f4f6' },
+                                        }}
+                                        aria-label="Toggle search"
+                                      >
+                                        <SearchIcon sx={{ fontSize: '1rem' }} />
+                                      </IconButton>
+                                    )}
+                                </>
+                              ) : (
+                                // Other tabs sorting
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSort(column);
+                                    }}
+                                    sx={{
+                                      ml: 0.5,
+                                      color: sortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                      background: sortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                      '&:hover': { background: '#f3f4f6' },
+                                    }}
+                                    disabled={!COLUMN_TO_SORT_BY_MAP[column]}
+                                    aria-label={`Sort ${column}`}
+                                  >
+                                    {getSortIcon(column)}
+                                  </IconButton>
+                                  {/* Magnifying glass button for Order ID search */}
+                                  {column === 'Order ID' && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowOrderIdSearch(!showOrderIdSearch);
+                                      }}
+                                      sx={{
+                                        ml: 0.5,
+                                        color: showOrderIdSearch ? '#1f2937' : '#6b7280',
+                                        background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
+                                        '&:hover': { background: '#f3f4f6' },
+                                      }}
+                                      aria-label="Toggle search"
+                                    >
+                                      <SearchIcon sx={{ fontSize: '1rem' }} />
+                                    </IconButton>
+                                  )}
+                                </>
+                              )}
+                            </Box>
+                            {/* Order ID Search Bar - Floating Popover */}
+                            {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 'calc(100% + 4px)',
+                                  left: 0,
+                                  zIndex: 20,
+                                  background: '#ffffff',
+                                  borderRadius: '8px',
+                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                  padding: '4px',
+                                  border: '1px solid #e5e7eb',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.5,
+                                  width: 'calc(100% - 16px)',
+                                  animation: 'slideDown 0.2s ease-out forwards',
+                                  '@keyframes slideDown': {
+                                    '0%': { transform: 'translateY(-10px)', opacity: 0 },
+                                    '100%': { transform: 'translateY(0)', opacity: 1 }
+                                  }
                                 }}
                               >
+                                <TextField
+                                  size="small"
+                                  value={orderIdSearch}
+                                  onChange={handleOrderIdSearchChange}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleOrderIdSearchClick();
+                                    }
+                                  }}
+                                  InputProps={{
+                                    endAdornment: (
+                                      <InputAdornment position="end">
+                                        {orderIdSearch?.trim() && (
+                                          <IconButton
+                                            size="small"
+                                            onClick={handleOrderIdSearchClear}
+                                            disabled={(loading || quadApiLoading) && !isSorting}
+                                            sx={{ p: 0.5, mr: 0.25 }}
+                                          >
+                                            <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
+                                          </IconButton>
+                                        )}
+                                        <IconButton
+                                          size="small"
+                                          onClick={handleOrderIdSearchClick}
+                                          disabled={(loading || quadApiLoading) && !isSorting}
+                                          sx={{ p: 0.5 }}
+                                        >
+                                          <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                        </IconButton>
+                                      </InputAdornment>
+                                    ),
+                                  }}
+                                  sx={{
+                                    width: '100%',
+                                    '& .MuiOutlinedInput-root': {
+                                      height: '32px',
+                                      fontSize: '0.75rem',
+                                      background: 'white',
+                                    }
+                                  }}
+                                />
+                              </Box>
+                            )}
+                            {/* Sales Report Search Bar - Floating Popover */}
+                            {activeTab === 4 && showSalesReportSearch &&
+                              ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
+                                (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                <Box
+                                  sx={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 4px)',
+                                    left: 0,
+                                    zIndex: 20,
+                                    background: '#ffffff',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                    padding: '4px',
+                                    border: '1px solid #e5e7eb',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.5,
+                                    width: 'calc(100% - 16px)',
+                                    animation: 'slideDown 0.2s ease-out forwards'
+                                    , '@keyframes slideDown': {
+                                      '0%': { transform: 'translateY(-10px)', opacity: 0 },
+                                      '100%': { transform: 'translateY(0)', opacity: 1 }
+                                    }
+                                  }}
+                                >
+                                  <TextField
+                                    size="small"
+                                    value={salesReportSearch}
+                                    onChange={handleSalesReportSearchChange}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSalesReportSearchClick();
+                                      }
+                                    }}
+                                    InputProps={{
+                                      endAdornment: (
+                                        <InputAdornment position="end">
+                                          {salesReportSearch?.trim() && (
+                                            <IconButton
+                                              size="small"
+                                              onClick={handleSalesReportSearchClear}
+                                              disabled={salesReportLoading && !isSorting}
+                                              sx={{ p: 0.5, mr: 0.25 }}
+                                            >
+                                              <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
+                                            </IconButton>
+                                          )}
+                                          <IconButton
+                                            size="small"
+                                            onClick={handleSalesReportSearchClick}
+                                            disabled={salesReportLoading && !isSorting}
+                                            sx={{ p: 0.5 }}
+                                          >
+                                            <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                          </IconButton>
+                                        </InputAdornment>
+                                      ),
+                                    }}
+                                    sx={{
+                                      width: '280px',
+                                      '& .MuiOutlinedInput-root': {
+                                        height: '32px',
+                                        fontSize: '0.75rem',
+                                        background: 'white',
+                                      }
+                                    }}
+                                  />
+                                </Box>
+                              )}
+                          </Box>
+                        </TableCell>
+                      ))}
+                    
+                        </TableRow>
+                      )}
+                      itemContent={(_index, row) => {
+                        const rowIndex = _index;
+                        const isSelected = (selectedTransaction?.["Order ID"] || selectedTransaction?.["Order Item ID"]) === (row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"]);
+                        return (
+                          <>
+                            
                                 {getCurrentColumns().map((column, colIndex) => {
                                   // For new API, we need to map column titles to row keys
                                   let value;
@@ -5942,13 +6515,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     </TableCell>
                                   );
                                 })}
-                              </TableRow>
-                            </React.Fragment>
-                          );
-                        })
-                    )}
-                  </TableBody>
-                </Table>
+                              
+                          </>
+                        );
+                      }}
+                    />
+                  )}
+
               </TableContainer>
 
               {/* Pagination */}

@@ -3078,14 +3078,9 @@ const MarketplaceReconciliation: React.FC = () => {
               background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
               borderRadius: '16px',
               border: '1px solid #f1f3f4',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              boxShadow: 'none',
               height: '100%',
               overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                transform: 'translateY(-2px)',
-              }
             }}>
               <CardContent sx={{ p: 0 }}>
                 {/* Title */}
@@ -3209,10 +3204,9 @@ const MarketplaceReconciliation: React.FC = () => {
                 background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
                 borderRadius: '16px',
                 border: '1px solid #f1f3f4',
-                boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+                boxShadow: 'none',
                 height: '100%',
                 overflow: 'hidden',
-                transition: 'all 0.3s ease',
               }}
             >
               <CardContent sx={{
@@ -3477,13 +3471,8 @@ const MarketplaceReconciliation: React.FC = () => {
               background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
               borderRadius: '16px',
               border: '1px solid #f1f3f4',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              boxShadow: 'none',
               overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                transform: 'translateY(-2px)',
-              }
             }}>
               <CardContent sx={{ p: 4 }}>
                 {(() => {
@@ -3775,7 +3764,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                   p: 3,
                                   background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
                                   borderRadius: '12px',
-                                  border: '1px solid #e2e8f0'
+                                  border: '1px solid #e5e7eb'
                                 }}>
                                   <Box>
                                     <Typography variant="h4" sx={{
@@ -4177,7 +4166,7 @@ const MarketplaceReconciliation: React.FC = () => {
 
                             return (
                               <>
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
                                   <Box>
                                     <Typography sx={{ fontWeight: 800, color: '#1f2937', letterSpacing: '-0.02em', fontSize: { xs: '1.75rem', md: '2.25rem' }, lineHeight: 1 }}>
                                       {formatCurrency(pendingPaymentAmount)}
@@ -4301,7 +4290,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             p: 3,
                             background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
                             borderRadius: '12px',
-                            border: '1px solid #e2e8f0'
+                            border: '1px solid #e5e7eb'
                           }}>
                             <Box>
                               <Typography variant="h4" sx={{
@@ -4864,13 +4853,8 @@ const MarketplaceReconciliation: React.FC = () => {
           background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
           borderRadius: '16px',
           border: '1px solid #f1f3f4',
-          boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+          boxShadow: 'none',
           overflow: 'hidden',
-          transition: 'all 0.3s ease',
-          '&:hover': {
-            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-            transform: 'translateY(-2px)',
-          }
         }}>
           <CardContent sx={{ p: 5 }}>
             {(() => {
@@ -5167,19 +5151,24 @@ const MarketplaceReconciliation: React.FC = () => {
             return null;
           }
 
-          // Get D2C totals for percentage calculation
-          const d2cTotal = partyComposition.totals?.find(t => t.platform === 'd2c');
-          const totalOrderCount = d2cTotal?.order_count || 0;
+          // Filter D2C rows
+          const d2cRows = partyComposition.rows.filter(row => row.platform === 'd2c');
+          
+          if (d2cRows.length === 0) {
+            return null;
+          }
+
+          // Calculate total orders dynamically to ensure 100% accuracy and avoid 0% bugs
+          const totalOrderCount = d2cRows.reduce((sum, row) => sum + row.order_count, 0);
 
           // Prepare data for visualization
-          const courierData = partyComposition.rows
-            .filter(row => row.platform === 'd2c')
+          const courierData = d2cRows
             .map((row, idx) => {
               const percentage = totalOrderCount > 0
                 ? (row.order_count / totalOrderCount) * 100
                 : 0;
               return {
-                name: row.shipping_courier_name,
+                name: row.shipping_courier_name || 'Unknown',
                 orderCount: row.order_count,
                 totalSellingPrice: row.total_selling_price,
                 percentage: percentage,
@@ -5194,13 +5183,8 @@ const MarketplaceReconciliation: React.FC = () => {
               background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
               borderRadius: '16px',
               border: '1px solid #f1f3f4',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              boxShadow: 'none',
               overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                transform: 'translateY(-2px)',
-              }
             }}>
               <CardContent sx={{ p: 5 }}>
                 <Typography variant="h3" sx={{
@@ -5213,167 +5197,111 @@ const MarketplaceReconciliation: React.FC = () => {
                   Party Composition
                 </Typography>
 
-                <Grid container spacing={3}>
-                  {/* Visualization */}
-                  <Grid item xs={12} md={8}>
-                    <Box sx={{ height: { xs: 320, sm: 360, md: 420, lg: 480 } }}>
+                <Grid container spacing={4} alignItems="center">
+                  {/* Left: Pie Chart */}
+                  <Grid item xs={12} md={5}>
+                    <Box sx={{ height: 320, position: 'relative' }}>
                       {courierData.length === 1 ? (
-                        // Single Courier - Show detailed gradient card
+                        // Single Courier - Show a clean circular ring
                         <Box sx={{
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: `linear-gradient(135deg, ${courierData[0].color}22 0%, ${courierData[0].color}11 100%)`,
-                          borderRadius: '20px',
-                          border: `2px solid ${courierData[0].color}`,
-                          position: 'relative',
-                          overflow: 'hidden'
-                        }}>
-                          <Box sx={{
-                            textAlign: 'center',
-                            position: 'relative',
-                            zIndex: 2,
-                            p: 3
-                          }}>
-                            <Typography variant="h4" sx={{ fontWeight: 700, mb: 1.5, color: '#1f2937' }}>
-                              {courierData[0].name}
-                            </Typography>
-                            <Typography variant="h3" sx={{ fontWeight: 700, mb: 2, color: courierData[0].color }}>
-                              {courierData[0].orderCount.toLocaleString('en-IN')}
-                            </Typography>
-                            <Typography variant="body1" sx={{ color: '#6b7280', mb: 1 }}>
-                              Orders
-                            </Typography>
-                            <Typography variant="h6" sx={{ color: '#1f2937', fontWeight: 600 }}>
-                              {formatCurrency(courierData[0].totalSellingPrice)}
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: '#6b7280' }}>
-                              Total Selling Price
-                            </Typography>
-                          </Box>
-                        </Box>
+                          width: 280, height: 280, borderRadius: '50%', border: `12px solid ${courierData[0].color}`,
+                          margin: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                          boxShadow: `inset 0 4px 20px ${courierData[0].color}10, 0 8px 30px ${courierData[0].color}15`
+                        }} />
                       ) : courierData.length > 1 ? (
                         // Multiple Couriers - Show pie chart
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart margin={{ top: 12, right: 12, bottom: 56, left: 12 }}>
-                            <Pie
-                              data={courierData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius="78%"
-                              outerRadius="86%"
-                              paddingAngle={1}
-                              cornerRadius={1}
-                              dataKey="orderCount"
-                            >
-                              {courierData.map((p, idx) => (
-                                <Cell key={`courier-${idx}`} fill={p.color} />
-                              ))}
-                            </Pie>
-                            <RechartsTooltip
-                              formatter={(value: any, name: string, props: any) => [
-                                `${Number(value).toLocaleString('en-IN')} orders (${props.payload.percentage.toFixed(1)}%)`,
-                                props.payload.name
-                              ]}
-                            />
-                            <Legend
-                              layout="horizontal"
-                              verticalAlign="bottom"
-                              align="center"
-                              iconType="circle"
-                              wrapperStyle={{ paddingTop: 8 }}
-                              height={40}
-                              formatter={(value, entry) => (
-                                <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>{value}</span>
-                              )}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
+                        <>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={courierData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius="78%"
+                                outerRadius="86%"
+                                paddingAngle={1}
+                                cornerRadius={1}
+                                dataKey="orderCount"
+                                stroke="none"
+                              >
+                                {courierData.map((p, idx) => (
+                                  <Cell key={`courier-${idx}`} fill={p.color} />
+                                ))}
+                              </Pie>
+                              <RechartsTooltip
+                                formatter={(value: any, name: string, props: any) => [
+                                  `${Number(value).toLocaleString('en-IN')} orders (${props.payload.percentage.toFixed(1)}%)`,
+                                  props.payload.name
+                                ]}
+                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontFamily: '"Inter", sans-serif' }}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </>
                       ) : (
                         // No data - show message
                         <Box sx={{
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#6b7280',
-                          border: '2px dashed #e5e7eb',
-                          borderRadius: '20px'
+                          height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: '#6b7280', border: '2px dashed #e5e7eb', borderRadius: '20px'
                         }}>
-                          <Typography variant="h6">No party composition data available</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>No party composition data available</Typography>
                         </Box>
                       )}
                     </Box>
                   </Grid>
 
-                  {/* Summary KPI cards */}
-                  <Grid item xs={12} md={4}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
-                      <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Orders</Typography>
-                        <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>
-                          {totalOrderCount.toLocaleString('en-IN')}
-                        </Typography>
+                  {/* Right: Minimalist Data-Table Hybrid */}
+                  <Grid item xs={12} md={7}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pr: { md: 2 }, mt: { xs: 2, md: 0 } }}>
+                      {/* Micro-Header Row */}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: -1, px: 0.5 }}>
+                        <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.05em' }}>COURIER</Typography>
+                        <Box sx={{ display: 'flex', gap: 3 }}>
+                          <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.05em', width: 65, textAlign: 'right' }}>ORDERS</Typography>
+                          <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.05em', width: 85, textAlign: 'right' }}>SALES</Typography>
+                          <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.05em', width: 45, textAlign: 'right' }}>SHARE</Typography>
+                        </Box>
                       </Box>
-                      <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Selling Price</Typography>
-                        <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>
-                          {formatCurrency(d2cTotal?.total_selling_price || 0)}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Grid>
-                </Grid>
-
-                {/* Courier breakdown table */}
-                <Box sx={{ mt: 4 }}>
-                  <Grid container spacing={2}>
-                    {courierData.map((courier, idx) => (
-                      <Grid key={idx} item xs={12} md={courierData.length === 1 ? 12 : 6}>
-                        <Box sx={{ p: 3, borderRadius: '14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(229,231,235,0.6)' }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 2 }}>
-                            <Typography variant="subtitle1" sx={{ color: '#374151', fontWeight: 700 }}>
-                              {courier.name}
-                            </Typography>
-                            <Chip
-                              label={`${courier.percentage.toFixed(1)}%`}
-                              sx={{
-                                bgcolor: `${courier.color}15`,
-                                color: courier.color,
-                                fontWeight: 700,
-                                fontSize: '0.75rem'
-                              }}
-                            />
+                      
+                      {courierData.map((courier, idx) => (
+                        <Box key={idx} sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 0.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Typography sx={{ fontWeight: 500, color: '#374151', fontSize: '0.8rem' }}>
+                                {courier.name}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#4b5563', fontVariantNumeric: 'tabular-nums', width: 65, textAlign: 'right' }}>
+                                {courier.orderCount.toLocaleString('en-IN')}
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#4b5563', fontVariantNumeric: 'tabular-nums', width: 85, textAlign: 'right' }}>
+                                {formatCurrency(courier.totalSellingPrice)}
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#111827', fontVariantNumeric: 'tabular-nums', width: 45, textAlign: 'right' }}>
+                                {courier.percentage.toFixed(1)}%
+                              </Typography>
+                            </Box>
                           </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
-                            <Typography variant="body2" sx={{ color: '#374151' }}>Order Count</Typography>
-                            <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                              {courier.orderCount.toLocaleString('en-IN')}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                            <Typography variant="body2" sx={{ color: '#374151' }}>Total Selling Price</Typography>
-                            <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                              {formatCurrency(courier.totalSellingPrice)}
-                            </Typography>
-                          </Box>
-                          {/* Progress bar showing percentage */}
-                          <Box sx={{ mt: 2, height: 8, borderRadius: '4px', bgcolor: '#e5e7eb', overflow: 'hidden' }}>
-                            <Box
-                              sx={{
-                                height: '100%',
-                                width: `${courier.percentage}%`,
-                                bgcolor: courier.color,
-                                transition: 'width 0.3s ease'
-                              }}
+                          
+                          {/* Minimalist Micro-Bar */}
+                          <Box sx={{ width: '100%', height: 4, backgroundColor: '#f3f4f6', borderRadius: 2, overflow: 'hidden' }}>
+                            <Box 
+                              sx={{ 
+                                width: `${courier.percentage}%`, 
+                                height: '100%', 
+                                backgroundColor: courier.color, 
+                                borderRadius: 2, 
+                                transition: 'width 1s cubic-bezier(0.4, 0, 0.2, 1)'
+                              }} 
                             />
                           </Box>
                         </Box>
-                      </Grid>
-                    ))}
+                      ))}
+                    </Box>
                   </Grid>
-                </Box>
+                </Grid>
               </CardContent>
             </Card>
           );
@@ -5383,10 +5311,10 @@ const MarketplaceReconciliation: React.FC = () => {
         <Paper sx={{
           p: 3,
           mb: 6,
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          border: '1px solid #e2e8f0',
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
           borderRadius: '16px',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+          boxShadow: 'none'
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>
@@ -5397,19 +5325,14 @@ const MarketplaceReconciliation: React.FC = () => {
               sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 700 }}
             />
           </Box>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: 3, px: 1 }}>
             {AGE_BUCKETS.map((b) => (
-              <Chip
-                key={b}
-                size="small"
-                label={b}
-                variant="outlined"
-                sx={{
-                  borderColor: BUCKET_COLORS[b],
-                  color: BUCKET_COLORS[b],
-                  fontWeight: 700
-                }}
-              />
+              <Box key={b} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: BUCKET_COLORS[b] }} />
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#4b5563' }}>
+                  {b}
+                </Typography>
+              </Box>
             ))}
           </Box>
           <Box sx={{ width: '100%', height: 380 }}>
@@ -5468,19 +5391,31 @@ const MarketplaceReconciliation: React.FC = () => {
               </Box>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ageingChartData} margin={{ top: 40, right: 10, left: 0, bottom: 0 }} barCategoryGap={"25%"} barGap={4}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="provider" tick={{ fontSize: 12 }} interval={0} height={60} angle={-15} textAnchor="end" />
-                  <YAxis unit="%" tick={{ fontSize: 12 }} domain={[0, 100]} />
-                  {/** Tooltip rows like "<=1d: 50%" */}
-                  <RechartsTooltip formatter={(v: any, name: string) => [`${Number(v).toFixed(2)}%`, `${name}:`]} />
+                <BarChart data={ageingChartData} margin={{ top: 40, right: 10, left: -20, bottom: 0 }} barCategoryGap={"25%"}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="provider" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} interval={0} height={60} angle={-25} textAnchor="end" />
+                  <YAxis unit="%" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                  <RechartsTooltip 
+                    formatter={(v: any, name: string) => [`${Number(v).toFixed(1)}%`, name]} 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontFamily: '"Inter", sans-serif' }}
+                    itemStyle={{ fontSize: '13px', fontWeight: 600 }}
+                    labelStyle={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}
+                  />
                   {AGE_BUCKETS.map((b, idx) => (
-                    <Bar key={b} dataKey={b} stackId="a" fill={BUCKET_COLORS[b]} radius={0} barSize={22}>
+                    <Bar 
+                      key={b} 
+                      dataKey={b} 
+                      stackId="a" 
+                      fill={BUCKET_COLORS[b]} 
+                      radius={idx === AGE_BUCKETS.length - 1 ? [4, 4, 0, 0] : 0} 
+                      barSize={16}
+                    >
                       {idx === AGE_BUCKETS.length - 1 && (
                         <LabelList
                           dataKey="avgTat"
                           position="top"
-                          formatter={(v: number) => `Avg TAT: ${Number(v).toFixed(1)}d`}
+                          formatter={(v: number) => `${Number(v).toFixed(1)}d`}
+                          style={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
                         />
                       )}
                     </Bar>
@@ -5495,10 +5430,10 @@ const MarketplaceReconciliation: React.FC = () => {
         <Paper sx={{
           p: 3,
           mb: 6,
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          border: '1px solid #e2e8f0',
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
           borderRadius: '16px',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+          boxShadow: 'none'
         }}>
           <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600, mb: 4 }}>
             Month on Month Growth
@@ -6247,13 +6182,8 @@ const MarketplaceReconciliation: React.FC = () => {
           background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
           borderRadius: '16px',
           border: '1px solid #f1f3f4',
-          boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+          boxShadow: 'none',
           overflow: 'hidden',
-          transition: 'all 0.3s ease',
-          '&:hover': {
-            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-            transform: 'translateY(-2px)',
-          }
         }}>
           <CardContent sx={{ p: 5 }}>
             <Grid container spacing={4}>
@@ -6264,7 +6194,6 @@ const MarketplaceReconciliation: React.FC = () => {
                   background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
                   border: '1px solid #bfdbfe',
                   textAlign: 'center',
-                  transition: 'all 0.3s ease',
                   '&:hover': {
                     transform: 'translateY(-2px)',
                     boxShadow: '0 8px 25px rgba(59, 130, 246, 0.15)',
@@ -6296,7 +6225,6 @@ const MarketplaceReconciliation: React.FC = () => {
                   background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
                   border: '1px solid #e9d5ff',
                   textAlign: 'center',
-                  transition: 'all 0.3s ease',
                   '&:hover': {
                     transform: 'translateY(-2px)',
                     boxShadow: '0 8px 25px rgba(168, 85, 247, 0.15)',
