@@ -1282,6 +1282,7 @@ const MarketplaceReconciliation: React.FC = () => {
         end_date: endDate,
       });
 
+      setMonthOnMonthGrowthData(null);
       setMonthOnMonthGrowthLoading(true);
       setMonthOnMonthGrowthError(null);
 
