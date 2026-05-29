@@ -373,6 +373,8 @@ const MarketplaceReconciliation: React.FC = () => {
   } | null>(null);
   const [monthOnMonthGrowthLoading, setMonthOnMonthGrowthLoading] = useState(false);
   const [monthOnMonthGrowthError, setMonthOnMonthGrowthError] = useState<string | null>(null);
+  // Race-condition guard: incremented on every new fetch; stale responses are discarded
+  const momRequestGenRef = useRef(0);
 
   // Sync data sources state
   // Removed sync modal; using inline button animation instead
@@ -1275,47 +1277,57 @@ const MarketplaceReconciliation: React.FC = () => {
       return;
     }
 
+    // Increment generation counter. Capture current value in closure.
+    // Any previous in-flight request that resolves after this point will
+    // see its generation != current and silently discard its results.
+    momRequestGenRef.current += 1;
+    const myGeneration = momRequestGenRef.current;
+
+    // Snapshot the platform at the time this fetch was started so that
+    // post-await guards can compare against it too.
+    const fetchedForPlatform = selectedPlatform;
+
+    // Immediately clear stale data and start loading
+    setMonthOnMonthGrowthData(null);
+    setMonthOnMonthGrowthLoading(true);
+    setMonthOnMonthGrowthError(null);
+
     try {
       console.log('[MonthOnMonthGrowth] Starting fetch with params:', {
-        platform: selectedPlatform,
+        platform: fetchedForPlatform,
         start_date: startDate,
         end_date: endDate,
+        generation: myGeneration,
       });
-
-      setMonthOnMonthGrowthData(null);
-      setMonthOnMonthGrowthLoading(true);
-      setMonthOnMonthGrowthError(null);
 
       const response = await apiIndex.monthOnMonthGrowth.getMonthOnMonthGrowth({
-        platform: selectedPlatform,
+        platform: fetchedForPlatform,
         start_date: startDate,
         end_date: endDate,
       });
+
+      // ---- STALE RESPONSE GUARD ----
+      // If a newer fetch has been initiated since this one started, discard this result.
+      if (myGeneration !== momRequestGenRef.current) {
+        console.log('[MonthOnMonthGrowth] Discarding stale response for platform:', fetchedForPlatform, '(superseded by generation', momRequestGenRef.current, ')');
+        return;
+      }
 
       console.log('[MonthOnMonthGrowth] API Response received:', {
         success: response.success,
         hasData: !!response.data,
         dataKeys: response.data ? Object.keys(response.data) : [],
-        fullResponse: response,
+        platform: fetchedForPlatform,
       });
 
       if (response.success && response.data) {
         const data = response.data;
-        console.log('[MonthOnMonthGrowth] Processing data for platform:', selectedPlatform, {
-          dataStructure: data,
-          dataKeys: Object.keys(data),
-        });
 
         try {
-          if (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'other') {
+          if (fetchedForPlatform === 'amazon' || fetchedForPlatform === 'flipkart' || fetchedForPlatform === 'amazon_uk' || fetchedForPlatform === 'other') {
             // For Amazon/Flipkart/Other (CRED): expect { data: [{ month, sales, settlement }, ...] }
             const marketplaceData = data.data || data || [];
-            console.log('[MonthOnMonthGrowth] Setting marketplace data:', {
-              dataLength: Array.isArray(marketplaceData) ? marketplaceData.length : 'not an array',
-              firstItem: Array.isArray(marketplaceData) && marketplaceData.length > 0 ? marketplaceData[0] : null,
-            });
 
-            // Validate data structure
             if (Array.isArray(marketplaceData)) {
               setMonthOnMonthGrowthData({
                 marketplaceData: marketplaceData,
@@ -1325,20 +1337,11 @@ const MarketplaceReconciliation: React.FC = () => {
               setMonthOnMonthGrowthError('Invalid data format received from API');
               setMonthOnMonthGrowthData(null);
             }
-          } else if (selectedPlatform === 'd2c') {
+          } else if (fetchedForPlatform === 'd2c') {
             // For D2C: expect { salesAndSettlement: [...], vendorSettlements: { cod: {...}, noncod: {...} } }
             const salesAndSettlement = data.salesAndSettlement || data.sales_and_settlement || [];
             const vendorSettlementsRaw = data.vendorSettlements || data.vendor_settlements || {};
 
-            console.log('[MonthOnMonthGrowth] Setting D2C data:', {
-              salesAndSettlementLength: Array.isArray(salesAndSettlement) ? salesAndSettlement.length : 'not an array',
-              vendorSettlementsRaw: vendorSettlementsRaw,
-              vendorSettlementsKeys: Object.keys(vendorSettlementsRaw),
-              hasCod: 'cod' in vendorSettlementsRaw,
-              hasNoncod: 'noncod' in vendorSettlementsRaw,
-            });
-
-            // Validate and structure vendor settlements
             const vendorSettlements: {
               cod?: Record<string, Array<{ month: string; settlement: number }>>;
               noncod?: Record<string, Array<{ month: string; settlement: number }>>;
@@ -1351,17 +1354,12 @@ const MarketplaceReconciliation: React.FC = () => {
               vendorSettlements.noncod = vendorSettlementsRaw.noncod;
             }
 
-            // Validate data structure
             if (Array.isArray(salesAndSettlement) && typeof vendorSettlementsRaw === 'object') {
               setMonthOnMonthGrowthData({
                 d2cSalesAndSettlement: salesAndSettlement,
                 d2cVendorSettlements: vendorSettlements,
               });
             } else {
-              console.error('[MonthOnMonthGrowth] Invalid D2C data format:', {
-                salesAndSettlementType: typeof salesAndSettlement,
-                vendorSettlementsType: typeof vendorSettlementsRaw,
-              });
               setMonthOnMonthGrowthError('Invalid data format received from API');
               setMonthOnMonthGrowthData(null);
             }
@@ -1372,22 +1370,22 @@ const MarketplaceReconciliation: React.FC = () => {
           setMonthOnMonthGrowthData(null);
         }
       } else {
-        console.warn('[MonthOnMonthGrowth] API returned unexpected format:', {
-          success: response.success,
-          hasData: !!response.data,
-          response: response,
-        });
         setMonthOnMonthGrowthError('Unexpected response format from API');
         setMonthOnMonthGrowthData(null);
       }
     } catch (error) {
+      // Only update state if this is still the latest request
+      if (myGeneration !== momRequestGenRef.current) return;
       console.error('[MonthOnMonthGrowth] Error fetching data:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       setMonthOnMonthGrowthError(`Failed to load month on month growth data: ${errorMessage}`);
       setMonthOnMonthGrowthData(null);
     } finally {
-      setMonthOnMonthGrowthLoading(false);
-      console.log('[MonthOnMonthGrowth] Fetch completed');
+      // Only clear loading if this is still the latest request
+      if (myGeneration === momRequestGenRef.current) {
+        setMonthOnMonthGrowthLoading(false);
+        console.log('[MonthOnMonthGrowth] Fetch completed for platform:', fetchedForPlatform);
+      }
     }
   };
 
