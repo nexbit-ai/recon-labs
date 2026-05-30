@@ -632,17 +632,24 @@ const OperationsCentrePage: React.FC = () => {
   // Build query parameters for API calls
   const buildQueryParams = (
     filtersOverride?: Record<string, any>,
-    orderIdsCsvOverride?: string
+    orderIdsCsvOverride?: string,
+    pageOverride?: number,
+    rowsPerPageOverride?: number,
+    tabOverride?: number
   ): TransactionQueryParams => {
     const params: TransactionQueryParams = {};
     const f = filtersOverride || columnFilters;
+    const currentTab = tabOverride !== undefined ? tabOverride : disputeSubTab;
 
     // Set status for unreconciled orders (less_payment_received, more_payment_received)
     // Only set default if no status filter is explicitly applied
-    if (disputeSubTab === 0 && !f['Status']) {
+    if (currentTab === 0 && !f['Status']) {
       params.status_in = 'less_payment_received,more_payment_received';
-      params.pagination = false; // Disable pagination to get all unreconciled orders
     }
+
+    // Use server-side pagination for all tabs
+    params.page = (pageOverride !== undefined ? pageOverride : page) + 1;
+    params.limit = rowsPerPageOverride !== undefined ? rowsPerPageOverride : rowsPerPage;
 
     // Add sorting parameters
     if (sortConfig && COLUMN_TO_SORT_BY_MAP[sortConfig.key]) {
@@ -848,11 +855,14 @@ const OperationsCentrePage: React.FC = () => {
     filtersOverride?: Record<string, any>,
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
     applySortOverride?: boolean,
-    orderIdsCsvOverride?: string
+    orderIdsCsvOverride?: string,
+    pageOverride?: number,
+    rowsPerPageOverride?: number,
+    tabOverride?: number
   ) => {
     try {
       // Build query parameters
-      const params = buildQueryParams(filtersOverride, orderIdsCsvOverride);
+      const params = buildQueryParams(filtersOverride, orderIdsCsvOverride, pageOverride, rowsPerPageOverride, tabOverride);
 
       // If explicitly applying override: when null, clear sort; when provided, set it
       if (applySortOverride) {
@@ -894,7 +904,7 @@ const OperationsCentrePage: React.FC = () => {
 
         // Update count from response
         if (response.data.pagination) {
-          setUnreconciledCount(response.data.pagination.current_count || response.data.pagination.total_count || 0);
+          setUnreconciledCount(response.data.pagination.total_count ?? response.data.pagination.current_count ?? 0);
         } else {
           setUnreconciledCount(transformedRows.length);
         }
@@ -918,11 +928,14 @@ const OperationsCentrePage: React.FC = () => {
     filtersOverride?: Record<string, any>,
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
     applySortOverride?: boolean,
-    orderIdsCsvOverride?: string
+    orderIdsCsvOverride?: string,
+    pageOverride?: number,
+    rowsPerPageOverride?: number,
+    tabOverride?: number
   ) => {
     try {
       // Build base query parameters (date, filters, ids, sorting, etc.)
-      const params = buildQueryParams(filtersOverride, orderIdsCsvOverride);
+      const params = buildQueryParams(filtersOverride, orderIdsCsvOverride, pageOverride, rowsPerPageOverride, tabOverride);
 
       // If explicitly applying override: when null, clear sort; when provided, set it
       if (applySortOverride) {
@@ -957,7 +970,7 @@ const OperationsCentrePage: React.FC = () => {
 
         // Update count from response
         if (response.data.pagination) {
-          setDisputedCount(response.data.pagination.current_count || response.data.pagination.total_count || 0);
+          setDisputedCount(response.data.pagination.total_count ?? response.data.pagination.current_count ?? 0);
         } else {
           setDisputedCount(transformedRows.length);
         }
@@ -978,11 +991,14 @@ const OperationsCentrePage: React.FC = () => {
     filtersOverride?: Record<string, any>,
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
     applySortOverride?: boolean,
-    orderIdsCsvOverride?: string
+    orderIdsCsvOverride?: string,
+    pageOverride?: number,
+    rowsPerPageOverride?: number,
+    tabOverride?: number
   ) => {
     try {
       // Build base query parameters (date, filters, ids, sorting, etc.)
-      const params = buildQueryParams(filtersOverride, orderIdsCsvOverride);
+      const params = buildQueryParams(filtersOverride, orderIdsCsvOverride, pageOverride, rowsPerPageOverride, tabOverride);
 
       // If explicitly applying override: when null, clear sort; when provided, set it
       if (applySortOverride) {
@@ -1017,7 +1033,7 @@ const OperationsCentrePage: React.FC = () => {
 
         // Update count from response
         if (response.data.pagination) {
-          setManuallyReconciledCount(response.data.pagination.current_count || response.data.pagination.total_count || 0);
+          setManuallyReconciledCount(response.data.pagination.total_count ?? response.data.pagination.current_count ?? 0);
         } else {
           setManuallyReconciledCount(transformedRows.length);
         }
@@ -1053,26 +1069,33 @@ const OperationsCentrePage: React.FC = () => {
     }
   }, []);
 
-  // Fetch all three APIs in parallel whenever filters or other inputs change
+  // Fetch only the active tab data whenever filters or other inputs change
   const fetchAllTabsData = async (
     filtersOverride?: Record<string, any>,
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
     applySortOverride?: boolean,
-    orderIdsCsvOverride?: string
+    orderIdsCsvOverride?: string,
+    pageOverride?: number,
+    rowsPerPageOverride?: number,
+    tabOverride?: number
   ) => {
     setApiLoading(true);
     setError(null);
 
+    const activeTab = tabOverride !== undefined ? tabOverride : disputeSubTab;
+
     try {
-      // Fetch all three APIs in parallel
-      await Promise.all([
-        fetchUnreconciledOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride),
-        fetchManuallyReconciledOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride),
-        fetchDisputeRaisedOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride)
-      ]);
+      // Fetch only the active tab to prevent redundant over-fetching
+      if (activeTab === 0) {
+        await fetchUnreconciledOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride, pageOverride, rowsPerPageOverride, activeTab);
+      } else if (activeTab === 1) {
+        await fetchManuallyReconciledOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride, pageOverride, rowsPerPageOverride, activeTab);
+      } else if (activeTab === 2) {
+        await fetchDisputeRaisedOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride, pageOverride, rowsPerPageOverride, activeTab);
+      }
     } catch (err) {
-      console.error('Error fetching all tabs data:', err);
-      setError('Failed to load some data. Please try again.');
+      console.error('Error fetching tab data:', err);
+      setError('Failed to load data. Please try again.');
     } finally {
       setApiLoading(false);
     }
@@ -1089,24 +1112,28 @@ const OperationsCentrePage: React.FC = () => {
     }
   }, [selectedPlatform]);
 
-  // Fetch all three APIs whenever filters or other inputs change (NOT when tab changes)
+  // Fetch active tab data whenever filters, platform, date range change
   useEffect(() => {
-    // On initial render in dev StrictMode this effect runs twice.
-    // Guard so we only fetch once on the true initial render, then allow future changes.
     if (isInitialRenderRef.current) {
       if (!hasFetchedOnInitialRef.current) {
         hasFetchedOnInitialRef.current = true;
         fetchAllTabsData();
-        // Mark initial render complete on next render cycle to allow platform changes to trigger fetches
         requestAnimationFrame(() => {
           isInitialRenderRef.current = false;
         });
       }
       return;
     }
-    // After initial render, always fetch when dependencies change (including platform changes)
+    // After initial render, fetch when dependencies change
     fetchAllTabsData();
   }, [selectedDateRange, customStartDate, customEndDate, selectedPlatform]);
+
+  // Fetch when tab changes
+  useEffect(() => {
+    if (!isInitialRenderRef.current) {
+      fetchAllTabsData(undefined, undefined, undefined, undefined, 0, undefined, disputeSubTab);
+    }
+  }, [disputeSubTab]);
 
   // Get current rows based on active tab
   const getCurrentRows = () => {
@@ -1118,138 +1145,6 @@ const OperationsCentrePage: React.FC = () => {
   const current = getCurrentRows();
 
   // Apply column filters to current data (must be defined before usage below)
-  const filteredCurrent = current.filter(row => {
-    // Apply column filters
-    for (const [column, filter] of Object.entries(columnFilters)) {
-      if (!filter) continue;
-
-      let value: any;
-
-      // Handle both API data and mock data
-      if ('Order ID' in row) {
-        // API data (TransactionRow) - handle D2C specific fields
-        switch (column) {
-          case 'Order ID':
-            value = (row as any)['Order ID'];
-            break;
-          case 'Invoice Date':
-            value = (row as any).invoice_date;
-            break;
-          case 'Settlement Date':
-            value = (row as any).settlement_date;
-            break;
-          case 'Difference':
-            value = (row as any).diff;
-            break;
-          case 'Reason':
-            // Extract mismatch_reason from originalData with priority:
-            // metadata.mismatch_reason > metadata.breakups.mismatch_reason > breakups.mismatch_reason
-            const originalData = (row as any).originalData;
-            if (originalData) {
-              if (originalData.metadata?.mismatch_reason) {
-                value = originalData.metadata.mismatch_reason;
-              } else if (originalData.metadata?.breakups?.mismatch_reason) {
-                value = originalData.metadata.breakups.mismatch_reason;
-              } else if (originalData.breakups?.mismatch_reason) {
-                value = originalData.breakups.mismatch_reason;
-              } else {
-                value = null;
-              }
-            } else {
-              value = (row as any).breakups?.mismatch_reason || null;
-            }
-            // Normalize value for comparison (trim whitespace)
-            if (value) value = String(value).trim();
-            break;
-          case 'Status':
-            value = (row as any).breakups?.recon_status;
-            break;
-          default:
-            continue;
-        }
-      } else if ('reason' in row) {
-        // Grouped data (unreconciled tab) - handle Reason filter
-        if (column === 'Reason') {
-          value = (row as any).reason;
-          // Normalize value for comparison (trim whitespace)
-          if (value) value = String(value).trim();
-        } else {
-          // Skip other filters for grouped data for now
-          continue;
-        }
-      } else {
-        // Mock data (old structure)
-        switch (column) {
-          case 'Order ID':
-            value = (row as any).orderId;
-            break;
-          case 'Order Value':
-            value = Math.abs((row as any).difference) + 1000;
-            break;
-          case 'Settlement Value':
-            value = Math.abs((row as any).difference) + 900;
-            break;
-          case 'Settlement Date':
-            value = '-';
-            break;
-          case 'Difference':
-            value = Math.abs((row as any).difference);
-            break;
-          case 'Event Type':
-            value = (row as any).eventType;
-            break;
-          default:
-            continue;
-        }
-      }
-
-      if (typeof filter === 'string') {
-        // String filter
-        if (!value.toString().toLowerCase().includes(filter.toLowerCase())) {
-          return false;
-        }
-      } else if (typeof filter === 'object') {
-        if (filter.min !== undefined && filter.min !== '') {
-          if (typeof value === 'number' && value < parseFloat(filter.min)) {
-            return false;
-          }
-        }
-        if (filter.max !== undefined && filter.max !== '') {
-          if (typeof value === 'number' && value > parseFloat(filter.max)) {
-            return false;
-          }
-        }
-        if (filter.from !== undefined && filter.from !== '') {
-          if (new Date(value) < new Date(filter.from)) {
-            return false;
-          }
-        }
-        if (filter.to !== undefined && filter.to !== '') {
-          if (new Date(value) > new Date(filter.to)) {
-            return false;
-          }
-        }
-        if (Array.isArray(filter) && filter.length > 0) {
-          // For Reason filter, compare normalized values
-          if (column === 'Reason') {
-            const normalizedFilter = filter.map(f => String(f).trim().toLowerCase());
-            const normalizedValue = value ? String(value).trim().toLowerCase() : '';
-            if (!normalizedFilter.includes(normalizedValue)) {
-              return false;
-            }
-          } else {
-            // For other enum filters, use exact match
-            if (!filter.includes(value)) {
-              return false;
-            }
-          }
-        }
-      }
-    }
-
-    return true;
-  });
-
   // Calculate total count for unreconciled orders
   const getUnreconciledTotalCount = () => {
     return unreconciledCount;
@@ -1265,13 +1160,7 @@ const OperationsCentrePage: React.FC = () => {
     return disputedCount;
   };
 
-  const paginatedCurrent = (() => {
-    const base = filteredCurrent;
-    if (disputeSubTab !== 0) return base;
-    const start = page * rowsPerPage;
-    const end = start + rowsPerPage;
-    return base.slice(start, end);
-  })();
+  const paginatedCurrent = current;
 
   // Selection helpers for visible rows in Unreconciled tab
   const visibleIds: string[] = disputeSubTab === 0
@@ -1552,7 +1441,7 @@ const OperationsCentrePage: React.FC = () => {
     // Reset to first page and refetch from backend with server-side filters
     setPage(0);
     closeFilterPopover();
-    fetchAllTabsData();
+    fetchAllTabsData(undefined, undefined, undefined, undefined, 0);
   };
 
   // Order ID search handlers (mirror TransactionSheet)
@@ -1563,7 +1452,7 @@ const OperationsCentrePage: React.FC = () => {
     if (value.trim() === '') {
       setOrderIdChips([]);
       setPage(0);
-      fetchAllTabsData(undefined, undefined, undefined, '');
+      fetchAllTabsData(undefined, undefined, undefined, '', 0);
     }
   };
 
@@ -1573,7 +1462,7 @@ const OperationsCentrePage: React.FC = () => {
     setOrderIdChips(ids);
     // Trigger API call
     setPage(0);
-    fetchAllTabsData(undefined, undefined, undefined, ids.join(','));
+    fetchAllTabsData(undefined, undefined, undefined, ids.join(','), 0);
   };
 
   const handleOrderIdSearchClear = () => {
@@ -1582,7 +1471,7 @@ const OperationsCentrePage: React.FC = () => {
     setShowOrderIdSearch(false);
     // Trigger API call without order IDs
     setPage(0);
-    fetchAllTabsData(undefined, undefined, undefined, '');
+    fetchAllTabsData(undefined, undefined, undefined, '', 0);
   };
 
   const getUniqueValuesForColumn = (column: string) => {
@@ -2106,7 +1995,7 @@ const OperationsCentrePage: React.FC = () => {
       <Card sx={{ mb: 3 }}>
         <CardContent sx={{ p: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Tabs value={disputeSubTab} onChange={(_, v) => setDisputeSubTab(v)} sx={{ '& .MuiTab-root': { textTransform: 'none', minHeight: 32 } }}>
+            <Tabs value={disputeSubTab} onChange={(_, v) => { setDisputeSubTab(v); setPage(0); }} sx={{ '& .MuiTab-root': { textTransform: 'none', minHeight: 32 } }}>
               <Tab label={`Mismatched Orders (${getUnreconciledTotalCount()})`} />
               <Tab label={`Manually Reconciled (${getManuallyReconciledCount()})`} />
               <Tab label={`Disputed (${getDisputedCount()})`} />
@@ -2726,7 +2615,18 @@ const OperationsCentrePage: React.FC = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {(disputeSubTab === 0 ? paginatedCurrent : current).map((row: any, index: number) => {
+                {apiLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={disputeSubTab === 0 ? 10 : 9} sx={{ textAlign: 'center', py: 8 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                        <CircularProgress size={40} sx={{ color: '#3b82f6' }} />
+                        <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500 }}>
+                          Loading data...
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ) : (disputeSubTab === 0 ? paginatedCurrent : current).map((row: any, index: number) => {
                   if (disputeSubTab === 0) {
                     // Flat detailed row for unreconciled orders
                     const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || '';
@@ -2953,7 +2853,7 @@ const OperationsCentrePage: React.FC = () => {
                   }
                   return null;
                 })}
-                {(disputeSubTab === 0 ? paginatedCurrent : current).length === 0 && (
+                {!apiLoading && (disputeSubTab === 0 ? paginatedCurrent : current).length === 0 && (
                   <TableRow>
                     <TableCell colSpan={disputeSubTab === 0 ? 10 : 9} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
                   </TableRow>
@@ -2967,9 +2867,17 @@ const OperationsCentrePage: React.FC = () => {
                 component="div"
                 count={getUnreconciledTotalCount()}
                 page={page}
-                onPageChange={(_, newPage) => setPage(newPage)}
+                onPageChange={(_, newPage) => {
+                  setPage(newPage);
+                  fetchAllTabsData(undefined, undefined, undefined, undefined, newPage);
+                }}
                 rowsPerPage={rowsPerPage}
-                onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+                onRowsPerPageChange={(e) => { 
+                  const newRows = parseInt(e.target.value, 10);
+                  setRowsPerPage(newRows); 
+                  setPage(0);
+                  fetchAllTabsData(undefined, undefined, undefined, undefined, 0, newRows);
+                }}
                 rowsPerPageOptions={[10, 25, 50, 100]}
               />
             </Box>

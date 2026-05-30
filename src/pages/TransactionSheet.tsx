@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { TableVirtuoso } from 'react-virtuoso';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -232,7 +233,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
 
     // Convert to string and clean it
     const cleanedValue = String(value)
-      .replace(/[₹$,\s]/g, '') // Remove currency symbols, commas, and spaces
+      .replace(/[£₹$,\s]/g, '') // Remove currency symbols, commas, and spaces
       .replace(/[^\d.-]/g, '') // Keep only digits, dots, and minus signs
       .trim();
 
@@ -1318,7 +1319,8 @@ const BreakupsModal: React.FC<{
   breakups: any; // This is now the full row
   orderId: string;
   anchorEl: HTMLElement | null;
-}> = ({ open, onClose, breakups, orderId, anchorEl }) => {
+  formatCurrency: (amount: number) => string;
+}> = ({ open, onClose, breakups, orderId, anchorEl, formatCurrency }) => {
   if (!open || !breakups || !anchorEl) return null;
 
   // Extract metadata from the row (check both originalData.metadata and metadata)
@@ -1338,15 +1340,7 @@ const BreakupsModal: React.FC<{
       .join(' ');
   };
 
-  // Format currency value
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  };
+
 
   // Format value based on type
   const formatValue = (value: any): string => {
@@ -1790,7 +1784,7 @@ interface TransactionSheetProps {
   statsData?: MarketplaceReconciliationResponse | null;
   initialTab?: number;
   dateRange?: { start: string; end: string };
-  initialPlatforms?: ('flipkart' | 'd2c' | 'amazon' | 'other')[];
+  initialPlatforms?: ('flipkart' | 'd2c' | 'amazon' | 'other' | 'amazon_uk')[];
   initialFilters?: { [key: string]: any };
 }
 
@@ -1798,7 +1792,7 @@ interface TransactionSheetProps {
 const COLUMN_TO_API_PARAM_MAP: Record<string, {
   apiParam: string;
   type: 'string' | 'number' | 'date' | 'enum';
-  supportedPlatforms?: ('flipkart' | 'amazon' | 'd2c' | 'all')[];
+  supportedPlatforms?: ('flipkart' | 'amazon' | 'd2c' | 'all' | 'amazon_uk')[];
   usesInSuffix?: boolean; // For CSV filters like status_in
 }> = {
   // Common filters (both platforms)
@@ -1871,7 +1865,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [headerDateRange, setHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   // Platform filter state - single selection only
-  const availablePlatforms = ['flipkart', 'amazon', 'd2c'] as const;
+  const availablePlatforms = ['flipkart', 'amazon', 'amazon_uk', 'd2c', 'other'] as const;
   type Platform = typeof availablePlatforms[number];
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Default: flipkart only
   const [pendingSelectedPlatform, setPendingSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Pending platform before apply
@@ -1939,12 +1933,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   const isFetchingRef = React.useRef(false);
   const lastQuadParamsRef = React.useRef<string | null>(null);
+  const lastBaseParamsSignatureRef = React.useRef<string | null>(null);
 
   // Mismatched sub-tab state (Less Received / More Received)
   const [mismatchedSubTab, setMismatchedSubTab] = useState<'less_received' | 'more_received'>('less_received');
 
   // Sales Report state management
   const [salesReportData, setSalesReportData] = useState<SalesTransactionsResponse | null>(null);
+  const [salesReportTotalCount, setSalesReportTotalCount] = useState<number | null>(null);
   const [salesReportLoading, setSalesReportLoading] = useState(false);
   const [lastSalesReportDateRange, setLastSalesReportDateRange] = useState<{ start: string, end: string } | null>(null);
   const [salesReportPagination, setSalesReportPagination] = useState<SalesTransactionsPagination | null>(null);
@@ -2182,9 +2178,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Dropdown menu state for Status column
 
 
+  const getCurrencySymbol = () => selectedPlatform === 'amazon_uk' ? '£' : '₹';
+  const getCurrencyLocale = () => selectedPlatform === 'amazon_uk' ? 'en-GB' : 'en-IN';
+
   // Format currency values
   const formatCurrency = (amount: number) => {
-    return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    return `${getCurrencySymbol()}${amount.toLocaleString(getCurrencyLocale(), { minimumFractionDigits: 2 })}`;
   };
 
   // Helper function to format date in "17th March, 2025" format
@@ -3130,6 +3129,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setHasInitialLoad(true);
   }, []);
 
+  // Lazy-load data when active tab or mismatched sub-tab changes after initial load
+  useEffect(() => {
+    if (!hasInitialLoad) return;
+    if (activeTab === 4) return; // Sales Report tab is fetched separately in handleTabChange
+    fetchQuadTransactions(currentPage);
+  }, [activeTab, mismatchedSubTab, hasInitialLoad]);
+
+
   // Apply filters function - called when Apply button is clicked
   const applyFilters = () => {
     // Copy pending filters to active filters
@@ -3304,6 +3311,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
 
     const platformToUse = overridePlatform !== undefined ? overridePlatform : selectedPlatform;
+    const filtersToUse = filters !== undefined ? filters : columnFilters;
+    const dateRangeToUse = dateRangeFilter !== undefined ? dateRangeFilter : dateRange;
 
     // Create base API call parameters
     const baseParams: any = {
@@ -3312,8 +3321,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     };
 
     // Convert filters to API parameters (Status filter has been removed)
-    if (filters && Object.keys(filters).length > 0) {
-      Object.entries(filters).forEach(([columnKey, filterValue]) => {
+    if (filtersToUse && Object.keys(filtersToUse).length > 0) {
+      Object.entries(filtersToUse).forEach(([columnKey, filterValue]) => {
         if (!filterValue) return;
         // Skip Status filter - it has been removed
         if (columnKey === 'Status') return;
@@ -3393,9 +3402,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
 
     // Add date range parameters with correct keys
-    if (dateRangeFilter?.start && dateRangeFilter?.end) {
-      baseParams.order_date_from = dateRangeFilter.start;
-      baseParams.order_date_to = dateRangeFilter.end;
+    if (dateRangeToUse?.start && dateRangeToUse?.end) {
+      baseParams.order_date_from = dateRangeToUse.start;
+      baseParams.order_date_to = dateRangeToUse.end;
     }
 
     // Add platform parameter
@@ -3417,12 +3426,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       baseParams.order_id = orderIdsCsv;
     }
 
-    const paramsSignature = createQuadParamsSignature(baseParams);
+    // Include activeTab and mismatchedSubTab in the signature so lazy-loading triggers when switching tabs
+    const paramsSignature = createQuadParamsSignature(baseParams) + `_tab_${activeTab}_sub_${mismatchedSubTab}`;
     const hasExistingQuadData = matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null;
 
     if (!forceRefetch && hasExistingQuadData && lastQuadParamsRef.current === paramsSignature) {
       return;
     }
+
+    const baseParamsSignature = createQuadParamsSignature(baseParams);
+    const isTabSwitchOnly = lastBaseParamsSignatureRef.current === baseParamsSignature && lastBaseParamsSignatureRef.current !== null;
 
     // Set the flag to prevent duplicate calls
     isFetchingRef.current = true;
@@ -3438,137 +3451,212 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Tab 0: Matched - settlement_matched
       const matchedParams = { ...baseParams };
       matchedParams.status_in = 'settlement_matched';
+      if (activeTab !== 0) matchedParams.count_only = 'true';
 
       // Tab 1: Mismatched - two separate calls for less_received and more_received
       const mismatchedLessReceivedParams = { ...baseParams };
       mismatchedLessReceivedParams.status = 'less_payment_received';
+      if (activeTab !== 1 || mismatchedSubTab !== 'less_received') mismatchedLessReceivedParams.count_only = 'true';
 
       const mismatchedMoreReceivedParams = { ...baseParams };
       mismatchedMoreReceivedParams.status = 'more_payment_received';
+      if (activeTab !== 1 || mismatchedSubTab !== 'more_received') mismatchedMoreReceivedParams.count_only = 'true';
 
       // Tab 2: Unsettled - unsettled
       const unsettledParams = { ...baseParams };
       unsettledParams.status = 'unsettled';
+      if (activeTab !== 2) unsettledParams.count_only = 'true';
 
       // Tab 3: All - no status filter
       const allParams = { ...baseParams };
       // No status filter applied
+      if (activeTab !== 3) allParams.count_only = 'true';
 
-      // Make all 5 API calls simultaneously
+      const salesReportParams: any = {
+        platform: platformToUse,
+        order_date_from: dateRangeToUse.start,
+        order_date_to: dateRangeToUse.end,
+        limit: 100,
+        page: 1,
+        count_only: 'true',
+      };
+
+      // Make only the active tab's API call if only switching tabs (to optimize network usage)
+      const matchedCall = (isTabSwitchOnly && activeTab !== 0)
+        ? Promise.resolve({ success: true, data: matchedData, skipped: true })
+        : api.transactions.getTotalTransactions(matchedParams);
+
+      const mismatchedLessReceivedCall = (isTabSwitchOnly && (activeTab !== 1 || mismatchedSubTab !== 'less_received'))
+        ? Promise.resolve({ success: true, data: mismatchedLessReceivedData, skipped: true })
+        : api.transactions.getTotalTransactions(mismatchedLessReceivedParams);
+
+      const mismatchedMoreReceivedCall = (isTabSwitchOnly && (activeTab !== 1 || mismatchedSubTab !== 'more_received'))
+        ? Promise.resolve({ success: true, data: mismatchedMoreReceivedData, skipped: true })
+        : api.transactions.getTotalTransactions(mismatchedMoreReceivedParams);
+
+      const unsettledCall = (isTabSwitchOnly && activeTab !== 2)
+        ? Promise.resolve({ success: true, data: unsettledData, skipped: true })
+        : api.transactions.getTotalTransactions(unsettledParams);
+
+      const allCall = (isTabSwitchOnly && activeTab !== 3)
+        ? Promise.resolve({ success: true, data: allData, skipped: true })
+        : api.transactions.getTotalTransactions(allParams);
+
+      const salesReportCall = (isTabSwitchOnly)
+        ? Promise.resolve({ success: true, data: { pagination: { total_count: salesReportTotalCount } }, skipped: true })
+        : api.transactions.getSalesTransactions(salesReportParams);
+
       const apiCalls = [
-        api.transactions.getTotalTransactions(matchedParams),
-        api.transactions.getTotalTransactions(mismatchedLessReceivedParams),
-        api.transactions.getTotalTransactions(mismatchedMoreReceivedParams),
-        api.transactions.getTotalTransactions(unsettledParams),
-        api.transactions.getTotalTransactions(allParams),
+        matchedCall,
+        mismatchedLessReceivedCall,
+        mismatchedMoreReceivedCall,
+        unsettledCall,
+        allCall,
+        salesReportCall,
       ];
 
-      const [matchedResponse, mismatchedLessReceivedResponse, mismatchedMoreReceivedResponse, unsettledResponse, allResponse] = await Promise.all(apiCalls);
+      const [
+        matchedResponse,
+        mismatchedLessReceivedResponse,
+        mismatchedMoreReceivedResponse,
+        unsettledResponse,
+        allResponse,
+        salesReportResponse,
+      ] = await Promise.all(apiCalls);
 
       // Enhance unsettled response for D2C with courier provider column/value
-      const processedUnsettledData = unsettledResponse.success
+      const processedUnsettledData = (unsettledResponse as any).success && !(unsettledResponse as any).skipped
         ? addCourierProviderColumn(unsettledResponse.data as TotalTransactionsResponse, platformToUse)
-        : null;
+        : unsettledData;
 
       // Use the first successful response that contains column metadata to populate filters
       const responseWithColumns = [matchedResponse, mismatchedLessReceivedResponse, mismatchedMoreReceivedResponse, unsettledResponse, allResponse].find(
-        (res) => res.success && (res.data as TotalTransactionsResponse | undefined)?.columns
+        (res) => (res as any).success && !(res as any).skipped && (res.data as TotalTransactionsResponse | undefined)?.columns
       );
       if (responseWithColumns?.data) {
         setTotalTransactionsData(responseWithColumns.data as TotalTransactionsResponse);
       }
 
       // Process matched response (Tab 0)
-      if (matchedResponse.success) {
-        setMatchedData(matchedResponse.data);
+      if ((matchedResponse as any).success && !(matchedResponse as any).skipped) {
+        setMatchedData(matchedResponse.data as any);
         if (matchedResponse.data?.pagination) {
           setMatchedTotalCount(matchedResponse.data.pagination.total_count);
         }
-      } else {
+      } else if (!matchedResponse.success) {
         console.error('[fetchQuadTransactions] Matched API failed:', matchedResponse);
       }
 
       // Process mismatched less received response (Tab 1 - sub-tab 1)
-      if (mismatchedLessReceivedResponse.success) {
-        setMismatchedLessReceivedData(mismatchedLessReceivedResponse.data);
+      if ((mismatchedLessReceivedResponse as any).success && !(mismatchedLessReceivedResponse as any).skipped) {
+        setMismatchedLessReceivedData(mismatchedLessReceivedResponse.data as any);
         if (mismatchedLessReceivedResponse.data?.pagination) {
           setMismatchedLessReceivedTotalCount(mismatchedLessReceivedResponse.data.pagination.total_count);
         }
-      } else {
+      } else if (!mismatchedLessReceivedResponse.success) {
         console.error('[fetchQuadTransactions] Mismatched Less Received API failed:', mismatchedLessReceivedResponse);
       }
 
       // Process mismatched more received response (Tab 1 - sub-tab 2)
-      if (mismatchedMoreReceivedResponse.success) {
-        setMismatchedMoreReceivedData(mismatchedMoreReceivedResponse.data);
+      if ((mismatchedMoreReceivedResponse as any).success && !(mismatchedMoreReceivedResponse as any).skipped) {
+        setMismatchedMoreReceivedData(mismatchedMoreReceivedResponse.data as any);
         if (mismatchedMoreReceivedResponse.data?.pagination) {
           setMismatchedMoreReceivedTotalCount(mismatchedMoreReceivedResponse.data.pagination.total_count);
         }
-      } else {
+      } else if (!mismatchedMoreReceivedResponse.success) {
         console.error('[fetchQuadTransactions] Mismatched More Received API failed:', mismatchedMoreReceivedResponse);
       }
 
       // Process unsettled response (Tab 2)
-      if (unsettledResponse.success) {
+      if ((unsettledResponse as any).success && !(unsettledResponse as any).skipped) {
         setUnsettledData(processedUnsettledData);
         if (processedUnsettledData?.pagination) {
           setUnsettledTotalCount(processedUnsettledData.pagination.total_count);
         }
-      } else {
+      } else if (!unsettledResponse.success) {
         console.error('[fetchQuadTransactions] Unsettled API failed:', unsettledResponse);
       }
 
       // Process all response (Tab 3)
-      if (allResponse.success) {
-        setAllData(allResponse.data);
+      if ((allResponse as any).success && !(allResponse as any).skipped) {
+        setAllData(allResponse.data as any);
         if (allResponse.data?.pagination) {
           setAllTotalCount(allResponse.data.pagination.total_count);
         }
-      } else {
+      } else if (!allResponse.success) {
         console.error('[fetchQuadTransactions] All API failed:', allResponse);
       }
 
+      // Process sales report response
+      if ((salesReportResponse as any).success && !(salesReportResponse as any).skipped) {
+        // Cast to any to avoid strict TS property checks
+        const responseData = salesReportResponse.data as any;
+        let totalCountVal = 0;
+        // Resolve total count from possible response shapes
+        if (responseData?.pagination?.total_count != null) {
+          totalCountVal = responseData.pagination.total_count;
+        } else if (typeof responseData?.count === 'number') {
+          totalCountVal = responseData.count;
+        } else if (Array.isArray(responseData?.transactions)) {
+          totalCountVal = responseData.transactions.length;
+        } else if (Array.isArray(responseData?.data)) {
+          totalCountVal = responseData.data.length;
+        }
+        setSalesReportTotalCount(totalCountVal);
+      } else if (!salesReportResponse.success) {
+        console.error('[fetchQuadTransactions] Sales Report count API failed:', salesReportResponse);
+      }
+
       // Update totalCount based on current active tab
-      if (activeTab === 0 && matchedResponse.success && matchedResponse.data?.pagination) {
-        setTotalCount(matchedResponse.data.pagination.total_count);
+      if (activeTab === 0 && matchedResponse.success && (matchedResponse.data?.pagination || matchedData?.pagination)) {
+        const pag = matchedResponse.data?.pagination || matchedData?.pagination;
+        if (pag) setTotalCount((pag.total_count ?? 0) as number);
       } else if (activeTab === 1) {
         // For mismatched tab, use the appropriate sub-tab data
-        if (mismatchedSubTab === 'less_received' && mismatchedLessReceivedResponse.success && mismatchedLessReceivedResponse.data?.pagination) {
-          setTotalCount(mismatchedLessReceivedResponse.data.pagination.total_count);
-        } else if (mismatchedSubTab === 'more_received' && mismatchedMoreReceivedResponse.success && mismatchedMoreReceivedResponse.data?.pagination) {
-          setTotalCount(mismatchedMoreReceivedResponse.data.pagination.total_count);
+        if (mismatchedSubTab === 'less_received' && mismatchedLessReceivedResponse.success && (mismatchedLessReceivedResponse.data?.pagination || mismatchedLessReceivedData?.pagination)) {
+          const pag = mismatchedLessReceivedResponse.data?.pagination || mismatchedLessReceivedData?.pagination;
+          if (pag) setTotalCount((pag.total_count ?? 0) as number);
+        } else if (mismatchedSubTab === 'more_received' && mismatchedMoreReceivedResponse.success && (mismatchedMoreReceivedResponse.data?.pagination || mismatchedMoreReceivedData?.pagination)) {
+          const pag = mismatchedMoreReceivedResponse.data?.pagination || mismatchedMoreReceivedData?.pagination;
+          if (pag) setTotalCount((pag.total_count ?? 0) as number);
         }
-      } else if (activeTab === 2 && unsettledResponse.success && (processedUnsettledData?.pagination || unsettledResponse.data?.pagination)) {
-        const unsettledPagination = processedUnsettledData?.pagination || unsettledResponse.data?.pagination;
+      } else if (activeTab === 2 && unsettledResponse.success && (processedUnsettledData?.pagination || unsettledData?.pagination)) {
+        const unsettledPagination = processedUnsettledData?.pagination || unsettledData?.pagination;
         if (unsettledPagination) {
-          setTotalCount(unsettledPagination.total_count);
+          setTotalCount((unsettledPagination.total_count ?? 0) as number);
         }
-      } else if (activeTab === 3 && allResponse.success && allResponse.data?.pagination) {
-        setTotalCount(allResponse.data.pagination.total_count);
+      } else if (activeTab === 3 && allResponse.success && (allResponse.data?.pagination || allData?.pagination)) {
+        const pag = allResponse.data?.pagination || allData?.pagination;
+        if (pag) setTotalCount((pag.total_count ?? 0) as number);
       }
 
       setCurrentPage(pageNumber);
 
-      const allSucceeded = matchedResponse.success && mismatchedLessReceivedResponse.success && mismatchedMoreReceivedResponse.success && unsettledResponse.success && allResponse.success;
+      const allSucceeded = matchedResponse.success && mismatchedLessReceivedResponse.success && mismatchedMoreReceivedResponse.success && unsettledResponse.success && allResponse.success && salesReportResponse.success;
       if (allSucceeded) {
         lastQuadParamsRef.current = paramsSignature;
+        lastBaseParamsSignatureRef.current = baseParamsSignature;
       } else {
         lastQuadParamsRef.current = null;
+        lastBaseParamsSignatureRef.current = null;
       }
 
-      // Update tab counts based on the actual data received
-      const lessReceivedCount = mismatchedLessReceivedResponse.success ? (mismatchedLessReceivedResponse.data?.data?.length || 0) : 0;
-      const moreReceivedCount = mismatchedMoreReceivedResponse.success ? (mismatchedMoreReceivedResponse.data?.data?.length || 0) : 0;
-      setTabCounts({
-        matched: matchedResponse.success ? (matchedResponse.data?.data?.length || 0) : null,
-        mismatched: lessReceivedCount + moreReceivedCount > 0 ? lessReceivedCount + moreReceivedCount : null,
-        unsettled: unsettledResponse.success ? (unsettledResponse.data?.data?.length || 0) : null,
-        all: allResponse.success ? (allResponse.data?.data?.length || 0) : null,
-      });
+      // Update tab counts based on the actual data received (only on initial load or base param change)
+      if (!isTabSwitchOnly) {
+        const lessReceivedCount = mismatchedLessReceivedResponse.success ? ((mismatchedLessReceivedResponse.data as any)?.data?.length || 0) : 0;
+        const moreReceivedCount = mismatchedMoreReceivedResponse.success ? ((mismatchedMoreReceivedResponse.data as any)?.data?.length || 0) : 0;
+        setTabCounts({
+          matched: matchedResponse.success ? ((matchedResponse.data as any)?.data?.length || 0) : null,
+          mismatched: lessReceivedCount + moreReceivedCount > 0 ? lessReceivedCount + moreReceivedCount : null,
+          unsettled: unsettledResponse.success ? ((unsettledResponse.data as any)?.data?.length || 0) : null,
+          all: allResponse.success ? ((allResponse.data as any)?.data?.length || 0) : null,
+        });
+      }
     } catch (err: any) {
       console.error('[fetchQuadTransactions] Error:', err);
       setError(err?.message || 'Failed to fetch transactions');
       lastQuadParamsRef.current = null;
+      lastBaseParamsSignatureRef.current = null;
     } finally {
       setQuadApiLoading(false);
       setPaginationLoading(false);
@@ -3681,6 +3769,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
         const totalRecords = pagination.total_count ?? responseData.count ?? responseData.transactions?.length ?? 0;
         setTotalCount(totalRecords);
+        setSalesReportTotalCount(totalRecords);
         setRowsPerPage(pagination.limit ?? requestedLimit);
         setPage((pagination.page ?? requestedPage) - 1);
         setCurrentPage(pagination.page ?? requestedPage);
@@ -3815,10 +3904,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS,
         params,
         {
-          headers: {
-            'X-Org-ID': '612cd642-c2ce-49da-b535-be35442cecfa',
-            'X-API-Key': 'kapiva-7b485b6a865b2b4a3d728ef2fd4f3'
-          }
+          headers: {},
+          useCache: true,
+          cacheTimeMs: 300000 // 5 minutes cache
         }
       );
 
@@ -4197,8 +4285,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       setTotalCount(allTotalCount);
     }
 
-    // No API call needed - just switch the displayed data
-    // The data is already loaded from quad API calls
+    // The activeTab useEffect hook will automatically trigger lazy-loading of the actual data for this tab,
+    // while keeping background tab counts cached.
   };
 
   // Handle transaction row click
@@ -4363,13 +4451,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   };
 
   const visibleColumns = getVisibleColumns();
-  const salesTabTotalCount = salesReportPagination?.total_count ?? salesReportData?.count ?? null;
   const tabDefinitions = [
     { label: 'Matched', count: matchedTotalCount },
     { label: 'Mismatched', count: mismatchedTotalCount },
     { label: 'Unsettled', count: unsettledTotalCount },
     { label: 'All', count: allTotalCount },
-    { label: 'Sales Report', count: activeTab === 4 ? salesTabTotalCount : null },
+    { label: 'Sales Report', count: salesReportTotalCount },
   ];
 
   const selectedDateRangeLabel = useMemo(() => {
@@ -4386,14 +4473,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   }, [dateRange.start, dateRange.end]);
 
   return (
-    <Slide direction="left" in mountOnEnter unmountOnExit>
-      <Box sx={{
-        width: '100%',
-        height: '100%',
-        background: '#fafafa',
-        position: 'relative',
-        overflow: 'auto',
-      }}>
+    <Box sx={{
+      width: '100%',
+      height: '100%',
+      background: '#fafafa',
+      position: 'relative',
+      overflow: 'auto',
+    }}>
         <Box sx={{ p: { xs: 1, md: 2 }, position: 'relative', zIndex: 1 }}>
           {/* Header */}
           <Fade in timeout={800}>
@@ -4403,7 +4489,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               borderRadius: '12px',
               border: '1px solid #e5e7eb'
             }}>
-              <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+              <CardContent sx={{ p: { xs: 1.5, sm: 2 }, pb: { xs: '12px !important', sm: '16px !important' } }}>
                 {/* Main Header Row - Responsive Layout */}
                 <Box sx={{
                   display: 'flex',
@@ -4597,7 +4683,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 fontSize: { xs: '0.65rem', sm: '0.7rem' },
                                 whiteSpace: 'nowrap'
                               }}>
-                                {platform === 'flipkart' ? 'Flipkart' : platform === 'amazon' ? 'Amazon' : 'D2C'}
+                                {platform === 'flipkart'
+                                  ? 'Flipkart'
+                                  : platform === 'amazon'
+                                    ? 'Amazon'
+                                    : platform === 'amazon_uk'
+                                      ? 'Amazon UK'
+                                      : platform === 'd2c'
+                                        ? 'D2C'
+                                        : 'Other'}
                               </Typography>
                             </Box>
                           ))}
@@ -4814,7 +4908,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       display: 'none'
                     },
                     scrollbarWidth: 'none',
-                    pb: { xs: 0, sm: 0.5 }
+                    pb: { xs: 0, sm: 0.5 },
+                    display: 'flex',
+                    alignItems: 'center'
                   }}>
                     <Box sx={{
                       display: 'inline-block',
@@ -4840,8 +4936,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             color: '#6b7280',
                             px: { xs: 1, sm: 1.5, md: 2.5 },
                             py: { xs: 0.75, sm: 1 },
-                            minWidth: { xs: 'auto', sm: 'fit-content' },
-                            maxWidth: { xs: '45%', sm: 'none' },
+                            width: { xs: 'auto', sm: '180px' },
+                            minWidth: { xs: 'auto', sm: '180px' },
+                            maxWidth: { xs: '45%', sm: '180px' },
                             whiteSpace: { xs: 'normal', sm: 'nowrap' },
                             textAlign: { xs: 'center', sm: 'left' },
                             overflow: 'hidden',
@@ -4867,9 +4964,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 display: 'flex',
                                 flexDirection: { xs: 'column', sm: 'row' },
                                 alignItems: 'center',
-                                gap: { xs: 0, sm: 0.25 },
+                                gap: { xs: 0, sm: 0.5 },
                                 width: '100%',
-                                justifyContent: 'center'
+                                justifyContent: { xs: 'center', sm: 'flex-start' }
                               }}>
                                 <Box component="span">{label}</Box>
                                 {count !== null && count !== undefined && (
@@ -4891,6 +4988,56 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         ))}
                       </Tabs>
                     </Box>
+                    
+                    {/* Active filter chips inline with Tabs */}
+                    {(!!Object.keys(columnFilters).filter(k => columnFilters[k]).length || orderIdChips.length > 0) && (
+                      <Box sx={{
+                        display: 'flex',
+                        gap: { xs: 0.5, sm: 0.75 },
+                        flexWrap: 'nowrap',
+                        ml: { xs: 1, sm: 2 },
+                        alignItems: 'center'
+                      }}>
+                        {/* Order ID chips */}
+                        {orderIdChips.length > 0 && (
+                          <Chip
+                            key="order-ids-filter"
+                            label={`Order IDs: ${orderIdChips.length} selected`}
+                            onDelete={() => {
+                              setOrderIdChips([]);
+                              setOrderIdSearch('');
+                              setShowOrderIdSearch(false);
+                              setPage(0);
+                              setCurrentPage(1);
+                              fetchQuadTransactions(1, columnFilters, dateRange, selectedPlatform, []);
+                            }}
+                            size="small"
+                            sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600, flexShrink: 0 }}
+                          />
+                        )}
+                        {Object.entries(columnFilters).filter(([_, v]) => !!v).map(([key, val]) => (
+                          <Chip
+                            key={key}
+                            size="small"
+                            label={`${key}: ${typeof val === 'object' ? (Array.isArray(val) ? val.join(',') : Object.values(val).filter(Boolean).join('~')) : val}`}
+                            onDelete={() => {
+                              const next = { ...columnFilters } as any;
+                              delete next[key as any];
+                              setColumnFilters(next);
+                              // Also update pending to reflect removal
+                              setPendingColumnFilters((prev) => {
+                                const p = { ...prev } as any;
+                                delete p[key as any];
+                                return p;
+                              });
+                              // Re-apply after deletion
+                              fetchQuadTransactions(1, next, pendingDateRange, selectedPlatform);
+                            }}
+                            sx={{ flexShrink: 0 }}
+                          />
+                        ))}
+                      </Box>
+                    )}
                   </Box>
 
                   <Button
@@ -5122,54 +5269,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   </Box>
                 )}
 
-                {/* Active filter chips row directly under the header row, aligned under back button - Responsive */}
-                {(!!Object.keys(columnFilters).filter(k => columnFilters[k]).length || orderIdChips.length > 0) && (
-                  <Box sx={{
-                    ml: { xs: 0, sm: 6 },
-                    mt: { xs: 1, sm: 0 },
-                    display: 'flex',
-                    gap: { xs: 0.5, sm: 0.75 },
-                    flexWrap: 'wrap'
-                  }}>
-                    {/* Order ID chips */}
-                    {orderIdChips.length > 0 && (
-                      <Chip
-                        key="order-ids-filter"
-                        label={`Order IDs: ${orderIdChips.length} selected`}
-                        onDelete={() => {
-                          setOrderIdChips([]);
-                          setOrderIdSearch('');
-                          setShowOrderIdSearch(false);
-                          setPage(0);
-                          setCurrentPage(1);
-                          fetchQuadTransactions(1, columnFilters, dateRange, selectedPlatform, []);
-                        }}
-                        size="small"
-                        sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600 }}
-                      />
-                    )}
-                    {Object.entries(columnFilters).filter(([_, v]) => !!v).map(([key, val]) => (
-                      <Chip
-                        key={key}
-                        size="small"
-                        label={`${key}: ${typeof val === 'object' ? (Array.isArray(val) ? val.join(',') : Object.values(val).filter(Boolean).join('~')) : val}`}
-                        onDelete={() => {
-                          const next = { ...columnFilters } as any;
-                          delete next[key as any];
-                          setColumnFilters(next);
-                          // Also update pending to reflect removal
-                          setPendingColumnFilters((prev) => {
-                            const p = { ...prev } as any;
-                            delete p[key as any];
-                            return p;
-                          });
-                          // Re-apply after deletion
-                          fetchQuadTransactions(1, next, pendingDateRange, selectedPlatform);
-                        }}
-                      />
-                    ))}
-                  </Box>
-                )}
+
               </CardContent>
             </Card>
           </Fade>
@@ -5191,52 +5291,41 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
             </Alert>
           )}
 
-          {/* Loading Indicator */}
-          {(loading || quadApiLoading || salesReportLoading) && !isSorting && (
-            <LinearProgress
-              sx={{
-                mb: 2,
-                borderRadius: '8px',
-                height: 4,
-                background: '#f3f4f6',
-                '& .MuiLinearProgress-bar': {
-                  background: '#1f2937',
-                },
-              }}
-            />
-          )}
-
-          {/* Pagination Loading Indicator */}
-          {paginationLoading && !isSorting && (
-            <LinearProgress
-              sx={{
-                mb: 2,
-                borderRadius: '8px',
-                height: 2,
-                background: '#f3f4f6',
-                '& .MuiLinearProgress-bar': {
-                  background: '#3b82f6',
-                },
-              }}
-            />
-          )}
-
           {/* Transaction Table */}
           <Fade in timeout={1000}>
             <Card sx={{
               background: '#ffffff',
               borderRadius: '12px',
               border: '1px solid #e5e7eb',
-              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-              overflow: 'hidden',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+              position: 'relative',
+              overflow: 'hidden'
             }}>
+              {/* Unified Premium Loading Indicator */}
+              <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, height: 3 }}>
+                {(loading || quadApiLoading || salesReportLoading || paginationLoading) && !isSorting && (
+                  <LinearProgress
+                    sx={{
+                      height: 3,
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      '& .MuiLinearProgress-bar': {
+                        background: 'linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)',
+                      },
+                    }}
+                  />
+                )}
+              </Box>
               <TableContainer sx={{
-                maxHeight: 'calc(100vh - 200px)',
+                height: 'calc(100vh - 200px)',
                 overflowX: 'auto',
+                overflowY: 'scroll',
                 position: 'relative',
                 zIndex: 1,
               }}>
-                <Table stickyHeader sx={{
+                
+                  {(paginationLoading && !isSorting) ? (
+                    <Table stickyHeader sx={{
+                  tableLayout: 'fixed',
                   borderCollapse: 'separate',
                   borderSpacing: 0,
                   '& .MuiTableCell-root': {
@@ -5256,8 +5345,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     // paddingBottom: '2px',
                   }
                 }}>
-                  <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
-                    <TableRow>
+                      <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
+                        <TableRow>
                       {getCurrentColumns().map((column, index) => (
                         <TableCell
                           key={`header-${column}`}
@@ -5267,6 +5356,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             background: '#f3f4f6',
                             textAlign: 'center',
                             py: 0.75,
+                            width: '160px',
                             minWidth: 160,
                             transition: 'all 0.3s ease',
                             position: 'relative',
@@ -5367,17 +5457,27 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 </>
                               )}
                             </Box>
-                            {/* Order ID Search Bar - Expandable */}
+                            {/* Order ID Search Bar - Floating Popover */}
                             {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && (
                               <Box
                                 sx={{
+                                  position: 'absolute',
+                                  top: 'calc(100% + 4px)',
+                                  left: 0,
+                                  zIndex: 20,
+                                  background: '#ffffff',
+                                  borderRadius: '8px',
+                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                  padding: '4px',
+                                  border: '1px solid #e5e7eb',
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: 0.5,
-                                  animation: 'expand 0.3s ease-in-out',
-                                  '@keyframes expand': {
-                                    '0%': { width: '0', opacity: 0 },
-                                    '100%': { width: '280px', opacity: 1 }
+                                  width: 'calc(100% - 16px)',
+                                  animation: 'slideDown 0.2s ease-out forwards',
+                                  '@keyframes slideDown': {
+                                    '0%': { transform: 'translateY(-10px)', opacity: 0 },
+                                    '100%': { transform: 'translateY(0)', opacity: 1 }
                                   }
                                 }}
                               >
@@ -5416,7 +5516,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     ),
                                   }}
                                   sx={{
-                                    width: '280px',
+                                    width: '100%',
                                     '& .MuiOutlinedInput-root': {
                                       height: '32px',
                                       fontSize: '0.75rem',
@@ -5426,20 +5526,30 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 />
                               </Box>
                             )}
-                            {/* Sales Report Search Bar - Expandable */}
+                            {/* Sales Report Search Bar - Floating Popover */}
                             {activeTab === 4 && showSalesReportSearch &&
                               ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
                                 (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
                                 (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
                                 <Box
                                   sx={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 4px)',
+                                    left: 0,
+                                    zIndex: 20,
+                                    background: '#ffffff',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                    padding: '4px',
+                                    border: '1px solid #e5e7eb',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 0.5,
-                                    animation: 'expand 0.3s ease-in-out',
-                                    '@keyframes expand': {
-                                      '0%': { width: '0', opacity: 0 },
-                                      '100%': { width: '280px', opacity: 1 }
+                                    width: 'calc(100% - 16px)',
+                                    animation: 'slideDown 0.2s ease-out forwards'
+                                    , '@keyframes slideDown': {
+                                      '0%': { transform: 'translateY(-10px)', opacity: 0 },
+                                      '100%': { transform: 'translateY(0)', opacity: 1 }
                                     }
                                   }}
                                 >
@@ -5492,35 +5602,338 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         </TableCell>
                       ))}
                     </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {(paginationLoading && !isSorting) ? (
-                      <TableRow>
-                        <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                            <CircularProgress size={30} sx={{ color: '#3b82f6' }} />
-                            <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>
-                              Loading page {currentPage}...
-                            </Typography>
+                      </TableHead>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                              <CircularProgress size={30} sx={{ color: '#3b82f6' }} />
+                              <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>
+                                Loading page {currentPage}...
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  ) : getCurrentData().length === 0 ? (
+                    <Table stickyHeader sx={{
+                  tableLayout: 'fixed',
+                  borderCollapse: 'separate',
+                  borderSpacing: 0,
+                  '& .MuiTableCell-root': {
+                    border: 'none !important',
+                  },
+                  '& .MuiTableCell-head': {
+                    border: 'none !important',
+                    borderBottom: '0.5px solid #e5e7eb !important',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 2,
+                  },
+                  '& .MuiTableCell-body': {
+                    border: 'none !important',
+                    borderBottom: '0.5px solid #e5e7eb !important',
+                    // paddingTop: '2px',
+                    // paddingBottom: '2px',
+                  }
+                }}>
+                      <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
+                        <TableRow>
+                      {getCurrentColumns().map((column, index) => (
+                        <TableCell
+                          key={`header-${column}`}
+                          sx={{
+                            fontWeight: 700,
+                            color: '#111827',
+                            background: '#f3f4f6',
+                            textAlign: 'center',
+                            py: 0.75,
+                            width: '160px',
+                            minWidth: 160,
+                            transition: 'all 0.3s ease',
+                            position: 'relative',
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            {/* Column Header */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
+                                {column === 'Status' ? 'Status' : column}
+                              </Typography>
+                              {/* Sorting button - different handlers for Sales Report vs other tabs */}
+                              {activeTab === 4 ? (
+                                // Sales Report tab sorting
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSalesReportSort(column);
+                                    }}
+                                    sx={{
+                                      ml: 0.5,
+                                      color: salesReportSortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                      background: salesReportSortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                      '&:hover': { background: '#f3f4f6' },
+                                    }}
+                                    disabled={!getSalesReportSortBy(column)}
+                                    aria-label={`Sort ${column}`}
+                                  >
+                                    {getSalesReportSortIcon(column)}
+                                  </IconButton>
+                                  {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
+                                  {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                    (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
+                                    (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setShowSalesReportSearch(!showSalesReportSearch);
+                                        }}
+                                        sx={{
+                                          ml: 0.5,
+                                          color: showSalesReportSearch ? '#1f2937' : '#6b7280',
+                                          background: showSalesReportSearch ? '#e5e7eb' : 'transparent',
+                                          '&:hover': { background: '#f3f4f6' },
+                                        }}
+                                        aria-label="Toggle search"
+                                      >
+                                        <SearchIcon sx={{ fontSize: '1rem' }} />
+                                      </IconButton>
+                                    )}
+                                </>
+                              ) : (
+                                // Other tabs sorting
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSort(column);
+                                    }}
+                                    sx={{
+                                      ml: 0.5,
+                                      color: sortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                      background: sortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                      '&:hover': { background: '#f3f4f6' },
+                                    }}
+                                    disabled={!COLUMN_TO_SORT_BY_MAP[column]}
+                                    aria-label={`Sort ${column}`}
+                                  >
+                                    {getSortIcon(column)}
+                                  </IconButton>
+                                  {/* Magnifying glass button for Order ID search */}
+                                  {column === 'Order ID' && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowOrderIdSearch(!showOrderIdSearch);
+                                      }}
+                                      sx={{
+                                        ml: 0.5,
+                                        color: showOrderIdSearch ? '#1f2937' : '#6b7280',
+                                        background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
+                                        '&:hover': { background: '#f3f4f6' },
+                                      }}
+                                      aria-label="Toggle search"
+                                    >
+                                      <SearchIcon sx={{ fontSize: '1rem' }} />
+                                    </IconButton>
+                                  )}
+                                </>
+                              )}
+                            </Box>
+                            {/* Order ID Search Bar - Floating Popover */}
+                            {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 'calc(100% + 4px)',
+                                  left: 0,
+                                  zIndex: 20,
+                                  background: '#ffffff',
+                                  borderRadius: '8px',
+                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                  padding: '4px',
+                                  border: '1px solid #e5e7eb',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.5,
+                                  width: 'calc(100% - 16px)',
+                                  animation: 'slideDown 0.2s ease-out forwards',
+                                  '@keyframes slideDown': {
+                                    '0%': { transform: 'translateY(-10px)', opacity: 0 },
+                                    '100%': { transform: 'translateY(0)', opacity: 1 }
+                                  }
+                                }}
+                              >
+                                <TextField
+                                  size="small"
+                                  value={orderIdSearch}
+                                  onChange={handleOrderIdSearchChange}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleOrderIdSearchClick();
+                                    }
+                                  }}
+                                  InputProps={{
+                                    endAdornment: (
+                                      <InputAdornment position="end">
+                                        {orderIdSearch?.trim() && (
+                                          <IconButton
+                                            size="small"
+                                            onClick={handleOrderIdSearchClear}
+                                            disabled={(loading || quadApiLoading) && !isSorting}
+                                            sx={{ p: 0.5, mr: 0.25 }}
+                                          >
+                                            <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
+                                          </IconButton>
+                                        )}
+                                        <IconButton
+                                          size="small"
+                                          onClick={handleOrderIdSearchClick}
+                                          disabled={(loading || quadApiLoading) && !isSorting}
+                                          sx={{ p: 0.5 }}
+                                        >
+                                          <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                        </IconButton>
+                                      </InputAdornment>
+                                    ),
+                                  }}
+                                  sx={{
+                                    width: '100%',
+                                    '& .MuiOutlinedInput-root': {
+                                      height: '32px',
+                                      fontSize: '0.75rem',
+                                      background: 'white',
+                                    }
+                                  }}
+                                />
+                              </Box>
+                            )}
+                            {/* Sales Report Search Bar - Floating Popover */}
+                            {activeTab === 4 && showSalesReportSearch &&
+                              ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
+                                (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                <Box
+                                  sx={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 4px)',
+                                    left: 0,
+                                    zIndex: 20,
+                                    background: '#ffffff',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                    padding: '4px',
+                                    border: '1px solid #e5e7eb',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.5,
+                                    width: 'calc(100% - 16px)',
+                                    animation: 'slideDown 0.2s ease-out forwards'
+                                    , '@keyframes slideDown': {
+                                      '0%': { transform: 'translateY(-10px)', opacity: 0 },
+                                      '100%': { transform: 'translateY(0)', opacity: 1 }
+                                    }
+                                  }}
+                                >
+                                  <TextField
+                                    size="small"
+                                    value={salesReportSearch}
+                                    onChange={handleSalesReportSearchChange}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSalesReportSearchClick();
+                                      }
+                                    }}
+                                    InputProps={{
+                                      endAdornment: (
+                                        <InputAdornment position="end">
+                                          {salesReportSearch?.trim() && (
+                                            <IconButton
+                                              size="small"
+                                              onClick={handleSalesReportSearchClear}
+                                              disabled={salesReportLoading && !isSorting}
+                                              sx={{ p: 0.5, mr: 0.25 }}
+                                            >
+                                              <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
+                                            </IconButton>
+                                          )}
+                                          <IconButton
+                                            size="small"
+                                            onClick={handleSalesReportSearchClick}
+                                            disabled={salesReportLoading && !isSorting}
+                                            sx={{ p: 0.5 }}
+                                          >
+                                            <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                          </IconButton>
+                                        </InputAdornment>
+                                      ),
+                                    }}
+                                    sx={{
+                                      width: '280px',
+                                      '& .MuiOutlinedInput-root': {
+                                        height: '32px',
+                                        fontSize: '0.75rem',
+                                        background: 'white',
+                                      }
+                                    }}
+                                  />
+                                </Box>
+                              )}
                           </Box>
                         </TableCell>
-                      </TableRow>
-                    ) : getCurrentData().length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
-                          <Typography variant="body2" sx={{ color: '#6b7280' }}>
-                            {totalTransactionsData ? 'No transactions found.' : 'No data available.'}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      getCurrentData()
-                        .map((row, rowIndex) => {
-                          const isSelected = (selectedTransaction?.["Order ID"] || selectedTransaction?.["Order Item ID"]) === (row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"]);
-                          return (
-                            <React.Fragment key={rowIndex}>
-                              <TableRow
-                                sx={{
+                      ))}
+                    </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell colSpan={getCurrentColumns().length} sx={{ textAlign: 'center', py: 4 }}>
+                            <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                              {totalTransactionsData ? 'No transactions found.' : 'No data available.'}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <TableVirtuoso
+                      data={getCurrentData()}
+                      useWindowScroll={false}
+                      components={{
+                        Table: (props) => <Table {...props} stickyHeader sx={{
+                  tableLayout: 'fixed',
+                  borderCollapse: 'separate',
+                  borderSpacing: 0,
+                  '& .MuiTableCell-root': {
+                    border: 'none !important',
+                  },
+                  '& .MuiTableCell-head': {
+                    border: 'none !important',
+                    borderBottom: '0.5px solid #e5e7eb !important',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 2,
+                  },
+                  '& .MuiTableCell-body': {
+                    border: 'none !important',
+                    borderBottom: '0.5px solid #e5e7eb !important',
+                    // paddingTop: '2px',
+                    // paddingBottom: '2px',
+                  }
+                }} />,
+                        TableHead: React.forwardRef((props, ref) => <TableHead {...props} ref={ref} sx={{ '& .MuiTableCell-root': { border: 'none !important' } }} />),
+                        TableRow: (props) => <TableRow {...props} sx={{
                                   borderLeft: `4px solid ${activeTab === 0 ? '#10b981' : // Matched - green
                                       activeTab === 1 ? '#f59e0b' : // Mismatched - orange
                                         activeTab === 2 ? '#ef4444' : // Unsettled - red
@@ -5529,8 +5942,275 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     }`,
                                   background: '#ffffff',
                                   position: 'relative',
+                                }} />,
+                        TableBody: React.forwardRef((props, ref) => <TableBody {...props} ref={ref} />),
+                      }}
+                      fixedHeaderContent={() => (
+                        <TableRow>
+                          
+                      {getCurrentColumns().map((column, index) => (
+                        <TableCell
+                          key={`header-${column}`}
+                          sx={{
+                            fontWeight: 700,
+                            color: '#111827',
+                            background: '#f3f4f6',
+                            textAlign: 'center',
+                            py: 0.75,
+                            width: '160px',
+                            minWidth: 160,
+                            transition: 'all 0.3s ease',
+                            position: 'relative',
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            {/* Column Header */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
+                                {column === 'Status' ? 'Status' : column}
+                              </Typography>
+                              {/* Sorting button - different handlers for Sales Report vs other tabs */}
+                              {activeTab === 4 ? (
+                                // Sales Report tab sorting
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSalesReportSort(column);
+                                    }}
+                                    sx={{
+                                      ml: 0.5,
+                                      color: salesReportSortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                      background: salesReportSortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                      '&:hover': { background: '#f3f4f6' },
+                                    }}
+                                    disabled={!getSalesReportSortBy(column)}
+                                    aria-label={`Sort ${column}`}
+                                  >
+                                    {getSalesReportSortIcon(column)}
+                                  </IconButton>
+                                  {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
+                                  {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                    (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
+                                    (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setShowSalesReportSearch(!showSalesReportSearch);
+                                        }}
+                                        sx={{
+                                          ml: 0.5,
+                                          color: showSalesReportSearch ? '#1f2937' : '#6b7280',
+                                          background: showSalesReportSearch ? '#e5e7eb' : 'transparent',
+                                          '&:hover': { background: '#f3f4f6' },
+                                        }}
+                                        aria-label="Toggle search"
+                                      >
+                                        <SearchIcon sx={{ fontSize: '1rem' }} />
+                                      </IconButton>
+                                    )}
+                                </>
+                              ) : (
+                                // Other tabs sorting
+                                <>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleSort(column);
+                                    }}
+                                    sx={{
+                                      ml: 0.5,
+                                      color: sortConfig?.key === column ? '#1f2937' : '#6b7280',
+                                      background: sortConfig?.key === column ? '#e5e7eb' : 'transparent',
+                                      '&:hover': { background: '#f3f4f6' },
+                                    }}
+                                    disabled={!COLUMN_TO_SORT_BY_MAP[column]}
+                                    aria-label={`Sort ${column}`}
+                                  >
+                                    {getSortIcon(column)}
+                                  </IconButton>
+                                  {/* Magnifying glass button for Order ID search */}
+                                  {column === 'Order ID' && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowOrderIdSearch(!showOrderIdSearch);
+                                      }}
+                                      sx={{
+                                        ml: 0.5,
+                                        color: showOrderIdSearch ? '#1f2937' : '#6b7280',
+                                        background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
+                                        '&:hover': { background: '#f3f4f6' },
+                                      }}
+                                      aria-label="Toggle search"
+                                    >
+                                      <SearchIcon sx={{ fontSize: '1rem' }} />
+                                    </IconButton>
+                                  )}
+                                </>
+                              )}
+                            </Box>
+                            {/* Order ID Search Bar - Floating Popover */}
+                            {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 'calc(100% + 4px)',
+                                  left: 0,
+                                  zIndex: 20,
+                                  background: '#ffffff',
+                                  borderRadius: '8px',
+                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                  padding: '4px',
+                                  border: '1px solid #e5e7eb',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 0.5,
+                                  width: 'calc(100% - 16px)',
+                                  animation: 'slideDown 0.2s ease-out forwards',
+                                  '@keyframes slideDown': {
+                                    '0%': { transform: 'translateY(-10px)', opacity: 0 },
+                                    '100%': { transform: 'translateY(0)', opacity: 1 }
+                                  }
                                 }}
                               >
+                                <TextField
+                                  size="small"
+                                  value={orderIdSearch}
+                                  onChange={handleOrderIdSearchChange}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleOrderIdSearchClick();
+                                    }
+                                  }}
+                                  InputProps={{
+                                    endAdornment: (
+                                      <InputAdornment position="end">
+                                        {orderIdSearch?.trim() && (
+                                          <IconButton
+                                            size="small"
+                                            onClick={handleOrderIdSearchClear}
+                                            disabled={(loading || quadApiLoading) && !isSorting}
+                                            sx={{ p: 0.5, mr: 0.25 }}
+                                          >
+                                            <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
+                                          </IconButton>
+                                        )}
+                                        <IconButton
+                                          size="small"
+                                          onClick={handleOrderIdSearchClick}
+                                          disabled={(loading || quadApiLoading) && !isSorting}
+                                          sx={{ p: 0.5 }}
+                                        >
+                                          <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                        </IconButton>
+                                      </InputAdornment>
+                                    ),
+                                  }}
+                                  sx={{
+                                    width: '100%',
+                                    '& .MuiOutlinedInput-root': {
+                                      height: '32px',
+                                      fontSize: '0.75rem',
+                                      background: 'white',
+                                    }
+                                  }}
+                                />
+                              </Box>
+                            )}
+                            {/* Sales Report Search Bar - Floating Popover */}
+                            {activeTab === 4 && showSalesReportSearch &&
+                              ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
+                                (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                <Box
+                                  sx={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 4px)',
+                                    left: 0,
+                                    zIndex: 20,
+                                    background: '#ffffff',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                    padding: '4px',
+                                    border: '1px solid #e5e7eb',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.5,
+                                    width: 'calc(100% - 16px)',
+                                    animation: 'slideDown 0.2s ease-out forwards'
+                                    , '@keyframes slideDown': {
+                                      '0%': { transform: 'translateY(-10px)', opacity: 0 },
+                                      '100%': { transform: 'translateY(0)', opacity: 1 }
+                                    }
+                                  }}
+                                >
+                                  <TextField
+                                    size="small"
+                                    value={salesReportSearch}
+                                    onChange={handleSalesReportSearchChange}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSalesReportSearchClick();
+                                      }
+                                    }}
+                                    InputProps={{
+                                      endAdornment: (
+                                        <InputAdornment position="end">
+                                          {salesReportSearch?.trim() && (
+                                            <IconButton
+                                              size="small"
+                                              onClick={handleSalesReportSearchClear}
+                                              disabled={salesReportLoading && !isSorting}
+                                              sx={{ p: 0.5, mr: 0.25 }}
+                                            >
+                                              <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
+                                            </IconButton>
+                                          )}
+                                          <IconButton
+                                            size="small"
+                                            onClick={handleSalesReportSearchClick}
+                                            disabled={salesReportLoading && !isSorting}
+                                            sx={{ p: 0.5 }}
+                                          >
+                                            <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
+                                          </IconButton>
+                                        </InputAdornment>
+                                      ),
+                                    }}
+                                    sx={{
+                                      width: '280px',
+                                      '& .MuiOutlinedInput-root': {
+                                        height: '32px',
+                                        fontSize: '0.75rem',
+                                        background: 'white',
+                                      }
+                                    }}
+                                  />
+                                </Box>
+                              )}
+                          </Box>
+                        </TableCell>
+                      ))}
+                    
+                        </TableRow>
+                      )}
+                      itemContent={(_index, row) => {
+                        const rowIndex = _index;
+                        const isSelected = (selectedTransaction?.["Order ID"] || selectedTransaction?.["Order Item ID"]) === (row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"]);
+                        return (
+                          <>
+                            
                                 {getCurrentColumns().map((column, colIndex) => {
                                   // For new API, we need to map column titles to row keys
                                   let value;
@@ -5621,7 +6301,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       }
                                     } else if (columnType === 'number') {
                                       const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
-                                      displayValue = numericValue !== null && !Number.isNaN(numericValue) ? numericValue.toLocaleString('en-IN') : '';
+                                      displayValue = numericValue !== null && !Number.isNaN(numericValue) ? numericValue.toLocaleString(getCurrencyLocale()) : '';
                                     } else {
                                       displayValue = value !== undefined && value !== null ? String(value) : '';
                                     }
@@ -5687,7 +6367,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       if (column === 'Order Value' || column === 'Settlement Value' || column === 'Difference') {
                                         displayValue = formatCurrency(value);
                                       } else {
-                                        displayValue = value.toLocaleString('en-IN');
+                                        displayValue = value.toLocaleString(getCurrencyLocale());
                                       }
                                     } else if (column.includes('Date')) {
                                       // Don't format "NA" as a date
@@ -5837,13 +6517,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     </TableCell>
                                   );
                                 })}
-                              </TableRow>
-                            </React.Fragment>
-                          );
-                        })
-                    )}
-                  </TableBody>
-                </Table>
+                              
+                          </>
+                        );
+                      }}
+                    />
+                  )}
+
               </TableContainer>
 
               {/* Pagination */}
@@ -5851,7 +6531,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 <TablePagination
                   rowsPerPageOptions={[100]}
                   component="div"
-                  count={activeTab === 4 ? (salesTabTotalCount ?? 0) : (totalCount || filteredData.length)}
+                  count={activeTab === 4 ? (salesReportTotalCount ?? 0) : (totalCount || filteredData.length)}
                   rowsPerPage={rowsPerPage}
                   page={page}
                   onPageChange={handleChangePage}
@@ -5882,7 +6562,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           anchorEl={anchorEl}
         />
 
-        {/* Breakups Modal */}
         <BreakupsModal
           open={breakupsModalOpen}
           onClose={() => {
@@ -5894,6 +6573,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           breakups={selectedBreakups}
           orderId={breakupsOrderId}
           anchorEl={breakupsAnchorEl}
+          formatCurrency={formatCurrency}
         />
 
         {/* Export Drawer */}
@@ -6342,7 +7022,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
             </Portal>
           )}
       </Box>
-    </Slide>
   );
 };
 

@@ -39,12 +39,13 @@ import {
   KeyboardArrowUp as KeyboardArrowUpIcon,
   PersonOutlined as PersonIcon,
   ExtensionOutlined as ExtensionIcon,
+  MoreVert as MoreVertIcon,
 } from '@mui/icons-material';
 // import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
 // @ts-ignore
 import logo from '../assets/logo_fresh.jpg';
 
-const drawerWidth = 240;
+const drawerWidth = 168;
 
 const menuItems = [
   { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation', upcoming: false },
@@ -122,6 +123,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <img
           src={logo}
           alt="Nexbit Logo"
+          loading="eager"
+          fetchPriority="high"
+          decoding="sync"
           style={{ width: 48, height: 48, marginBottom: 16, display: 'block' }}
         />
       </Toolbar>
@@ -160,7 +164,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               disabled={item.upcoming}
               sx={{
                 borderRadius: 0,
-                mr: 2,
+                mr: 1.5,
                 my: 0.25,
                 opacity: item.upcoming ? 0.5 : 1,
                 cursor: item.upcoming ? 'not-allowed' : 'pointer',
@@ -186,9 +190,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     : location.pathname === item.path 
                       ? theme.palette.primary.main 
                       : 'inherit',
-                  minWidth: 30,
+                  minWidth: 28,
                   '& .MuiSvgIcon-root': {
-                    fontSize: 18, // force smaller px size
+                    fontSize: 18,
                   },
                 }}
               >
@@ -243,7 +247,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             selected={location.pathname === '/upload-documents'}
             sx={{
               borderRadius: 0,
-              mr: 2,
+              mr: 1.5,
               my: 0.25,
               '&.Mui-selected': {
                 backgroundColor: theme.palette.primary.main + '15',
@@ -253,8 +257,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               },
             }}
           >
-            <ListItemIcon sx={{ minWidth: 36 }}>
-              {/* Use the built-in Upload icon from MUI */}
+            <ListItemIcon sx={{ minWidth: 28 }}>
               <UploadIcon />
             </ListItemIcon>
             <ListItemText
@@ -265,41 +268,22 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </ListItem>
         {/* Data Sources nav commented out: only upload is now shown to user. */}
         <ListItem disablePadding>
-          <ListItemButton onClick={handleSettingsClick} sx={{ borderRadius: 0, mr: 2, my: 0.25 }}>
-            <ListItemText 
-              primary={
-                <Typography sx={{ 
-                  fontWeight: 'bold', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 0.75, 
-                  color: 'text.primary',
-                  fontSize: '14px'
-                }}>
-                  Hey Demo User
-                  <Box
-                    component="span"
-                    sx={{
-                      backgroundColor: 'success.main',
-                      color: 'common.white',
-                      fontSize: '9px',
-                      fontWeight: 600,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      borderRadius: '8px',
-                      px: 1,
-                      py: 0.25,
-                      lineHeight: 1,
-                      whiteSpace: 'nowrap',
-                      letterSpacing: 0.3,
-                    }}
-                  >
-                    Demo
-                  </Box>
-                  <KeyboardArrowUpIcon sx={{ fontSize: '16px', color: 'text.primary', fontWeight: 'bold' }} />
-                </Typography>
-              } 
-            />
+          <ListItemButton onClick={handleSettingsClick} sx={{ borderRadius: 0, mr: 1.5, my: 0.25, display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', overflow: 'hidden' }}>
+              <Typography sx={{
+                fontWeight: 600,
+                color: 'text.primary',
+                fontSize: '12.5px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flex: 1,
+                lineHeight: 1.3,
+              }}>
+                Hi, {displayName}
+              </Typography>
+              <MoreVertIcon sx={{ fontSize: '16px', color: 'text.secondary', flexShrink: 0, ml: 0.5 }} />
+            </Box>
           </ListItemButton>
         </ListItem>
         <Menu

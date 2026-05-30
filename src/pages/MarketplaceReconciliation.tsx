@@ -54,6 +54,8 @@ import {
   ListItemSecondaryAction,
   Menu,
   TextField,
+  Skeleton,
+  Drawer,
 } from '@mui/material';
 import {
   PieChart,
@@ -141,7 +143,8 @@ const getProviderDisplayName = (code: string): string => {
     'payu': 'PayU',
     'shadowfax': 'Shadowfax',
     'shiprocket': 'Shiprocket',
-    'zippee': 'Zippee',
+    'zippee-loginext': 'Zippee Loginext',
+    'zippee-blaze': 'Zippee Blaze',
     'ekart': 'Ekart',
   };
   return displayMap[code.toLowerCase()] || code;
@@ -196,6 +199,7 @@ import {
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
 import { apiService } from '../services/api/apiService';
+import { API_CONFIG } from '../services/api/config';
 import { MarketplaceReconciliationResponse, MainSummaryResponse, ProviderAgeingData, AgeingAnalysisResponse, ReconciliationStatus } from '../services/api/types';
 import { api as apiIndex } from '../services/api';
 import { mockReconciliationData, getSafeReconciliationData, isValidReconciliationData } from '../data/mockReconciliationData';
@@ -211,7 +215,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
   const [initialTsFilters, setInitialTsFilters] = useState<{ [key: string]: any } | undefined>(undefined);
   const [initialTsTab, setInitialTsTab] = useState<number>(0);
-  const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'amazon' | 'd2c' | 'other' | undefined>(undefined);
+  const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other' | undefined>(undefined);
   const location = useLocation();
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
@@ -272,9 +276,12 @@ const MarketplaceReconciliation: React.FC = () => {
       setShowTransactionSheet(true);
     }
   };
-  const getPlatformForProvider = (providerKey: string, providerName: string): 'flipkart' | 'amazon' | 'd2c' | 'other' => {
+  const getPlatformForProvider = (providerKey: string, providerName: string): 'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other' => {
     const key = providerKey?.toLowerCase?.() || '';
     const name = providerName?.toLowerCase?.() || '';
+    if (key === 'amazon_uk' || name.includes('amazon uk') || name.includes('amazon_uk')) {
+      return 'amazon_uk';
+    }
     if (key === 'amazon' || name.includes('amazon')) {
       return 'amazon';
     }
@@ -366,6 +373,8 @@ const MarketplaceReconciliation: React.FC = () => {
   } | null>(null);
   const [monthOnMonthGrowthLoading, setMonthOnMonthGrowthLoading] = useState(false);
   const [monthOnMonthGrowthError, setMonthOnMonthGrowthError] = useState<string | null>(null);
+  // Race-condition guard: incremented on every new fetch; stale responses are discarded
+  const momRequestGenRef = useRef(0);
 
   // Sync data sources state
   // Removed sync modal; using inline button animation instead
@@ -448,9 +457,9 @@ const MarketplaceReconciliation: React.FC = () => {
   // Date range options
   const dateRangeOptions = [
     { value: 'today', label: 'Today', dates: 'Today' },
-    { value: 'this-week', label: 'This week', dates: 'This week' },
     { value: 'this-month', label: 'This month', dates: 'This month' },
-    { value: 'this-year', label: 'This year', dates: 'This year' },
+    { value: 'this-year', label: 'Current Fiscal Year', dates: 'Current Fiscal Year' },
+    { value: 'last-fiscal-year', label: 'Last Fiscal Year', dates: 'Last Fiscal Year' },
     { value: 'custom', label: 'Custom date range', dates: 'Custom' }
   ];
 
@@ -648,30 +657,31 @@ const MarketplaceReconciliation: React.FC = () => {
 
     if (selectedDateRange === 'today') {
       startDate = endDate = today.toISOString().split('T')[0];
-    } else if (selectedDateRange === 'this-week') {
-      const startOfWeek = new Date(today);
-      startOfWeek.setDate(today.getDate() - today.getDay());
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(startOfWeek.getDate() + 6);
-      startDate = startOfWeek.toISOString().split('T')[0];
-      endDate = endOfWeek.toISOString().split('T')[0];
     } else if (selectedDateRange === 'this-month') {
       startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
       const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       endDate = endOfMonth.toISOString().split('T')[0];
     } else if (selectedDateRange === 'this-year') {
-      // Financial year: April 1 to March 31
+      // Current Fiscal Year: April 1 to March 31
       const currentYear = today.getFullYear();
       const currentMonth = today.getMonth(); // 0-11 (Jan=0, Apr=3, Dec=11)
-      
       if (currentMonth >= 3) {
-        // April onwards: FY starts April 1 of current year, ends March 31 of next year
         startDate = `${currentYear}-04-01`;
         endDate = `${currentYear + 1}-03-31`;
       } else {
-        // Jan, Feb, Mar: FY starts April 1 of previous year, ends March 31 of current year
         startDate = `${currentYear - 1}-04-01`;
         endDate = `${currentYear}-03-31`;
+      }
+    } else if (selectedDateRange === 'last-fiscal-year') {
+      // Last Fiscal Year: April 1 to March 31 of the previous FY
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth();
+      if (currentMonth >= 3) {
+        startDate = `${currentYear - 1}-04-01`;
+        endDate = `${currentYear}-03-31`;
+      } else {
+        startDate = `${currentYear - 2}-04-01`;
+        endDate = `${currentYear - 1}-03-31`;
       }
     }
 
@@ -983,14 +993,6 @@ const MarketplaceReconciliation: React.FC = () => {
         const today = new Date();
         startDate = today.toISOString().split('T')[0];
         endDate = today.toISOString().split('T')[0];
-      } else if (dateRange === 'this-week') {
-        const today = new Date();
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        startDate = startOfWeek.toISOString().split('T')[0];
-        endDate = endOfWeek.toISOString().split('T')[0];
       } else if (dateRange === 'this-month') {
         const today = new Date();
         startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
@@ -998,18 +1000,25 @@ const MarketplaceReconciliation: React.FC = () => {
         endDate = endOfMonth.toISOString().split('T')[0];
       } else if (dateRange === 'this-year') {
         const today = new Date();
-        // Financial year: April 1 to March 31
         const currentYear = today.getFullYear();
-        const currentMonth = today.getMonth(); // 0-11 (Jan=0, Apr=3, Dec=11)
-        
+        const currentMonth = today.getMonth();
         if (currentMonth >= 3) {
-          // April onwards: FY starts April 1 of current year, ends March 31 of next year
           startDate = `${currentYear}-04-01`;
           endDate = `${currentYear + 1}-03-31`;
         } else {
-          // Jan, Feb, Mar: FY starts April 1 of previous year, ends March 31 of current year
           startDate = `${currentYear - 1}-04-01`;
           endDate = `${currentYear}-03-31`;
+        }
+      } else if (dateRange === 'last-fiscal-year') {
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth();
+        if (currentMonth >= 3) {
+          startDate = `${currentYear - 1}-04-01`;
+          endDate = `${currentYear}-03-31`;
+        } else {
+          startDate = `${currentYear - 2}-04-01`;
+          endDate = `${currentYear - 1}-03-31`;
         }
       } else {
         // Fallback to current month
@@ -1100,30 +1109,29 @@ const MarketplaceReconciliation: React.FC = () => {
       } else if (dateRange === 'today') {
         startDate = today.toISOString().split('T')[0];
         endDate = today.toISOString().split('T')[0];
-      } else if (dateRange === 'this-week') {
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        startDate = startOfWeek.toISOString().split('T')[0];
-        endDate = endOfWeek.toISOString().split('T')[0];
       } else if (dateRange === 'this-month') {
         startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
         const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         endDate = endOfMonth.toISOString().split('T')[0];
       } else if (dateRange === 'this-year') {
-        // Financial year: April 1 to March 31
         const currentYear = today.getFullYear();
-        const currentMonth = today.getMonth(); // 0-11 (Jan=0, Apr=3, Dec=11)
-        
+        const currentMonth = today.getMonth();
         if (currentMonth >= 3) {
-          // April onwards: FY starts April 1 of current year, ends March 31 of next year
           startDate = `${currentYear}-04-01`;
           endDate = `${currentYear + 1}-03-31`;
         } else {
-          // Jan, Feb, Mar: FY starts April 1 of previous year, ends March 31 of current year
           startDate = `${currentYear - 1}-04-01`;
           endDate = `${currentYear}-03-31`;
+        }
+      } else if (dateRange === 'last-fiscal-year') {
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth();
+        if (currentMonth >= 3) {
+          startDate = `${currentYear - 1}-04-01`;
+          endDate = `${currentYear}-03-31`;
+        } else {
+          startDate = `${currentYear - 2}-04-01`;
+          endDate = `${currentYear - 1}-03-31`;
         }
       } else {
         startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
@@ -1193,30 +1201,29 @@ const MarketplaceReconciliation: React.FC = () => {
       } else if (selectedDateRange === 'today') {
         startDate = today.toISOString().split('T')[0];
         endDate = today.toISOString().split('T')[0];
-      } else if (selectedDateRange === 'this-week') {
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        startDate = startOfWeek.toISOString().split('T')[0];
-        endDate = endOfWeek.toISOString().split('T')[0];
       } else if (selectedDateRange === 'this-month') {
         startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
         const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         endDate = endOfMonth.toISOString().split('T')[0];
       } else if (selectedDateRange === 'this-year') {
-        // Financial year: April 1 to March 31
         const currentYear = today.getFullYear();
-        const currentMonth = today.getMonth(); // 0-11 (Jan=0, Apr=3, Dec=11)
-        
+        const currentMonth = today.getMonth();
         if (currentMonth >= 3) {
-          // April onwards: FY starts April 1 of current year, ends March 31 of next year
           startDate = `${currentYear}-04-01`;
           endDate = `${currentYear + 1}-03-31`;
         } else {
-          // Jan, Feb, Mar: FY starts April 1 of previous year, ends March 31 of current year
           startDate = `${currentYear - 1}-04-01`;
           endDate = `${currentYear}-03-31`;
+        }
+      } else if (selectedDateRange === 'last-fiscal-year') {
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth();
+        if (currentMonth >= 3) {
+          startDate = `${currentYear - 1}-04-01`;
+          endDate = `${currentYear}-03-31`;
+        } else {
+          startDate = `${currentYear - 2}-04-01`;
+          endDate = `${currentYear - 1}-03-31`;
         }
       } else {
         // Fallback to current month
@@ -1254,7 +1261,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const fetchMonthOnMonthGrowth = async () => {
     if (
       !selectedPlatform ||
-      (selectedPlatform !== 'amazon' && selectedPlatform !== 'flipkart' && selectedPlatform !== 'd2c' && selectedPlatform !== 'other')
+      (selectedPlatform !== 'amazon' && selectedPlatform !== 'flipkart' && selectedPlatform !== 'amazon_uk' && selectedPlatform !== 'd2c' && selectedPlatform !== 'other')
     ) {
       console.log('[MonthOnMonthGrowth] Skipping fetch - invalid platform:', selectedPlatform);
       return;
@@ -1270,46 +1277,57 @@ const MarketplaceReconciliation: React.FC = () => {
       return;
     }
 
+    // Increment generation counter. Capture current value in closure.
+    // Any previous in-flight request that resolves after this point will
+    // see its generation != current and silently discard its results.
+    momRequestGenRef.current += 1;
+    const myGeneration = momRequestGenRef.current;
+
+    // Snapshot the platform at the time this fetch was started so that
+    // post-await guards can compare against it too.
+    const fetchedForPlatform = selectedPlatform;
+
+    // Immediately clear stale data and start loading
+    setMonthOnMonthGrowthData(null);
+    setMonthOnMonthGrowthLoading(true);
+    setMonthOnMonthGrowthError(null);
+
     try {
       console.log('[MonthOnMonthGrowth] Starting fetch with params:', {
-        platform: selectedPlatform,
+        platform: fetchedForPlatform,
         start_date: startDate,
         end_date: endDate,
+        generation: myGeneration,
       });
-
-      setMonthOnMonthGrowthLoading(true);
-      setMonthOnMonthGrowthError(null);
 
       const response = await apiIndex.monthOnMonthGrowth.getMonthOnMonthGrowth({
-        platform: selectedPlatform,
+        platform: fetchedForPlatform,
         start_date: startDate,
         end_date: endDate,
       });
+
+      // ---- STALE RESPONSE GUARD ----
+      // If a newer fetch has been initiated since this one started, discard this result.
+      if (myGeneration !== momRequestGenRef.current) {
+        console.log('[MonthOnMonthGrowth] Discarding stale response for platform:', fetchedForPlatform, '(superseded by generation', momRequestGenRef.current, ')');
+        return;
+      }
 
       console.log('[MonthOnMonthGrowth] API Response received:', {
         success: response.success,
         hasData: !!response.data,
         dataKeys: response.data ? Object.keys(response.data) : [],
-        fullResponse: response,
+        platform: fetchedForPlatform,
       });
 
       if (response.success && response.data) {
         const data = response.data;
-        console.log('[MonthOnMonthGrowth] Processing data for platform:', selectedPlatform, {
-          dataStructure: data,
-          dataKeys: Object.keys(data),
-        });
 
         try {
-          if (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'other') {
+          if (fetchedForPlatform === 'amazon' || fetchedForPlatform === 'flipkart' || fetchedForPlatform === 'amazon_uk' || fetchedForPlatform === 'other') {
             // For Amazon/Flipkart/Other (CRED): expect { data: [{ month, sales, settlement }, ...] }
             const marketplaceData = data.data || data || [];
-            console.log('[MonthOnMonthGrowth] Setting marketplace data:', {
-              dataLength: Array.isArray(marketplaceData) ? marketplaceData.length : 'not an array',
-              firstItem: Array.isArray(marketplaceData) && marketplaceData.length > 0 ? marketplaceData[0] : null,
-            });
 
-            // Validate data structure
             if (Array.isArray(marketplaceData)) {
               setMonthOnMonthGrowthData({
                 marketplaceData: marketplaceData,
@@ -1319,20 +1337,11 @@ const MarketplaceReconciliation: React.FC = () => {
               setMonthOnMonthGrowthError('Invalid data format received from API');
               setMonthOnMonthGrowthData(null);
             }
-          } else if (selectedPlatform === 'd2c') {
+          } else if (fetchedForPlatform === 'd2c') {
             // For D2C: expect { salesAndSettlement: [...], vendorSettlements: { cod: {...}, noncod: {...} } }
             const salesAndSettlement = data.salesAndSettlement || data.sales_and_settlement || [];
             const vendorSettlementsRaw = data.vendorSettlements || data.vendor_settlements || {};
 
-            console.log('[MonthOnMonthGrowth] Setting D2C data:', {
-              salesAndSettlementLength: Array.isArray(salesAndSettlement) ? salesAndSettlement.length : 'not an array',
-              vendorSettlementsRaw: vendorSettlementsRaw,
-              vendorSettlementsKeys: Object.keys(vendorSettlementsRaw),
-              hasCod: 'cod' in vendorSettlementsRaw,
-              hasNoncod: 'noncod' in vendorSettlementsRaw,
-            });
-
-            // Validate and structure vendor settlements
             const vendorSettlements: {
               cod?: Record<string, Array<{ month: string; settlement: number }>>;
               noncod?: Record<string, Array<{ month: string; settlement: number }>>;
@@ -1345,17 +1354,12 @@ const MarketplaceReconciliation: React.FC = () => {
               vendorSettlements.noncod = vendorSettlementsRaw.noncod;
             }
 
-            // Validate data structure
             if (Array.isArray(salesAndSettlement) && typeof vendorSettlementsRaw === 'object') {
               setMonthOnMonthGrowthData({
                 d2cSalesAndSettlement: salesAndSettlement,
                 d2cVendorSettlements: vendorSettlements,
               });
             } else {
-              console.error('[MonthOnMonthGrowth] Invalid D2C data format:', {
-                salesAndSettlementType: typeof salesAndSettlement,
-                vendorSettlementsType: typeof vendorSettlementsRaw,
-              });
               setMonthOnMonthGrowthError('Invalid data format received from API');
               setMonthOnMonthGrowthData(null);
             }
@@ -1366,22 +1370,22 @@ const MarketplaceReconciliation: React.FC = () => {
           setMonthOnMonthGrowthData(null);
         }
       } else {
-        console.warn('[MonthOnMonthGrowth] API returned unexpected format:', {
-          success: response.success,
-          hasData: !!response.data,
-          response: response,
-        });
         setMonthOnMonthGrowthError('Unexpected response format from API');
         setMonthOnMonthGrowthData(null);
       }
     } catch (error) {
+      // Only update state if this is still the latest request
+      if (myGeneration !== momRequestGenRef.current) return;
       console.error('[MonthOnMonthGrowth] Error fetching data:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       setMonthOnMonthGrowthError(`Failed to load month on month growth data: ${errorMessage}`);
       setMonthOnMonthGrowthData(null);
     } finally {
-      setMonthOnMonthGrowthLoading(false);
-      console.log('[MonthOnMonthGrowth] Fetch completed');
+      // Only clear loading if this is still the latest request
+      if (myGeneration === momRequestGenRef.current) {
+        setMonthOnMonthGrowthLoading(false);
+        console.log('[MonthOnMonthGrowth] Fetch completed for platform:', fetchedForPlatform);
+      }
     }
   };
 
@@ -1492,6 +1496,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const availablePlatforms = [
     { value: 'flipkart' as Platform, label: 'Flipkart' },
     { value: 'amazon' as Platform, label: 'Amazon' },
+    { value: 'amazon_uk' as Platform, label: 'Amazon UK' },
     { value: 'd2c' as Platform, label: 'D2C' },
     { value: 'other' as Platform, label: 'Other (CRED)' },
   ];
@@ -1597,8 +1602,16 @@ const MarketplaceReconciliation: React.FC = () => {
 
   const availableMonths = generateAvailableMonths();
 
-  const formatCurrency = (amount: number) => {
-    return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+  const getCurrencySymbol = () => selectedPlatform === 'amazon_uk' ? '£' : '₹';
+  const getCurrencyLocale = () => selectedPlatform === 'amazon_uk' ? 'en-GB' : 'en-IN';
+
+  const formatCurrency = (amount: number, noFractions: boolean = false) => {
+    const symbol = getCurrencySymbol();
+    const locale = getCurrencyLocale();
+    if (noFractions) {
+      return `${symbol}${amount.toLocaleString(locale)}`;
+    }
+    return `${symbol}${amount.toLocaleString(locale, { minimumFractionDigits: 2 })}`;
   };
 
   const formatPercentage = (value: number) => {
@@ -1650,30 +1663,29 @@ const MarketplaceReconciliation: React.FC = () => {
       if (selectedDateRange === 'today') {
         startDate = format(today);
         endDate = format(today);
-      } else if (selectedDateRange === 'this-week') {
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        startDate = format(startOfWeek);
-        endDate = format(endOfWeek);
       } else if (selectedDateRange === 'this-month') {
         const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
         endDate = format(endOfMonth);
       } else if (selectedDateRange === 'this-year') {
-        // Financial year: April 1 to March 31
         const currentYear = today.getFullYear();
-        const currentMonth = today.getMonth(); // 0-11 (Jan=0, Apr=3, Dec=11)
-        
+        const currentMonth = today.getMonth();
         if (currentMonth >= 3) {
-          // April onwards: FY starts April 1 of current year, ends March 31 of next year
           startDate = `${currentYear}-04-01`;
           endDate = `${currentYear + 1}-03-31`;
         } else {
-          // Jan, Feb, Mar: FY starts April 1 of previous year, ends March 31 of current year
           startDate = `${currentYear - 1}-04-01`;
           endDate = `${currentYear}-03-31`;
+        }
+      } else if (selectedDateRange === 'last-fiscal-year') {
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth();
+        if (currentMonth >= 3) {
+          startDate = `${currentYear - 1}-04-01`;
+          endDate = `${currentYear}-03-31`;
+        } else {
+          startDate = `${currentYear - 2}-04-01`;
+          endDate = `${currentYear - 1}-03-31`;
         }
       }
     }
@@ -1988,7 +2000,7 @@ const MarketplaceReconciliation: React.FC = () => {
       fetchAgeingAnalysis();
     }
     // Fetch month on month growth data when platform is selected
-    if (selectedPlatform && (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'd2c' || selectedPlatform === 'other')) {
+    if (selectedPlatform && (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || selectedPlatform === 'other')) {
       fetchMonthOnMonthGrowth();
     }
     // Call upload-list API at the same time as main-summary and ageing-analysis
@@ -2054,28 +2066,29 @@ const MarketplaceReconciliation: React.FC = () => {
         end = fmt(today);
       } else if (selectedDateRange === 'this-week') {
         const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        start = fmt(startOfWeek);
-        end = fmt(endOfWeek);
       } else if (selectedDateRange === 'this-month') {
         const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         start = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
         end = fmt(endOfMonth);
       } else if (selectedDateRange === 'this-year') {
-        // Financial year: April 1 to March 31
         const currentYear = today.getFullYear();
-        const currentMonth = today.getMonth(); // 0-11 (Jan=0, Apr=3, Dec=11)
-        
+        const currentMonth = today.getMonth();
         if (currentMonth >= 3) {
-          // April onwards: FY starts April 1 of current year, ends March 31 of next year
           start = `${currentYear}-04-01`;
           end = `${currentYear + 1}-03-31`;
         } else {
-          // Jan, Feb, Mar: FY starts April 1 of previous year, ends March 31 of current year
           start = `${currentYear - 1}-04-01`;
           end = `${currentYear}-03-31`;
+        }
+      } else if (selectedDateRange === 'last-fiscal-year') {
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth();
+        if (currentMonth >= 3) {
+          start = `${currentYear - 1}-04-01`;
+          end = `${currentYear}-03-31`;
+        } else {
+          start = `${currentYear - 2}-04-01`;
+          end = `${currentYear - 1}-03-31`;
         }
       }
     }
@@ -2093,6 +2106,40 @@ const MarketplaceReconciliation: React.FC = () => {
       // ignore storage errors
     }
   }, [effectiveDateRangeForTs.start, effectiveDateRangeForTs.end]);
+
+  // --- EAGER PREFETCHING FOR TRANSACTION SHEET ---
+  // This is a senior-level performance optimization. We silently fetch the first page of transactions 
+  // into our custom cache while the user is looking at the dashboard. 
+  // When they click "View Transactions", the latency will be completely hidden.
+  useEffect(() => {
+    // Debounce the prefetch to prevent spamming the database during rapid filter changes
+    const prefetchTimer = setTimeout(() => {
+      const params: Record<string, any> = {
+        page: 1,
+        limit: 100, // Matches the default rowsPerPage in TransactionSheet
+        sort_by: 'order_date',
+        sort_order: 'desc',
+      };
+      
+      if (selectedPlatform) {
+        params.platform = selectedPlatform;
+      }
+      
+      if (effectiveDateRangeForTs.start && effectiveDateRangeForTs.end) {
+        params.order_date_from = effectiveDateRangeForTs.start;
+        params.order_date_to = effectiveDateRangeForTs.end;
+      }
+
+      console.log('🔄 [Prefetch] Eagerly background fetching TransactionSheet data...');
+      apiService.get(API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS, params, { 
+        useCache: true, 
+        cacheTimeMs: 300000 // Cache lives for 5 minutes
+      }).catch(() => { /* Ignore errors on background prefetch */ });
+      
+    }, 1500); // 1.5s debounce wait time
+
+    return () => clearTimeout(prefetchTimer);
+  }, [selectedPlatform, effectiveDateRangeForTs.start, effectiveDateRangeForTs.end]);
 
   // Helper function to generate last 12 months labels
   const generateLast12Months = () => {
@@ -2652,29 +2699,42 @@ const MarketplaceReconciliation: React.FC = () => {
 
       <Box sx={{ p: { xs: 2, md: 3 }, position: 'relative', zIndex: 1 }}>
         {/* Header */}
-        <Fade in timeout={800}>
-          <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: 2 }}>
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
               mb: 2,
             }}>
-              <Typography variant="h4" sx={{
-                fontWeight: 700,
-                color: '#1a1a1a',
-                letterSpacing: '-0.01em',
-                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-              }}>
-                Reconciliation
-              </Typography>
-
               {/* Date Range Filter */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {loading && (
-                  <CircularProgress size={24} sx={{ color: '#1a1a1a' }} />
-                )}
+                <Box sx={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {loading && (
+                    <CircularProgress size={24} sx={{ color: '#1a1a1a' }} />
+                  )}
+                </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
+                  {/* Last updated timestamp - inline left of date filter */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'flex-end',
+                    gap: 0.5, 
+                    mr: 0.5, 
+                    minWidth: 210,
+                    opacity: (normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at) ? 1 : 0,
+                    visibility: (normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at) ? 'visible' : 'hidden',
+                    transition: 'opacity 0.3s ease'
+                  }}>
+                    {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at && (
+                      <>
+                        <CheckCircleIcon sx={{ fontSize: 13, color: '#16a34a' }} />
+                        <Typography sx={{ fontSize: '0.72rem', color: '#6b7280', fontWeight: 400, whiteSpace: 'nowrap' }}>
+                          Last updated at {formatReconciliationTimestamp(normalizedReconciliationStatus.last_completed_at)}
+                        </Typography>
+                      </>
+                    )}
+                  </Box>
                   <Button
                     variant="outlined"
                     endIcon={<KeyboardArrowDownIcon />}
@@ -3008,16 +3068,15 @@ const MarketplaceReconciliation: React.FC = () => {
                       Mock Data Values:
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#666666', fontSize: '0.875rem', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                      Gross Sales: ₹12,00,000 • Orders Delivered: 480 orders (₹12,30,000) • Returns: 12 orders (-₹30,000)
+                      Gross Sales: {getCurrencySymbol()}12,00,000 • Orders Delivered: 480 orders ({getCurrencySymbol()}12,30,000) • Returns: 12 orders (-{getCurrencySymbol()}30,000)
                     </Typography>
                   </Box>
                 )}
               </Alert>
             )}
           </Box>
-        </Fade>
 
-        {/* Reconciliation Status Message - only show when reconciliation_status exists from backend */}
+        {/* Status Message - only show when reconciliation_status exists from backend */}
         {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processing' && (
           <Alert
             severity="info"
@@ -3046,31 +3105,6 @@ const MarketplaceReconciliation: React.FC = () => {
             }
           </Alert>
         )}
-        {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at && (
-          <Alert
-            severity="success"
-            icon={<CheckCircleIcon />}
-            sx={{
-              mb: 3,
-              bgcolor: '#f0fdf4',
-              color: '#166534',
-              border: '1px solid #bbf7d0',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              '& .MuiAlert-icon': {
-                alignItems: 'center',
-                display: 'flex'
-              },
-              '& .MuiAlert-message': {
-                display: 'flex',
-                alignItems: 'center'
-              }
-            }}
-          >
-            Last updated at {formatReconciliationTimestamp(normalizedReconciliationStatus.last_completed_at)}
-          </Alert>
-        )}
 
         <Grid container spacing={3} alignItems="stretch" sx={{ mb: 6 }}>
           <Grid item xs={12} md={7}>
@@ -3078,14 +3112,9 @@ const MarketplaceReconciliation: React.FC = () => {
               background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
               borderRadius: '16px',
               border: '1px solid #f1f3f4',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              boxShadow: 'none',
               height: '100%',
               overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                transform: 'translateY(-2px)',
-              }
             }}>
               <CardContent sx={{ p: 0 }}>
                 {/* Title */}
@@ -3134,7 +3163,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
-                          minWidth: 140,
+                          width: 160,
                           cursor: onClick ? 'pointer' : 'default'
                         }}
                       >
@@ -3142,11 +3171,16 @@ const MarketplaceReconciliation: React.FC = () => {
                           {label}
                         </Typography>
                         <Typography sx={{ fontSize: '1.5rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
-                          ₹{Math.round(Number(amount || 0)).toLocaleString('en-IN')}
+                          {getCurrencySymbol()}{Math.round(Number(amount || 0)).toLocaleString(getCurrencyLocale())}
                         </Typography>
-                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
-                          {Number(count || 0).toLocaleString('en-IN')} orders
-                        </Typography>
+                        <Box sx={{ display: 'flex', width: '100%', alignItems: 'baseline' }}>
+                          <Typography sx={{ flex: 1, textAlign: 'right', pr: 0.5, fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.025em', fontVariantNumeric: 'tabular-nums' }}>
+                            {Number(count || 0).toLocaleString('en-IN')}
+                          </Typography>
+                          <Typography sx={{ flex: 1, textAlign: 'left', pl: 0, fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
+                            orders
+                          </Typography>
+                        </Box>
                       </Box>
                     );
 
@@ -3185,7 +3219,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                 Previous Return/Cancellations
                               </Typography>
                               <Typography sx={{ fontSize: '1rem', fontWeight: 400, color: '#111827' }}>
-                                ₹{Math.round(prevReturnOrCancelledAmount).toLocaleString('en-IN')} • {Number(prevReturnOrCancelledCount || 0).toLocaleString('en-IN')} orders
+                                {getCurrencySymbol()}{Math.round(prevReturnOrCancelledAmount).toLocaleString(getCurrencyLocale())} • {Number(prevReturnOrCancelledCount || 0).toLocaleString('en-IN')} orders
                               </Typography>
                             </Box>
                           </Box>
@@ -3197,17 +3231,16 @@ const MarketplaceReconciliation: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
-          {/* Reconciliation Status */}
+          {/* Status */}
           <Grid item xs={12} md={5}>
             <Card
               sx={{
                 background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
                 borderRadius: '16px',
                 border: '1px solid #f1f3f4',
-                boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+                boxShadow: 'none',
                 height: '100%',
                 overflow: 'hidden',
-                transition: 'all 0.3s ease',
               }}
             >
               <CardContent sx={{
@@ -3472,13 +3505,8 @@ const MarketplaceReconciliation: React.FC = () => {
               background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
               borderRadius: '16px',
               border: '1px solid #f1f3f4',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              boxShadow: 'none',
               overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                transform: 'translateY(-2px)',
-              }
             }}>
               <CardContent sx={{ p: 4 }}>
                 {(() => {
@@ -3770,7 +3798,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                   p: 3,
                                   background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
                                   borderRadius: '12px',
-                                  border: '1px solid #e2e8f0'
+                                  border: '1px solid #e5e7eb'
                                 }}>
                                   <Box>
                                     <Typography variant="h4" sx={{
@@ -3781,9 +3809,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                     }}>
                                       {formatCurrency(settledAmount)}
                                     </Typography>
-                                    <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
-                                      {(matchedCount).toLocaleString('en-IN')} Orders Matched
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'baseline', color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
+                                      <Typography sx={{ width: 85, textAlign: 'left', fontWeight: 'inherit', fontSize: 'inherit', fontVariantNumeric: 'tabular-nums' }}>
+                                        {(matchedCount).toLocaleString('en-IN')}
+                                      </Typography>
+                                      <Typography sx={{ fontWeight: 'inherit', fontSize: 'inherit' }}>
+                                        Orders Matched
+                                      </Typography>
+                                    </Box>
                                   </Box>
                                   <Box sx={{ textAlign: 'right' }}>
                                     {/* <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>
@@ -3798,9 +3831,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                           {formatCurrency(expectedSalesAmount)}
                                         </Typography>
                                       </Box>
-                                      <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
-                                        {(expectedSalesCount).toLocaleString('en-IN')} Orders
-                                      </Typography>
+                                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', color: '#6b7280' }}>
+                                        <Typography variant="caption" sx={{ width: 85, textAlign: 'right', pr: 0.5, fontVariantNumeric: 'tabular-nums' }}>
+                                          {(expectedSalesCount).toLocaleString('en-IN')}
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ textAlign: 'left', width: 45 }}>
+                                          Orders
+                                        </Typography>
+                                      </Box>
                                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                                         {/* <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
                                           Settled&nbsp;<span style={{ marginLeft: 130 }}>{percentSettled.toFixed(1)}%</span>
@@ -4162,7 +4200,7 @@ const MarketplaceReconciliation: React.FC = () => {
 
                             return (
                               <>
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
                                   <Box>
                                     <Typography sx={{ fontWeight: 800, color: '#1f2937', letterSpacing: '-0.02em', fontSize: { xs: '1.75rem', md: '2.25rem' }, lineHeight: 1 }}>
                                       {formatCurrency(pendingPaymentAmount)}
@@ -4286,7 +4324,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             p: 3,
                             background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
                             borderRadius: '12px',
-                            border: '1px solid #e2e8f0'
+                            border: '1px solid #e5e7eb'
                           }}>
                             <Box>
                               <Typography variant="h4" sx={{
@@ -4297,9 +4335,14 @@ const MarketplaceReconciliation: React.FC = () => {
                               }}>
                                 {formatCurrency(Math.abs(totalUnrecAmount))}
                               </Typography>
-                              <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
-                                {(totalUnrecCount).toLocaleString('en-IN')} Orders
-                              </Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'baseline', color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
+                                <Typography sx={{ width: 85, textAlign: 'left', fontWeight: 'inherit', fontSize: 'inherit', fontVariantNumeric: 'tabular-nums' }}>
+                                  {(totalUnrecCount).toLocaleString('en-IN')}
+                                </Typography>
+                                <Typography sx={{ fontWeight: 'inherit', fontSize: 'inherit' }}>
+                                  Orders
+                                </Typography>
+                              </Box>
                             </Box>
                             <Box sx={{ textAlign: 'right' }}>
                               {/* <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>
@@ -4314,9 +4357,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                     {formatCurrency(Math.abs(lessPaymentAmount))}
                                   </Typography>
                                 </Box>
-                                <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
-                                  {lessPaymentCount.toLocaleString('en-IN')} Orders
-                                </Typography>
+                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', color: '#6b7280' }}>
+                                  <Typography variant="caption" sx={{ width: 85, textAlign: 'right', pr: 0.5, fontVariantNumeric: 'tabular-nums' }}>
+                                    {lessPaymentCount.toLocaleString('en-IN')}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ textAlign: 'left', width: 45 }}>
+                                    Orders
+                                  </Typography>
+                                </Box>
                                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                                   <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
                                     More Payment Received
@@ -4325,9 +4373,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                     {formatCurrency(Math.abs(morePaymentAmount))}
                                   </Typography>
                                 </Box>
-                                <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
-                                  {morePaymentCount.toLocaleString('en-IN')} Orders
-                                </Typography>
+                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', color: '#6b7280' }}>
+                                  <Typography variant="caption" sx={{ width: 85, textAlign: 'right', pr: 0.5, fontVariantNumeric: 'tabular-nums' }}>
+                                    {morePaymentCount.toLocaleString('en-IN')}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ textAlign: 'left', width: 45 }}>
+                                    Orders
+                                  </Typography>
+                                </Box>
                               </Box>
                             </Box>
                           </Box>
@@ -4834,13 +4887,8 @@ const MarketplaceReconciliation: React.FC = () => {
           background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
           borderRadius: '16px',
           border: '1px solid #f1f3f4',
-          boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+          boxShadow: 'none',
           overflow: 'hidden',
-          transition: 'all 0.3s ease',
-          '&:hover': {
-            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-            transform: 'translateY(-2px)',
-          }
         }}>
           <CardContent sx={{ p: 5 }}>
             {(() => {
@@ -5137,19 +5185,24 @@ const MarketplaceReconciliation: React.FC = () => {
             return null;
           }
 
-          // Get D2C totals for percentage calculation
-          const d2cTotal = partyComposition.totals?.find(t => t.platform === 'd2c');
-          const totalOrderCount = d2cTotal?.order_count || 0;
+          // Filter D2C rows
+          const d2cRows = partyComposition.rows.filter(row => row.platform === 'd2c');
+          
+          if (d2cRows.length === 0) {
+            return null;
+          }
+
+          // Calculate total orders dynamically to ensure 100% accuracy and avoid 0% bugs
+          const totalOrderCount = d2cRows.reduce((sum, row) => sum + row.order_count, 0);
 
           // Prepare data for visualization
-          const courierData = partyComposition.rows
-            .filter(row => row.platform === 'd2c')
+          const courierData = d2cRows
             .map((row, idx) => {
               const percentage = totalOrderCount > 0
                 ? (row.order_count / totalOrderCount) * 100
                 : 0;
               return {
-                name: row.shipping_courier_name,
+                name: row.shipping_courier_name || 'Unknown',
                 orderCount: row.order_count,
                 totalSellingPrice: row.total_selling_price,
                 percentage: percentage,
@@ -5164,13 +5217,8 @@ const MarketplaceReconciliation: React.FC = () => {
               background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
               borderRadius: '16px',
               border: '1px solid #f1f3f4',
-              boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+              boxShadow: 'none',
               overflow: 'hidden',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-                transform: 'translateY(-2px)',
-              }
             }}>
               <CardContent sx={{ p: 5 }}>
                 <Typography variant="h3" sx={{
@@ -5183,167 +5231,111 @@ const MarketplaceReconciliation: React.FC = () => {
                   Party Composition
                 </Typography>
 
-                <Grid container spacing={3}>
-                  {/* Visualization */}
-                  <Grid item xs={12} md={8}>
-                    <Box sx={{ height: { xs: 320, sm: 360, md: 420, lg: 480 } }}>
+                <Grid container spacing={4} alignItems="center">
+                  {/* Left: Pie Chart */}
+                  <Grid item xs={12} md={5}>
+                    <Box sx={{ height: 320, position: 'relative' }}>
                       {courierData.length === 1 ? (
-                        // Single Courier - Show detailed gradient card
+                        // Single Courier - Show a clean circular ring
                         <Box sx={{
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: `linear-gradient(135deg, ${courierData[0].color}22 0%, ${courierData[0].color}11 100%)`,
-                          borderRadius: '20px',
-                          border: `2px solid ${courierData[0].color}`,
-                          position: 'relative',
-                          overflow: 'hidden'
-                        }}>
-                          <Box sx={{
-                            textAlign: 'center',
-                            position: 'relative',
-                            zIndex: 2,
-                            p: 3
-                          }}>
-                            <Typography variant="h4" sx={{ fontWeight: 700, mb: 1.5, color: '#1f2937' }}>
-                              {courierData[0].name}
-                            </Typography>
-                            <Typography variant="h3" sx={{ fontWeight: 700, mb: 2, color: courierData[0].color }}>
-                              {courierData[0].orderCount.toLocaleString('en-IN')}
-                            </Typography>
-                            <Typography variant="body1" sx={{ color: '#6b7280', mb: 1 }}>
-                              Orders
-                            </Typography>
-                            <Typography variant="h6" sx={{ color: '#1f2937', fontWeight: 600 }}>
-                              {formatCurrency(courierData[0].totalSellingPrice)}
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: '#6b7280' }}>
-                              Total Selling Price
-                            </Typography>
-                          </Box>
-                        </Box>
+                          width: 280, height: 280, borderRadius: '50%', border: `12px solid ${courierData[0].color}`,
+                          margin: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                          boxShadow: `inset 0 4px 20px ${courierData[0].color}10, 0 8px 30px ${courierData[0].color}15`
+                        }} />
                       ) : courierData.length > 1 ? (
                         // Multiple Couriers - Show pie chart
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart margin={{ top: 12, right: 12, bottom: 56, left: 12 }}>
-                            <Pie
-                              data={courierData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius="78%"
-                              outerRadius="86%"
-                              paddingAngle={1}
-                              cornerRadius={1}
-                              dataKey="orderCount"
-                            >
-                              {courierData.map((p, idx) => (
-                                <Cell key={`courier-${idx}`} fill={p.color} />
-                              ))}
-                            </Pie>
-                            <RechartsTooltip
-                              formatter={(value: any, name: string, props: any) => [
-                                `${Number(value).toLocaleString('en-IN')} orders (${props.payload.percentage.toFixed(1)}%)`,
-                                props.payload.name
-                              ]}
-                            />
-                            <Legend
-                              layout="horizontal"
-                              verticalAlign="bottom"
-                              align="center"
-                              iconType="circle"
-                              wrapperStyle={{ paddingTop: 8 }}
-                              height={40}
-                              formatter={(value, entry) => (
-                                <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>{value}</span>
-                              )}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
+                        <>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={courierData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius="78%"
+                                outerRadius="86%"
+                                paddingAngle={1}
+                                cornerRadius={1}
+                                dataKey="orderCount"
+                                stroke="none"
+                              >
+                                {courierData.map((p, idx) => (
+                                  <Cell key={`courier-${idx}`} fill={p.color} />
+                                ))}
+                              </Pie>
+                              <RechartsTooltip
+                                formatter={(value: any, name: string, props: any) => [
+                                  `${Number(value).toLocaleString('en-IN')} orders (${props.payload.percentage.toFixed(1)}%)`,
+                                  props.payload.name
+                                ]}
+                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontFamily: '"Inter", sans-serif' }}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </>
                       ) : (
                         // No data - show message
                         <Box sx={{
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#6b7280',
-                          border: '2px dashed #e5e7eb',
-                          borderRadius: '20px'
+                          height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: '#6b7280', border: '2px dashed #e5e7eb', borderRadius: '20px'
                         }}>
-                          <Typography variant="h6">No party composition data available</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>No party composition data available</Typography>
                         </Box>
                       )}
                     </Box>
                   </Grid>
 
-                  {/* Summary KPI cards */}
-                  <Grid item xs={12} md={4}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
-                      <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Orders</Typography>
-                        <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>
-                          {totalOrderCount.toLocaleString('en-IN')}
-                        </Typography>
+                  {/* Right: Minimalist Data-Table Hybrid */}
+                  <Grid item xs={12} md={7}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pr: { md: 2 }, mt: { xs: 2, md: 0 } }}>
+                      {/* Micro-Header Row */}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: -1, px: 0.5 }}>
+                        <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.05em' }}>COURIER</Typography>
+                        <Box sx={{ display: 'flex', gap: 3 }}>
+                          <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.05em', width: 65, textAlign: 'right' }}>ORDERS</Typography>
+                          <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.05em', width: 85, textAlign: 'right' }}>SALES</Typography>
+                          <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.05em', width: 45, textAlign: 'right' }}>SHARE</Typography>
+                        </Box>
                       </Box>
-                      <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Selling Price</Typography>
-                        <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>
-                          {formatCurrency(d2cTotal?.total_selling_price || 0)}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Grid>
-                </Grid>
-
-                {/* Courier breakdown table */}
-                <Box sx={{ mt: 4 }}>
-                  <Grid container spacing={2}>
-                    {courierData.map((courier, idx) => (
-                      <Grid key={idx} item xs={12} md={courierData.length === 1 ? 12 : 6}>
-                        <Box sx={{ p: 3, borderRadius: '14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(229,231,235,0.6)' }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 2 }}>
-                            <Typography variant="subtitle1" sx={{ color: '#374151', fontWeight: 700 }}>
-                              {courier.name}
-                            </Typography>
-                            <Chip
-                              label={`${courier.percentage.toFixed(1)}%`}
-                              sx={{
-                                bgcolor: `${courier.color}15`,
-                                color: courier.color,
-                                fontWeight: 700,
-                                fontSize: '0.75rem'
-                              }}
-                            />
+                      
+                      {courierData.map((courier, idx) => (
+                        <Box key={idx} sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 0.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Typography sx={{ fontWeight: 500, color: '#374151', fontSize: '0.8rem' }}>
+                                {courier.name}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#4b5563', fontVariantNumeric: 'tabular-nums', width: 65, textAlign: 'right' }}>
+                                {courier.orderCount.toLocaleString('en-IN')}
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#4b5563', fontVariantNumeric: 'tabular-nums', width: 85, textAlign: 'right' }}>
+                                {formatCurrency(courier.totalSellingPrice)}
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#111827', fontVariantNumeric: 'tabular-nums', width: 45, textAlign: 'right' }}>
+                                {courier.percentage.toFixed(1)}%
+                              </Typography>
+                            </Box>
                           </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
-                            <Typography variant="body2" sx={{ color: '#374151' }}>Order Count</Typography>
-                            <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                              {courier.orderCount.toLocaleString('en-IN')}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                            <Typography variant="body2" sx={{ color: '#374151' }}>Total Selling Price</Typography>
-                            <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                              {formatCurrency(courier.totalSellingPrice)}
-                            </Typography>
-                          </Box>
-                          {/* Progress bar showing percentage */}
-                          <Box sx={{ mt: 2, height: 8, borderRadius: '4px', bgcolor: '#e5e7eb', overflow: 'hidden' }}>
-                            <Box
-                              sx={{
-                                height: '100%',
-                                width: `${courier.percentage}%`,
-                                bgcolor: courier.color,
-                                transition: 'width 0.3s ease'
-                              }}
+                          
+                          {/* Minimalist Micro-Bar */}
+                          <Box sx={{ width: '100%', height: 4, backgroundColor: '#f3f4f6', borderRadius: 2, overflow: 'hidden' }}>
+                            <Box 
+                              sx={{ 
+                                width: `${courier.percentage}%`, 
+                                height: '100%', 
+                                backgroundColor: courier.color, 
+                                borderRadius: 2, 
+                                transition: 'width 1s cubic-bezier(0.4, 0, 0.2, 1)'
+                              }} 
                             />
                           </Box>
                         </Box>
-                      </Grid>
-                    ))}
+                      ))}
+                    </Box>
                   </Grid>
-                </Box>
+                </Grid>
               </CardContent>
             </Card>
           );
@@ -5353,10 +5345,10 @@ const MarketplaceReconciliation: React.FC = () => {
         <Paper sx={{
           p: 3,
           mb: 6,
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          border: '1px solid #e2e8f0',
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
           borderRadius: '16px',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+          boxShadow: 'none'
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>
@@ -5367,19 +5359,14 @@ const MarketplaceReconciliation: React.FC = () => {
               sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 700 }}
             />
           </Box>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: 3, px: 1 }}>
             {AGE_BUCKETS.map((b) => (
-              <Chip
-                key={b}
-                size="small"
-                label={b}
-                variant="outlined"
-                sx={{
-                  borderColor: BUCKET_COLORS[b],
-                  color: BUCKET_COLORS[b],
-                  fontWeight: 700
-                }}
-              />
+              <Box key={b} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: BUCKET_COLORS[b] }} />
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#4b5563' }}>
+                  {b}
+                </Typography>
+              </Box>
             ))}
           </Box>
           <Box sx={{ width: '100%', height: 380 }}>
@@ -5438,19 +5425,31 @@ const MarketplaceReconciliation: React.FC = () => {
               </Box>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ageingChartData} margin={{ top: 40, right: 10, left: 0, bottom: 0 }} barCategoryGap={"25%"} barGap={4}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="provider" tick={{ fontSize: 12 }} interval={0} height={60} angle={-15} textAnchor="end" />
-                  <YAxis unit="%" tick={{ fontSize: 12 }} domain={[0, 100]} />
-                  {/** Tooltip rows like "<=1d: 50%" */}
-                  <RechartsTooltip formatter={(v: any, name: string) => [`${Number(v).toFixed(2)}%`, `${name}:`]} />
+                <BarChart data={ageingChartData} margin={{ top: 40, right: 10, left: -20, bottom: 0 }} barCategoryGap={"25%"}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="provider" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} interval={0} height={60} angle={-25} textAnchor="end" />
+                  <YAxis unit="%" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                  <RechartsTooltip 
+                    formatter={(v: any, name: string) => [`${Number(v).toFixed(1)}%`, name]} 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontFamily: '"Inter", sans-serif' }}
+                    itemStyle={{ fontSize: '13px', fontWeight: 600 }}
+                    labelStyle={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}
+                  />
                   {AGE_BUCKETS.map((b, idx) => (
-                    <Bar key={b} dataKey={b} stackId="a" fill={BUCKET_COLORS[b]} radius={0} barSize={22}>
+                    <Bar 
+                      key={b} 
+                      dataKey={b} 
+                      stackId="a" 
+                      fill={BUCKET_COLORS[b]} 
+                      radius={idx === AGE_BUCKETS.length - 1 ? [4, 4, 0, 0] : 0} 
+                      barSize={16}
+                    >
                       {idx === AGE_BUCKETS.length - 1 && (
                         <LabelList
                           dataKey="avgTat"
                           position="top"
-                          formatter={(v: number) => `Avg TAT: ${Number(v).toFixed(1)}d`}
+                          formatter={(v: number) => `${Number(v).toFixed(1)}d`}
+                          style={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
                         />
                       )}
                     </Bar>
@@ -5465,21 +5464,21 @@ const MarketplaceReconciliation: React.FC = () => {
         <Paper sx={{
           p: 3,
           mb: 6,
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          border: '1px solid #e2e8f0',
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
           borderRadius: '16px',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+          boxShadow: 'none'
         }}>
           <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600, mb: 4 }}>
             Month on Month Growth
           </Typography>
 
-          {selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'other' ? (
+          {selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'other' ? (
             // Amazon/Flipkart/Other (CRED): Sales vs Settlement (and Commission for Amazon/Flipkart) Table
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600 }}>
-                  {selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'flipkart' ? 'Flipkart' : 'Other (CRED)'} - Sales vs Settlement
+                  {selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : selectedPlatform === 'flipkart' ? 'Flipkart' : 'Other (CRED)'} - Sales vs Settlement
                 </Typography>
                 {marketplaceGrowthData.length > 0 && (
                   <Button
@@ -5487,7 +5486,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     size="small"
                     startIcon={<DownloadIcon />}
                     onClick={() => {
-                      const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart';
+                      const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk';
                         const tableData = marketplaceGrowthData.map(row => ({
                           month: row.month,
                           sales: row.sales,
@@ -5549,46 +5548,52 @@ const MarketplaceReconciliation: React.FC = () => {
                   maxHeight: 600,
                   borderRadius: '12px',
                   border: '1px solid #e5e7eb',
-                  '& .MuiTable-root': { minWidth: 700 }
+                  overflowX: 'auto',
+                  pb: 1,
+                  '& .MuiTable-root': { minWidth: 700 },
+                  '&::-webkit-scrollbar': { height: '4px' },
+                  '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+                  '&::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: '4px' },
+                  '&::-webkit-scrollbar-thumb:hover': { backgroundColor: 'rgba(0,0,0,0.2)' }
                 }}>
-                  <Table stickyHeader>
+                  <Table stickyHeader size="small">
                     <TableHead>
                       <TableRow>
                         <TableCell sx={{
-                          backgroundColor: '#f8fafc',
-                          fontWeight: 700,
+                          backgroundColor: '#ffffff',
+                                fontWeight: 600,
                           color: '#374151',
-                          borderBottom: '2px solid #e5e7eb'
+                                borderBottom: '1px solid #f1f3f4'
                         }}>
                           Month
                         </TableCell>
                         <TableCell align="right" sx={{
-                          backgroundColor: '#f8fafc',
-                          fontWeight: 700,
+                          backgroundColor: '#ffffff',
+                                fontWeight: 600,
                           color: '#2563eb',
-                          borderBottom: '2px solid #e5e7eb'
+                                borderBottom: '1px solid #f1f3f4'
                         }}>
                           Sales (Invoice Date)
                         </TableCell>
                         <TableCell
                           align="right"
                           sx={{
-                            backgroundColor: '#f8fafc',
-                            fontWeight: 700,
+                            backgroundColor: '#ffffff',
+                                fontWeight: 600,
                             color: '#10b981',
-                            borderBottom: '2px solid #e5e7eb',
+                                borderBottom: '1px solid #f1f3f4',
                           }}
                         >
                           Settlement (Settlement Date)
                         </TableCell>
-                        {(selectedPlatform === 'amazon' || selectedPlatform === 'flipkart') && (
+                        {(selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk') && (
                           <TableCell
                             align="right"
                             sx={{
-                              backgroundColor: '#f8fafc',
-                              fontWeight: 700,
+                              backgroundColor: '#ffffff',
+                                fontWeight: 600,
                               color: '#f97316',
-                              borderBottom: '2px solid #e5e7eb',
+                                borderBottom: '1px solid #f1f3f4',
                             }}
                           >
                             Commission (Settlement Date)
@@ -5598,7 +5603,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     </TableHead>
                     <TableBody>
                       {marketplaceGrowthData.map((row, index) => {
-                        const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart';
+                        const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk';
                         const commissionValue = showCommissionColumn ? (row.comissionData ?? 0) : 0;
                         return (
                           <TableRow
@@ -5641,7 +5646,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             marketplaceGrowthData.reduce((sum, r) => sum + r.settlement, 0),
                           )}
                         </TableCell>
-                        {(selectedPlatform === 'amazon' || selectedPlatform === 'flipkart') && (
+                        {(selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk') && (
                           <TableCell
                             align="right"
                             sx={{ fontWeight: 700, color: '#f97316', borderTop: '2px solid #e5e7eb' }}
@@ -5682,8 +5687,8 @@ const MarketplaceReconciliation: React.FC = () => {
                         }));
                         downloadCSV(tableData, 'd2c_sales_settlement', [
                           { key: 'month', label: 'Month' },
-                          { key: 'sales', label: 'Sales (₹)' },
-                          { key: 'settlement', label: 'Settlement (₹)' }
+                          { key: 'sales', label: `Sales (${getCurrencySymbol()})` },
+                          { key: 'settlement', label: `Settlement (${getCurrencySymbol()})` }
                         ]);
                       }}
                       sx={{
@@ -5721,14 +5726,26 @@ const MarketplaceReconciliation: React.FC = () => {
                     maxHeight: 600,
                     borderRadius: '12px',
                     border: '1px solid #e5e7eb',
-                    '& .MuiTable-root': { minWidth: 700 }
+                    overflowX: 'auto',
+                    pb: 1,
+                    '& .MuiTable-root': { minWidth: 700 },
+                    '&::-webkit-scrollbar': { height: '4px' },
+                    '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+                    '&::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: '4px' },
+                    '&::-webkit-scrollbar-thumb:hover': { backgroundColor: 'rgba(0,0,0,0.2)' }
                   }}>
-                    <Table stickyHeader>
+                    <Table stickyHeader size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb' }}>Month</TableCell>
-                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#2563eb', borderBottom: '2px solid #e5e7eb' }}>Sales (₹)</TableCell>
-                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#10b981', borderBottom: '2px solid #e5e7eb' }}>Settlement (₹)</TableCell>
+                          <TableCell sx={{ backgroundColor: '#ffffff',
+                                fontWeight: 600, color: '#374151',
+                                borderBottom: '1px solid #f1f3f4' }}>Month</TableCell>
+                          <TableCell align="right" sx={{ backgroundColor: '#ffffff',
+                                fontWeight: 600, color: '#2563eb',
+                                borderBottom: '1px solid #f1f3f4' }}>{`Sales (${getCurrencySymbol()})`}</TableCell>
+                          <TableCell align="right" sx={{ backgroundColor: '#ffffff',
+                                fontWeight: 600, color: '#10b981',
+                                borderBottom: '1px solid #f1f3f4' }}>{`Settlement (${getCurrencySymbol()})`}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -5741,7 +5758,17 @@ const MarketplaceReconciliation: React.FC = () => {
                                 '&:hover': { backgroundColor: '#f0f9ff' }
                               }}
                             >
-                              <TableCell sx={{ fontWeight: 500, color: '#1f2937' }}>{row.month}</TableCell>
+                              <TableCell sx={{
+                                fontWeight: 500,
+                                color: '#1f2937',
+                                position: 'sticky',
+                                left: 0,
+                                backgroundColor: 'inherit',
+                                borderRight: '1px solid #e5e7eb',
+                                zIndex: 1
+                              }}>
+                                {row.month}
+                              </TableCell>
                               <TableCell align="right" sx={{ color: '#2563eb', fontWeight: 600 }}>{formatCurrency(row.sales)}</TableCell>
                               <TableCell align="right" sx={{ color: '#10b981', fontWeight: 600 }}>{formatCurrency(row.settlement)}</TableCell>
                             </TableRow>
@@ -5749,7 +5776,18 @@ const MarketplaceReconciliation: React.FC = () => {
                         })}
                         {/* Summary Row */}
                         <TableRow sx={{ backgroundColor: '#f1f5f9' }}>
-                          <TableCell sx={{ fontWeight: 700, color: '#1f2937', borderTop: '2px solid #e5e7eb' }}>Total</TableCell>
+                          <TableCell sx={{
+                            fontWeight: 700,
+                            color: '#1f2937',
+                            borderTop: '2px solid #e5e7eb',
+                            borderRight: '1px solid #e5e7eb',
+                            position: 'sticky',
+                            left: 0,
+                            backgroundColor: 'inherit',
+                            zIndex: 2
+                          }}>
+                            Total
+                          </TableCell>
                           <TableCell align="right" sx={{ fontWeight: 700, color: '#2563eb', borderTop: '2px solid #e5e7eb' }}>
                             {formatCurrency(d2cSalesGrowthData.reduce((sum, r) => sum + r.sales, 0))}
                           </TableCell>
@@ -5769,7 +5807,7 @@ const MarketplaceReconciliation: React.FC = () => {
               <Box sx={{ mb: 6 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                   <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600 }}>
-                    COD Vendor Settlement - Month on Month
+                    COD  Settlement Data - Payment Date
                   </Typography>
                   {d2cCodVendorSettlementCombinedData.length > 0 && (
                     <Button
@@ -5832,12 +5870,27 @@ const MarketplaceReconciliation: React.FC = () => {
                     maxHeight: 600,
                     borderRadius: '12px',
                     border: '1px solid #e5e7eb',
-                    overflowX: 'auto'
+                    overflowX: 'auto',
+                    pb: 1,
+                    '&::-webkit-scrollbar': { height: '4px' },
+                    '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+                    '&::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: '4px' },
+                    '&::-webkit-scrollbar-thumb:hover': { backgroundColor: 'rgba(0,0,0,0.2)' }
                   }}>
                     <Table stickyHeader size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', minWidth: 100 }}>
+                          <TableCell sx={{
+                            backgroundColor: '#ffffff',
+                            fontWeight: 600,
+                            color: '#64748b',
+                            borderBottom: '1px solid #f1f3f4',
+                            borderRight: '1px solid #e5e7eb',
+                            minWidth: 100,
+                            position: 'sticky',
+                            left: 0,
+                            zIndex: 3
+                          }}>
                             Month
                           </TableCell>
                           {Object.keys(d2cVendorSettlementData?.cod || {}).map((vendor, idx) => (
@@ -5845,17 +5898,19 @@ const MarketplaceReconciliation: React.FC = () => {
                               key={vendor}
                               align="right"
                               sx={{
-                                backgroundColor: '#f8fafc',
-                                fontWeight: 700,
+                                backgroundColor: '#ffffff',
+                                fontWeight: 600,
                                 color: getCodVendorColor(vendor),
-                                borderBottom: '2px solid #e5e7eb',
+                                borderBottom: '1px solid #f1f3f4',
                                 minWidth: 120
                               }}
                             >
                               {vendor}
                             </TableCell>
                           ))}
-                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#1f2937', borderBottom: '2px solid #e5e7eb', minWidth: 120 }}>
+                          <TableCell align="right" sx={{ backgroundColor: '#ffffff',
+                                fontWeight: 600, color: '#1f2937',
+                                borderBottom: '1px solid #f1f3f4', minWidth: 120 }}>
                             Total
                           </TableCell>
                         </TableRow>
@@ -5876,7 +5931,17 @@ const MarketplaceReconciliation: React.FC = () => {
                                 '&:hover': { backgroundColor: '#fff7ed' }
                               }}
                             >
-                              <TableCell sx={{ fontWeight: 500, color: '#1f2937' }}>{row.month}</TableCell>
+                              <TableCell sx={{
+                                fontWeight: 500,
+                                color: '#1f2937',
+                                position: 'sticky',
+                                left: 0,
+                                backgroundColor: 'inherit',
+                                borderRight: '1px solid #e5e7eb',
+                                zIndex: 1
+                              }}>
+                                {row.month}
+                              </TableCell>
                               {codVendorKeys.map(vendor => {
                                 const key = vendor.replace(/\s+/g, '_');
                                 const value = (row as any)[key] || 0;
@@ -5894,7 +5959,18 @@ const MarketplaceReconciliation: React.FC = () => {
                         })}
                         {/* Summary Row */}
                         <TableRow sx={{ backgroundColor: '#fef3c7' }}>
-                          <TableCell sx={{ fontWeight: 700, color: '#1f2937', borderTop: '2px solid #e5e7eb' }}>Total</TableCell>
+                          <TableCell sx={{
+                            fontWeight: 700,
+                            color: '#1f2937',
+                            borderTop: '2px solid #e5e7eb',
+                            borderRight: '1px solid #e5e7eb',
+                            position: 'sticky',
+                            left: 0,
+                            backgroundColor: 'inherit',
+                            zIndex: 2
+                          }}>
+                            Total
+                          </TableCell>
                           {Object.keys(d2cVendorSettlementData?.cod || {}).map(vendor => {
                             const key = vendor.replace(/\s+/g, '_');
                             const vendorTotal = d2cCodVendorSettlementCombinedData.reduce((sum, r) => sum + ((r as any)[key] || 0), 0);
@@ -5928,7 +6004,7 @@ const MarketplaceReconciliation: React.FC = () => {
               <Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                   <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600 }}>
-                    Non-COD Vendor Settlement - Month on Month
+                    Prepaid Settlement Data - Payment Date
                   </Typography>
                   {d2cNonCodVendorSettlementCombinedData.length > 0 && (
                     <Button
@@ -5991,12 +6067,27 @@ const MarketplaceReconciliation: React.FC = () => {
                     maxHeight: 600,
                     borderRadius: '12px',
                     border: '1px solid #e5e7eb',
-                    overflowX: 'auto'
+                    overflowX: 'auto',
+                    pb: 1,
+                    '&::-webkit-scrollbar': { height: '4px' },
+                    '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+                    '&::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: '4px' },
+                    '&::-webkit-scrollbar-thumb:hover': { backgroundColor: 'rgba(0,0,0,0.2)' }
                   }}>
                     <Table stickyHeader size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#374151', borderBottom: '2px solid #e5e7eb', minWidth: 100 }}>
+                          <TableCell sx={{
+                            backgroundColor: '#ffffff',
+                            fontWeight: 600,
+                            color: '#64748b',
+                            borderBottom: '1px solid #f1f3f4',
+                            borderRight: '1px solid #e5e7eb',
+                            minWidth: 100,
+                            position: 'sticky',
+                            left: 0,
+                            zIndex: 3
+                          }}>
                             Month
                           </TableCell>
                           {Object.keys(d2cVendorSettlementData?.noncod || {}).map((vendor, idx) => (
@@ -6004,17 +6095,19 @@ const MarketplaceReconciliation: React.FC = () => {
                               key={vendor}
                               align="right"
                               sx={{
-                                backgroundColor: '#f8fafc',
-                                fontWeight: 700,
+                                backgroundColor: '#ffffff',
+                                fontWeight: 600,
                                 color: getNonCodVendorColor(vendor),
-                                borderBottom: '2px solid #e5e7eb',
+                                borderBottom: '1px solid #f1f3f4',
                                 minWidth: 120
                               }}
                             >
                               {vendor}
                             </TableCell>
                           ))}
-                          <TableCell align="right" sx={{ backgroundColor: '#f8fafc', fontWeight: 700, color: '#1f2937', borderBottom: '2px solid #e5e7eb', minWidth: 120 }}>
+                          <TableCell align="right" sx={{ backgroundColor: '#ffffff',
+                                fontWeight: 600, color: '#1f2937',
+                                borderBottom: '1px solid #f1f3f4', minWidth: 120 }}>
                             Total
                           </TableCell>
                         </TableRow>
@@ -6031,11 +6124,21 @@ const MarketplaceReconciliation: React.FC = () => {
                             <TableRow
                               key={row.month}
                               sx={{
-                                backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9fafb',
-                                '&:hover': { backgroundColor: '#f5f3ff' }
+                                backgroundColor: '#ffffff',
+                                '&:hover': { backgroundColor: '#f1f5f9' }
                               }}
                             >
-                              <TableCell sx={{ fontWeight: 500, color: '#1f2937' }}>{row.month}</TableCell>
+                              <TableCell sx={{
+                                fontWeight: 500,
+                                color: '#1f2937',
+                                position: 'sticky',
+                                left: 0,
+                                backgroundColor: 'inherit',
+                                borderRight: '1px solid #e5e7eb',
+                                zIndex: 1
+                              }}>
+                                {row.month}
+                              </TableCell>
                               {nonCodVendorKeys.map(vendor => {
                                 const key = vendor.replace(/\s+/g, '_');
                                 const value = (row as any)[key] || 0;
@@ -6053,7 +6156,18 @@ const MarketplaceReconciliation: React.FC = () => {
                         })}
                         {/* Summary Row */}
                         <TableRow sx={{ backgroundColor: '#ede9fe' }}>
-                          <TableCell sx={{ fontWeight: 700, color: '#1f2937', borderTop: '2px solid #e5e7eb' }}>Total</TableCell>
+                          <TableCell sx={{
+                            fontWeight: 700,
+                            color: '#1f2937',
+                            borderTop: '2px solid #e5e7eb',
+                            borderRight: '1px solid #e5e7eb',
+                            position: 'sticky',
+                            left: 0,
+                            backgroundColor: 'inherit',
+                            zIndex: 2
+                          }}>
+                            Total
+                          </TableCell>
                           {Object.keys(d2cVendorSettlementData?.noncod || {}).map(vendor => {
                             const key = vendor.replace(/\s+/g, '_');
                             const vendorTotal = d2cNonCodVendorSettlementCombinedData.reduce((sum, r) => sum + ((r as any)[key] || 0), 0);
@@ -6102,13 +6216,8 @@ const MarketplaceReconciliation: React.FC = () => {
           background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
           borderRadius: '16px',
           border: '1px solid #f1f3f4',
-          boxShadow: '0 2px 20px rgba(0, 0, 0, 0.04)',
+          boxShadow: 'none',
           overflow: 'hidden',
-          transition: 'all 0.3s ease',
-          '&:hover': {
-            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
-            transform: 'translateY(-2px)',
-          }
         }}>
           <CardContent sx={{ p: 5 }}>
             <Grid container spacing={4}>
@@ -6119,7 +6228,6 @@ const MarketplaceReconciliation: React.FC = () => {
                   background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
                   border: '1px solid #bfdbfe',
                   textAlign: 'center',
-                  transition: 'all 0.3s ease',
                   '&:hover': {
                     transform: 'translateY(-2px)',
                     boxShadow: '0 8px 25px rgba(59, 130, 246, 0.15)',
@@ -6151,7 +6259,6 @@ const MarketplaceReconciliation: React.FC = () => {
                   background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
                   border: '1px solid #e9d5ff',
                   textAlign: 'center',
-                  transition: 'all 0.3s ease',
                   '&:hover': {
                     transform: 'translateY(-2px)',
                     boxShadow: '0 8px 25px rgba(168, 85, 247, 0.15)',
@@ -6185,37 +6292,38 @@ const MarketplaceReconciliation: React.FC = () => {
       {/* Sync modal removed; animation shown on the button icon itself */}
 
       {/* TransactionSheet Overlay */}
-      {showTransactionSheet && (
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 9999,
-            background: 'rgba(0, 0, 0, 0.5)',
+      <Drawer
+        anchor="right"
+        open={showTransactionSheet}
+        onClose={() => {
+          setShowTransactionSheet(false);
+          setSelectedProviderPlatform(undefined);
+          setInitialTsFilters(undefined);
+        }}
+        PaperProps={{
+          sx: { width: '100%', maxWidth: '100vw' }
+        }}
+        transitionDuration={350}
+        keepMounted={false}
+      >
+        <TransactionSheet
+          onBack={() => {
+            setShowTransactionSheet(false);
+            setSelectedProviderPlatform(undefined);
+            setInitialTsFilters(undefined);
           }}
-        >
-          <TransactionSheet
-            onBack={() => {
-              setShowTransactionSheet(false);
-              setSelectedProviderPlatform(undefined);
-              setInitialTsFilters(undefined);
-            }}
-            statsData={reconciliationData}
-            initialTab={initialTsTab}
-            dateRange={effectiveDateRangeForTs}
-            initialPlatforms={
-              selectedPlatform &&
-              (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'd2c' || selectedPlatform === 'other')
-                ? [selectedPlatform as 'flipkart' | 'amazon' | 'd2c' | 'other']
-                : undefined
-            }
-            initialFilters={initialTsFilters}
-          />
-        </Box>
-      )}
+          statsData={reconciliationData}
+          initialTab={initialTsTab}
+          dateRange={effectiveDateRangeForTs}
+          initialPlatforms={
+            selectedPlatform &&
+            (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || selectedPlatform === 'other')
+              ? [selectedPlatform as 'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other']
+              : undefined
+          }
+          initialFilters={initialTsFilters}
+        />
+      </Drawer>
 
 
     </Box>

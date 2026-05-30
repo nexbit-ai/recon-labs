@@ -68,7 +68,6 @@ class MarketplaceApiService {
 
       const headers = {
         'X-API-Key': this.apiKey,
-        'X-Org-ID': this.orgId,
         'Content-Type': 'application/json'
       };
 

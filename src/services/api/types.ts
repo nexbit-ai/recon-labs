@@ -53,6 +53,8 @@ export interface RequestConfig {
   retryDelay?: number;
   withCredentials?: boolean;
   useD2CHeaders?: boolean;
+  useCache?: boolean;
+  cacheTimeMs?: number;
 }
 
 export interface ApiRequestConfig extends RequestConfig {
