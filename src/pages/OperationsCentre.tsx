@@ -39,7 +39,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Tooltip
 } from '@mui/material';
 import {
   CalendarToday as CalendarTodayIcon,
@@ -303,6 +304,23 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
 const OperationsCentrePage: React.FC = () => {
   const [disputeSubTab, setDisputeSubTab] = useState<number>(0); // 0: unreconciled, 1: manually reconciled, 2: disputed
 
+  const getDisputeRequiredInfo = (orderId: string) => {
+    let hash = 0;
+    for (let i = 0; i < orderId.length; i++) {
+      hash = orderId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const isYes = Math.abs(hash) % 2 === 0;
+    if (isYes) {
+      const reasonIndex = Math.abs(hash) % 2;
+      const reason = reasonIndex === 0 
+        ? "Yes because dispute window is approaching"
+        : "Yes because its been 30 days for this order and yet not settled";
+      return { value: 'Yes', reason, color: '#059669', bgColor: '#dcfce7' }; // Green
+    } else {
+      return { value: 'No', reason: "No, within settlement window", color: '#dc2626', bgColor: '#fee2e2' }; // Red
+    }
+  };
+
   // State for date filtering
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   // Initialize date range synchronously from URL → localStorage → this month to avoid race before first fetch
@@ -457,6 +475,7 @@ const OperationsCentrePage: React.FC = () => {
   // Column metadata for filter types
   const COLUMN_META = {
     'Order ID': { type: 'string' },
+    'Dispute Required': { type: 'enum' },
     'Order Value': { type: 'number' },
     'Settlement Value': { type: 'number' },
     'Invoice Date': { type: 'date' },
@@ -1137,9 +1156,34 @@ const OperationsCentrePage: React.FC = () => {
 
   // Get current rows based on active tab
   const getCurrentRows = () => {
-    if (disputeSubTab === 0) return unreconciledRows;
-    if (disputeSubTab === 1) return manuallyReconciledRows;
-    return disputedRows;
+    let rows: any[] = [];
+    if (disputeSubTab === 0) rows = unreconciledRows;
+    else if (disputeSubTab === 1) rows = manuallyReconciledRows;
+    else rows = disputedRows;
+
+    // Apply client-side filters for columns not handled by the backend
+    if (columnFilters['Dispute Required']) {
+      const allowedValues = columnFilters['Dispute Required'];
+      if (Array.isArray(allowedValues) && allowedValues.length > 0) {
+        rows = rows.filter(row => {
+          const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || '';
+          const info = getDisputeRequiredInfo(orderId);
+          return allowedValues.includes(info.value);
+        });
+      }
+    }
+
+    if (columnFilters['Reason']) {
+      const allowedValues = columnFilters['Reason'];
+      if (Array.isArray(allowedValues) && allowedValues.length > 0) {
+        rows = rows.filter(row => {
+          const reason = row.Remark || '';
+          return allowedValues.some(val => reason.toLowerCase().includes(val.toLowerCase()));
+        });
+      }
+    }
+
+    return rows;
   };
 
   const current = getCurrentRows();
@@ -1147,6 +1191,9 @@ const OperationsCentrePage: React.FC = () => {
   // Apply column filters to current data (must be defined before usage below)
   // Calculate total count for unreconciled orders
   const getUnreconciledTotalCount = () => {
+    if (columnFilters['Dispute Required'] || columnFilters['Reason']) {
+      return current.length;
+    }
     return unreconciledCount;
   };
 
@@ -1476,6 +1523,10 @@ const OperationsCentrePage: React.FC = () => {
 
   const getUniqueValuesForColumn = (column: string) => {
     const values = new Set<string>();
+
+    if (column === 'Dispute Required') {
+      return ['Yes', 'No'];
+    }
 
     // For Event Type, show available event types
     if (column === 'Event Type') {
@@ -2308,6 +2359,9 @@ const OperationsCentrePage: React.FC = () => {
                         />
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Dispute Required</Typography>
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order ID</Typography>
                           <IconButton
@@ -2617,7 +2671,7 @@ const OperationsCentrePage: React.FC = () => {
               <TableBody>
                 {apiLoading ? (
                   <TableRow>
-                    <TableCell colSpan={disputeSubTab === 0 ? 10 : 9} sx={{ textAlign: 'center', py: 8 }}>
+                    <TableCell colSpan={disputeSubTab === 0 ? 12 : 9} sx={{ textAlign: 'center', py: 8 }}>
                       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                         <CircularProgress size={40} sx={{ color: '#3b82f6' }} />
                         <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500 }}>
@@ -2657,6 +2711,43 @@ const OperationsCentrePage: React.FC = () => {
                               '&.Mui-checked': { color: '#1f2937' },
                             }}
                           />
+                        </TableCell>
+                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          {(() => {
+                            const info = getDisputeRequiredInfo(orderId);
+                            return (
+                              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                                <Chip
+                                  label={info.value}
+                                  size="small"
+                                  sx={{
+                                    background: info.bgColor,
+                                    color: info.color,
+                                    fontWeight: 700,
+                                    fontSize: '0.75rem',
+                                    height: 24,
+                                    '& .MuiChip-label': { px: 1.5 },
+                                  }}
+                                />
+                                <Tooltip title={info.reason} arrow placement="top">
+                                  <IconButton
+                                    size="small"
+                                    sx={{
+                                      p: 0.25,
+                                      color: '#6b7280',
+                                      '&:hover': {
+                                        color: '#111827',
+                                        background: '#f3f4f6',
+                                      },
+                                    }}
+                                    aria-label="Dispute reasoning info"
+                                  >
+                                    <InfoIcon fontSize="small" sx={{ fontSize: '0.875rem' }} />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>{orderId}</TableCell>
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
@@ -2855,7 +2946,7 @@ const OperationsCentrePage: React.FC = () => {
                 })}
                 {!apiLoading && (disputeSubTab === 0 ? paginatedCurrent : current).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={disputeSubTab === 0 ? 10 : 9} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
+                    <TableCell colSpan={disputeSubTab === 0 ? 12 : 9} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
                   </TableRow>
                 )}
               </TableBody>

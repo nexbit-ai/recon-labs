@@ -19,6 +19,13 @@ import {
   Avatar,
   Menu,
   MenuItem,
+  Select,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  CircularProgress,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -40,6 +47,7 @@ import {
   PersonOutlined as PersonIcon,
   ExtensionOutlined as ExtensionIcon,
   MoreVert as MoreVertIcon,
+
 } from '@mui/icons-material';
 // import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
 // @ts-ignore
@@ -61,10 +69,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { session } = useStytchMemberSession();
-  const { memberName } = useUser();
+  const { memberName, selectedOrganization, setSelectedOrganization } = useUser();
   // const { user, logout } = useAuth(); // Authentication disabled
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
+
   
   const [settingsAnchorEl, setSettingsAnchorEl] = React.useState<null | HTMLElement>(null);
 
@@ -129,6 +138,39 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           style={{ width: 48, height: 48, marginBottom: 16, display: 'block' }}
         />
       </Toolbar>
+      <Box sx={{ px: 2, mb: 1, mt: -1 }}>
+        <Typography variant="caption" sx={{ color: '#9ca3af', fontWeight: 600, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', mb: 0.5 }}>
+          Organization
+        </Typography>
+        <Select
+          value={selectedOrganization}
+          onChange={(e) => setSelectedOrganization(e.target.value as string)}
+          size="small"
+          fullWidth
+          sx={{
+            height: 32,
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            color: '#374151',
+            bgcolor: 'transparent',
+            borderRadius: '4px',
+            '& .MuiOutlinedInput-notchedOutline': {
+              border: 'none',
+            },
+            '&:hover': {
+              bgcolor: 'rgba(0, 0, 0, 0.04)',
+            },
+            '&.Mui-focused': {
+              bgcolor: 'rgba(0, 0, 0, 0.04)',
+            },
+          }}
+        >
+          <MenuItem value="ACME" sx={{ fontSize: '0.75rem', fontWeight: 500 }}>ACME</MenuItem>
+          <MenuItem value="Warby Parker" sx={{ fontSize: '0.75rem', fontWeight: 500 }}>Warby Parker</MenuItem>
+          <MenuItem value="Glossier" sx={{ fontSize: '0.75rem', fontWeight: 500 }}>Glossier</MenuItem>
+          <MenuItem value="Casper" sx={{ fontSize: '0.75rem', fontWeight: 500 }}>Casper</MenuItem>
+        </Select>
+      </Box>
       <List sx={{ flex: 1 }}>
         {menuItems.map((item) => (
           <ListItem key={item.text} disablePadding>
@@ -386,10 +428,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           minHeight: '100vh',
           backgroundColor: 'background.default',
-          pt: 2,
+          pt: 0,
         }}
       >
-        {children}
+        {/* Page Content Wrapper */}
+        <Box sx={{ p: 4, pt: 2 }}>
+          {children}
+        </Box>
+
+
       </Box>
     </Box>
   );

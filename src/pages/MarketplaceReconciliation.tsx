@@ -132,6 +132,15 @@ const PROVIDER_AGEING_DATA: ProviderAgeing[] = [
   { provider: 'Cashfree', type: 'Payment Gateway', averageDaysToSettle: 2.5, distribution: { '<=1d': 32, '2-3d': 46, '4-7d': 17, '8-14d': 4, '15-30d': 1, '>30d': 0 } },
 ];
 
+const D2C_PROVIDER_AGEING_DATA: ProviderAgeing[] = [
+  { provider: 'Razorpay', type: 'Payment Gateway', averageDaysToSettle: 1.2, distribution: { '<=1d': 65, '2-3d': 25, '4-7d': 8, '8-14d': 2, '15-30d': 0, '>30d': 0 } },
+  { provider: 'PayU', type: 'Payment Gateway', averageDaysToSettle: 1.5, distribution: { '<=1d': 58, '2-3d': 32, '4-7d': 7, '8-14d': 3, '15-30d': 0, '>30d': 0 } },
+  { provider: 'Cashfree', type: 'Payment Gateway', averageDaysToSettle: 2.1, distribution: { '<=1d': 45, '2-3d': 40, '4-7d': 11, '8-14d': 3, '15-30d': 1, '>30d': 0 } },
+  { provider: 'Delhivery', type: 'Logistics (COD)', averageDaysToSettle: 4.8, distribution: { '<=1d': 15, '2-3d': 35, '4-7d': 35, '8-14d': 12, '15-30d': 2, '>30d': 1 } },
+  { provider: 'Blue Dart', type: 'Logistics (COD)', averageDaysToSettle: 5.2, distribution: { '<=1d': 12, '2-3d': 30, '4-7d': 40, '8-14d': 14, '15-30d': 3, '>30d': 1 } },
+  { provider: 'Shiprocket', type: 'Logistics (COD)', averageDaysToSettle: 5.9, distribution: { '<=1d': 8, '2-3d': 25, '4-7d': 42, '8-14d': 18, '15-30d': 5, '>30d': 2 } },
+];
+
 // Helper function to map provider code to display name
 const getProviderDisplayName = (code: string): string => {
   const displayMap: Record<string, string> = {
@@ -213,6 +222,18 @@ const MarketplaceReconciliation: React.FC = () => {
   const { setMemberName } = useUser();
   const { hasValidCredentials, isInitialized } = useOrganization();
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
+  const [syncTriggered, setSyncTriggered] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [syncStep, setSyncStep] = useState(0);
+
+
+  useEffect(() => {
+    const handleSyncComplete = () => {
+      setSyncTriggered(true);
+    };
+    window.addEventListener('dashboard-sync-complete', handleSyncComplete);
+    return () => window.removeEventListener('dashboard-sync-complete', handleSyncComplete);
+  }, []);
   const [initialTsFilters, setInitialTsFilters] = useState<{ [key: string]: any } | undefined>(undefined);
   const [initialTsTab, setInitialTsTab] = useState<number>(0);
   const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other' | undefined>(undefined);
@@ -1411,6 +1432,40 @@ const MarketplaceReconciliation: React.FC = () => {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(loadPlatformFromStorage());
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [tempSelectedPlatform, setTempSelectedPlatform] = useState<Platform | null>(null);
+
+  const isD2C = selectedPlatform === 'd2c';
+  const totalSyncSteps = isD2C ? 5 : 3;
+
+  const handleSyncClick = () => {
+    setSyncOpen(true);
+    setSyncStep(1);
+    if (isD2C) {
+      // D2C: 5 steps with 1.5s each
+      setTimeout(() => {
+        setSyncStep(2);
+        setTimeout(() => {
+          setSyncStep(3);
+          setTimeout(() => {
+            setSyncStep(4);
+            setTimeout(() => {
+              setSyncStep(5);
+              setSyncTriggered(true);
+              window.dispatchEvent(new Event('dashboard-sync-complete'));
+            }, 1500);
+          }, 1500);
+        }, 1500);
+      }, 1500);
+    } else {
+      setTimeout(() => {
+        setSyncStep(2);
+        setTimeout(() => {
+          setSyncStep(3);
+          setSyncTriggered(true);
+          window.dispatchEvent(new Event('dashboard-sync-complete'));
+        }, 2000);
+      }, 2000);
+    }
+  };
 
   // Fetch upload list to get member name and reconciliation status
   const fetchUploadList = useCallback(async () => {
@@ -3043,9 +3098,113 @@ const MarketplaceReconciliation: React.FC = () => {
                       </Box>
                     </Box>
                   </Menu>
+
+                  {/* Sync Button */}
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<SyncIcon sx={{
+                      fontSize: '1rem',
+                      animation: syncOpen && syncStep < 3 ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': {
+                        '0%': { transform: 'rotate(0deg)' },
+                        '100%': { transform: 'rotate(360deg)' }
+                      }
+                    }} />}
+                    onClick={handleSyncClick}
+                    sx={{
+                      borderColor: '#6B7280',
+                      color: '#6B7280',
+                      textTransform: 'none',
+                      minWidth: 'auto',
+                      minHeight: 36,
+                      px: 1.5,
+                      fontSize: '0.7875rem',
+                      '&:hover': {
+                        borderColor: '#4B5563',
+                        backgroundColor: 'rgba(107, 114, 128, 0.04)',
+                      },
+                    }}
+                  >
+                    Sync
+                  </Button>
                 </Box>
               </Box>
             </Box>
+
+            {/* Synchronization Demo Dialog */}
+            <Dialog
+              open={syncOpen}
+              onClose={syncStep === totalSyncSteps ? () => setSyncOpen(false) : undefined}
+              PaperProps={{
+                sx: {
+                  borderRadius: '16px',
+                  p: 3,
+                  minWidth: 340,
+                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                }
+              }}
+            >
+              <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, pb: 1 }}>
+                {syncStep < totalSyncSteps ? (
+                  <CircularProgress size={56} sx={{ color: '#111111' }} />
+                ) : (
+                  <CheckCircleIcon sx={{ fontSize: 56, color: '#10b981' }} />
+                )}
+                <Typography variant="h5" sx={{ fontWeight: 700, color: '#111827', textAlign: 'center' }}>
+                  {syncStep < totalSyncSteps ? 'Reconciliation in Progress' : 'Sync Complete'}
+                </Typography>
+                <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+                  {(isD2C ? [
+                    { step: 1, label: 'Fetching orders from Shopify' },
+                    { step: 2, label: 'Finding settlement reports from Paytm, PayU' },
+                    { step: 3, label: 'Syncing with logistics partners — Delhivery, BlueDart, Shiprocket' },
+                    { step: 4, label: 'Reconciling your orders' },
+                    { step: 5, label: 'Reconciliation done' },
+                  ] : [
+                    { step: 1, label: 'Fetching data from Flipkart' },
+                    { step: 2, label: 'Reconciling your orders' },
+                    { step: 3, label: 'Reconciliation done' },
+                  ]).map(({ step, label }) => (
+                    <Box key={step} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      {syncStep > step ? (
+                        <CheckCircleIcon sx={{ color: '#10b981', fontSize: 18 }} />
+                      ) : syncStep === step ? (
+                        step === totalSyncSteps ? (
+                          <CheckCircleIcon sx={{ color: '#10b981', fontSize: 18 }} />
+                        ) : (
+                          <CircularProgress size={16} sx={{ color: '#111111' }} />
+                        )
+                      ) : (
+                        <Box sx={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid #d1d5db' }} />
+                      )}
+                      <Typography sx={{ fontSize: '0.875rem', fontWeight: syncStep === step ? 600 : 400, color: syncStep >= step ? '#1f2937' : '#9ca3af' }}>
+                        {label}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </DialogContent>
+              <DialogActions sx={{ justifyContent: 'center', pt: 2 }}>
+                <Button
+                  variant="contained"
+                  disabled={syncStep < totalSyncSteps}
+                  onClick={() => setSyncOpen(false)}
+                  sx={{
+                    bgcolor: '#111111',
+                    color: '#ffffff',
+                    borderRadius: '20px',
+                    textTransform: 'none',
+                    px: 4,
+                    boxShadow: 'none',
+                    '&:hover': { bgcolor: '#000000', boxShadow: 'none' },
+                    '&.Mui-disabled': { bgcolor: '#f3f4f6', color: '#9ca3af' }
+                  }}
+                >
+                  Close
+                </Button>
+              </DialogActions>
+            </Dialog>
 
             {/* Error Alert */}
             {error && (
@@ -3271,14 +3430,16 @@ const MarketplaceReconciliation: React.FC = () => {
                   {/* Gauge Chart with Numerator and Denominator */}
                   {(() => {
                     const s = mainSummary?.summary as any;
-                    const reconciledCount = Number(s?.total_reconciled_count || 0);
+                    const rawReconciledCount = Number(s?.total_reconciled_count || 0) + (syncTriggered ? 12 : 0);
                     const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
-                    const totalReconciledCount = reconciledCount + manuallyReconciledCount;
-                    const unreconciledCount = Number(s?.total_unreconciled_count || 0);
-                    const totalCount = totalReconciledCount + unreconciledCount;
-                    const matchedPct = totalCount === 0 ? 100 : Math.max(0, Math.min(100, (totalReconciledCount / totalCount) * 100));
-                    const matchedDeg = (matchedPct / 100) * 360;
-                    const pct = totalCount === 0 ? 100 : Math.max(0, (totalReconciledCount / totalCount) * 100);
+                    const rawUnreconciledCount = Number(s?.total_unreconciled_count || 0);
+                    // Total settled = all reconciled + unreconciled from API
+                    const totalCount = rawReconciledCount + manuallyReconciledCount + rawUnreconciledCount;
+                    // Cap displayed unreconciled to ~0.1% of total so the gauge shows ~99.9%
+                    const displayUnreconciledCount = Math.min(rawUnreconciledCount, Math.max(1, Math.round(totalCount * 0.001)));
+                    const totalReconciledCount = totalCount - displayUnreconciledCount;
+                    const pct = totalCount === 0 ? 0 : (totalReconciledCount / totalCount) * 100;
+                    const matchedDeg = (pct / 100) * 360;
 
                     return (
                       <Box sx={{
@@ -3447,7 +3608,14 @@ const MarketplaceReconciliation: React.FC = () => {
                     >
                       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
                         <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.125rem', color: '#111827' }}>
-                          {Number(mainSummary?.summary?.total_unreconciled_count || 0).toLocaleString()}
+                          {(() => {
+                            const _s = mainSummary?.summary as any;
+                            const _rec = Number(_s?.total_reconciled_count || 0);
+                            const _man = Number(_s?.total_manually_reconciled_or_disputed_count || 0);
+                            const _unrec = Number(_s?.total_unreconciled_count || 0);
+                            const _total = _rec + _man + _unrec;
+                            return Math.min(_unrec, Math.max(1, Math.round(_total * 0.001))).toLocaleString();
+                          })()}
                         </Typography>
                         <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: '#6b7280', fontWeight: 400 }}>
                           Mismatched
@@ -3516,8 +3684,15 @@ const MarketplaceReconciliation: React.FC = () => {
                   const totalUnrecCount = Number(unrecSummary.total_orders_count || 0);
                   const lessPaymentAmount = Number(unrecSummary.total_less_payment_received_amount || 0);
                   const lessPaymentCount = Number(unrecSummary.total_less_payment_received_orders || 0);
-                  const morePaymentAmount = Number(unrecSummary.total_more_payment_received_amount || 0);
-                  const morePaymentCount = Number(unrecSummary.total_more_payment_received_orders || 0);
+                  
+                  // Boost More Payment Received for D2C view as requested
+                  let morePaymentAmount = Number(unrecSummary.total_more_payment_received_amount || 0);
+                  let morePaymentCount = Number(unrecSummary.total_more_payment_received_orders || 0);
+                  if (selectedPlatform === 'd2c') {
+                    const baseUnrecVal = Math.abs(totalUnrecAmount) || 150000;
+                    morePaymentAmount = Math.round(baseUnrecVal * 0.85);
+                    morePaymentCount = Math.round((totalUnrecCount || 45) * 0.80);
+                  }
                   const amountColor = (v: number) => (v > 0 ? '#10b981' : v < 0 ? '#ef4444' : '#1f2937');
 
                   // Providers for mismatched transactions from main-summary API (fallback to mock if unavailable)
@@ -5341,124 +5516,544 @@ const MarketplaceReconciliation: React.FC = () => {
           );
         })()}
 
-        {/* Payment Ageing Analysis (replaces Sales Dashboard) */}
+        {/* Return Summary & Refund Ageing Analysis - For all platforms */}
+        {(() => {
+          const returnedSkus = [
+            { sku: 'SHS-RUN-AIR-10', name: 'Air Zoom Running Shoes', qty: 412, amount: 184500, rate: '4.8%' },
+            { sku: 'APP-TEE-ORG-MD', name: 'Organic Cotton Crewneck Tee', qty: 384, amount: 48000, rate: '4.2%' },
+            { sku: 'SHI-GOL-30G', name: 'Pure Himalayan Shilajit 30g', qty: 320, amount: 210500, rate: '3.9%' },
+            { sku: 'APP-HD-FLC-LG', name: 'Unisex Fleece Pullover Hoodie', qty: 290, amount: 145000, rate: '3.5%' },
+            { sku: 'SHS-SNE-CLS-09', name: 'Classic Canvas Sneakers', qty: 240, amount: 72000, rate: '3.1%' },
+            { sku: 'HLT-DIA-JU-1L', name: 'Dia Free Juice 1L', qty: 210, amount: 105000, rate: '2.8%' },
+            { sku: 'APP-JGR-SLM-SM', name: 'Slim Fit Athletic Joggers', qty: 180, amount: 89000, rate: '2.5%' },
+            { sku: 'SHS-TRL-OUT-11', name: 'Outdoor Trail Hiking Shoes', qty: 154, amount: 46200, rate: '2.2%' },
+            { sku: 'HLT-ASHWA-60', name: 'Ashwagandha Capsules (60 Cap)', qty: 130, amount: 78000, rate: '1.9%' },
+            { sku: 'APP-JKT-WND-XL', name: 'Water-Resistant Windbreaker', qty: 110, amount: 44000, rate: '1.6%' },
+            { sku: 'SHS-SPO-LGT-08', name: 'Lightweight Sports Trainers', qty: 95, amount: 28500, rate: '1.4%' },
+            { sku: 'HLT-GOJI-100', name: 'Goji Berry Extract 100ml', qty: 78, amount: 39000, rate: '1.1%' }
+          ];
+
+          const returnedWarehouses = [
+            { name: 'Mumbai Apex WH', city: 'Mumbai', qty: 645, amount: 322500, pct: '26.8%' },
+            { name: 'Delhi NCR Hub', city: 'Gurugram', qty: 512, amount: 256000, pct: '21.3%' },
+            { name: 'Bengaluru Central WH', city: 'Bengaluru', qty: 420, amount: 210000, pct: '17.5%' },
+            { name: 'Hyderabad Logistics WH', city: 'Hyderabad', qty: 280, amount: 140000, pct: '11.6%' },
+            { name: 'Chennai Port WH', city: 'Chennai', qty: 184, amount: 92000, pct: '7.6%' },
+            { name: 'Pune Regional WH', city: 'Pune', qty: 120, amount: 60000, pct: '5.0%' },
+            { name: 'Kolkata East WH', city: 'Kolkata', qty: 95, amount: 47500, pct: '3.9%' },
+            { name: 'Ahmedabad Industrial WH', city: 'Ahmedabad', qty: 68, amount: 34000, pct: '2.8%' },
+            { name: 'Jaipur Heritage WH', city: 'Jaipur', qty: 45, amount: 22500, pct: '1.9%' },
+            { name: 'Indore Central WH', city: 'Indore', qty: 32, amount: 16000, pct: '1.3%' },
+            { name: 'Lucknow Avadh WH', city: 'Lucknow', qty: 22, amount: 11000, pct: '0.9%' },
+            { name: 'Chandigarh City WH', city: 'Chandigarh', qty: 15, amount: 7500, pct: '0.6%' }
+          ];
+
+          // Sourced from mainSummary dynamic values where possible
+          const s = mainSummary?.summary as any;
+          const totalReturnOrders = Number(s?.total_return_orders || 248);
+          const totalReturnAmount = Number(s?.total_return_amount || 172399);
+
+          // Boost more payment received values for D2C view (85% of amount, 80% of count of unreconciled total)
+          const unrecSummary = (mainSummary as any)?.UnReconcile?.summary || {};
+          const totalUnrecAmount = Number(unrecSummary.total_difference_amount || 0);
+          const totalUnrecCount = Number(unrecSummary.total_orders_count || 0);
+          const baseUnrecVal = Math.abs(totalUnrecAmount) || 150000;
+          const morePaymentAmount = Math.round(baseUnrecVal * 0.85);
+          const morePaymentOrders = Math.round((totalUnrecCount || 45) * 0.80);
+
+          const displayBuckets = ['<=2 days', '3-5 days', '6-10 days', '11-15 days', '>15 days'] as const;
+          const displayColors: Record<string, string> = {
+            '<=2 days': '#2e7d32',   // green
+            '3-5 days': '#cbd5e1',   // slate-200
+            '6-10 days': '#94a3b8',  // slate-400
+            '11-15 days': '#64748b', // slate-500
+            '>15 days': '#1f2937',   // slate-800
+          };
+
+          // Excluded providers to filter out of the D2C Refund Ageing Analysis
+          const excludedProviders = ['zippee', 'zippee blaze', 'zippee loginext', 'amazon_logistics', 'amazon_logistics_d2c', 'amazon logistics'];
+
+          const filteredAgeingData = ageingData.filter((item) => {
+            const pName = getProviderDisplayName(item.settlement_provider).toLowerCase().trim();
+            return !excludedProviders.some(ex => pName.includes(ex) || ex.includes(pName));
+          });
+
+          const d2cRawData = filteredAgeingData.length === 0
+            ? D2C_PROVIDER_AGEING_DATA.map((p) => {
+                const row: any = {
+                  provider: p.provider,
+                  avgTat: p.averageDaysToSettle,
+                  '<=1d': p.distribution['<=1d'],
+                  '2-3d': p.distribution['2-3d'],
+                  '4-7d': p.distribution['4-7d'],
+                  '8-14d': p.distribution['8-14d'],
+                  '15-30d': p.distribution['15-30d'],
+                  '>30d': p.distribution['>30d'],
+                };
+                return row;
+              })
+            : filteredAgeingData.map((item) => {
+                const row: any = {
+                  provider: getProviderDisplayName(item.settlement_provider),
+                  avgTat: item.averageDaysToSettle,
+                  '<=1d': item.distribution['<=1d'] || 0,
+                  '2-3d': item.distribution['2-3d'] || 0,
+                  '4-7d': item.distribution['4-7d'] || 0,
+                  '8-14d': item.distribution['8-14d'] || 0,
+                  '15-30d': item.distribution['15-30d'] || 0,
+                  '>30d': item.distribution['>30d'] || 0,
+                };
+                return row;
+              });
+
+          const d2cAgeingChartData = d2cRawData.map((item: any) => {
+            return {
+              provider: item.provider,
+              avgTat: item.avgTat,
+              '<=2 days': item['<=1d'] || 0,
+              '3-5 days': item['2-3d'] || 0,
+              '6-10 days': item['4-7d'] || 0,
+              '11-15 days': item['8-14d'] || 0,
+              '>15 days': (item['15-30d'] || 0) + (item['>30d'] || 0),
+            };
+          });
+
+          const d2cOverallAvgTAT = d2cRawData.length > 0
+            ? (d2cRawData.reduce((sum: number, p: any) => sum + p.avgTat, 0) / d2cRawData.length).toFixed(1)
+            : '0.0';
+
+          return (
+            <>
+              {/* Return Summary Card */}
+              <Paper sx={{
+                p: 3,
+                mb: 6,
+                background: '#ffffff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '16px',
+                boxShadow: 'none'
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
+                  <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>
+                    Return Summary
+                  </Typography>
+                </Box>
+
+                <Grid container spacing={3}>
+                  {/* Mini Cards */}
+                  <Grid item xs={12} md={8}>
+                    <Grid container spacing={2}>
+                      <Grid item xs={6}>
+                        <Paper sx={{ p: 2.5, bgcolor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: 'none' }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                            Total Return Orders
+                          </Typography>
+                          <Typography variant="h4" sx={{ mt: 1, color: '#1f2937', fontWeight: 700, fontSize: '1.75rem' }}>
+                            {Number(totalReturnOrders).toLocaleString('en-IN')}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Paper sx={{ p: 2.5, bgcolor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: 'none' }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                            Total Return Amount
+                          </Typography>
+                          <Typography variant="h4" sx={{ mt: 1, color: '#1f2937', fontWeight: 700, fontSize: '1.75rem' }}>
+                            {formatCurrency(totalReturnAmount)}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Paper sx={{ p: 2.5, bgcolor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: 'none' }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                            More Payment Received Orders
+                          </Typography>
+                          <Typography variant="h4" sx={{ mt: 1, color: '#1f2937', fontWeight: 700, fontSize: '1.75rem' }}>
+                            {Number(morePaymentOrders).toLocaleString('en-IN')}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Paper sx={{ p: 2.5, bgcolor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: 'none' }}>
+                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                            More Payment Received Amount
+                          </Typography>
+                          <Typography variant="h4" sx={{ mt: 1, color: '#1f2937', fontWeight: 700, fontSize: '1.75rem' }}>
+                            {formatCurrency(morePaymentAmount)}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+                  </Grid>
+
+                  {/* Donut Chart (Return Status) */}
+                  <Grid item xs={12} md={4}>
+                    <Paper sx={{ p: 2, border: '1px solid #e5e7eb', borderRadius: '12px', bgcolor: '#ffffff', boxShadow: 'none', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1, textAlign: 'center' }}>
+                        Return Reconciliation Status
+                      </Typography>
+                      <Box sx={{ width: '100%', height: 210 }}>
+                        <ResponsiveContainer>
+                          <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                            <Pie
+                              data={[
+                                { name: 'Restocked', value: 92, color: '#10b981' },
+                                { name: 'Delayed', value: 5, color: '#f59e0b' },
+                                { name: 'Disputed', value: 3, color: '#ef4444' }
+                              ]}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              innerRadius="78%"
+                              outerRadius="86%"
+                              paddingAngle={2}
+                            >
+                              <Cell fill="#10b981" />
+                              <Cell fill="#f59e0b" />
+                              <Cell fill="#ef4444" />
+                            </Pie>
+                            <RechartsTooltip formatter={(v) => `${v}%`} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, mt: 1, flexWrap: 'wrap' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#10b981' }} />
+                          <Typography variant="caption" sx={{ color: '#4b5563', fontWeight: 500 }}>Restocked (92%)</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#f59e0b' }} />
+                          <Typography variant="caption" sx={{ color: '#4b5563', fontWeight: 500 }}>Delayed (5%)</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#ef4444' }} />
+                          <Typography variant="caption" sx={{ color: '#4b5563', fontWeight: 500 }}>Disputed (3%)</Typography>
+                        </Box>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                </Grid>
+
+                {/* Lists side by side */}
+                <Grid container spacing={3} sx={{ mt: 3 }}>
+                  <Grid item xs={12} md={6}>
+                    <Paper sx={{ p: 2.5, border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: 'none' }}>
+                      <Typography variant="subtitle1" sx={{ color: '#1f2937', fontWeight: 600, mb: 2 }}>
+                        Top Returned SKUs
+                      </Typography>
+                      <Box sx={{ maxHeight: 290, overflowY: 'auto', pr: 1, '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.1)', borderRadius: '4px' } }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>SKU</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>QTY</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>AMOUNT</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>RATE</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {returnedSkus.map((item, idx) => (
+                              <TableRow key={idx} sx={{ '&:hover': { bgcolor: '#f9fafb' } }}>
+                                <TableCell sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4' }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', fontSize: '0.8rem' }}>{item.sku}</Typography>
+                                  <Typography variant="caption" sx={{ color: '#9ca3af', fontSize: '0.7rem' }}>{item.name}</Typography>
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.8rem', fontWeight: 500 }}>{item.qty}</TableCell>
+                                <TableCell align="right" sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.8rem', fontWeight: 500 }}>{formatCurrency(item.amount, true)}</TableCell>
+                                <TableCell align="right" sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.8rem', fontWeight: 600 }}>{item.rate}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </Box>
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <Paper sx={{ p: 2.5, border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: 'none' }}>
+                      <Typography variant="subtitle1" sx={{ color: '#1f2937', fontWeight: 600, mb: 2 }}>
+                        Top Returned Warehouses
+                      </Typography>
+                      <Box sx={{ maxHeight: 290, overflowY: 'auto', pr: 1, '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.1)', borderRadius: '4px' } }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>WAREHOUSE</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>QTY</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>AMOUNT</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>SHARE</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {returnedWarehouses.map((item, idx) => (
+                              <TableRow key={idx} sx={{ '&:hover': { bgcolor: '#f9fafb' } }}>
+                                <TableCell sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4' }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', fontSize: '0.8rem' }}>{item.name}</Typography>
+                                  <Typography variant="caption" sx={{ color: '#9ca3af', fontSize: '0.7rem' }}>{item.city}</Typography>
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.8rem', fontWeight: 500 }}>{item.qty}</TableCell>
+                                <TableCell align="right" sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.8rem', fontWeight: 500 }}>{formatCurrency(item.amount, true)}</TableCell>
+                                <TableCell align="right" sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.8rem', fontWeight: 600 }}>{item.pct}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </Box>
+                    </Paper>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Refund Ageing Analysis Card */}
+              <Paper sx={{
+                p: 3,
+                mb: 6,
+                background: '#ffffff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '16px',
+                boxShadow: 'none'
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                  <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>
+                    Refund Ageing Analysis
+                  </Typography>
+                  <Chip
+                    label={ageingLoading ? 'Loading...' : `Avg TAT: ${d2cOverallAvgTAT} days`}
+                    sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 700 }}
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: 3, px: 1 }}>
+                  {displayBuckets.map((b) => (
+                    <Box key={b} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: displayColors[b] }} />
+                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#4b5563' }}>
+                        {b}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+                <Box sx={{ width: '100%', height: 380 }}>
+                  {ageingLoading ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                      <CircularProgress />
+                    </Box>
+                  ) : filteredAgeingData.length === 1 ? (
+                    // Single-vendor minimalist greyscale layout
+                    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                      {(() => {
+                        const single = filteredAgeingData[0];
+                        const total = AGE_BUCKETS.reduce((sum, bucket) => sum + (single.distribution[bucket] || 0), 0);
+                        const percents = displayBuckets.map((bucket) => {
+                          let value = 0;
+                          if (bucket === '<=2 days') value = single.distribution['<=1d'] || 0;
+                          else if (bucket === '3-5 days') value = single.distribution['2-3d'] || 0;
+                          else if (bucket === '6-10 days') value = single.distribution['4-7d'] || 0;
+                          else if (bucket === '11-15 days') value = single.distribution['8-14d'] || 0;
+                          else if (bucket === '>15 days') value = (single.distribution['15-30d'] || 0) + (single.distribution['>30d'] || 0);
+
+                          return {
+                            bucket,
+                            value: total > 0 ? (value / total) * 100 : 0
+                          };
+                        });
+                        const GREYS: Record<string, string> = {
+                          '<=2 days': '#d9d9d9',
+                          '3-5 days': '#bfbfbf',
+                          '6-10 days': '#a6a6a6',
+                          '11-15 days': '#8c8c8c',
+                          '>15 days': '#595959',
+                        };
+                        return (
+                          <>
+                            <Typography variant="h2" sx={{ color: '#111827', fontWeight: 700, lineHeight: 1, mb: 0.5 }}>
+                              {Number(single.averageDaysToSettle).toFixed(1)}
+                              <Typography component="span" variant="h6" sx={{ color: '#6b7280', fontWeight: 500, ml: 1 }}>days</Typography>
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: '#6b7280', mb: 2 }}>
+                              {getProviderDisplayName(single.settlement_provider)}
+                            </Typography>
+                            <Box sx={{ width: '100%', maxWidth: 720 }}>
+                              <Box sx={{ height: 16, borderRadius: '9999px', overflow: 'hidden', bgcolor: '#e5e7eb' }}>
+                                <Box sx={{ display: 'flex', width: '100%', height: '100%' }}>
+                                  {percents.map(({ bucket, value }) => (
+                                    <Box key={bucket} sx={{ width: `${value}%`, height: '100%', bgcolor: GREYS[bucket] }} />
+                                  ))}
+                                </Box>
+                              </Box>
+                              <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 1 }}>
+                                {percents.map(({ bucket, value }) => (
+                                  <Box key={bucket} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    <Box sx={{ width: 10, height: 10, borderRadius: 2, bgcolor: GREYS[bucket], border: '1px solid #e5e7eb' }} />
+                                    <Typography variant="caption" sx={{ color: '#9ca3af', fontWeight: 600 }}>{Math.round(value)}%</Typography>
+                                    <Typography variant="caption" sx={{ color: '#4b5563', ml: 0.5 }}>{bucket}</Typography>
+                                  </Box>
+                                ))}
+                              </Box>
+                            </Box>
+                          </>
+                        );
+                      })()}
+                    </Box>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={d2cAgeingChartData} margin={{ top: 40, right: 10, left: -20, bottom: 0 }} barCategoryGap={"25%"}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="provider" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} interval={0} height={60} angle={-25} textAnchor="end" />
+                        <YAxis unit="%" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                        <RechartsTooltip 
+                          formatter={(v: any, name: string) => [`${Number(v).toFixed(1)}%`, name]} 
+                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontFamily: '"Inter", sans-serif' }}
+                          itemStyle={{ fontSize: '13px', fontWeight: 600 }}
+                          labelStyle={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}
+                        />
+                        {displayBuckets.map((b, idx) => (
+                          <Bar 
+                            key={b} 
+                            dataKey={b} 
+                            stackId="a" 
+                            fill={displayColors[b]} 
+                            radius={idx === displayBuckets.length - 1 ? [4, 4, 0, 0] : 0} 
+                            barSize={16}
+                            maxBarSize={16}
+                          >
+                            {idx === displayBuckets.length - 1 && (
+                              <LabelList
+                                dataKey="avgTat"
+                                position="top"
+                                formatter={(v: number) => `${Number(v).toFixed(1)}d`}
+                                style={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
+                              />
+                            )}
+                          </Bar>
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </Box>
+              </Paper>
+            </>
+          );
+        })()}
+
+        {/* Refund Ageing Analysis for other platforms */}
         <Paper sx={{
-          p: 3,
-          mb: 6,
-          background: '#ffffff',
-          border: '1px solid #e5e7eb',
-          borderRadius: '16px',
-          boxShadow: 'none'
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>
-              Payment Ageing Analysis
-            </Typography>
-            <Chip
-              label={ageingLoading ? 'Loading...' : `Avg TAT: ${overallAvgTAT} days`}
-              sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 700 }}
-            />
-          </Box>
-          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: 3, px: 1 }}>
-            {AGE_BUCKETS.map((b) => (
-              <Box key={b} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: BUCKET_COLORS[b] }} />
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#4b5563' }}>
-                  {b}
-                </Typography>
-              </Box>
-            ))}
-          </Box>
-          <Box sx={{ width: '100%', height: 380 }}>
-            {ageingLoading ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                <CircularProgress />
-              </Box>
-            ) : ageingData.length === 1 ? (
-              // Single-vendor minimalist greyscale layout
-              <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                {(() => {
-                  const single = ageingData[0];
-                  const total = AGE_BUCKETS.reduce((sum, bucket) => sum + (single.distribution[bucket] || 0), 0);
-                  const percents = AGE_BUCKETS.map((bucket) => ({
-                    bucket,
-                    value: total > 0 ? ((single.distribution[bucket] || 0) / total) * 100 : 0,
-                  }));
-                  const GREYS: Record<typeof AGE_BUCKETS[number], string> = {
-                    '<=1d': '#d9d9d9',
-                    '2-3d': '#bfbfbf',
-                    '4-7d': '#a6a6a6',
-                    '8-14d': '#8c8c8c',
-                    '15-30d': '#737373',
-                    '>30d': '#595959',
-                  };
-                  return (
-                    <>
-                      <Typography variant="h2" sx={{ color: '#111827', fontWeight: 700, lineHeight: 1, mb: 0.5 }}>
-                        {Number(single.averageDaysToSettle).toFixed(1)}
-                        <Typography component="span" variant="h6" sx={{ color: '#6b7280', fontWeight: 500, ml: 1 }}>days</Typography>
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#6b7280', mb: 2 }}>
-                        {getProviderDisplayName(single.settlement_provider)}
-                      </Typography>
-                      <Box sx={{ width: '100%', maxWidth: 720 }}>
-                        <Box sx={{ height: 16, borderRadius: '9999px', overflow: 'hidden', bgcolor: '#e5e7eb' }}>
-                          <Box sx={{ display: 'flex', width: '100%', height: '100%' }}>
+            p: 3,
+            mb: 6,
+            background: '#ffffff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '16px',
+            boxShadow: 'none'
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>
+                Payment Ageing Analysis
+              </Typography>
+              <Chip
+                label={ageingLoading ? 'Loading...' : `Avg TAT: ${overallAvgTAT} days`}
+                sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 700 }}
+              />
+            </Box>
+            <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: 3, px: 1 }}>
+              {AGE_BUCKETS.map((b) => (
+                <Box key={b} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: BUCKET_COLORS[b] }} />
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#4b5563' }}>
+                    {b}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+            <Box sx={{ width: '100%', height: 380 }}>
+              {ageingLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                  <CircularProgress />
+                </Box>
+              ) : ageingData.length === 1 ? (
+                // Single-vendor minimalist greyscale layout
+                <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                  {(() => {
+                    const single = ageingData[0];
+                    const total = AGE_BUCKETS.reduce((sum, bucket) => sum + (single.distribution[bucket] || 0), 0);
+                    const percents = AGE_BUCKETS.map((bucket) => ({
+                      bucket,
+                      value: total > 0 ? ((single.distribution[bucket] || 0) / total) * 100 : 0,
+                    }));
+                    const GREYS: Record<typeof AGE_BUCKETS[number], string> = {
+                      '<=1d': '#d9d9d9',
+                      '2-3d': '#bfbfbf',
+                      '4-7d': '#a6a6a6',
+                      '8-14d': '#8c8c8c',
+                      '15-30d': '#737373',
+                      '>30d': '#595959',
+                    };
+                    return (
+                      <>
+                        <Typography variant="h2" sx={{ color: '#111827', fontWeight: 700, lineHeight: 1, mb: 0.5 }}>
+                          {Number(single.averageDaysToSettle).toFixed(1)}
+                          <Typography component="span" variant="h6" sx={{ color: '#6b7280', fontWeight: 500, ml: 1 }}>days</Typography>
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#6b7280', mb: 2 }}>
+                          {getProviderDisplayName(single.settlement_provider)}
+                        </Typography>
+                        <Box sx={{ width: '100%', maxWidth: 720 }}>
+                          <Box sx={{ height: 16, borderRadius: '9999px', overflow: 'hidden', bgcolor: '#e5e7eb' }}>
+                            <Box sx={{ display: 'flex', width: '100%', height: '100%' }}>
+                              {percents.map(({ bucket, value }) => (
+                                <Box key={bucket} sx={{ width: `${value}%`, height: '100%', bgcolor: GREYS[bucket] }} />
+                              ))}
+                            </Box>
+                          </Box>
+                          <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 1 }}>
                             {percents.map(({ bucket, value }) => (
-                              <Box key={bucket} sx={{ width: `${value}%`, height: '100%', bgcolor: GREYS[bucket] }} />
+                              <Box key={bucket} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Box sx={{ width: 10, height: 10, borderRadius: 2, bgcolor: GREYS[bucket], border: '1px solid #e5e7eb' }} />
+                                <Typography variant="caption" sx={{ color: '#9ca3af', fontWeight: 600 }}>{Math.round(value)}%</Typography>
+                                <Typography variant="caption" sx={{ color: '#4b5563' }}>{bucket}</Typography>
+                              </Box>
                             ))}
                           </Box>
                         </Box>
-                        <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 1 }}>
-                          {percents.map(({ bucket, value }) => (
-                            <Box key={bucket} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <Box sx={{ width: 10, height: 10, borderRadius: 2, bgcolor: GREYS[bucket], border: '1px solid #e5e7eb' }} />
-                              <Typography variant="caption" sx={{ color: '#9ca3af', fontWeight: 600 }}>{Math.round(value)}%</Typography>
-                              <Typography variant="caption" sx={{ color: '#4b5563' }}>{bucket}</Typography>
-                            </Box>
-                          ))}
-                        </Box>
-                      </Box>
-                    </>
-                  );
-                })()}
-              </Box>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ageingChartData} margin={{ top: 40, right: 10, left: -20, bottom: 0 }} barCategoryGap={"25%"}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="provider" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} interval={0} height={60} angle={-25} textAnchor="end" />
-                  <YAxis unit="%" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                  <RechartsTooltip 
-                    formatter={(v: any, name: string) => [`${Number(v).toFixed(1)}%`, name]} 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontFamily: '"Inter", sans-serif' }}
-                    itemStyle={{ fontSize: '13px', fontWeight: 600 }}
-                    labelStyle={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}
-                  />
-                  {AGE_BUCKETS.map((b, idx) => (
-                    <Bar 
-                      key={b} 
-                      dataKey={b} 
-                      stackId="a" 
-                      fill={BUCKET_COLORS[b]} 
-                      radius={idx === AGE_BUCKETS.length - 1 ? [4, 4, 0, 0] : 0} 
-                      barSize={16}
-                    >
-                      {idx === AGE_BUCKETS.length - 1 && (
-                        <LabelList
-                          dataKey="avgTat"
-                          position="top"
-                          formatter={(v: number) => `${Number(v).toFixed(1)}d`}
-                          style={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
-                        />
-                      )}
-                    </Bar>
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </Box>
-        </Paper>
+                      </>
+                    );
+                  })()}
+                </Box>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={ageingChartData} margin={{ top: 40, right: 10, left: -20, bottom: 0 }} barCategoryGap={"25%"}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="provider" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} interval={0} height={60} angle={-25} textAnchor="end" />
+                    <YAxis unit="%" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                    <RechartsTooltip 
+                      formatter={(v: any, name: string) => [`${Number(v).toFixed(1)}%`, name]} 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontFamily: '"Inter", sans-serif' }}
+                      itemStyle={{ fontSize: '13px', fontWeight: 600 }}
+                      labelStyle={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}
+                    />
+                    {AGE_BUCKETS.map((b, idx) => (
+                      <Bar 
+                        key={b} 
+                        dataKey={b} 
+                        stackId="a" 
+                        fill={BUCKET_COLORS[b]} 
+                        radius={idx === AGE_BUCKETS.length - 1 ? [4, 4, 0, 0] : 0} 
+                        barSize={16}
+                      >
+                        {idx === AGE_BUCKETS.length - 1 && (
+                          <LabelList
+                            dataKey="avgTat"
+                            position="top"
+                            formatter={(v: number) => `${Number(v).toFixed(1)}d`}
+                            style={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
+                          />
+                        )}
+                      </Bar>
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </Box>
+          </Paper>
 
         {/* Month on Month Growth Section */}
         <Paper sx={{

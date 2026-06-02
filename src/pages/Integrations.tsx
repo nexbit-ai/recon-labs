@@ -44,7 +44,16 @@ const categories: IntegrationCategory[] = [
       { id: 'amazon', name: 'Amazon', domain: 'amazon.com', status: 'connected' },
       { id: 'flipkart', name: 'Flipkart', domain: 'flipkart.com', status: 'connected' },
       { id: 'myntra', name: 'Myntra', domain: 'myntra.com', status: 'available' },
+      { id: 'nykaa', name: 'Nykaa', domain: 'nykaa.com', status: 'available' },
+      { id: 'supertails', name: 'Supertails', domain: 'supertails.com', status: 'available' },
+    ]
+  },
+  {
+    title: 'Quick Commerce',
+    items: [
+      { id: 'blinkit', name: 'Blinkit', domain: 'blinkit.com', status: 'available' },
       { id: 'zepto', name: 'Zepto', domain: 'zeptonow.com', status: 'available' },
+      { id: 'swiggy', name: 'Swiggy Instamart', domain: 'swiggy.com', status: 'available' },
     ]
   },
   {
@@ -61,6 +70,15 @@ const categories: IntegrationCategory[] = [
     items: [
       { id: 'paytm', name: 'Paytm', domain: 'paytm.com', status: 'connected' },
       { id: 'payu', name: 'PayU', domain: 'payu.in', status: 'available' },
+    ]
+  },
+  {
+    title: 'POS (Point of Sale)',
+    items: [
+      { id: 'pinelabs', name: 'Pine Labs', domain: 'pinelabs.com', status: 'connected' },
+      { id: 'paytm_pos', name: 'Paytm POS', domain: 'paytm.com', status: 'connected' },
+      { id: 'bharatpe', name: 'BharatPe', domain: 'bharatpe.com', status: 'available' },
+      { id: 'mswipe', name: 'Mswipe', domain: 'mswipe.com', status: 'available' },
     ]
   }
 ];

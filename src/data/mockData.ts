@@ -71,7 +71,7 @@ export interface FinanceMockData {
   returns_table: SalesRow[];
 }
 
-export type Platform = 'shopify' | 'amazon' | 'flipkart' | 'myntra' | 'd2c' | 'other' | 'amazon_uk';
+export type Platform = 'shopify' | 'amazon' | 'flipkart' | 'myntra' | 'd2c' | 'other' | 'amazon_uk' | 'nykaa' | 'blinkit' | 'zepto' | 'offline' | 'offlinestore';
 
 export interface PlatformData {
   [key: string]: FinanceMockData;
@@ -86,6 +86,11 @@ const PLATFORM_WEIGHTS: Record<Platform, number> = {
   d2c: 0.25,        // 25% - D2C platform
   other: 0.10,      // 10% - generic "Other" / CRED
   amazon_uk: 0.20,  // 20% - Amazon UK
+  nykaa: 0.18,      // 18% - Nykaa
+  blinkit: 0.24,    // 24% - Blinkit
+  zepto: 0.26,      // 26% - Zepto
+  offline: 0.32,    // 32% - Offline Store
+  offlinestore: 0.32, // 32% - Offline Store
 };
 
 // Helper function to get number of days from date range string
