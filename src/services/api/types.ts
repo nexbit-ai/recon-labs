@@ -113,6 +113,7 @@ export interface MainSummaryResponse {
     providers: {
       paytm?: MainSummaryProviderEntry;
       payU?: MainSummaryProviderEntry;
+      cashfree?: MainSummaryProviderEntry;
       flipkart?: MainSummaryProviderEntry;
       cod?: MainSummaryProviderEntry[];
       [key: string]: any;
@@ -131,6 +132,7 @@ export interface MainSummaryResponse {
     providers: {
       paytm?: MainSummaryProviderEntry;
       payU?: MainSummaryProviderEntry;
+      cashfree?: MainSummaryProviderEntry;
       flipkart?: MainSummaryProviderEntry;
       cod?: MainSummaryProviderEntry[];
       [key: string]: any;

@@ -141,6 +141,7 @@ const getProviderDisplayName = (code: string): string => {
     'grow_simple': 'Grow Simple',
     'paytm': 'Paytm',
     'payu': 'PayU',
+    'cashfree': 'Cashfree',
     'shadowfax': 'Shadowfax',
     'shiprocket': 'Shiprocket',
     'zippee-loginext': 'Zippee Loginext',
@@ -908,6 +909,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const DISPLAY_NAME_MAP: Record<string, string> = {
     paytm: 'Paytm',
     payu: 'PayU',
+    cashfree: 'Cashfree',
     flipkart: 'Flipkart',
     grow_simple: 'Grow Simple',
     shiprocket: 'Shiprocket',
@@ -944,11 +946,12 @@ const MarketplaceReconciliation: React.FC = () => {
     // Known keys
     pushOne(providers.paytm);
     pushOne(providers.payU);
+    pushOne(providers.cashfree);
     pushOne(providers.flipkart);
     if (Array.isArray(providers.cod)) providers.cod.forEach(pushOne);
     // Any other dynamic providers
     Object.keys(providers).forEach((k) => {
-      if (k === 'paytm' || k === 'payU' || k === 'flipkart' || k === 'cod') return;
+      if (k === 'paytm' || k === 'payU' || k === 'cashfree' || k === 'flipkart' || k === 'cod') return;
       const val = providers[k];
       if (Array.isArray(val)) val.forEach(pushOne); else pushOne(val);
     });
@@ -4142,7 +4145,8 @@ const MarketplaceReconciliation: React.FC = () => {
 
                             const COLOR_MAP: Record<string, string> = {
                               paytm: '#1e40af',
-                              payU: '#2563eb',
+                              payu: '#2563eb',
+                              cashfree: '#10b981',
                               razorpay: '#0ea5e9',
                               stripe: '#38bdf8',
                               grow_simple: '#0ea5e9',
@@ -4912,9 +4916,13 @@ const MarketplaceReconciliation: React.FC = () => {
               const platformColors: Record<string, string> = {
                 'paytm': palette2[0],
                 'payu': palette2[1],
-                'flipkart': palette2[2],
+                'cashfree': palette2[2],
+                'flipkart': palette2[3],
                 'amazon': palette2[3],
                 'myntra': palette2[4],
+                'grow_simple': palette2[4],
+                'shiprocket': palette2[5],
+                'delhivery': palette2[6],
               };
 
               // Build providerData dynamically from API data
@@ -5032,7 +5040,52 @@ const MarketplaceReconciliation: React.FC = () => {
                                   <Cell key={`prov-${idx}`} fill={p.color} />
                                 ))}
                               </Pie>
-                              <RechartsTooltip formatter={(value: any, name: string) => [formatCurrency(Number(value)), name]} />
+                              <RechartsTooltip
+                                cursor={{ fill: 'transparent' }}
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    const data = payload[0].payload;
+                                    const color = payload[0].color || data.color || '#1f2937';
+                                    const settled = Math.abs(data.originalData?.total_amount_settled || 0);
+                                    const comm = Math.abs(data.originalData?.total_commission || 0);
+                                    const gst = Math.abs(data.originalData?.total_gst_on_commission || 0);
+                                    
+                                    return (
+                                      <Box sx={{
+                                        background: 'rgba(255, 255, 255, 0.95)',
+                                        backdropFilter: 'blur(12px)',
+                                        borderRadius: '16px',
+                                        boxShadow: '0 10px 40px -10px rgba(0,0,0,0.12)',
+                                        border: '1px solid rgba(229,231,235,0.7)',
+                                        p: 2.5,
+                                        minWidth: '240px'
+                                      }}>
+                                        <Typography sx={{ fontWeight: 700, color, mb: 2, display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.95rem' }}>
+                                          <Box component="span" sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: color }} />
+                                          {data.name}
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>Settlement</Typography>
+                                            <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 600 }}>{formatCurrency(settled)}</Typography>
+                                          </Box>
+                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>Commission</Typography>
+                                            <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 600 }}>{formatCurrency(comm)}</Typography>
+                                          </Box>
+                                          {gst > 0 && (
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                              <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>GST</Typography>
+                                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 600 }}>{formatCurrency(gst)}</Typography>
+                                            </Box>
+                                          )}
+                                        </Box>
+                                      </Box>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
                               <Legend
                                 layout="horizontal"
                                 verticalAlign="bottom"
@@ -5098,7 +5151,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   <Box sx={{ mt: 4 }}>
                     <Grid container spacing={2}>
                       {commissionArray.map((item, idx) => (
-                        <Grid key={idx} item xs={12} md={providerCount === 1 ? 12 : 6}>
+                        <Grid key={idx} item xs={12} md={providerCount === 1 ? 12 : (providerCount === 2 ? 6 : 4)}>
                           <Box sx={{ p: 3, borderRadius: '14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(229,231,235,0.6)' }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                               <Typography variant="subtitle1" sx={{ color: '#374151', fontWeight: 700 }}>
