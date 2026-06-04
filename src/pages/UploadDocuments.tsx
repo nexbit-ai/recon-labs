@@ -59,11 +59,9 @@ const vendors: Vendor[] = [
   // D2C logistics partner - uses report_type "amazon_logistics"
   { id: 'amazon_logistics', name: 'Amazon Logistics' },
   // D2C payment gateway partner - uses report_type "cashfree"
-  { id: 'cashfree', name: 'Cashfree' },
   { id: 'cashfree_payments', name: 'Cashfree Payments' },
-  // D2C logistics partner - uses report_type "zippee-loginext" and "zippee-blaze"
-  { id: 'zippee-loginext', name: 'Zippee Loginext' },
-  { id: 'zippee-blaze', name: 'Zippee Blaze' },
+  // D2C logistics partner - uses report_type "zippee-loginext"
+  { id: 'zippee-loginext', name: 'Zippee' },
   // D2C logistics partner - uses report_type "ekart"
   { id: 'ekart', name: 'Ekart' },
   // Portal partner - uses report_types "cred_sales" and "cred_settlement"

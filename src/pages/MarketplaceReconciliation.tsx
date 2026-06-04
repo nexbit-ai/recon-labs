@@ -144,8 +144,7 @@ const getProviderDisplayName = (code: string): string => {
     'cashfree': 'Cashfree',
     'shadowfax': 'Shadowfax',
     'shiprocket': 'Shiprocket',
-    'zippee-loginext': 'Zippee Loginext',
-    'zippee-blaze': 'Zippee Blaze',
+    'zippee-loginext': 'Zippee',
     'ekart': 'Ekart',
   };
   return displayMap[code.toLowerCase()] || code;
