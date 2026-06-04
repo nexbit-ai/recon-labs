@@ -225,6 +225,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [syncTriggered, setSyncTriggered] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
   const [syncStep, setSyncStep] = useState(0);
+  const [syncView, setSyncView] = useState<'syncing' | 'connect-prompt' | 'credentials'>('syncing');
 
 
   useEffect(() => {
@@ -1434,13 +1435,15 @@ const MarketplaceReconciliation: React.FC = () => {
   const [tempSelectedPlatform, setTempSelectedPlatform] = useState<Platform | null>(null);
 
   const isD2C = selectedPlatform === 'd2c';
-  const totalSyncSteps = isD2C ? 5 : 3;
+  const totalSyncSteps = isD2C ? 8 : 6;
+  const isMarketplace = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c';
+  const [connectedPlatforms, setConnectedPlatforms] = useState<Set<string>>(new Set());
+  const isConnected = !isMarketplace || connectedPlatforms.has(selectedPlatform);
 
-  const handleSyncClick = () => {
-    setSyncOpen(true);
+  const startSyncSimulation = () => {
+    setSyncView('syncing');
     setSyncStep(1);
     if (isD2C) {
-      // D2C: 5 steps with 1.5s each
       setTimeout(() => {
         setSyncStep(2);
         setTimeout(() => {
@@ -1449,21 +1452,50 @@ const MarketplaceReconciliation: React.FC = () => {
             setSyncStep(4);
             setTimeout(() => {
               setSyncStep(5);
-              setSyncTriggered(true);
-              window.dispatchEvent(new Event('dashboard-sync-complete'));
-            }, 1500);
-          }, 1500);
-        }, 1500);
-      }, 1500);
+              setTimeout(() => {
+                setSyncStep(6);
+                setTimeout(() => {
+                  setSyncStep(7);
+                  setTimeout(() => {
+                    setSyncStep(8);
+                    setSyncTriggered(true);
+                    setConnectedPlatforms(prev => new Set(prev).add(selectedPlatform));
+                    window.dispatchEvent(new Event('dashboard-sync-complete'));
+                  }, 1200);
+                }, 1200);
+              }, 1200);
+            }, 1200);
+          }, 1200);
+        }, 1200);
+      }, 1200);
     } else {
       setTimeout(() => {
         setSyncStep(2);
         setTimeout(() => {
           setSyncStep(3);
-          setSyncTriggered(true);
-          window.dispatchEvent(new Event('dashboard-sync-complete'));
-        }, 2000);
-      }, 2000);
+          setTimeout(() => {
+            setSyncStep(4);
+            setTimeout(() => {
+              setSyncStep(5);
+              setTimeout(() => {
+                setSyncStep(6);
+                setSyncTriggered(true);
+                setConnectedPlatforms(prev => new Set(prev).add(selectedPlatform));
+                window.dispatchEvent(new Event('dashboard-sync-complete'));
+              }, 1500);
+            }, 1500);
+          }, 1500);
+        }, 1500);
+      }, 1500);
+    }
+  };
+
+  const handleSyncClick = () => {
+    setSyncOpen(true);
+    if (isMarketplace && !connectedPlatforms.has(selectedPlatform)) {
+      setSyncView('connect-prompt');
+    } else {
+      startSyncSimulation();
     }
   };
 
@@ -3133,77 +3165,215 @@ const MarketplaceReconciliation: React.FC = () => {
             </Box>
 
             {/* Synchronization Demo Dialog */}
+            
             <Dialog
               open={syncOpen}
-              onClose={syncStep === totalSyncSteps ? () => setSyncOpen(false) : undefined}
+              onClose={(syncView !== 'syncing' || syncStep === totalSyncSteps) ? () => setSyncOpen(false) : undefined}
               PaperProps={{
                 sx: {
                   borderRadius: '16px',
                   p: 3,
-                  minWidth: 340,
+                  width: 460,
+                  minWidth: 460,
                   boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
                 }
               }}
             >
               <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, pb: 1 }}>
-                {syncStep < totalSyncSteps ? (
-                  <CircularProgress size={56} sx={{ color: '#111111' }} />
-                ) : (
-                  <CheckCircleIcon sx={{ fontSize: 56, color: '#10b981' }} />
+                {syncView === 'connect-prompt' && (
+                  <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, minHeight: isD2C ? 456 : 376 }}>
+
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: '#111827', textAlign: 'center' }}>
+                      {selectedPlatform === 'd2c' ? 'Data Sources Not Connected' : `${selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : 'Flipkart'} Not Connected`}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#6B7280', textAlign: 'center', mb: 2 }}>
+                      You need to connect your seller account to sync data automatically.
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      onClick={() => setSyncView('credentials')}
+                      sx={{
+                        borderColor: '#d1d5db',
+                        color: '#374151',
+                        textTransform: 'none',
+                        px: 4,
+                        py: 1,
+                        borderRadius: '8px',
+                        fontWeight: 600,
+                        '&:hover': {
+                          borderColor: '#111827',
+                          backgroundColor: 'rgba(107, 114, 128, 0.04)',
+                        }
+                      }}
+                    >
+                      Connect Account
+                    </Button>
+                  </Box>
                 )}
-                <Typography variant="h5" sx={{ fontWeight: 700, color: '#111827', textAlign: 'center' }}>
-                  {syncStep < totalSyncSteps ? 'Reconciliation in Progress' : 'Sync Complete'}
-                </Typography>
-                <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-                  {(isD2C ? [
-                    { step: 1, label: 'Fetching orders from Shopify' },
-                    { step: 2, label: 'Finding settlement reports from Paytm, PayU' },
-                    { step: 3, label: 'Syncing with logistics partners — Delhivery, BlueDart, Shiprocket' },
-                    { step: 4, label: 'Reconciling your orders' },
-                    { step: 5, label: 'Reconciliation done' },
-                  ] : [
-                    { step: 1, label: 'Fetching data from Flipkart' },
-                    { step: 2, label: 'Reconciling your orders' },
-                    { step: 3, label: 'Reconciliation done' },
-                  ]).map(({ step, label }) => (
-                    <Box key={step} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      {syncStep > step ? (
-                        <CheckCircleIcon sx={{ color: '#10b981', fontSize: 18 }} />
-                      ) : syncStep === step ? (
-                        step === totalSyncSteps ? (
-                          <CheckCircleIcon sx={{ color: '#10b981', fontSize: 18 }} />
-                        ) : (
-                          <CircularProgress size={16} sx={{ color: '#111111' }} />
-                        )
-                      ) : (
-                        <Box sx={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid #d1d5db' }} />
-                      )}
-                      <Typography sx={{ fontSize: '0.875rem', fontWeight: syncStep === step ? 600 : 400, color: syncStep >= step ? '#1f2937' : '#9ca3af' }}>
-                        {label}
-                      </Typography>
+                {syncView === 'credentials' && (
+                  <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2.5, minHeight: isD2C ? 456 : 376 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: '#111827', textAlign: 'center', mb: 1 }}>
+                      Connect {selectedPlatform === 'd2c' ? 'Data Sources' : selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : 'Flipkart'}
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      label="Seller ID"
+                      variant="outlined"
+                      size="small"
+                      placeholder="Enter your Seller ID"
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+                    />
+                    <TextField
+                      fullWidth
+                      label="API Token / Secret"
+                      variant="outlined"
+                      size="small"
+                      type="password"
+                      placeholder="Enter your API token"
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+                    />
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      onClick={() => {
+                        startSyncSimulation();
+                      }}
+                      sx={{
+                        mt: 2,
+                        bgcolor: '#111827',
+                        color: '#fff',
+                        textTransform: 'none',
+                        py: 1.2,
+                        borderRadius: '8px',
+                        fontWeight: 600,
+                        boxShadow: 'none',
+                        '&:hover': {
+                          bgcolor: '#374151',
+                          boxShadow: 'none',
+                        }
+                      }}
+                    >
+                      Save & Continue
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      onClick={() => {
+                        startSyncSimulation();
+                      }}
+                      sx={{
+                        borderColor: '#d1d5db',
+                        color: '#374151',
+                        textTransform: 'none',
+                        py: 1.2,
+                        borderRadius: '8px',
+                        fontWeight: 600,
+                        '&:hover': {
+                          borderColor: '#111827',
+                          backgroundColor: 'rgba(107, 114, 128, 0.04)',
+                        }
+                      }}
+                    >
+                      {selectedPlatform === 'd2c' ? 'Show Test Data' : 'Show Test Account'}
+                    </Button>
+                  </Box>
+                )}
+                {syncView === 'syncing' && (
+                  <>
+                    {syncStep < totalSyncSteps ? (
+                      <CircularProgress size={56} sx={{ color: '#111111' }} />
+                    ) : (
+                      <CheckCircleIcon sx={{ fontSize: 56, color: '#10b981' }} />
+                    )}
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: '#111827', textAlign: 'center' }}>
+                      {syncStep < totalSyncSteps ? 'Reconciliation in Progress' : 'Sync Complete'}
+                    </Typography>
+                    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 2, mt: 1, minHeight: isD2C ? 320 : 240 }}>
+                      {(() => {
+                        const s = mainSummary?.summary as any;
+                        const sd = reconciliationData?.summaryData as any;
+                        
+                        const rawCount = s?.total_transaction_orders !== undefined ? Number(s.total_transaction_orders) : Number(sd?.totalTransaction?.number || 0);
+                        const rawAmount = s?.total_transactions_amount !== undefined ? Math.abs(Number(s.total_transactions_amount)) : Number(sd?.totalTransaction?.amount || reconciliationData?.grossSales || 0);
+                        const countVal = typeof rawCount === 'number' && isFinite(rawCount) ? rawCount : parseFloat(String(rawCount || '0')) || 0;
+                        const amountVal = typeof rawAmount === 'number' && isFinite(rawAmount) ? rawAmount : parseFloat(String(rawAmount || '0')) || 0;
+
+                        const ordersCountStr = countVal > 0 ? countVal.toLocaleString('en-IN') + ' ' : '';
+                        const ordersAmountStr = amountVal > 0 ? `(${getCurrencySymbol()}${Math.round(amountVal).toLocaleString(getCurrencyLocale())}) ` : '';
+                        
+                        const platformName = selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : selectedPlatform === 'flipkart' ? 'Flipkart' : selectedPlatform === 'other' ? 'CRED' : 'Marketplace';
+                        
+                        const shouldShowNumbers = isD2C ? syncStep >= 4 : syncStep >= 2;
+                        const message = shouldShowNumbers ? `Reconciling your ${ordersCountStr}orders ${ordersAmountStr}`.trim() : 'Reconciling your orders';
+
+                        return isD2C ? [
+                          { step: 1, label: 'Fetching orders from Shopify' },
+                          { step: 2, label: 'Finding settlement reports from Paytm, PayU' },
+                          { step: 3, label: 'Syncing with logistics partners — Delhivery, BlueDart, Shiprocket' },
+                          { step: 4, label: message },
+                          { step: 5, label: 'Calculating expected settlement amount' },
+                          { step: 6, label: 'Calculating difference between expected and actual' },
+                          { step: 7, label: 'Finding the reasons of mismatch' },
+                          { step: 8, label: 'Reconciliation done' },
+                        ] : [
+                          { step: 1, label: `Fetching data from ${platformName}` },
+                          { step: 2, label: message },
+                          { step: 3, label: 'Calculating expected settlement amount' },
+                          { step: 4, label: 'Calculating difference between expected and actual' },
+                          { step: 5, label: 'Finding the reasons of mismatch' },
+                          { step: 6, label: 'Reconciliation done' },
+                        ];
+                      })().filter(({ step }) => step <= syncStep).map(({ step, label }) => (
+                        <Box key={step} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          {syncStep > step ? (
+                            <CheckCircleIcon sx={{ color: '#10b981', fontSize: 18 }} />
+                          ) : syncStep === step ? (
+                            step === totalSyncSteps ? (
+                              <CheckCircleIcon sx={{ color: '#10b981', fontSize: 18 }} />
+                            ) : (
+                              <CircularProgress size={16} sx={{ color: '#111111' }} />
+                            )
+                          ) : (
+                            <Box sx={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid #d1d5db' }} />
+                          )}
+                          <Typography sx={{ fontSize: '0.875rem', fontWeight: syncStep === step ? 600 : 400, color: syncStep >= step ? '#1f2937' : '#9ca3af' }}>
+                            {label}
+                          </Typography>
+                        </Box>
+                      ))}
                     </Box>
-                  ))}
-                </Box>
+                  </>
+                )}
               </DialogContent>
-              <DialogActions sx={{ justifyContent: 'center', pt: 2 }}>
-                <Button
-                  variant="contained"
-                  disabled={syncStep < totalSyncSteps}
-                  onClick={() => setSyncOpen(false)}
-                  sx={{
-                    bgcolor: '#111111',
-                    color: '#ffffff',
-                    borderRadius: '20px',
-                    textTransform: 'none',
-                    px: 4,
-                    boxShadow: 'none',
-                    '&:hover': { bgcolor: '#000000', boxShadow: 'none' },
-                    '&.Mui-disabled': { bgcolor: '#f3f4f6', color: '#9ca3af' }
-                  }}
-                >
-                  Close
-                </Button>
-              </DialogActions>
+              {syncView === 'syncing' && (
+                <DialogActions sx={{ justifyContent: 'center', pt: 2 }}>
+                  <Button
+                    variant="contained"
+                    disabled={syncStep < totalSyncSteps}
+                    onClick={() => setSyncOpen(false)}
+                    sx={{
+                      bgcolor: '#111827',
+                      color: '#fff',
+                      textTransform: 'none',
+                      px: 6,
+                      py: 1,
+                      borderRadius: '8px',
+                      fontWeight: 600,
+                      boxShadow: 'none',
+                      '&:hover': {
+                        bgcolor: '#374151',
+                        boxShadow: 'none',
+                      },
+                      '&.Mui-disabled': {
+                        bgcolor: '#e5e7eb',
+                        color: '#9ca3af',
+                      }
+                    }}
+                  >
+                    Done
+                  </Button>
+                </DialogActions>
+              )}
             </Dialog>
 
             {/* Error Alert */}
@@ -3265,6 +3435,8 @@ const MarketplaceReconciliation: React.FC = () => {
           </Alert>
         )}
 
+        {isConnected ? (
+        <>
         <Grid container spacing={3} alignItems="stretch" sx={{ mb: 6 }}>
           <Grid item xs={12} md={7}>
             <Card sx={{
@@ -6882,6 +7054,40 @@ const MarketplaceReconciliation: React.FC = () => {
           </CardContent>
         </Card>
         */}
+        </>
+        ) : (
+          <Box sx={{ width: '100%', minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+            <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: 'rgba(107, 114, 128, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <StorefrontIcon sx={{ fontSize: 40, color: '#9CA3AF' }} />
+            </Box>
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#374151' }}>
+              {selectedPlatform === 'd2c' ? 'Data Sources are not connected' : `Connect your ${selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : 'Flipkart'} Account`}
+            </Typography>
+            <Typography variant="body1" sx={{ color: '#6B7280', maxWidth: 400, textAlign: 'center' }}>
+              Sync your seller account to view real-time reconciliation metrics, settlement reports, and automated discrepancy tracking.
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={handleSyncClick}
+              sx={{
+                bgcolor: '#111827',
+                color: '#fff',
+                textTransform: 'none',
+                px: 4,
+                py: 1.5,
+                borderRadius: '8px',
+                fontWeight: 600,
+                boxShadow: 'none',
+                '&:hover': {
+                  bgcolor: '#374151',
+                  boxShadow: 'none',
+                }
+              }}
+            >
+              {selectedPlatform === 'd2c' ? 'Show Test Data' : 'Connect Now'}
+            </Button>
+          </Box>
+        )}
       </Box>
 
       {/* Sync modal removed; animation shown on the button icon itself */}

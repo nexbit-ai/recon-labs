@@ -1956,6 +1956,25 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [exportLoading, setExportLoading] = useState(false);
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
   const [exportListLoading, setExportListLoading] = useState(false);
+  const [hasSyncedTransactions, setHasSyncedTransactions] = useState(false);
+  const [simulatedSyncRowIndex, setSimulatedSyncRowIndex] = useState(-1);
+  const [isSimulatedSyncing, setIsSimulatedSyncing] = useState(false);
+
+  const startTransactionSync = () => {
+    setIsSimulatedSyncing(true);
+    setSimulatedSyncRowIndex(0);
+    let currentRow = 0;
+    
+    const interval = setInterval(() => {
+      currentRow += 1; // Slower: 1 row per tick
+      setSimulatedSyncRowIndex(currentRow);
+      if (currentRow > 100) { 
+        clearInterval(interval);
+        setIsSimulatedSyncing(false);
+        setHasSyncedTransactions(true);
+      }
+    }, 200); // Slower interval for smooth cascade
+  };
   const [exportRequests, setExportRequests] = useState<ExportRequest[]>(() => [
     {
       id: 'EXP-3921',
@@ -3076,6 +3095,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       setAmazonBusinessMode('B2C');
     }
   }, [selectedPlatform, amazonBusinessMode]);
+
+  // Reset simulated sync state when platform changes
+  useEffect(() => {
+    setHasSyncedTransactions(false);
+    setIsSimulatedSyncing(false);
+    setSimulatedSyncRowIndex(-1);
+  }, [selectedPlatform]);
 
   // Status filter has been removed - mismatched tab now uses sub-tabs instead
   // Clear any existing Status filter from columnFilters when component mounts or tab changes
@@ -4564,6 +4590,41 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       width: { xs: '100%', sm: 'auto' },
                       justifyContent: { xs: 'flex-start', sm: 'flex-end' }
                     }}>
+                      {isSimulatedSyncing && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', px: 1.5, py: 0.5, bgcolor: '#eff6ff', borderRadius: '6px', mr: 1 }}>
+                          <RefreshIcon sx={{ color: '#3b82f6', fontSize: 16, mr: 0.5, animation: 'spin 1s linear infinite', '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } } }} />
+                          <Typography variant="caption" sx={{ color: '#3b82f6', fontWeight: 600 }}>
+                            Processing Data...
+                          </Typography>
+                        </Box>
+                      )}
+                      {hasSyncedTransactions && !isSimulatedSyncing && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', px: 1.5, py: 0.5, bgcolor: '#f0fdf4', borderRadius: '6px', mr: 1 }}>
+                          <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 600 }}>
+                            Sync Complete
+                          </Typography>
+                        </Box>
+                      )}
+                      <Button
+                        variant="contained"
+                        size="small"
+                        disabled={isSimulatedSyncing}
+                        onClick={startTransactionSync}
+                        sx={{
+                          bgcolor: '#111827',
+                          color: '#fff',
+                          textTransform: 'none',
+                          borderRadius: '8px',
+                          boxShadow: 'none',
+                          mr: 1,
+                          '&:hover': {
+                            bgcolor: '#374151',
+                            boxShadow: 'none',
+                          }
+                        }}
+                      >
+                        Sync
+                      </Button>
                       <IconButton
                         onClick={() => {
                           fetchQuadTransactions(1, columnFilters, dateRange, selectedPlatform);
@@ -6385,6 +6446,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     displayValue = formatSettlementProvider(value);
                                   }
 
+                                  const isColumnSimulated = column === 'Difference' || column === 'Status' || column === 'status' || column === 'diff' || column === 'Courier Provider' || column === 'Settlement Provider';
+                                  const shouldMask = isColumnSimulated && (!hasSyncedTransactions && !(isSimulatedSyncing && rowIndex <= simulatedSyncRowIndex));
+                                  if (shouldMask) {
+                                    displayValue = ''; // Blank value to simulate processing
+                                  }
+
                                   return (
                                     <TableCell
                                       key={`${(row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"])}-${column}-${colIndex}`}
@@ -6403,7 +6470,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       }}
                                     >
                                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        {column === 'Status' ? (
+                                        {shouldMask ? (
+                                          <Box sx={{ height: 24, width: '60%', bgcolor: 'rgba(243,244,246,0.6)', borderRadius: '4px' }} />
+                                        ) : column === 'Status' ? (
                                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                             {/* Recon Status from row data */}
                                             {(() => {
