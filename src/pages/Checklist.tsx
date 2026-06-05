@@ -22,6 +22,7 @@ import {
   AvatarGroup,
   InputAdornment,
   Fade,
+  Tooltip as MuiTooltip,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -36,6 +37,7 @@ import {
   AttachFile as AttachFileIcon,
   PsychologyAlt as BrainIcon,
   PsychologyAlt as AssistantIcon,
+  PersonAddOutlined as PersonAddIcon,
 } from '@mui/icons-material';
 import {
   BarChart,
@@ -87,6 +89,17 @@ const AnimatedAIAvatar: React.FC<{ size?: number, animated?: boolean }> = ({ siz
 
 // --- Types & Interfaces ---
 
+interface Message {
+  id: string;
+  text: string;
+  sender: 'user' | 'assistant';
+  timestamp: Date;
+  chartData?: any[];
+  chartType?: 'bar' | 'line';
+  hasDownload?: boolean;
+  downloadName?: string;
+}
+
 interface User {
   id: number;
   name: string;
@@ -96,62 +109,98 @@ interface User {
 interface Task {
   id: number;
   title: string;
-  tag: string;
-  due: string;
-  users: User[];
-  status: 'overdue' | 'upcoming' | 'completed';
-}
-
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'assistant';
-  timestamp: Date;
-  chartData?: any[];
-  chartType?: 'bar' | 'line';
+  tags: { label: string; type: 'danger' | 'warning' | 'default' }[];
+  subtitle: string;
+  amount?: string;
+  actionText: string;
+  status: 'requires_action' | 'review' | 'completed';
+  aiConfidence?: number;
+  aiInsights?: string;
+  trendData?: { val: number }[];
 }
 
 // --- Mock Data ---
 
-const users: User[] = [
-  { id: 1, name: 'Alice', avatar: 'https://randomuser.me/api/portraits/women/1.jpg' },
-  { id: 2, name: 'Bob', avatar: 'https://randomuser.me/api/portraits/men/2.jpg' },
-  { id: 3, name: 'Carol', avatar: 'https://randomuser.me/api/portraits/women/3.jpg' },
-  { id: 4, name: 'Dan', avatar: 'https://randomuser.me/api/portraits/men/4.jpg' },
-];
-
 const initialTasks: Task[] = [
   {
     id: 1,
-    title: 'Reconcile March Flipkart orders for Pilgrim',
-    tag: 'FLIPKART',
-    due: 'Today',
-    users: [users[0], users[1]],
-    status: 'overdue',
+    title: 'Automated Dispute Filing',
+    tags: [
+      { label: 'Pending', type: 'danger' },
+      { label: 'Logistics', type: 'default' }
+    ],
+    subtitle: 'REC-001 · Delhivery · Identified 342 orders with weight anomalies',
+    amount: '₹1,45,000',
+    actionText: 'Assign to Agent',
+    status: 'requires_action',
+    aiConfidence: 96,
+    aiInsights: "Nex AI Analysis: Highly correlated with Delhivery's North zone volumetric scanning recalibration on Mar 12.",
+    trendData: [{val: 10}, {val: 15}, {val: 20}, {val: 18}, {val: 45}, {val: 90}, {val: 145}],
   },
   {
     id: 2,
-    title: 'Verify Amazon payment disputes for April',
-    tag: 'AMAZON',
-    due: '2 days left',
-    users: [users[2]],
-    status: 'upcoming',
+    title: 'Marketplace Commission Audit',
+    tags: [
+      { label: 'Done', type: 'default' },
+      { label: 'Marketplace', type: 'default' }
+    ],
+    subtitle: 'REC-002 · Flipkart · Excess commission on 12% of electronics',
+    amount: '₹2,10,500',
+    actionText: 'Assign to Agent',
+    status: 'review',
+    aiConfidence: 88,
+    aiInsights: "Nex AI Analysis: Flipkart Beauty category rate card shifted on May 1st, causing systemic overcharges.",
+    trendData: [{val: 210}, {val: 210}, {val: 210}, {val: 210}, {val: 210}, {val: 210}, {val: 210}],
   },
   {
     id: 3,
-    title: 'Match website sales with Razorpay settlements',
-    tag: 'D2C',
-    due: 'Tomorrow',
-    users: [users[3], users[0]],
-    status: 'upcoming',
+    title: 'High-Risk RTO Anomaly',
+    tags: [
+      { label: 'Pending', type: 'danger' },
+      { label: 'Rules', type: 'default' }
+    ],
+    subtitle: 'REC-003 · D2C Platform · 40% spike in RTOs in North region',
+    amount: '₹56,550',
+    actionText: 'Assign to Agent',
+    status: 'requires_action',
+    aiConfidence: 91,
+    aiInsights: "Nex AI Analysis: Spike in fake orders originating from 3 specific IP ranges in UP.",
+    trendData: [{val: 5}, {val: 6}, {val: 5}, {val: 8}, {val: 25}, {val: 45}, {val: 56}],
+  },
+];
+
+const cfoDailyTasks: Task[] = [
+  {
+    id: 101,
+    title: 'Daily Cash Flow Summary',
+    tags: [{ label: 'Done', type: 'default' }],
+    subtitle: 'REC-CFO-1 · Verify T-1 incoming settlements across Amazon, Flipkart, and Razorpay',
+    actionText: 'Assign to Agent',
+    status: 'review',
   },
   {
-    id: 4,
-    title: 'Download Amazon logistics report for auditing',
-    tag: 'LOGISTICS',
-    due: 'Completed',
-    users: [users[1]],
-    status: 'completed',
+    id: 102,
+    title: 'Daily Returns Refund Report',
+    tags: [{ label: 'Pending', type: 'danger' }],
+    subtitle: 'REC-CFO-2 · Review incoming returns and match against refunds issued',
+    actionText: 'Assign to Agent',
+    status: 'requires_action',
+  },
+  {
+    id: 103,
+    title: 'Gross Margin Reconciliation',
+    tags: [{ label: 'Done', type: 'default' }],
+    subtitle: 'REC-CFO-3 · Review 4% dip in net margins correlated with Q3 logistics surge',
+    actionText: 'Assign to Agent',
+    status: 'review',
+  },
+  {
+    id: 104,
+    title: 'Total Marketplace Settlement Daily Report',
+    tags: [{ label: 'Pending', type: 'danger' }],
+    subtitle: 'REC-CFO-4 · Reconcile total incoming settlements from Amazon, Flipkart, Myntra',
+    actionText: 'Assign to Agent',
+    status: 'requires_action',
   },
 ];
 
@@ -276,7 +325,23 @@ const MessageBubble: React.FC<{ msg: Message; isLatestAssistant?: boolean; onStr
               </Box>
             )}
 
-            {/* Timestamp removed */}
+            {(msg.hasDownload && !shouldType) && (
+              <Button
+                variant="outlined"
+                sx={{ 
+                  mt: 2.5, 
+                  borderRadius: '8px', 
+                  fontSize: '0.75rem', 
+                  fontWeight: 600, 
+                  color: '#111', 
+                  borderColor: '#e2e8f0', 
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: '#f8fafc' } 
+                }}
+              >
+                Download {msg.downloadName}
+              </Button>
+            )}
           </Paper>
         </Box>
       </Box>
@@ -287,7 +352,12 @@ const MessageBubble: React.FC<{ msg: Message; isLatestAssistant?: boolean; onStr
 // --- Main Checklist Page ---
 
 const Checklist: React.FC = () => {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [activeTab, setActiveTab] = useState<'all' | 'daily'>('all');
+  const [allTasks, setAllTasks] = useState<Task[]>(initialTasks);
+  const [dailyTasks, setDailyTasks] = useState<Task[]>(cfoDailyTasks);
+  
+  const displayedTasks = activeTab === 'all' ? allTasks : dailyTasks;
+
   const [expandedTask, setExpandedTask] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   
@@ -395,15 +465,90 @@ const Checklist: React.FC = () => {
         timestamp: new Date(),
         chartData: data.chartData,
         chartType: data.chartType,
+        hasDownload: data.hasDownload,
+        downloadName: data.downloadName
       };
       setMessages(prev => [...prev, assistantMsg]);
       setStreamingMessageId(assistantMsg.id);
     }, 4000);
   };
 
-  const getAIResponse = (query: string): { text: string; chartData?: any[]; chartType?: 'bar' | 'line' } => {
+  const getAIResponse = (query: string): { text: string; chartData?: any[]; chartType?: 'bar' | 'line'; hasDownload?: boolean; downloadName?: string } => {
     const q = query.toLowerCase();
     
+    if (q.includes('automated dispute filing') || q.includes('delhivery')) {
+      return {
+        text: "I've analyzed the Delhivery weight anomalies (REC-001). We identified 342 orders where the courier billed for a higher volumetric weight than our internal manifest.\n\nSummary:\n• Total Orders Flagged: 342\n• Overcharge Value: ₹1,45,000\n• Root Cause: Probable scanner recalibration at North Zone Hub.\n\nHere is the trend of overcharges over the past 7 days. Would you like me to automatically file a bulk dispute with Delhivery with the attached evidence, or would you like to close this action item?",
+        chartType: 'line',
+        chartData: [
+          { name: 'Mon', value: 10 },
+          { name: 'Tue', value: 15 },
+          { name: 'Wed', value: 20 },
+          { name: 'Thu', value: 18 },
+          { name: 'Fri', value: 45 },
+          { name: 'Sat', value: 90 },
+          { name: 'Sun', value: 145 },
+        ]
+      };
+    }
+
+    if (q.includes('daily cash flow summary') || q.includes('cfo-1')) {
+      return {
+        text: "I've compiled the T-1 Cash Flow Summary (REC-CFO-1). We've processed the incoming settlements for Amazon, Flipkart, and Razorpay.\n\nSummary:\n• Total Expected: ₹14,50,000\n• Actual Received: ₹14,25,000\n• Variance: ₹25,000 (pending Razorpay T+2 hold)\n\nThe chart below compares expected vs actual. Shall I authorize the ledger sync for the verified amounts?",
+        chartType: 'bar',
+        chartData: [
+          { name: 'Amazon', value: 450000 },
+          { name: 'Flipkart', value: 380000 },
+          { name: 'Razorpay', value: 595000 },
+        ]
+      };
+    }
+
+    if (q.includes('daily returns refund report') || q.includes('cfo-2') || q.includes('returns')) {
+      return {
+        text: "Generating Daily Returns Refund Report (REC-CFO-2)... \n\nThe report has been compiled successfully. It includes all unmatched RTOs and excess refunds issued for yesterday.\n\nSummary:\n• Total Returns: 1,452\n• Unmatched Refunds: 45\n\nYou can download the full report below. Shall I automatically dispute the unmatched refunds?",
+        hasDownload: true,
+        downloadName: 'Daily_Returns_Refund_Report.csv'
+      };
+    }
+
+    if (q.includes('gross margin reconciliation') || q.includes('cfo-3')) {
+      return {
+        text: "I've analyzed the Gross Margin Variance (REC-CFO-3). Net margins have dipped by 4% compared to the Q2 baseline.\n\nSummary:\n• Total Variance: -4%\n• Root Cause: 65% of the drop is correlated with the Q3 logistics surge and volumetric weight penalties.\n\nThe chart below tracks margin degradation over the month. Would you like me to flag the specific SKUs causing this anomaly?",
+        chartType: 'line',
+        chartData: [
+          { name: 'Week 1', value: 22.5 },
+          { name: 'Week 2', value: 21.0 },
+          { name: 'Week 3', value: 19.5 },
+          { name: 'Week 4', value: 18.5 },
+        ]
+      };
+    }
+
+    if (q.includes('total marketplace settlement daily report') || q.includes('cfo-4')) {
+      return {
+        text: "Generating Total Marketplace Settlement Daily Report (REC-CFO-4)... \n\nThe report is ready. It aggregates T-1 settlements from Amazon, Flipkart, and Myntra, matching them against expected sales ledger entries.\n\nYou can download the detailed settlement reconciliation below.",
+        hasDownload: true,
+        downloadName: 'Marketplace_Settlements_Daily.csv'
+      };
+    }
+
+    if (q.includes('high-risk rto anomaly') || q.includes('rto')) {
+      return {
+        text: "I've investigated the RTO anomaly for the D2C Platform (REC-003). There's a 40% sudden spike in Return to Origin (RTO) orders originating from the North region.\n\nSummary:\n• Total Potential Loss: ₹56,550\n• Suspicious Activity: High concentration of fake addresses from 3 specific IP blocks in UP.\n\nThis looks like targeted fraudulent behavior. I recommend instantly blocking these IP ranges and blacklisting the associated phone numbers. Shall I proceed with the block, or close this alert?",
+        chartType: 'line',
+        chartData: [
+          { name: 'W1', value: 5 },
+          { name: 'W2', value: 6 },
+          { name: 'W3', value: 5 },
+          { name: 'W4', value: 8 },
+          { name: 'W5', value: 25 },
+          { name: 'W6', value: 45 },
+          { name: 'W7', value: 56 },
+        ]
+      };
+    }
+
     if (q.includes('flipkart recon') || q.includes('march 26')) {
       return {
         text: "I've initiated the Flipkart reconciliation for March 2026. Data ingestion is 100% complete. I found a gross discrepancy of ₹12,45,600 across 114 transactions, primarily due to 'Seller Share Discount' mismatches.\n\nMatching the dashboard figures: Gross Revenue is recorded at ₹4.41 Cr with Net settlement at ₹3.70 Cr.\n\nWould you like me to flag these 114 items for dispute?",
@@ -462,20 +607,12 @@ const Checklist: React.FC = () => {
     }
 
     return {
-      text: "I'm on it. I've scanned the relevant reports. Most operations are within tolerance levels. I recommend focusing on the Amazon weight disputes for this peak period.",
+      text: "I'm on it. I've scanned the relevant reports. Most operations are within tolerance levels. I recommend focusing on the Amazon weight disputes for this peak period. Shall I run a deep dive or close this item?",
     };
   };
 
   const handleAskAI = (task: Task) => {
     handleSendMessage(`Help me with this task: "${task.title}"`);
-  };
-
-  const handleToggleTask = (id: number) => {
-    setTasks(prev => prev.map(t => 
-      t.id === id 
-        ? { ...t, status: t.status === 'completed' ? 'upcoming' : 'completed' } 
-        : t
-    ));
   };
 
   return (
@@ -498,11 +635,11 @@ const Checklist: React.FC = () => {
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Typography sx={{ fontWeight: 800, color: '#111', letterSpacing: '-0.02em', fontSize: '1.15rem' }}>
-            Operations Center
+            Actions
           </Typography>
           <Box sx={{ display: 'flex', gap: 0.5 }}>
             <Chip label="5 Pending" size="small" sx={{ bgcolor: '#111', color: '#fff', fontWeight: 700, fontSize: '0.6rem', height: 16 }} />
-            <Chip label="1 Urgent" size="small" sx={{ bgcolor: '#fef2f2', color: '#dc2626', fontWeight: 700, fontSize: '0.6rem', height: 16, border: '1px solid #fee2e2' }} />
+            <Chip label="1 Urgent" size="small" sx={{ bgcolor: '#fef2f2', color: '#EF4545', fontWeight: 700, fontSize: '0.6rem', height: 16, border: '1px solid #fee2e2' }} />
           </Box>
         </Box>
         
@@ -530,84 +667,50 @@ const Checklist: React.FC = () => {
         </Stack>
       </Box>
 
-      <Grid container sx={{ flex: 1, overflow: 'hidden' }}>
+      <Grid container sx={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {/* Left Column: Task List */}
-        <Grid item xs={12} md={6} sx={{ 
+        <Grid item xs={12} md={7} sx={{ 
           height: '100%', 
           borderRight: '1px solid #f1f5f9',
           overflowY: 'auto',
-          px: 4,
-          py: 3,
+          px: 6,
+          py: 4,
         }}>
-          {/* Overdue Section */}
-          <Box sx={{ mb: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-              <Typography variant="caption" sx={{ fontWeight: 800, color: '#dc2626', letterSpacing: '0.05em', fontSize: '0.6rem' }}>
-                OVERDUE
+          {/* Action Items Header */}
+          <Box sx={{ mb: 3 }}>
+            <Stack direction="row" spacing={3} sx={{ borderBottom: '1px solid #f1f5f9', pb: 1 }}>
+              <Typography 
+                onClick={() => setActiveTab('all')}
+                sx={{ fontWeight: activeTab === 'all' ? 700 : 600, color: activeTab === 'all' ? '#111' : '#64748b', fontSize: '0.85rem', cursor: 'pointer', borderBottom: activeTab === 'all' ? '2px solid #111' : 'none', pb: 1, mb: -1.25 }}
+              >
+                All ({allTasks.length})
               </Typography>
-              <Box sx={{ flex: 1, height: '1px', bgcolor: '#fee2e2' }} />
-            </Box>
-            <List sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {tasks.filter(t => t.status === 'overdue').map(task => (
-                <TaskItem 
-                  key={task.id} 
-                  task={task} 
-                  isExpanded={expandedTask === task.id}
-                  onExpand={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
-                  onToggle={() => handleToggleTask(task.id)}
-                  onAskAI={() => handleAskAI(task)}
-                />
-              ))}
-            </List>
+              <Typography 
+                onClick={() => setActiveTab('daily')}
+                sx={{ fontWeight: activeTab === 'daily' ? 700 : 600, color: activeTab === 'daily' ? '#111' : '#64748b', fontSize: '0.85rem', cursor: 'pointer', borderBottom: activeTab === 'daily' ? '2px solid #111' : 'none', pb: 1, mb: -1.25 }}
+              >
+                Daily ({dailyTasks.length})
+              </Typography>
+            </Stack>
           </Box>
 
-          {/* Pending Section */}
-          <Box sx={{ mb: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-              <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748b', letterSpacing: '0.05em', fontSize: '0.66rem' }}>
-                FOR REVIEW
-              </Typography>
-              <Box sx={{ flex: 1, height: '1px', bgcolor: '#f1f5f9' }} />
-            </Box>
-            <List sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {tasks.filter(t => t.status === 'upcoming').map(task => (
-                <TaskItem 
-                  key={task.id} 
-                  task={task} 
-                  isExpanded={expandedTask === task.id}
-                  onExpand={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
-                  onToggle={() => handleToggleTask(task.id)}
-                  onAskAI={() => handleAskAI(task)}
-                />
+          <Paper elevation={0} sx={{ border: '1px solid #f1f5f9', borderRadius: '12px', overflow: 'hidden' }}>
+            <List sx={{ p: 0 }}>
+              {displayedTasks.map((task, index) => (
+                <React.Fragment key={task.id}>
+                  <TaskItem 
+                    task={task} 
+                    onAskAI={() => handleAskAI(task)}
+                  />
+                  {index < displayedTasks.length - 1 && <Divider />}
+                </React.Fragment>
               ))}
             </List>
-          </Box>
-
-          {/* Completed Section */}
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-              <Typography variant="caption" sx={{ fontWeight: 800, color: '#22c55e', letterSpacing: '0.05em', fontSize: '0.66rem' }}>
-                COMPLETED
-              </Typography>
-              <Box sx={{ flex: 1, height: '1px', bgcolor: '#f0fdf4' }} />
-            </Box>
-            <List sx={{ display: 'flex', flexDirection: 'column', gap: 1, opacity: 0.6 }}>
-              {tasks.filter(t => t.status === 'completed').map(task => (
-                <TaskItem 
-                  key={task.id} 
-                  task={task} 
-                  isExpanded={expandedTask === task.id}
-                  onExpand={() => setExpandedTask(expandedTask === task.id ? null : task.id)}
-                  onToggle={() => handleToggleTask(task.id)}
-                  onAskAI={() => handleAskAI(task)}
-                />
-              ))}
-            </List>
-          </Box>
+          </Paper>
         </Grid>
 
         {/* Right Column: Nex Assistant */}
-        <Grid item xs={12} md={6} sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#fcfdfe' }}>
+        <Grid item xs={12} md={5} sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#fcfdfe' }}>
           {/* Chat Header */}
           <Box sx={{ px: 3, py: 1.5, borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#fff' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -733,119 +836,133 @@ const Checklist: React.FC = () => {
 
 const TaskItem: React.FC<{ 
   task: Task; 
-  isExpanded: boolean; 
-  onExpand: () => void;
-  onToggle: () => void;
   onAskAI: () => void;
-}> = ({ task, isExpanded, onExpand, onToggle, onAskAI }) => {
-  const isCompleted = task.status === 'completed';
-  const isOverdue = task.status === 'overdue';
-
+}> = ({ task, onAskAI }) => {
   return (
-    <Paper
-      elevation={0}
+    <Box
       sx={{
-        borderRadius: '10px',
-        border: '1px solid',
-        borderColor: isExpanded ? '#111' : '#f1f5f9',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        p: 2.5,
         bgcolor: '#fff',
         transition: 'all 0.15s ease',
         '&:hover': {
-          borderColor: isExpanded ? '#111' : '#e2e8f0',
+          bgcolor: '#f8fafc',
         }
       }}
     >
-      <Box
-        sx={{
-          p: 1.75,
-          display: 'flex',
-          alignItems: 'center',
-          cursor: 'pointer',
-        }}
-        onClick={onExpand}
-      >
-        <ListItemIcon 
-          sx={{ minWidth: 32 }}
-          onClick={(e) => { e.stopPropagation(); onToggle(); }}
-        >
-          {isCompleted ? (
-            <CheckCircleIcon sx={{ color: '#22c55e', fontSize: 18 }} />
-          ) : (
-            <RadioButtonUncheckedIcon sx={{ color: isOverdue ? '#dc2626' : '#cbd5e1', fontSize: 18 }} />
-          )}
-        </ListItemIcon>
-        
-        <Box sx={{ flex: 1 }}>
+      {/* Left side: Title, Tags, Subtitle */}
+      <Box sx={{ flex: 1, minWidth: 0, pr: 4 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
           <Typography
             sx={{
               fontWeight: 700,
-              color: isCompleted ? '#94a3b8' : '#1e293b',
-              textDecoration: isCompleted ? 'line-through' : 'none',
-              fontSize: '0.86rem',
-              letterSpacing: '-0.01em'
+              color: '#111',
+              fontSize: '0.9rem',
+              letterSpacing: '-0.01em',
             }}
           >
             {task.title}
           </Typography>
-          <Stack direction="row" spacing={0.75} sx={{ mt: 0.25 }}>
-            <Chip 
-              label={task.tag} 
-              size="small" 
-              sx={{ 
-                fontSize: '0.62rem', 
-                height: 16, 
-                bgcolor: isOverdue ? '#fef2f2' : '#f1f5f9', 
-                color: isOverdue ? '#dc2626' : '#64748b',
-                fontWeight: 800,
-                borderRadius: '3px'
-              }} 
-            />
-            <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.35, fontWeight: 600, fontSize: '0.66rem', color: isOverdue ? '#dc2626' : '#94a3b8' }}>
-              <CalendarTodayIcon sx={{ fontSize: 10 }} />
-              {task.due}
-            </Typography>
+          
+          <Stack direction="row" spacing={1} alignItems="center">
+            {task.tags.map((tag, i) => (
+              <Chip 
+                key={i}
+                label={tag.label} 
+                size="small" 
+                sx={{ 
+                  fontSize: '0.65rem', 
+                  height: 20, 
+                  bgcolor: tag.type === 'danger' ? '#fef2f2' : (tag.type === 'warning' ? '#fffbeb' : '#f1f5f9'), 
+                  color: tag.type === 'danger' ? '#EF4545' : (tag.type === 'warning' ? '#d97706' : '#64748b'),
+                  fontWeight: 600,
+                  borderRadius: '4px',
+                  border: '1px solid',
+                  borderColor: tag.type === 'danger' ? '#fecaca' : (tag.type === 'warning' ? '#fde68a' : 'transparent'),
+                }} 
+              />
+            ))}
           </Stack>
         </Box>
 
-        <AvatarGroup max={2} sx={{ '& .MuiAvatar-root': { width: 22, height: 22, fontSize: 8, border: '1.5px solid #fff' }, mr: 1 }}>
-          {task.users.map(u => (
-            <Avatar key={u.id} src={u.avatar} title={u.name} />
-          ))}
-        </AvatarGroup>
-
-        <IconButton size="small">
-          {isExpanded ? <ExpandLessIcon sx={{ fontSize: 16 }} /> : <ExpandMoreIcon sx={{ fontSize: 16 }} />}
-        </IconButton>
+        <Typography
+          sx={{
+            color: '#94a3b8',
+            fontSize: '0.8rem',
+            fontWeight: 500,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {task.subtitle}
+        </Typography>
       </Box>
 
-      <Collapse in={isExpanded}>
-        <Box sx={{ px: 5.75, pb: 2, pt: 0.25 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.75, lineHeight: 1.5, fontSize: '0.80rem' }}>
-            Run the automated reconciliation engine. Review mismatch flag if discrepancy {'>'} 2%. 
-          </Typography>
-          
-          <Stack direction="row" spacing={1}>
+      {/* Right side: Amount and Buttons */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <Typography
+          sx={{
+            fontWeight: 700,
+            color: '#111',
+            fontSize: '0.95rem',
+            letterSpacing: '-0.02em',
+            minWidth: '70px',
+            textAlign: 'right'
+          }}
+        >
+          {task.amount}
+        </Typography>
+
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          {task.status !== 'completed' && (
             <Button
-              size="small"
               variant="outlined"
-              startIcon={<AnimatedAIAvatar size={20} animated={false} />}
-              sx={{ borderRadius: '6px', color: '#111', borderColor: '#111', textTransform: 'none', fontWeight: 700, px: 2, height: 28, fontSize: '0.72rem' }}
-              onClick={(e) => { e.stopPropagation(); onAskAI(); }}
+              onClick={() => {}}
+              startIcon={<PersonAddIcon sx={{ fontSize: '14px !important', color: '#64748b' }} />}
+              sx={{ 
+                color: '#64748b',
+                borderColor: '#e2e8f0',
+                textTransform: 'none', 
+                fontWeight: 600, 
+                fontSize: '0.75rem',
+                height: 28,
+                px: 1.5,
+                borderRadius: '6px',
+                '&:hover': {
+                  bgcolor: '#f8fafc',
+                  color: '#111',
+                  borderColor: '#cbd5e1',
+                }
+              }}
             >
-              Ask Nex
+              Teammate
             </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              sx={{ borderRadius: '6px', color: '#64748b', borderColor: '#e2e8f0', textTransform: 'none', fontWeight: 700, px: 2, height: 28, fontSize: '0.72rem' }}
-              onClick={(e) => { e.stopPropagation(); onToggle(); }}
-            >
-              {isCompleted ? 'Pending' : 'Done'}
-            </Button>
-          </Stack>
-        </Box>
-      </Collapse>
-    </Paper>
+          )}
+          <Button
+            variant="text"
+            onClick={onAskAI}
+            sx={{ 
+              color: '#64748b',
+              textTransform: 'none', 
+              fontWeight: 600, 
+              fontSize: '0.8rem',
+              height: 28,
+              px: 1,
+              minWidth: 'auto',
+              '&:hover': {
+                bgcolor: '#f1f5f9',
+                color: '#111',
+              }
+            }}
+          >
+            {task.actionText}
+          </Button>
+        </Stack>
+      </Box>
+    </Box>
   );
 };
 

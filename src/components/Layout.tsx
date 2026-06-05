@@ -56,11 +56,11 @@ import logo from '../assets/logo_fresh.jpg';
 const drawerWidth = 168;
 
 const menuItems = [
+  { text: 'Actions', icon: <ChecklistIcon />, path: '/checklist', upcoming: false },
   { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation', upcoming: false },
   { text: 'Operations', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
   { text: 'Logistics', icon: <StorageIcon />, path: '/logistics', upcoming: false },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping', upcoming: false },
-  { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist', upcoming: false },
   // { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
 ];
 
@@ -432,7 +432,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         }}
       >
         {/* Page Content Wrapper */}
-        <Box sx={{ p: 4, pt: 2 }}>
+        <Box sx={{ p: 0 }}>
           {children}
         </Box>
 
