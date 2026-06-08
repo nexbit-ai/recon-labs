@@ -90,6 +90,46 @@ export const API_CONFIG = {
     SETTINGS: '/settings',
     NOTIFICATIONS: '/notifications',
     SECURITY: '/security',
+    
+    // Amazon Auth
+    AMAZON_AUTH_START: '/amazon/auth/start',
+    AMAZON_AUTH_CALLBACK: '/amazon/auth/callback',
+
+    // Shopify Auth
+    SHOPIFY_AUTH_START: '/shopify/auth/start',
+    SHOPIFY_AUTH_CALLBACK: '/shopify/auth/callback',
+    SHOPIFY_STATUS: '/shopify/status',
+    SHOPIFY_TEST_FETCH: '/shopify/test-fetch',
+
+    // Razorpay
+    RAZORPAY_CONFIG: '/razorpay/config',
+    RAZORPAY_STATUS: '/razorpay/status',
+    RAZORPAY_TEST_FETCH: '/razorpay/test-fetch',
+
+    // Clickpost
+    CLICKPOST_CONFIG: '/clickpost/config',
+    CLICKPOST_STATUS: '/clickpost/status',
+    CLICKPOST_TEST_FETCH: '/clickpost/test-fetch',
+
+    // PayU
+    PAYU_CONFIG: '/payu/config',
+    PAYU_STATUS: '/payu/status',
+    PAYU_TEST_FETCH: '/payu/test-fetch',
+
+    // Paytm
+    PAYTM_CONFIG: '/paytm/config',
+    PAYTM_STATUS: '/paytm/status',
+    PAYTM_TEST_FETCH: '/paytm/test-fetch',
+
+    // Shiprocket
+    SHIPROCKET_CONFIG: '/shiprocket/config',
+    SHIPROCKET_STATUS: '/shiprocket/status',
+    SHIPROCKET_TEST_FETCH: '/shiprocket/test-fetch',
+
+    // Unicommerce
+    UNICOMMERCE_CONFIG: '/unicommerce/config',
+    UNICOMMERCE_STATUS: '/unicommerce/status',
+    UNICOMMERCE_TEST_FETCH: '/unicommerce/test-fetch',
   },
   
   // Feature Flags

@@ -87,7 +87,18 @@ class ApiService {
         clearTimeout(timeoutId);
         
         // Handle response
-        return await this.handleResponse<T>(response);
+        try {
+          return await this.handleResponse<T>(response);
+        } catch (error: any) {
+          if (error.error === 'TOKEN_REFRESHED') {
+            console.log('🔄 Retrying request after token refresh...');
+            // Update headers with new token
+            requestOptions.headers = await this.buildHeaders(requestConfig.headers, useD2CHeaders);
+            const retryResponse = await this.makeRequestWithRetry(fullUrl, requestOptions, requestConfig);
+            return await this.handleResponse<T>(retryResponse);
+          }
+          throw error;
+        }
         
       } catch (error) {
         clearTimeout(timeoutId);

@@ -31,6 +31,7 @@ export { dataSourcesAPI } from './endpoints';
 export { aiAPI } from './endpoints';
 export { settingsAPI } from './endpoints';
 export { fileAPI } from './endpoints';
+export { amazonAuthAPI } from './endpoints';
 
 // Hook exports
 export { 
