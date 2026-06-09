@@ -363,6 +363,11 @@ class ApiService {
       };
     }
 
+    // Preserve existing ApiError structure
+    if (error.statusCode !== undefined && error.error !== undefined) {
+      return error as ApiError;
+    }
+
     return {
       message: error.message || 'Network error',
       statusCode: 0,

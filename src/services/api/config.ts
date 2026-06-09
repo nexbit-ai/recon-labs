@@ -94,6 +94,7 @@ export const API_CONFIG = {
     // Amazon Auth
     AMAZON_AUTH_START: '/amazon/auth/start',
     AMAZON_AUTH_CALLBACK: '/amazon/auth/callback',
+    AMAZON_STATUS: '/amazon/auth/status',
 
     // Shopify Auth
     SHOPIFY_AUTH_START: '/shopify/auth/start',

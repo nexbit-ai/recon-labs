@@ -20,6 +20,9 @@ import {
   Alert,
   Fade,
   Tooltip,
+  Checkbox,
+  FormGroup,
+  FormControlLabel,
 } from '@mui/material';
 import {
   Sync as SyncIcon,
@@ -34,6 +37,7 @@ import {
 import { api } from '../services/api';
 import shiprocketLogo from '../assets/providers/shiprocket.png';
 import unicommerceLogo from '../assets/providers/unicommerce.png';
+import amazonLogo from '../assets/providers/amazon.jpg';
 
 const Integrations: React.FC = () => {
   const theme = useTheme();
@@ -158,25 +162,37 @@ const Integrations: React.FC = () => {
         const unicommerceResp = await api.unicommerceAuth.getStatus();
         if (unicommerceResp.statusCode === 200 && unicommerceResp.data?.connected) {
           setUnicommerceConnected(true);
-          setUnicommerceConfig(prev => ({ 
-            ...prev, 
+          setUnicommerceConfig(prev => ({
+            ...prev,
             tenant: unicommerceResp.data?.tenant || '',
             username: unicommerceResp.data?.username || ''
           }));
         }
       } catch (e) { console.error('Unicommerce status fetch failed', e); }
+
+      // Fetch Amazon status
+      try {
+        const amazonResp = await api.amazonAuth.getStatus();
+        if (amazonResp.statusCode === 200 && amazonResp.data?.connected) {
+          setAmazonConnected(true);
+          setAmazonConfig(prev => ({
+            ...prev,
+            client_id: amazonResp.data?.client_id || '',
+            marketplace_regions: amazonResp.data?.marketplace_regions || []
+          }));
+        }
+      } catch (e) { console.error('Amazon status fetch failed', e); }
     };
 
     fetchStatuses();
   }, []);
 
+  const [amazonConnected, setAmazonConnected] = useState(false);
   // Amazon Config State
   const [amazonConfig, setAmazonConfig] = useState({
     client_id: '',
     client_secret: '',
-    redirect_uri: window.location.origin + '/integrations/callback',
-    seller_central_domain: 'sellercentral.amazon.in',
-    region_base_url: 'https://sellingpartnerapi-fe.amazon.com',
+    marketplace_regions: [] as string[],
   });
 
   const handleAmazonAuth = async () => {
@@ -192,7 +208,7 @@ const Integrations: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Failed to initiate Amazon Auth:', err);
-      setError(err?.response?.data?.error || 'Failed to initiate sync. Make sure you have saved the configuration.');
+      setError(err?.error || err?.response?.data?.error || 'Failed to initiate sync. Make sure you have saved the configuration.');
     } finally {
       setLoading(null);
     }
@@ -203,7 +219,7 @@ const Integrations: React.FC = () => {
       setError('Please enter your Shopify store domain');
       return;
     }
-    
+
     // Normalize domain
     let domain = shopifyDomain.trim();
     if (domain.includes('://')) domain = domain.split('://')[1];
@@ -248,8 +264,13 @@ const Integrations: React.FC = () => {
     setError(null);
     try {
       if (configType === 'amazon') {
-        await api.amazonAuth.saveConfig(amazonConfig);
-        setSuccess('Amazon configuration saved successfully');
+        await api.amazonAuth.saveConfig({
+          client_id: amazonConfig.client_id,
+          client_secret: amazonConfig.client_secret,
+          marketplace_regions: amazonConfig.marketplace_regions,
+        });
+        setSuccess('Amazon configuration saved successfully!');
+        setAmazonConnected(true);
       } else if (configType === 'razorpay') {
         if (!razorpayConfig.key_id || !razorpayConfig.key_secret) {
           setError('Please enter both Key ID and Key Secret');
@@ -272,9 +293,9 @@ const Integrations: React.FC = () => {
           return;
         }
         await api.payuAuth.saveConfig(
-          payuConfig.merchant_key, 
-          payuConfig.merchant_salt, 
-          payuConfig.client_id, 
+          payuConfig.merchant_key,
+          payuConfig.merchant_salt,
+          payuConfig.client_id,
           payuConfig.client_secret
         );
         setSuccess('PayU credentials saved successfully');
@@ -420,7 +441,7 @@ const Integrations: React.FC = () => {
       name: 'Amazon SP-API',
       category: 'Marketplaces',
       description: 'Automate your Amazon sales and settlement data sync directly from the Selling Partner API.',
-      logo: 'https://cdn.worldvectorlogo.com/logos/amazon-icon.svg',
+      logo: amazonLogo,
       status: 'Available',
       onConnect: handleAmazonAuth,
       onConfig: () => {
@@ -606,8 +627,8 @@ const Integrations: React.FC = () => {
       description: 'Direct integration with Flipkart Seller Hub for automated data fetching.',
       logo: 'https://cdn.worldvectorlogo.com/logos/flipkart.svg',
       status: 'Coming Soon',
-      onConnect: () => {},
-      onConfig: () => {},
+      onConnect: () => { },
+      onConfig: () => { },
     },
   ];
 
@@ -617,17 +638,17 @@ const Integrations: React.FC = () => {
     <Box sx={{ p: 4, width: '100%', minHeight: '100vh' }}>
       <Fade in={true} timeout={400}>
         <Box sx={{ mb: 4, ml: 1 }}>
-          <Typography 
-            variant="h4" 
-            sx={{ 
-              fontWeight: 700, 
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
               color: '#1a202c',
               mb: 0
             }}
           >
             Integrations
           </Typography>
-          
+
           {error && (
             <Alert severity="error" sx={{ mt: 3, borderRadius: 1.5, borderLeft: '4px solid #ef4444' }}>
               {error}
@@ -648,14 +669,14 @@ const Integrations: React.FC = () => {
 
         return (
           <Box key={category} sx={{ mb: 6 }}>
-            <Typography 
-              variant="subtitle1" 
-              sx={{ 
-                fontWeight: 700, 
-                color: '#4a5568', 
-                mb: 3, 
-                ml: 1, 
-                display: 'flex', 
+            <Typography
+              variant="subtitle1"
+              sx={{
+                fontWeight: 700,
+                color: '#4a5568',
+                mb: 3,
+                ml: 1,
+                display: 'flex',
                 alignItems: 'center',
                 '&::after': {
                   content: '""',
@@ -671,211 +692,211 @@ const Integrations: React.FC = () => {
             </Typography>
             <Grid container spacing={2}>
               {filteredIntegrations.map((integration, index) => (
-          <Grid item xs={12} sm={6} md={3} lg={2.4} key={integration.id}>
-            <Fade in={true} timeout={300 + index * 50}>
-              <Card
-                elevation={0}
-                sx={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  transition: 'all 0.2s ease-in-out',
-                  '&:hover': {
-                    boxShadow: '0 8px 16px rgba(0,0,0,0.04)',
-                    borderColor: theme.palette.primary.main,
-                  },
-                  borderRadius: 1.5,
-                  border: '1px solid #edf2f7',
-                  background: '#fff',
-                }}
-              >
-                {integration.onInfo && (
-                  <IconButton 
-                    size="small" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      integration.onInfo?.();
-                    }}
-                    sx={{ 
-                      position: 'absolute', 
-                      top: 8, 
-                      right: 8, 
-                      color: '#cbd5e1',
-                      '&:hover': { color: theme.palette.primary.main }
-                    }}
-                  >
-                    <InfoIcon sx={{ fontSize: 18 }} />
-                  </IconButton>
-                )}
-                <CardContent sx={{ p: 2.5, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                  <Box
-                    sx={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      mb: 2,
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #f1f5f9',
-                    }}
-                  >
-                    <img
-                      src={integration.logo}
-                      alt={integration.name}
-                      style={{ width: 36, height: 36, objectFit: 'contain' }}
-                    />
-                  </Box>
-
-                  <Typography variant="subtitle1" sx={{ mb: 0.8, fontWeight: 700, color: '#1a202c', fontSize: '0.9rem' }}>
-                    {integration.name}
-                  </Typography>
-                  
-
-                  <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                    <Button
-                      variant="outlined"
-                      disabled={integration.status !== 'Available' && integration.status !== 'Connected' || loading === integration.id}
-                      onClick={integration.onConnect}
-                      size="small"
+                <Grid item xs={12} sm={6} md={3} lg={2.4} key={integration.id}>
+                  <Fade in={true} timeout={300 + index * 50}>
+                    <Card
+                      elevation={0}
                       sx={{
-                        py: 0.6,
-                        px: 2,
-                        borderRadius: 1,
-                        fontWeight: 700,
-                        textTransform: 'none',
-                        fontSize: '0.75rem',
-                        borderWidth: 1.5,
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        transition: 'all 0.2s ease-in-out',
                         '&:hover': {
-                          borderWidth: 1.5,
+                          boxShadow: '0 8px 16px rgba(0,0,0,0.04)',
+                          borderColor: theme.palette.primary.main,
                         },
-                        borderColor: integration.status === 'Connected' ? '#15803d' : theme.palette.primary.main,
-                        color: integration.status === 'Connected' ? '#15803d' : theme.palette.primary.main,
-                        backgroundColor: integration.status === 'Connected' ? 'rgba(21, 128, 61, 0.04)' : 'transparent',
+                        borderRadius: 1.5,
+                        border: '1px solid #edf2f7',
+                        background: '#fff',
                       }}
                     >
-                      {loading === integration.id ? (
-                        <CircularProgress size={16} sx={{ color: theme.palette.primary.main }} />
-                      ) : integration.status === 'Available' ? (
-                        `Connect`
-                      ) : (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          {integration.status === 'Connected' && <CheckCircleIcon sx={{ fontSize: 14 }} />}
-                          {integration.status}
-                        </Box>
+                      {integration.onInfo && (
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            integration.onInfo?.();
+                          }}
+                          sx={{
+                            position: 'absolute',
+                            top: 8,
+                            right: 8,
+                            color: '#cbd5e1',
+                            '&:hover': { color: theme.palette.primary.main }
+                          }}
+                        >
+                          <InfoIcon sx={{ fontSize: 18 }} />
+                        </IconButton>
                       )}
-                    </Button>
-                    
-                    {integration.status === 'Available' && integration.id === 'amazon' && (
-                      <Button
-                        variant="text"
-                        size="small"
-                        startIcon={<SettingsIcon sx={{ fontSize: '14px !important' }} />}
-                        onClick={integration.onConfig}
-                        sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
-                      >
-                        Config
-                      </Button>
-                    )}
+                      <CardContent sx={{ p: 2.5, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <Box
+                          sx={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            mb: 2,
+                            backgroundColor: '#f8fafc',
+                            border: '1px solid #f1f5f9',
+                          }}
+                        >
+                          <img
+                            src={integration.logo}
+                            alt={integration.name}
+                            style={{ width: 36, height: 36, objectFit: 'contain' }}
+                          />
+                        </Box>
 
-                     {integration.id === 'shopify' && (
-                        <Button
-                         variant="text"
-                         size="small"
-                         startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
-                         onClick={() => handleShopifyTestFetch('nexbit-staging.myshopify.com')}
-                         disabled={loading === 'test-fetch'}
-                         sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
-                       >
-                         Test Connection
-                       </Button>
-                     )}
+                        <Typography variant="subtitle1" sx={{ mb: 0.8, fontWeight: 700, color: '#1a202c', fontSize: '0.9rem' }}>
+                          {integration.name}
+                        </Typography>
 
-                     {integration.id === 'razorpay' && (
-                        <Button
-                         variant="text"
-                         size="small"
-                         startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
-                         onClick={handleRazorpayTestFetch}
-                         disabled={loading === 'razorpay-test'}
-                         sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
-                       >
-                         Test Connection
-                       </Button>
-                     )}
 
-                     {integration.id === 'clickpost' && (
-                        <Button
-                         variant="text"
-                         size="small"
-                         startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
-                         onClick={handleClickpostTestFetch}
-                         disabled={loading === 'clickpost-test'}
-                         sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
-                       >
-                         Test Connection
-                       </Button>
-                     )}
+                        <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                          <Button
+                            variant="outlined"
+                            disabled={integration.status !== 'Available' && integration.status !== 'Connected' || loading === integration.id}
+                            onClick={integration.onConnect}
+                            size="small"
+                            sx={{
+                              py: 0.6,
+                              px: 2,
+                              borderRadius: 1,
+                              fontWeight: 700,
+                              textTransform: 'none',
+                              fontSize: '0.75rem',
+                              borderWidth: 1.5,
+                              '&:hover': {
+                                borderWidth: 1.5,
+                              },
+                              borderColor: integration.status === 'Connected' ? '#15803d' : theme.palette.primary.main,
+                              color: integration.status === 'Connected' ? '#15803d' : theme.palette.primary.main,
+                              backgroundColor: integration.status === 'Connected' ? 'rgba(21, 128, 61, 0.04)' : 'transparent',
+                            }}
+                          >
+                            {loading === integration.id ? (
+                              <CircularProgress size={16} sx={{ color: theme.palette.primary.main }} />
+                            ) : integration.status === 'Available' ? (
+                              `Connect`
+                            ) : (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                {integration.status === 'Connected' && <CheckCircleIcon sx={{ fontSize: 14 }} />}
+                                {integration.status}
+                              </Box>
+                            )}
+                          </Button>
 
-                     {integration.id === 'shiprocket' && (
-                        <Button
-                         variant="text"
-                         size="small"
-                         startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
-                         onClick={handleShiprocketTestFetch}
-                         disabled={loading === 'shiprocket-test'}
-                         sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
-                       >
-                         Test Connection
-                       </Button>
-                     )}
+                          {integration.status === 'Available' && integration.id === 'amazon' && (
+                            <Button
+                              variant="text"
+                              size="small"
+                              startIcon={<SettingsIcon sx={{ fontSize: '14px !important' }} />}
+                              onClick={integration.onConfig}
+                              sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
+                            >
+                              Config
+                            </Button>
+                          )}
 
-                     {integration.id === 'unicommerce' && (
-                        <Button
-                         variant="text"
-                         size="small"
-                         startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
-                         onClick={handleUnicommerceTestFetch}
-                         disabled={loading === 'unicommerce-test'}
-                         sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
-                       >
-                         Test Connection
-                       </Button>
-                     )}
+                          {integration.id === 'shopify' && (
+                            <Button
+                              variant="text"
+                              size="small"
+                              startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
+                              onClick={() => handleShopifyTestFetch('nexbit-staging.myshopify.com')}
+                              disabled={loading === 'test-fetch'}
+                              sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
+                            >
+                              Test Connection
+                            </Button>
+                          )}
 
-                     {integration.id === 'payu' && (
-                        <Button
-                         variant="text"
-                         size="small"
-                         startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
-                         onClick={handlePayUTestFetch}
-                         disabled={loading === 'payu-test'}
-                         sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
-                       >
-                         Test Connection
-                       </Button>
-                     )}
+                          {integration.id === 'razorpay' && (
+                            <Button
+                              variant="text"
+                              size="small"
+                              startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
+                              onClick={handleRazorpayTestFetch}
+                              disabled={loading === 'razorpay-test'}
+                              sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
+                            >
+                              Test Connection
+                            </Button>
+                          )}
 
-                     {integration.id === 'paytm' && (
-                        <Button
-                         variant="text"
-                         size="small"
-                         startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
-                         onClick={handlePaytmTestFetch}
-                         disabled={loading === 'paytm-test'}
-                         sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
-                       >
-                         Test Connection
-                       </Button>
-                     )}
-                  </Box>
-                </CardContent>
-              </Card>
-            </Fade>
-          </Grid>
+                          {integration.id === 'clickpost' && (
+                            <Button
+                              variant="text"
+                              size="small"
+                              startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
+                              onClick={handleClickpostTestFetch}
+                              disabled={loading === 'clickpost-test'}
+                              sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
+                            >
+                              Test Connection
+                            </Button>
+                          )}
+
+                          {integration.id === 'shiprocket' && (
+                            <Button
+                              variant="text"
+                              size="small"
+                              startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
+                              onClick={handleShiprocketTestFetch}
+                              disabled={loading === 'shiprocket-test'}
+                              sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
+                            >
+                              Test Connection
+                            </Button>
+                          )}
+
+                          {integration.id === 'unicommerce' && (
+                            <Button
+                              variant="text"
+                              size="small"
+                              startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
+                              onClick={handleUnicommerceTestFetch}
+                              disabled={loading === 'unicommerce-test'}
+                              sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
+                            >
+                              Test Connection
+                            </Button>
+                          )}
+
+                          {integration.id === 'payu' && (
+                            <Button
+                              variant="text"
+                              size="small"
+                              startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
+                              onClick={handlePayUTestFetch}
+                              disabled={loading === 'payu-test'}
+                              sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
+                            >
+                              Test Connection
+                            </Button>
+                          )}
+
+                          {integration.id === 'paytm' && (
+                            <Button
+                              variant="text"
+                              size="small"
+                              startIcon={<ScienceIcon sx={{ fontSize: '14px !important' }} />}
+                              onClick={handlePaytmTestFetch}
+                              disabled={loading === 'paytm-test'}
+                              sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
+                            >
+                              Test Connection
+                            </Button>
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Fade>
+                </Grid>
               ))}
             </Grid>
           </Box>
@@ -915,19 +936,19 @@ const Integrations: React.FC = () => {
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
-          <Button 
-            onClick={() => setShopifyDialogOpen(false)} 
+          <Button
+            onClick={() => setShopifyDialogOpen(false)}
             sx={{ fontWeight: 600, color: '#718096', textTransform: 'none' }}
           >
             Cancel
           </Button>
-          <Button 
-            variant="outlined" 
+          <Button
+            variant="outlined"
             onClick={handleShopifyAuth}
             disabled={loading === 'shopify'}
-            sx={{ 
-              borderRadius: 1.5, 
-              px: 3, 
+            sx={{
+              borderRadius: 1.5,
+              px: 3,
               fontWeight: 700,
               textTransform: 'none',
               borderWidth: 1.5,
@@ -940,8 +961,8 @@ const Integrations: React.FC = () => {
       </Dialog>
 
       {/* Configuration Dialog (Amazon / Razorpay) */}
-      <Dialog 
-        open={configOpen} 
+      <Dialog
+        open={configOpen}
         onClose={() => setConfigOpen(false)}
         maxWidth="sm"
         fullWidth
@@ -953,7 +974,7 @@ const Integrations: React.FC = () => {
             <CloseIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </DialogTitle>
-        <DialogContent dividers sx={{ p: 4 }}>
+        <DialogContent dividers sx={{ p: 4, minHeight: '350px' }}>
           {configType === 'paytm' && (
             <Box sx={{ py: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
@@ -1096,7 +1117,7 @@ const Integrations: React.FC = () => {
           {configType === 'clickpost' && (
             <Box sx={{ py: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Enter your Clickpost Username and Password. 
+                Enter your Clickpost Username and Password.
                 <Box component="span" sx={{ display: 'block', mt: 1, fontWeight: 600, color: 'primary.main' }}>
                   Please get in touch with your onboarding manager or ClickPost support team to get the username and password.
                 </Box>
@@ -1158,64 +1179,73 @@ const Integrations: React.FC = () => {
                 value={amazonConfig.client_secret}
                 onChange={(e) => setAmazonConfig({ ...amazonConfig, client_secret: e.target.value })}
               />
-              <TextField
-                label="Redirect URI (Optional)"
-                fullWidth
-                value={amazonConfig.redirect_uri}
-                onChange={(e) => setAmazonConfig({ ...amazonConfig, redirect_uri: e.target.value })}
-                helperText="Only change this if you are using a custom Amazon Developer App."
-              />
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    select
-                    label="Marketplace Region"
-                    fullWidth
-                    value={amazonConfig.region_base_url}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      let domain = 'sellercentral.amazon.in';
-                      if (val.includes('-na')) domain = 'sellercentral.amazon.com';
-                      if (val.includes('-eu')) domain = 'sellercentral.amazon.co.uk';
-                      setAmazonConfig({ ...amazonConfig, region_base_url: val, seller_central_domain: domain });
-                    }}
-                  >
-                    <MenuItem value="https://sellingpartnerapi-fe.amazon.com">Far East (India/Japan/Australia)</MenuItem>
-                    <MenuItem value="https://sellingpartnerapi-na.amazon.com">North America (US/Canada/Mexico/Brazil)</MenuItem>
-                    <MenuItem value="https://sellingpartnerapi-eu.amazon.com">Europe (UK/Germany/France/Italy/Spain)</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    label="Seller Central Domain"
-                    fullWidth
-                    value={amazonConfig.seller_central_domain}
-                    onChange={(e) => setAmazonConfig({ ...amazonConfig, seller_central_domain: e.target.value })}
-                    placeholder="sellercentral.amazon.in"
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary', fontWeight: 600 }}>
+                  Marketplace Regions
+                </Typography>
+                <FormGroup>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={amazonConfig.marketplace_regions.includes('FE')}
+                        onChange={(e) => {
+                          const regions = e.target.checked
+                            ? [...amazonConfig.marketplace_regions, 'FE']
+                            : amazonConfig.marketplace_regions.filter(r => r !== 'FE');
+                          setAmazonConfig({ ...amazonConfig, marketplace_regions: regions });
+                        }}
+                      />
+                    }
+                    label="India"
                   />
-                </Grid>
-              </Grid>
-              <Alert severity="info" sx={{ mt: 1, borderRadius: 2 }}>
-                Ensure this Redirect URI is whitelisted in your Amazon Developer Console application settings.
-              </Alert>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={amazonConfig.marketplace_regions.includes('NA')}
+                        onChange={(e) => {
+                          const regions = e.target.checked
+                            ? [...amazonConfig.marketplace_regions, 'NA']
+                            : amazonConfig.marketplace_regions.filter(r => r !== 'NA');
+                          setAmazonConfig({ ...amazonConfig, marketplace_regions: regions });
+                        }}
+                      />
+                    }
+                    label="North America (US/Canada/Mexico/Brazil)"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={amazonConfig.marketplace_regions.includes('EU')}
+                        onChange={(e) => {
+                          const regions = e.target.checked
+                            ? [...amazonConfig.marketplace_regions, 'EU']
+                            : amazonConfig.marketplace_regions.filter(r => r !== 'EU');
+                          setAmazonConfig({ ...amazonConfig, marketplace_regions: regions });
+                        }}
+                      />
+                    }
+                    label="Europe (UK/Germany/France/Italy/Spain)"
+                  />
+                </FormGroup>
+              </Box>
             </Box>
           )}
         </DialogContent>
         <DialogActions sx={{ p: 3, gap: 1 }}>
-          <Button 
-            onClick={() => setConfigOpen(false)} 
+          <Button
+            onClick={() => setConfigOpen(false)}
             sx={{ fontWeight: 600, color: '#718096', textTransform: 'none' }}
           >
             Cancel
           </Button>
-          <Button 
-            variant="outlined" 
+          <Button
+            variant="outlined"
             onClick={handleSaveConfig}
             disabled={loading === 'save'}
-            sx={{ 
-              borderRadius: 1.5, 
-              px: 4, 
-              fontWeight: 700, 
+            sx={{
+              borderRadius: 1.5,
+              px: 4,
+              fontWeight: 700,
               textTransform: 'none',
               borderWidth: 1.5,
               '&:hover': { borderWidth: 1.5 }
@@ -1227,8 +1257,8 @@ const Integrations: React.FC = () => {
       </Dialog>
 
       {/* Success Animation Dialog */}
-      <Dialog 
-        open={!!testResult} 
+      <Dialog
+        open={!!testResult}
         onClose={() => setTestResult(null)}
         PaperProps={{ sx: { borderRadius: 5, p: 3, textAlign: 'center', maxWidth: 400 } }}
       >
@@ -1246,9 +1276,9 @@ const Integrations: React.FC = () => {
             <Alert severity="success" sx={{ borderRadius: 2, textAlign: 'left' }}>
               We have successfully fetched {testResult?.count || 0} settlement records for verification.
             </Alert>
-            <Button 
-              fullWidth 
-              variant="contained" 
+            <Button
+              fullWidth
+              variant="contained"
               onClick={() => setTestResult(null)}
               sx={{ mt: 4, borderRadius: 3, py: 1.5, fontWeight: 800 }}
             >
@@ -1259,8 +1289,8 @@ const Integrations: React.FC = () => {
       </Dialog>
 
       {/* Info / Guide Dialog */}
-      <Dialog 
-        open={infoDialogOpen} 
+      <Dialog
+        open={infoDialogOpen}
         onClose={() => setInfoDialogOpen(false)}
         maxWidth="xs"
         fullWidth
@@ -1276,12 +1306,12 @@ const Integrations: React.FC = () => {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, py: 1 }}>
             {infoContent.steps.map((step, idx) => (
               <Box key={idx} sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-                <Box 
-                  sx={{ 
-                    width: 22, 
-                    height: 22, 
-                    borderRadius: '50%', 
-                    backgroundColor: 'rgba(37, 99, 235, 0.08)', 
+                <Box
+                  sx={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(37, 99, 235, 0.08)',
                     color: theme.palette.primary.main,
                     display: 'flex',
                     alignItems: 'center',
@@ -1303,13 +1333,13 @@ const Integrations: React.FC = () => {
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
-          <Button 
-            fullWidth 
-            variant="outlined" 
+          <Button
+            fullWidth
+            variant="outlined"
             onClick={() => setInfoDialogOpen(false)}
-            sx={{ 
-              borderRadius: 1.5, 
-              fontWeight: 700, 
+            sx={{
+              borderRadius: 1.5,
+              fontWeight: 700,
               textTransform: 'none',
               py: 1,
               borderWidth: 1.5,
