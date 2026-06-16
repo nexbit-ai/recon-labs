@@ -2745,8 +2745,7 @@ const MarketplaceReconciliation: React.FC = () => {
       minHeight: '100vh',
       background: '#fafafa',
       position: 'relative',
-      overflow: 'hidden',
-      mt: -4
+      overflow: 'hidden'
     }}>
 
       {/* View Detailed Transactions Button */}

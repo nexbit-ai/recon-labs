@@ -22,3 +22,9 @@ Interactive elements like search bars or popovers must not disrupt the document 
 
 ## 4. Unified Loading States
 - Avoid injecting loading bars directly into the document flow where they force surrounding elements down. Use a single, absolutely positioned premium gradient loading bar anchored to the top of the container (`position: 'absolute', top: 0, left: 0, right: 0, height: '3px'`). This provides immediate feedback while guaranteeing zero vertical layout shifts.
+
+## 5. Enterprise Color Palette
+To maintain a professional, high-fidelity enterprise appearance, avoid "vibe coded" aesthetics that rely heavily on bright primary colors (e.g., generic reds, greens, yellows, blues).
+- **Core Palette**: Stick strictly to a monochrome scale of **Black, White, and Greys**.
+- **Accent Color**: Use **`#7A5DBF`** (signature purple) sparingly for active states, primary actions, or in-progress status indicators.
+- **Status Indicators**: Instead of vividly colored chips, use soft grey backgrounds (`#f3f4f6`, `#f9fafb`, `#e5e7eb`) with dark text (`#111827`, `#4b5563`). Only use `#7A5DBF` (with a low-opacity background like `rgba(122, 93, 191, 0.05)`) to draw attention to items currently being worked on.

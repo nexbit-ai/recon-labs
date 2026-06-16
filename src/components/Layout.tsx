@@ -58,7 +58,7 @@ const drawerWidth = 168;
 const menuItems = [
   { text: 'Actions', icon: <ChecklistIcon />, path: '/checklist', upcoming: false },
   { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation', upcoming: false },
-  { text: 'Operations', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
+  { text: 'Claims', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
   { text: 'Logistics', icon: <StorageIcon />, path: '/logistics', upcoming: false },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping', upcoming: false },
   // { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
@@ -180,27 +180,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 if (item.upcoming) {
                   return;
                 }
-                // For Operations, include platforms from localStorage
-                if (item.path === '/operations-centre') {
-                  try {
-                    const stored = localStorage.getItem('recon_selected_platforms');
-                    let platformsParam = '';
-                    if (stored) {
-                      const parsed = JSON.parse(stored);
-                      // Handle both array format (old) and single string format (current)
-                      if (Array.isArray(parsed) && parsed.length > 0) {
-                        platformsParam = `?platforms=${parsed.join(',')}`;
-                      } else if (typeof parsed === 'string' && ['flipkart', 'amazon', 'd2c'].includes(parsed)) {
-                        platformsParam = `?platforms=${parsed}`;
-                      }
-                    }
-                    navigate(`${item.path}${platformsParam}`);
-                  } catch (e) {
-                    navigate(item.path);
-                  }
-                } else {
-                  navigate(item.path);
-                }
+                navigate(item.path);
               }}
               selected={location.pathname === item.path && !item.upcoming}
               disabled={item.upcoming}
