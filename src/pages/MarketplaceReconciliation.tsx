@@ -3421,15 +3421,9 @@ const MarketplaceReconciliation: React.FC = () => {
                     <Button
                       variant="text"
                       onClick={() => {
-                        const platformsParam = selectedPlatform || '';
-                        const urlParams = new URLSearchParams({
-                          from: effectiveDateRangeForTs.start,
-                          to: effectiveDateRangeForTs.end
-                        });
-                        if (platformsParam) {
-                          urlParams.set('platforms', platformsParam);
-                        }
-                        navigate(`/operations-centre?${urlParams.toString()}`);
+                        setInitialTsFilters(undefined);
+                        setInitialTsTab(1);
+                        setShowTransactionSheet(true);
                       }}
                       sx={{
                         flex: 1,
@@ -3597,8 +3591,9 @@ const MarketplaceReconciliation: React.FC = () => {
                             variant="outlined"
                             size="small"
                             onClick={() => {
-                              const platformsParam = selectedPlatform || '';
-                              navigate(`/operations-centre?from=${effectiveDateRangeForTs.start}&to=${effectiveDateRangeForTs.end}${platformsParam ? `&platforms=${platformsParam}` : ''}`);
+                              setInitialTsFilters(undefined);
+                              setInitialTsTab(1);
+                              setShowTransactionSheet(true);
                             }}
                             sx={{
                               borderColor: '#6366f1',
