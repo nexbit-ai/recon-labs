@@ -131,6 +131,28 @@ export const manualActionsAPI = {
     ),
 };
 
+// Claims API
+export const claimsAPI = {
+  // Evaluate aged claims
+  evaluateAgedClaims: () =>
+    apiService.post<{ success: boolean; message: string; data: { newly_eligible_orders: number } }>(
+      '/claims/evaluate'
+    ),
+
+  markClaimFiled: (orderId: string, payload: { ticket_id: string; platform: string }) =>
+    apiService.put<{ success: boolean; message: string }>(
+      `/claims/${orderId}/file`,
+      payload
+    ),
+  markBatchFiled: (payload: { reason: string; ticket_id: string; platform: string }) =>
+    apiService.put<{ success: boolean; message: string }>(
+      `/claims/batches/file`,
+      payload
+    ),
+  getClaimBatches: () =>
+    apiService.get<{ success: boolean; data: any[] }>('/claims/batches'),
+};
+
 // Orders API
 export const ordersAPI = {
   // Get orders list
@@ -398,6 +420,7 @@ export const api = {
   reconciliation: reconciliationAPI,
   transactions: transactionsAPI,
   manualActions: manualActionsAPI,
+  claims: claimsAPI,
   orders: ordersAPI,
   stats: statsAPI,
   mainSummary: mainSummaryAPI,

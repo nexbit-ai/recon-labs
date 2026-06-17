@@ -39,7 +39,9 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Fab,
+  Drawer
 } from '@mui/material';
 import {
   CalendarToday as CalendarTodayIcon,
@@ -51,11 +53,12 @@ import {
   ArrowUpward as ArrowUpwardIcon,
   ArrowDownward as ArrowDownwardIcon,
   UnfoldMore as UnfoldMoreIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import { api } from '../services/api';
 import ColumnFilterControls from '../components/ColumnFilterControls';
-
+import TransactionSheet from './TransactionSheet';
 // Type definitions for transaction data based on API response
 interface TransactionRow {
   "Order ID": string;
@@ -301,7 +304,9 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
 };
 
 const OperationsCentrePage: React.FC = () => {
-  const [disputeSubTab, setDisputeSubTab] = useState<number>(0); // 0: unreconciled, 1: manually reconciled, 2: disputed
+  const [disputeSubTab, setDisputeSubTab] = useState<number>(2); // 0: unreconciled, 1: manually reconciled, 2: disputed
+
+  const [showTransactionSheet, setShowTransactionSheet] = useState(false);
 
   // State for date filtering
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
@@ -321,15 +326,14 @@ const OperationsCentrePage: React.FC = () => {
     const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0)).toISOString().split('T')[0];
     return { start: firstDay, end: lastDay, kind: 'this-month' as const };
   })();
-  const [selectedDateRange, setSelectedDateRange] = useState<'this-month' | 'last-month' | 'this-year' | 'custom'>(initialFromTo.kind);
+  const [selectedDateRange, setSelectedDateRange] = useState<'today' | 'this-month' | 'last-month' | 'this-year' | 'last-fiscal-year' | 'custom'>(initialFromTo.kind as any);
   const [customStartDate, setCustomStartDate] = useState(initialFromTo.start);
   const [customEndDate, setCustomEndDate] = useState(initialFromTo.end);
   const [tempStartDate, setTempStartDate] = useState('');
   const [tempEndDate, setTempEndDate] = useState('');
 
   // Header date range state - for the date selector displayed at the top
-  const [headerDateRange, setHeaderDateRange] = useState<{ start: string, end: string }>({ start: initialFromTo.start, end: initialFromTo.end });
-  const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{ start: string, end: string }>({ start: initialFromTo.start, end: initialFromTo.end });
+  // removed legacy date range states
 
   // Calendar popup state
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
@@ -339,41 +343,29 @@ const OperationsCentrePage: React.FC = () => {
   const hasFetchedOnInitialRef = useRef(false);
 
   // Initialize platform from URL or localStorage - single platform only
-  const getInitialPlatform = (): 'flipkart' | 'amazon' | 'd2c' => {
+  const getInitialPlatform = (): 'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' => {
     const params = new URLSearchParams(window.location.search);
     const platformsParam = params.get('platforms');
     if (platformsParam) {
-      const platforms = platformsParam.split(',').filter(p => ['flipkart', 'amazon', 'd2c'].includes(p)) as Array<'flipkart' | 'amazon' | 'd2c'>;
+      const platforms = platformsParam.split(',').filter(p => ['flipkart', 'amazon', 'amazon_uk', 'd2c'].includes(p)) as Array<'flipkart' | 'amazon' | 'amazon_uk' | 'd2c'>;
       if (platforms.length > 0) {
         // Return only the first platform for single-select
         return platforms[0];
       }
     }
-    // Fallback to localStorage if no URL param
+    // Ignore localStorage to enforce Amazon as the absolute default
     try {
-      const stored = localStorage.getItem('recon_selected_platforms');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Handle both array format (old) and single string format (current)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const validPlatforms = parsed.filter(p => ['flipkart', 'amazon', 'd2c'].includes(p)) as Array<'flipkart' | 'amazon' | 'd2c'>;
-          if (validPlatforms.length > 0) {
-            // Return only the first platform for single-select
-            return validPlatforms[0];
-          }
-        } else if (typeof parsed === 'string' && ['flipkart', 'amazon', 'd2c'].includes(parsed)) {
-          return parsed as 'flipkart' | 'amazon' | 'd2c';
-        }
-      }
+      // We still update localStorage when platform changes, but we don't read it for the initial load 
+      // to ensure Amazon is the strict default when no URL param is present.
     } catch (e) {
-      console.warn('Failed to load platforms from localStorage:', e);
+      console.warn('Failed to handle platforms from localStorage:', e);
     }
-    return 'd2c'; // default fallback
+    return 'amazon'; // default fallback
   };
 
   // Platform selector state for dropdown (single-select) - initialize from URL params
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedPlatform, setSelectedPlatform] = useState<'flipkart' | 'amazon' | 'd2c'>(getInitialPlatform());
+  const [selectedPlatform, setSelectedPlatform] = useState<'flipkart' | 'amazon' | 'amazon_uk' | 'd2c'>(getInitialPlatform());
 
   // Initialize platform and tab from URL query params if provided
   useEffect(() => {
@@ -381,7 +373,7 @@ const OperationsCentrePage: React.FC = () => {
     // Also update platform from URL params if present (use first if multiple)
     const platformsParam = params.get('platforms');
     if (platformsParam) {
-      const platforms = platformsParam.split(',').filter(p => ['flipkart', 'amazon', 'd2c'].includes(p)) as Array<'flipkart' | 'amazon' | 'd2c'>;
+      const platforms = platformsParam.split(',').filter(p => ['flipkart', 'amazon', 'amazon_uk', 'd2c'].includes(p)) as Array<'flipkart' | 'amazon' | 'amazon_uk' | 'd2c'>;
       if (platforms.length > 0) {
         setSelectedPlatform(platforms[0]); // Use first platform only
       }
@@ -391,11 +383,31 @@ const OperationsCentrePage: React.FC = () => {
     const tabParam = params.get('tab');
     if (tabParam) {
       const tabIndex = parseInt(tabParam, 10);
-      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 2) {
+      if (!isNaN(tabIndex) && tabIndex >= 1 && tabIndex <= 2) {
         setDisputeSubTab(tabIndex);
       }
     }
   }, []);
+
+  // Persist date selection to URL and localStorage whenever it changes
+  useEffect(() => {
+    try {
+      if (customStartDate) localStorage.setItem('recon_selected_date_from', customStartDate);
+      if (customEndDate) localStorage.setItem('recon_selected_date_to', customEndDate);
+      if (selectedDateRange) localStorage.setItem('recon_selected_date_kind', selectedDateRange);
+    } catch { }
+    const params = new URLSearchParams(window.location.search);
+    if (customStartDate && customEndDate) {
+      params.set('from', customStartDate);
+      params.set('to', customEndDate);
+    } else {
+      params.delete('from');
+      params.delete('to');
+    }
+    params.set('dateRange', selectedDateRange || 'custom');
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState(null, '', newUrl);
+  }, [selectedDateRange, customStartDate, customEndDate]);
 
   // Date range menu state
   const [dateRangeMenuAnchor, setDateRangeMenuAnchor] = useState<HTMLElement | null>(null);
@@ -416,11 +428,20 @@ const OperationsCentrePage: React.FC = () => {
   // Store API response with columns for settlement provider filter
   const [apiResponseData, setApiResponseData] = useState<any>(null);
 
+  // Claim Batches State
+  const [claimBatches, setClaimBatches] = useState<any[]>([]);
+  const filteredBatches = claimBatches.filter(b => b.platform === selectedPlatform);
+  const [activeClaimTag, setActiveClaimTag] = useState<string>('All');
+
+  // Claims UI states
+  const [claimDialogOpen, setClaimDialogOpen] = useState(false);
+  const [claimTicketInput, setClaimTicketInput] = useState('');
+  const [pendingClaim, setPendingClaim] = useState<{ orderId: string, platform: string } | null>(null);
+
   // Helper to get current tab's data (for backward compatibility)
   const getApiRows = () => {
     if (disputeSubTab === 0) return unreconciledRows;
-    if (disputeSubTab === 1) return manuallyReconciledRows;
-    return disputedRows;
+        return disputedRows;
   };
 
   const [mockRows, setMockRows] = useState<Array<{ id: string; orderItemId: string; orderDate: string; difference: number; remark: string; eventType: string; status: 'unreconciled' | 'open' | 'raised'; }>>([]);
@@ -472,7 +493,7 @@ const OperationsCentrePage: React.FC = () => {
   const COLUMN_TO_API_PARAM_MAP: Record<string, {
     apiParam: string;
     type: 'string' | 'number' | 'date' | 'enum';
-    supportedPlatforms?: ('flipkart' | 'amazon' | 'd2c' | 'all')[];
+    supportedPlatforms?: ('flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'all')[];
     usesInSuffix?: boolean; // For CSV filters like status_in
   }> = {
     // Common filters (both platforms)
@@ -532,44 +553,180 @@ const OperationsCentrePage: React.FC = () => {
     return mapping;
   }, [apiResponseData]);
 
-  // Get current date range text for display
+  // Get current date range display text
   const getCurrentDateRangeText = () => {
-    if (selectedDateRange === 'this-month') {
-      const now = new Date();
-      return `${now.toLocaleString('default', { month: 'long' })} ${now.getFullYear()}`;
-    } else if (selectedDateRange === 'last-month') {
-      const now = new Date();
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      return `${lastMonth.toLocaleString('default', { month: 'long' })} ${lastMonth.getFullYear()}`;
-    } else if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
+    if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
       return `${customStartDate} to ${customEndDate}`;
     }
-    return 'This Month';
+
+    const today = new Date();
+    let startDate, endDate;
+
+    if (selectedDateRange === 'today') {
+      startDate = endDate = today.toISOString().split('T')[0];
+    } else if (selectedDateRange === 'this-month') {
+      startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      endDate = endOfMonth.toISOString().split('T')[0];
+    } else if (selectedDateRange === 'this-year') {
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth(); // 0-11
+      if (currentMonth >= 3) {
+        startDate = `${currentYear}-04-01`;
+        endDate = `${currentYear + 1}-03-31`;
+      } else {
+        startDate = `${currentYear - 1}-04-01`;
+        endDate = `${currentYear}-03-31`;
+      }
+    } else if (selectedDateRange === 'last-fiscal-year') {
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth();
+      if (currentMonth >= 3) {
+        startDate = `${currentYear - 1}-04-01`;
+        endDate = `${currentYear}-03-31`;
+      } else {
+        startDate = `${currentYear - 2}-04-01`;
+        endDate = `${currentYear - 1}-03-31`;
+      }
+    }
+
+    return startDate && endDate ? `${startDate} to ${endDate}` : 'Select date';
   };
 
   // Handle date range selection
   const handleDateRangeSelect = (value: string) => {
-    if (value === 'custom') {
-      setShowCustomDatePicker(true);
+    setSelectedDateRange(value as any);
+    if (value !== 'custom') {
+      setDateRangeMenuAnchor(null);
+      setPage(0);
+      fetchAllTabsData();
     } else {
-      setSelectedDateRange(value as 'this-month' | 'last-month' | 'this-year' | 'custom');
-      if (value === 'this-month' || value === 'last-month' || value === 'this-year') {
+      setShowCustomDatePicker(true);
+      setDateRangeMenuAnchor(null);
+    }
+  };
+
+  // Initialize calendar dates when custom picker opens
+  useEffect(() => {
+    if (showCustomDatePicker) {
+      if (!currentCalendarDate || currentCalendarDate.getTime() === 0) {
+        const today = new Date();
+        setCurrentCalendarDate(today);
+        if (!customStartDate) {
+          setCustomStartDate(today.toISOString().split('T')[0]);
+        }
+      } else if (!customStartDate) {
+        const today = new Date();
+        setCustomStartDate(today.toISOString().split('T')[0]);
+      }
+    }
+  }, [showCustomDatePicker, customStartDate, currentCalendarDate]);
+
+  // Handle click outside calendar popup
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (calendarPopupRef.current && !calendarPopupRef.current.contains(event.target as Node)) {
+        setShowCustomDatePicker(false);
+      }
+    };
+
+    if (showCustomDatePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCustomDatePicker]);
+
+  // Calendar helper functions
+  const currentCalendarMonth = currentCalendarDate.toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric'
+  });
+
+  const handleCalendarMonthChange = (direction: number) => {
+    setCurrentCalendarDate(new Date(
+      currentCalendarDate.getFullYear(),
+      currentCalendarDate.getMonth() + direction,
+      1
+    ));
+  };
+
+  const getDateFromCalendarPosition = (day: string) => {
+    if (!day) return null;
+    const year = currentCalendarDate.getFullYear();
+    const month = currentCalendarDate.getMonth();
+    return new Date(year, month, parseInt(day));
+  };
+
+  const getCalendarDays = () => {
+    const year = currentCalendarDate.getFullYear();
+    const month = currentCalendarDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+    const days = [];
+    for (let i = 0; i < 42; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      if (date.getMonth() === month) {
+        days.push(date.getDate().toString());
+      } else {
+        days.push('');
+      }
+    }
+    return days;
+  };
+
+  const handleCalendarDateClick = (day: string) => {
+    if (!day) return;
+    const clickedDate = getDateFromCalendarPosition(day);
+    if (!clickedDate) return;
+    const dateString = clickedDate.toLocaleDateString('en-CA');
+
+    if (!tempStartDate || (tempStartDate && tempEndDate)) {
+      setTempStartDate(dateString);
+      setTempEndDate('');
+      setCustomStartDate(dateString);
+      setCustomEndDate('');
+    } else {
+      if (new Date(dateString) < new Date(tempStartDate)) {
+        setTempEndDate(tempStartDate);
+        setTempStartDate(dateString);
+        setCustomStartDate(dateString);
+        setCustomEndDate(tempStartDate);
+        setShowCustomDatePicker(false);
+        setPage(0);
+        fetchAllTabsData();
+      } else {
+        setTempEndDate(dateString);
+        setCustomEndDate(dateString);
+        setShowCustomDatePicker(false);
+        setPage(0);
         fetchAllTabsData();
       }
     }
-    setDateRangeMenuAnchor(null);
   };
 
-  // Apply header date range changes - called when Apply button next to date selector is clicked
-  const applyHeaderDateRange = () => {
-    if (!pendingHeaderDateRange.start || !pendingHeaderDateRange.end) return;
-    setHeaderDateRange(pendingHeaderDateRange);
-    setCustomStartDate(pendingHeaderDateRange.start);
-    setCustomEndDate(pendingHeaderDateRange.end);
-    setSelectedDateRange('custom');
-    // Reset to first page and fetch data with new date range
-    setPage(0);
-    fetchAllTabsData();
+  const isDateSelected = (day: string) => {
+    if (!day) return false;
+    const clickedDate = getDateFromCalendarPosition(day);
+    if (!clickedDate) return false;
+    const dateString = clickedDate.toLocaleDateString('en-CA');
+    return dateString === customStartDate || dateString === customEndDate;
+  };
+
+  const isDateInRange = (day: string) => {
+    if (!day || !customStartDate || !customEndDate) return false;
+    const clickedDate = getDateFromCalendarPosition(day);
+    if (!clickedDate) return false;
+    const dateString = clickedDate.toLocaleDateString('en-CA');
+    const date = new Date(dateString);
+    const start = new Date(customStartDate);
+    const end = new Date(customEndDate);
+    return date >= start && date <= end;
   };
 
   // Sorting functions
@@ -986,6 +1143,18 @@ const OperationsCentrePage: React.FC = () => {
     }
   };
 
+  const fetchClaimBatchesData = async () => {
+    try {
+      const response = await api.claims.getClaimBatches();
+      if (response && response.data) {
+        setClaimBatches(response.data.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching claim batches:', err);
+      setClaimBatches([]);
+    }
+  };
+
   // Fetch manually reconciled orders from API
   const fetchManuallyReconciledOrders = async (
     filtersOverride?: Record<string, any>,
@@ -1085,14 +1254,18 @@ const OperationsCentrePage: React.FC = () => {
     const activeTab = tabOverride !== undefined ? tabOverride : disputeSubTab;
 
     try {
-      // Fetch only the active tab to prevent redundant over-fetching
-      if (activeTab === 0) {
-        await fetchUnreconciledOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride, pageOverride, rowsPerPageOverride, activeTab);
-      } else if (activeTab === 1) {
-        await fetchManuallyReconciledOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride, pageOverride, rowsPerPageOverride, activeTab);
-      } else if (activeTab === 2) {
-        await fetchDisputeRaisedOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride, pageOverride, rowsPerPageOverride, activeTab);
+      // Fetch only the active tab to prevent redundant over-fetching, or all if activeTab is -1
+      const promises = [];
+      if (activeTab === 0 || activeTab === -1) {
+        promises.push(fetchUnreconciledOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride, pageOverride, rowsPerPageOverride, 0));
       }
+      if (activeTab === 1 || activeTab === -1) {
+        promises.push(fetchDisputeRaisedOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride, pageOverride, rowsPerPageOverride, 1));
+      }
+      if (activeTab === 2 || activeTab === -1) {
+        promises.push(fetchClaimBatchesData());
+      }
+      await Promise.all(promises);
     } catch (err) {
       console.error('Error fetching tab data:', err);
       setError('Failed to load data. Please try again.');
@@ -1117,7 +1290,7 @@ const OperationsCentrePage: React.FC = () => {
     if (isInitialRenderRef.current) {
       if (!hasFetchedOnInitialRef.current) {
         hasFetchedOnInitialRef.current = true;
-        fetchAllTabsData();
+        fetchAllTabsData(undefined, undefined, undefined, undefined, 0, undefined, -1);
         requestAnimationFrame(() => {
           isInitialRenderRef.current = false;
         });
@@ -1125,21 +1298,13 @@ const OperationsCentrePage: React.FC = () => {
       return;
     }
     // After initial render, fetch when dependencies change
-    fetchAllTabsData();
+    fetchAllTabsData(undefined, undefined, undefined, undefined, 0, undefined, -1);
   }, [selectedDateRange, customStartDate, customEndDate, selectedPlatform]);
-
-  // Fetch when tab changes
-  useEffect(() => {
-    if (!isInitialRenderRef.current) {
-      fetchAllTabsData(undefined, undefined, undefined, undefined, 0, undefined, disputeSubTab);
-    }
-  }, [disputeSubTab]);
 
   // Get current rows based on active tab
   const getCurrentRows = () => {
     if (disputeSubTab === 0) return unreconciledRows;
-    if (disputeSubTab === 1) return manuallyReconciledRows;
-    return disputedRows;
+        return disputedRows;
   };
 
   const current = getCurrentRows();
@@ -1320,6 +1485,158 @@ const OperationsCentrePage: React.FC = () => {
     setNoteDialogOpen(false);
     setPendingOrderIds([]);
     setNoteInput('');
+  };
+
+  const openClaimDialog = (orderId: string, platform: string) => {
+    setPendingClaim({ orderId, platform });
+    setClaimTicketInput('');
+    setClaimDialogOpen(true);
+  };
+
+  const closeClaimDialog = () => {
+    setClaimDialogOpen(false);
+    setPendingClaim(null);
+    setClaimTicketInput('');
+  };
+
+  // Claim Batch UI
+  const [batchClaimDialogOpen, setBatchClaimDialogOpen] = useState(false);
+  const [selectedBatchForClaim, setSelectedBatchForClaim] = useState<any>(null);
+
+  const openBatchClaimDialog = (batch: any) => {
+    setSelectedBatchForClaim(batch);
+    setClaimTicketInput('');
+    setBatchClaimDialogOpen(true);
+  };
+
+  const closeBatchClaimDialog = () => {
+    setBatchClaimDialogOpen(false);
+    setSelectedBatchForClaim(null);
+  };
+
+  // Track Claim UI
+  const [trackClaimDialogOpen, setTrackClaimDialogOpen] = useState(false);
+  const [selectedBatchForTracking, setSelectedBatchForTracking] = useState<any>(null);
+
+  const openTrackClaimDialog = (batch: any) => {
+    setSelectedBatchForTracking(batch);
+    setTrackClaimDialogOpen(true);
+  };
+
+  const closeTrackClaimDialog = () => {
+    setTrackClaimDialogOpen(false);
+    setSelectedBatchForTracking(null);
+  };
+
+  const handleMarkBatchFiledSubmit = async () => {
+    if (!claimTicketInput || !selectedBatchForClaim) return;
+    try {
+      setApiLoading(true);
+      await api.claims.markBatchFiled({
+        reason: selectedBatchForClaim.reason,
+        platform: selectedBatchForClaim.platform,
+        ticket_id: claimTicketInput,
+      });
+      closeBatchClaimDialog();
+      fetchClaimBatchesData();
+      if (selectedPlatform) {
+         fetchDisputeRaisedOrders(undefined, undefined, undefined, undefined, 0, undefined, disputeSubTab);
+      }
+    } catch (err) {
+      console.error('Failed to mark batch filed:', err);
+    } finally {
+      setApiLoading(false);
+    }
+  };
+
+  const handleExportBatch = async (batch: any) => {
+    try {
+      setApiLoading(true);
+      
+      // Batch stats come from an endpoint that doesn't filter by date,
+      // so we must fetch without date filters to get all matching orders.
+      const params: any = {
+        platform: selectedPlatform,
+        claim_status: batch.status, // Matches GetClaimBatches WHERE claim_status IS NOT NULL / ELIGIBLE
+        limit: 10000,
+        page: 1,
+      };
+      
+      const response = await api.transactions.getTotalTransactions(params);
+      
+      if (response.success && response.data) {
+        const responseData = response.data as any;
+        const transactionData = responseData.transactions || responseData.data || [];
+        
+        const batchOrders = transactionData.filter((r: any) => {
+          const r1 = r.claim_reason;
+          const r2 = r.metadata?.mismatch_reason;
+          const r3 = r.metadata?.manual_override_note;
+          const r4 = r.mismatch_reason;
+          const b = batch.reason;
+          return r1 === b || r2 === b || r3 === b || r4 === b;
+        });
+
+        if (batchOrders.length === 0) {
+          const sample = transactionData.length > 0 
+            ? (transactionData[0].claim_reason || transactionData[0].metadata?.mismatch_reason || transactionData[0].metadata?.manual_override_note || "unknown")
+            : "no-data";
+          setSnackbarMsg(`Found 0 for "${batch.reason}". Total fetched: ${transactionData.length}. Sample: ${sample}`);
+          setSnackbarOpen(true);
+          return;
+        }
+        
+        let csv = 'Order ID,Original Sale Price,Reimbursement Received,Gap Amount,Claim Reason\n';
+        batchOrders.forEach((o: any) => {
+          const originalSalePrice = o.order_value || o.metadata?.order_value?.total || 0;
+          const reimbursementReceived = o.settlement_amount || 0;
+          const gapAmount = o.diff !== undefined ? o.diff : originalSalePrice;
+          csv += `"${o.order_id}",${originalSalePrice},${reimbursementReceived},${gapAmount},"${o.claim_reason}"\n`;
+        });
+        
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `claim_proof_${batch.reason.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`;
+        a.click();
+      } else {
+        setSnackbarMsg("Failed to load prepared orders.");
+        setSnackbarOpen(true);
+      }
+    } catch (err) {
+      console.error('Failed to export batch:', err);
+      setSnackbarMsg("Failed to export batch");
+      setSnackbarOpen(true);
+    } finally {
+      setApiLoading(false);
+    }
+  };
+
+  const handleMarkClaimFiled = async () => {
+    if (!pendingClaim) return;
+    if (!claimTicketInput.trim()) {
+      setSnackbarMsg('Please enter a valid ticket ID');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    try {
+      const response = await api.claims.markClaimFiled(pendingClaim.orderId, {
+        ticket_id: claimTicketInput,
+        platform: pendingClaim.platform,
+      });
+      if (response && response.success) {
+        setSnackbarMsg('Claim marked as filed successfully');
+        setSnackbarOpen(true);
+        closeClaimDialog();
+        fetchAllTabsData(); // Refresh data
+      }
+    } catch (err) {
+      console.error('Failed to mark claim filed', err);
+      setSnackbarMsg('Failed to mark claim as filed');
+      setSnackbarOpen(true);
+    }
   };
 
   const confirmManualAction = async () => {
@@ -1829,7 +2146,7 @@ const OperationsCentrePage: React.FC = () => {
           <Box sx={{ p: 2, maxHeight: position.maxHeight ? `${position.maxHeight - 80}px` : '420px', overflowY: 'auto' }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               {/* Previous Status */}
-              {(disputeSubTab === 1 || disputeSubTab === 2) && (
+              {(disputeSubTab === 1) && (
                 <Box
                   sx={{
                     p: 1.5,
@@ -1991,278 +2308,363 @@ const OperationsCentrePage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Card sx={{ mb: 3 }}>
-        <CardContent sx={{ p: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Tabs value={disputeSubTab} onChange={(_, v) => { setDisputeSubTab(v); setPage(0); }} sx={{ '& .MuiTab-root': { textTransform: 'none', minHeight: 32 } }}>
-              <Tab label={`Mismatched Orders (${getUnreconciledTotalCount()})`} />
-              <Tab label={`Manually Reconciled (${getManuallyReconciledCount()})`} />
-              <Tab label={`Disputed (${getDisputedCount()})`} />
-            </Tabs>
-            {/* Right controls: applied filter chips + filter + platform + send button */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              {/* Applied filter summary (left of Filter button) */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', maxWidth: 520 }}>
-                {/* Order ID chips summary (matches TransactionSheet behavior) */}
-                {orderIdChips.length > 0 && (
-                  <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, border: '1px solid #e5e7eb', borderRadius: '9999px', fontSize: '0.75rem', color: '#111827', background: '#e0f2fe' }}>
-                    <span>{`Order IDs: ${orderIdChips.length} selected`}</span>
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        handleOrderIdSearchClear();
-                      }}
-                      sx={{ p: 0.25, color: '#6b7280', '&:hover': { color: '#111827' } }}
-                      aria-label={`Clear Order IDs`}
-                    >
+    <Box sx={{
+      minHeight: '100vh',
+      background: '#fafafa',
+      position: 'relative',
+      overflow: 'hidden',
+      mt: -4
+    }}>
+      {/* View Detailed Transactions Button */}
+      <Fab
+        variant="extended"
+        color="primary"
+        aria-label="View detailed transactions"
+        sx={{
+          position: 'fixed',
+          right: 24,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          zIndex: 1000,
+          background: '#1a1a1a',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+          '&:hover': {
+            background: '#000000',
+            transform: 'translateY(-50%) scale(1.02)',
+            boxShadow: '0 6px 24px rgba(0, 0, 0, 0.2)',
+          },
+          writingMode: 'vertical-rl',
+          textOrientation: 'mixed',
+          height: 180,
+          width: 50,
+          borderRadius: '20px',
+        }}
+        onClick={() => {
+          console.log('Button clicked, setting showTransactionSheet to true');
+          setShowTransactionSheet(true);
+        }}
+      >
+        <ArrowUpwardIcon sx={{ mb: 1, transform: 'rotate(90deg)', color: 'white' }} />
+        <Typography variant="body2" sx={{ fontWeight: 500, color: 'white', fontSize: '0.75rem' }}>
+          View Transactions
+        </Typography>
+      </Fab>
+
+      <Box sx={{ p: { xs: 2, md: 3 }, position: 'relative', zIndex: 1 }}>
+        {/* Header Controls */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+          {/* Tabs */}
+          <Tabs 
+            value={disputeSubTab} 
+            onChange={(_, v) => { setDisputeSubTab(v); setPage(0); }} 
+            sx={{ 
+              '& .MuiTab-root': { textTransform: 'none', minHeight: 32, minWidth: 'auto', px: 2, fontWeight: 500, fontSize: '0.875rem' } 
+            }}
+          >
+            <Tab value={2} label="Home" />
+            <Tab value={1} label={`Dispute Required (${getDisputedCount()})`} />
+          </Tabs>
+
+          {/* Controls */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            {/* Applied filter chips */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', maxWidth: 520 }}>
+              {orderIdChips.length > 0 && (
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, border: '1px solid #e5e7eb', borderRadius: '9999px', fontSize: '0.75rem', color: '#111827', background: '#e0f2fe' }}>
+                  <span>{`Order IDs: ${orderIdChips.length} selected`}</span>
+                  <IconButton size="small" onClick={() => handleOrderIdSearchClear()} sx={{ p: 0.25, color: '#6b7280', '&:hover': { color: '#111827' } }}>
+                    <CloseIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </Box>
+              )}
+              {Object.entries(columnFilters).map(([col, val]) => {
+                if (!val || (typeof val === 'string' && !val.trim()) || (Array.isArray(val) && val.length === 0)) return null;
+                let label = '';
+                if (typeof val === 'string') label = `${col}: ${val}`;
+                else if (Array.isArray(val)) label = `${col}: ${val.join(', ')}`;
+                else if (val && (val.min || val.max)) label = `${col}: ${val.min ?? ''} - ${val.max ?? ''}`;
+                else if (val && (val.from || val.to)) label = `${col}: ${val.from ?? ''} → ${val.to ?? ''}`;
+                else return null;
+                return (
+                  <Box key={`${col}-${label}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, border: '1px solid #e5e7eb', borderRadius: '9999px', fontSize: '0.75rem', color: '#111827', background: '#f3f4f6' }}>
+                    <span>{label}</span>
+                    <IconButton size="small" onClick={() => {
+                      const next = { ...columnFilters } as Record<string, any>;
+                      delete next[col];
+                      setColumnFilters(next);
+                      setPage(0);
+                      fetchAllTabsData(next);
+                    }} sx={{ p: 0.25, color: '#6b7280', '&:hover': { color: '#111827' } }}>
                       <CloseIcon sx={{ fontSize: 14 }} />
                     </IconButton>
                   </Box>
-                )}
-                {Object.entries(columnFilters).map(([col, val]) => {
-                  if (!val || (typeof val === 'string' && !val.trim()) || (Array.isArray(val) && val.length === 0)) return null;
-                  let label = '';
-                  if (typeof val === 'string') label = `${col}: ${val}`;
-                  else if (Array.isArray(val)) label = `${col}: ${val.join(', ')}`;
-                  else if (val && (val.min || val.max)) label = `${col}: ${val.min ?? ''} - ${val.max ?? ''}`;
-                  else if (val && (val.from || val.to)) label = `${col}: ${val.from ?? ''} → ${val.to ?? ''}`;
-                  else return null;
-                  return (
-                    <Box key={`${col}-${label}`} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.25, border: '1px solid #e5e7eb', borderRadius: '9999px', fontSize: '0.75rem', color: '#111827', background: '#f3f4f6' }}>
-                      <span>{label}</span>
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          const next = { ...columnFilters } as Record<string, any>;
-                          delete next[col];
-                          setColumnFilters(next);
-                          setPage(0);
-                          fetchAllTabsData(next);
-                        }}
-                        sx={{ p: 0.25, color: '#6b7280', '&:hover': { color: '#111827' } }}
-                        aria-label={`Clear ${col} filter`}
-                      >
-                        <CloseIcon sx={{ fontSize: 14 }} />
-                      </IconButton>
-                    </Box>
-                  );
-                })}
-              </Box>
-
-              {/* Date Range Selector - Next to Filter button */}
-              <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5,
-                padding: '4px 8px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                backgroundColor: '#f9fafb',
-                flexShrink: 0,
-              }}>
-                {/* Date label */}
-                <Typography variant="body2" sx={{
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  fontSize: '0.7rem',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}>
-                  Date Range:
-                </Typography>
-
-                {/* Date inputs */}
-                <Box sx={{
-                  display: 'flex',
-                  gap: 0.5,
-                  alignItems: 'center',
-                  flexShrink: 0,
-                }}>
-                  <TextField
-                    label="From"
-                    type="date"
-                    size="small"
-                    value={pendingHeaderDateRange.start}
-                    onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, start: e.target.value }))}
-                    InputLabelProps={{ shrink: true }}
-                    sx={{
-                      width: '110px',
-                      '& .MuiOutlinedInput-root': {
-                        backgroundColor: '#ffffff',
-                        fontSize: '0.7rem',
-                        padding: '4px 8px',
-                      },
-                      '& .MuiInputLabel-root': {
-                        fontSize: '0.7rem',
-                      },
-                      '& input': {
-                        padding: '6px 4px',
-                        fontSize: '0.7rem'
-                      }
-                    }}
-                  />
-                  <Typography variant="body2" sx={{
-                    color: '#6b7280',
-                    fontSize: '0.7rem',
-                    flexShrink: 0,
-                  }}>
-                    to
-                  </Typography>
-                  <TextField
-                    label="To"
-                    type="date"
-                    size="small"
-                    value={pendingHeaderDateRange.end}
-                    onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, end: e.target.value }))}
-                    InputLabelProps={{ shrink: true }}
-                    sx={{
-                      width: '110px',
-                      '& .MuiOutlinedInput-root': {
-                        backgroundColor: '#ffffff',
-                        fontSize: '0.7rem',
-                        padding: '4px 8px',
-                      },
-                      '& .MuiInputLabel-root': {
-                        fontSize: '0.7rem',
-                      },
-                      '& input': {
-                        padding: '6px 4px',
-                        fontSize: '0.7rem'
-                      }
-                    }}
-                  />
-                </Box>
-
-                {/* Divider */}
-                <Box sx={{
-                  width: '1px',
-                  height: '18px',
-                  backgroundColor: '#d1d5db',
-                  mx: 0.25,
-                  flexShrink: 0
-                }} />
-
-                {/* Apply Button */}
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={applyHeaderDateRange}
-                  disabled={
-                    !pendingHeaderDateRange.start ||
-                    !pendingHeaderDateRange.end ||
-                    (pendingHeaderDateRange.start === headerDateRange.start &&
-                      pendingHeaderDateRange.end === headerDateRange.end)
-                  }
-                  sx={{
-                    textTransform: 'none',
-                    fontSize: '0.7rem',
-                    padding: '3px 10px',
-                    minWidth: 'auto',
-                    backgroundColor: '#1f2937',
-                    flexShrink: 0,
-                    whiteSpace: 'nowrap',
-                    '&:hover': { backgroundColor: '#374151' },
-                    '&:disabled': {
-                      backgroundColor: '#9ca3af',
-                      color: '#ffffff',
-                    },
-                  }}
-                >
-                  Apply
-                </Button>
-              </Box>
-
-              {/* New Filter button matching reconciliation behavior */}
-              <Button
-                variant="outlined"
-                startIcon={<FilterIcon />}
-                onClick={(event) => openFilterPopover(activeFilterColumn || 'Order ID', event.currentTarget)}
-                sx={{
-                  borderColor: '#6B7280',
-                  color: '#6B7280',
-                  textTransform: 'none',
-                  minWidth: 120,
-                  minHeight: 36,
-                  px: 1.5,
-                  fontSize: '0.7875rem',
-                  '&:hover': {
-                    borderColor: '#4B5563',
-                    backgroundColor: 'rgba(107, 114, 128, 0.04)',
-                  },
-                }}
-              >
-                Filter
-              </Button>
-
-              <Button
-                variant="outlined"
-                endIcon={<KeyboardArrowDownIcon />}
-                startIcon={<StorefrontIcon />}
-                onClick={(e) => setPlatformMenuAnchorEl(e.currentTarget)}
-                sx={{
-                  borderColor: '#6B7280', color: '#6B7280', textTransform: 'none',
-                  minWidth: 'auto', minHeight: 36, px: 1.5, fontSize: '0.7875rem', '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107,114,128,0.04)' }
-                }}
-              >
-                {selectedPlatform === 'flipkart' ? 'Flipkart' : selectedPlatform === 'amazon' ? 'Amazon' : 'D2C'}
-              </Button>
-              <Menu
-                anchorEl={platformMenuAnchorEl}
-                open={Boolean(platformMenuAnchorEl)}
-                onClose={() => setPlatformMenuAnchorEl(null)}
-                PaperProps={{
-                  sx: {
-                    mt: 1,
-                    minWidth: 220,
-                    borderRadius: '10px',
-                    border: '1px solid #e5e7eb',
-                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)',
-                    p: 0.75,
-                    backgroundColor: '#ffffff'
-                  }
-                }}
-              >
-                <Box sx={{ p: 1, minWidth: 240 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', mb: 1 }}>Select Platform</Typography>
-                  <RadioGroup
-                    value={selectedPlatform}
-                    onChange={(e) => {
-                      const newPlatform = e.target.value as 'flipkart' | 'amazon' | 'd2c';
-                      setSelectedPlatform(newPlatform);
-                      setPlatformMenuAnchorEl(null);
-                      // Data fetch will be triggered by useEffect watching selectedPlatform
-                    }}
-                  >
-                    {(['flipkart', 'amazon', 'd2c'] as const).map((p) => (
-                      <MenuItem
-                        key={p}
-                        onClick={() => {
-                          setSelectedPlatform(p);
-                          setPlatformMenuAnchorEl(null);
-                          // Data fetch will be triggered by useEffect watching selectedPlatform
-                        }}
-                        sx={{ py: 1, px: 1, borderRadius: '8px' }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Radio size="small" checked={selectedPlatform === p} value={p} />
-                          <Box>
-                            <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p === 'flipkart' ? 'Flipkart' : p === 'amazon' ? 'Amazon' : 'D2C'}</Typography>
-                            <Typography variant="caption" sx={{ color: '#6b7280' }}>{p === 'd2c' ? 'Website / D2C' : 'E-commerce marketplace'}</Typography>
-                          </Box>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </RadioGroup>
-                </Box>
-              </Menu>
+                );
+              })}
             </Box>
+
+            {/* Date Range Selector */}
+            <Button
+              variant="outlined"
+              endIcon={<KeyboardArrowDownIcon />}
+              startIcon={<CalendarTodayIcon />}
+              onClick={(event) => setDateRangeMenuAnchor(event.currentTarget)}
+              sx={{
+                borderColor: '#6B7280', color: '#6B7280', textTransform: 'none',
+                minWidth: 200, minHeight: 36, px: 1.5, fontSize: '0.7875rem',
+                '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' },
+              }}
+            >
+              <Box sx={{ textAlign: 'left' }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
+                  {getCurrentDateRangeText()}
+                </Typography>
+              </Box>
+            </Button>
+            <Menu
+              anchorEl={dateRangeMenuAnchor}
+              open={Boolean(dateRangeMenuAnchor)}
+              onClose={() => setDateRangeMenuAnchor(null)}
+              PaperProps={{
+                sx: { mt: 1, minWidth: 250, borderRadius: 0.5, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', border: '1px solid #e5e7eb' }
+              }}
+            >
+              {dateRangeOptions.map((option) => (
+                <MenuItem key={option.value} onClick={() => handleDateRangeSelect(option.value)} sx={{ py: 1.5, px: 2, '&:hover': { backgroundColor: '#f9fafb' } }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>{option.label}</Typography>
+                    <Typography variant="caption" sx={{ color: '#6b7280' }}>{option.dates}</Typography>
+                  </Box>
+                </MenuItem>
+              ))}
+            </Menu>
+
+            {/* Custom Calendar Popup */}
+            {showCustomDatePicker && (
+              <Box ref={calendarPopupRef} sx={{ position: 'absolute', top: 120, right: 24, zIndex: 1000, mt: 1, bgcolor: 'white', borderRadius: 2, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', border: '1px solid #e5e7eb', p: 1.8, minWidth: 270 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.8, px: 0.9 }}>
+                  <IconButton size="small" onClick={() => handleCalendarMonthChange(-1)} sx={{ color: '#6b7280' }}>
+                    <KeyboardArrowDownIcon sx={{ transform: 'rotate(90deg)' }} />
+                  </IconButton>
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f2937', fontSize: '1.0125rem' }}>{currentCalendarMonth}</Typography>
+                  <IconButton size="small" onClick={() => handleCalendarMonthChange(1)} sx={{ color: '#6b7280' }}>
+                    <KeyboardArrowDownIcon sx={{ transform: 'rotate(-90deg)' }} />
+                  </IconButton>
+                </Box>
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.9, mb: 0.9 }}>
+                  {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
+                    <Typography key={day} variant="caption" sx={{ textAlign: 'center', color: '#6b7280', fontWeight: 500, py: 1 }}>{day}</Typography>
+                  ))}
+                </Box>
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.9 }}>
+                  {getCalendarDays().map((day, index) => (
+                    <Box key={index} onClick={() => handleCalendarDateClick(day)} sx={{ aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: day ? 'pointer' : 'default', borderRadius: 1, fontSize: '0.7875rem', fontWeight: 500, color: day ? '#1f2937' : 'transparent', border: day && isDateInRange(day) ? '1px solid #3b82f6' : 'none', '&:hover': day ? { backgroundColor: '#f3f4f6' } : {}, ...(day && isDateSelected(day) && { color: '#1d4ed8', fontWeight: 700 }), ...(day && isDateInRange(day) && !isDateSelected(day) && { color: '#3b82f6' }) }}>
+                      {day}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            {/* Filter Button */}
+            <Button variant="outlined" startIcon={<FilterIcon />} onClick={(event) => openFilterPopover(activeFilterColumn || 'Order ID', event.currentTarget)} sx={{ borderColor: '#6B7280', color: '#6B7280', textTransform: 'none', minWidth: 120, minHeight: 36, px: 1.5, fontSize: '0.7875rem', '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' } }}>
+              Filter
+            </Button>
+
+            {/* Platform Selector */}
+            <Button variant="outlined" endIcon={<KeyboardArrowDownIcon />} startIcon={<StorefrontIcon />} onClick={(e) => setPlatformMenuAnchorEl(e.currentTarget)} sx={{ borderColor: '#6B7280', color: '#6B7280', textTransform: 'none', minWidth: 'auto', minHeight: 36, px: 1.5, fontSize: '0.7875rem', '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107,114,128,0.04)' } }}>
+              {selectedPlatform === 'flipkart' ? 'Flipkart' : selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : 'D2C'}
+            </Button>
+            <Menu anchorEl={platformMenuAnchorEl} open={Boolean(platformMenuAnchorEl)} onClose={() => setPlatformMenuAnchorEl(null)} PaperProps={{ sx: { mt: 1, minWidth: 220, borderRadius: '10px', border: '1px solid #e5e7eb', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)', p: 0.75, backgroundColor: '#ffffff' } }}>
+              <Box sx={{ p: 1, minWidth: 240 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', mb: 1 }}>Select Platform</Typography>
+                <RadioGroup value={selectedPlatform} onChange={(e) => { setSelectedPlatform(e.target.value as any); setPlatformMenuAnchorEl(null); }}>
+                  {(['flipkart', 'amazon', 'amazon_uk', 'd2c'] as const).map((p) => (
+                    <MenuItem key={p} onClick={() => { setSelectedPlatform(p); setPlatformMenuAnchorEl(null); }} sx={{ py: 1, px: 1, borderRadius: '8px' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Radio size="small" checked={selectedPlatform === p} value={p} />
+                        <Box>
+                          <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p === 'flipkart' ? 'Flipkart' : p === 'amazon' ? 'Amazon' : p === 'amazon_uk' ? 'Amazon UK' : 'D2C'}</Typography>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>{p === 'd2c' ? 'Website / D2C' : 'E-commerce marketplace'}</Typography>
+                        </Box>
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </RadioGroup>
+              </Box>
+            </Menu>
           </Box>
-        </CardContent>
-      </Card>
+        </Box>
 
+      {/* Claims Dashboard */}
+      {disputeSubTab === 2 && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* Metrics Cards */}
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+            <Card sx={{ width: 260, borderRadius: 1, background: '#ffffff', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+              <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.875rem' }}>Claims Raised</Typography>
+                  <Box sx={{ px: 1.5, py: 0.5, borderRadius: 1, background: '#f3f4f6', color: '#374151', fontWeight: 600, fontSize: '0.875rem' }}>
+                    {filteredBatches.filter(b => b.status !== 'ELIGIBLE').length}
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
 
+            <Card sx={{ width: 260, borderRadius: 1, background: '#ffffff', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+              <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.875rem' }}>Claims Approved</Typography>
+                    <Box sx={{ px: 1.5, py: 0.5, borderRadius: 1, background: '#f3f4f6', color: '#374151', fontWeight: 600, fontSize: '0.875rem' }}>
+                      {filteredBatches.filter(b => ['APPROVED', 'REIMBURSED', 'SUCCESS'].includes(b.status)).length}
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.8125rem' }}>Value</Typography>
+                    <Typography sx={{ color: '#111827', fontWeight: 700, fontSize: '1rem' }}>
+                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(filteredBatches.filter(b => ['APPROVED', 'REIMBURSED', 'SUCCESS'].includes(b.status)).reduce((sum, b) => sum + (Number(b.total_gap) || 0), 0))}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
 
+            <Card sx={{ width: 260, borderRadius: 1, background: '#ffffff', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+              <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.875rem' }}>Reimbursed</Typography>
+                  <Typography sx={{ color: '#111827', fontWeight: 700, fontSize: '1.25rem' }}>
+                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(filteredBatches.filter(b => ['REIMBURSED', 'SUCCESS'].includes(b.status)).reduce((sum, b) => sum + (Number(b.total_gap) || 0), 0))}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* Claim Tags */}
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            {['All', 'Action Required', 'In-progress', 'Approved'].map((tag) => (
+              <Chip
+                key={tag}
+                label={tag}
+                onClick={() => setActiveClaimTag(tag)}
+                sx={{
+                  fontWeight: 500,
+                  fontSize: '0.8125rem',
+                  cursor: 'pointer',
+                  backgroundColor: activeClaimTag === tag ? '#e5e7eb' : 'transparent',
+                  color: activeClaimTag === tag ? '#111827' : '#6b7280',
+                  border: activeClaimTag === tag ? '1px solid #d1d5db' : '1px solid #e5e7eb',
+                  '&:hover': {
+                    backgroundColor: activeClaimTag === tag ? '#e5e7eb' : '#f9fafb',
+                  }
+                }}
+              />
+            ))}
+          </Box>
+
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {filteredBatches.length === 0 && !apiLoading && (
+              <Typography sx={{ color: '#6b7280', width: '100%', textAlign: 'center', mt: 4 }}>No claim batches available.</Typography>
+            )}
+            {filteredBatches
+              .filter((batch) => {
+                if (activeClaimTag === 'All') return true;
+                if (activeClaimTag === 'Action Required') return batch.status === 'ELIGIBLE';
+                if (activeClaimTag === 'In-progress') return batch.status === 'FILED';
+                if (activeClaimTag === 'Approved') return batch.status === 'APPROVED' || batch.status === 'SUCCESS';
+                return true;
+              })
+              .map((batch, index) => {
+            const isActionReq = batch.status === 'ELIGIBLE';
+            const badgeBg = isActionReq ? '#f3f4f6' : '#f3e8ff';
+            const badgeColor = isActionReq ? '#374151' : '#7e22ce';
+            const badgeText = isActionReq ? 'Action Required' : (batch.status === 'FILED' ? 'In Progress' : batch.status);
+
+            return (
+              <Card key={index} sx={{ width: 280, borderRadius: 2, border: '1px solid #e5e7eb', boxShadow: 'none' }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                    <Chip label={badgeText} size="small" sx={{ background: badgeBg, color: badgeColor, fontWeight: 600, fontSize: '0.75rem', height: 24 }} />
+
+                  </Box>
+                  
+                  <Typography variant="body2" sx={{ color: '#374151', fontWeight: 500, mb: 2, lineHeight: 1.4, fontSize: '0.8125rem' }}>
+                    Reason: <span style={{ color: '#111827', fontWeight: 700 }}>{batch.reason}</span>
+                  </Typography>
+
+                  <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
+                    <Box sx={{ flex: 1, p: 1.5, borderRadius: 1, background: '#f9fafb' }}>
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500 }}>Total Gap</Typography>
+                      <Typography variant="subtitle1" sx={{ color: '#111827', fontWeight: 700, mt: 0.5 }}>
+                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(batch.total_gap)}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ flex: 1, p: 1.5, borderRadius: 1, background: '#f9fafb' }}>
+                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500 }}>Prepared Orders</Typography>
+                      <Typography variant="subtitle1" sx={{ color: '#111827', fontWeight: 700, mt: 0.5 }}>
+                        {batch.total_orders}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button 
+                        fullWidth 
+                        variant="outlined" 
+                        sx={{ textTransform: 'none', fontWeight: 600, py: 0.75, fontSize: '0.8125rem', borderColor: '#e5e7eb', color: '#374151', '&:hover': { background: '#f9fafb' } }}
+                        onClick={() => {
+                          setDisputeSubTab(1); // Jump to Dispute Required tab
+                        }}
+                      >
+                        View Orders
+                      </Button>
+                      <Button 
+                        fullWidth 
+                        variant="outlined" 
+                        sx={{ textTransform: 'none', fontWeight: 600, py: 0.75, fontSize: '0.8125rem', borderColor: '#e5e7eb', color: '#374151', '&:hover': { background: '#f9fafb' } }}
+                        onClick={() => handleExportBatch(batch)}
+                      >
+                        Export Proof
+                      </Button>
+                    </Box>
+                    {batch.status === 'FILED' ? (
+                      <Button 
+                        fullWidth 
+                        variant="outlined" 
+                        sx={{ 
+                          textTransform: 'none', fontWeight: 600, py: 0.75, fontSize: '0.8125rem', borderColor: '#e5e7eb', color: '#374151', '&:hover': { background: '#f9fafb' } 
+                        }}
+                        onClick={() => openTrackClaimDialog(batch)}
+                      >
+                        Track Status
+                      </Button>
+                    ) : (
+                      <Button 
+                        fullWidth 
+                        variant="contained" 
+                        sx={{ 
+                          background: '#7A5DBF', 
+                          color: 'white', 
+                          textTransform: 'none', fontWeight: 600, py: 0.75, fontSize: '0.8125rem', boxShadow: 'none', '&:hover': { background: '#624a9e', boxShadow: 'none' } 
+                        }}
+                        onClick={() => openBatchClaimDialog(batch)}
+                      >
+                        Mark Batch Filed
+                      </Button>
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </Box>
+      </Box>
+      )}
+
+      {/* Legacy Tabs Table */}
+      {disputeSubTab !== 2 && (
       <Card sx={{
         background: '#ffffff',
         borderRadius: '12px',
@@ -2272,10 +2674,12 @@ const OperationsCentrePage: React.FC = () => {
       }}>
         <CardContent sx={{ p: 0 }}>
           <TableContainer sx={{
-            maxHeight: 'calc(100vh - 200px)',
+            height: 'calc(100vh - 140px)',
+            overflowY: 'scroll',
             overflowX: 'auto',
           }}>
             <Table stickyHeader sx={{
+              minWidth: 1200,
               borderCollapse: 'separate',
               borderSpacing: 0,
               '& .MuiTableCell-root': {
@@ -2610,6 +3014,19 @@ const OperationsCentrePage: React.FC = () => {
                       <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Remark</Typography>
                       </TableCell>
+                      {disputeSubTab === 1 && (
+                        <>
+                          <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Claim Status</Typography>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Claim Reason</Typography>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Claim Action</Typography>
+                          </TableCell>
+                        </>
+                      )}
                     </>
                   )}
                 </TableRow>
@@ -2758,7 +3175,7 @@ const OperationsCentrePage: React.FC = () => {
                         </TableCell>
                       </TableRow>
                     );
-                  } else if (disputeSubTab === 1 || disputeSubTab === 2) {
+                  } else if (disputeSubTab === 1) {
                     // Flat detailed row for Manually Reconciled or Disputed tabs
                     const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || '';
                     const amount = row["Amount"] || row["Order Value"] || 0;
@@ -2769,6 +3186,10 @@ const OperationsCentrePage: React.FC = () => {
                     const remark = row["Remark"] || 'Not Available';
                     const eventType = row["Event Type"] || 'Sale';
                     const status = row.originalData?.breakups?.recon_status || row.originalData?.status || 'settlement_matched';
+                    const claimStatus = row.originalData?.claim_status || null;
+                    const claimReason = row.originalData?.claim_reason || null;
+                    const claimTicketId = row.originalData?.claim_ticket_id || null;
+                    const platform = row.originalData?.platform || 'amazon';
 
                     return (
                       <TableRow key={`flat-${index}`} sx={{ '&:hover': { background: '#f3f4f6' }, transition: 'all 0.3s ease' }}>
@@ -2800,11 +3221,11 @@ const OperationsCentrePage: React.FC = () => {
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
                             <Chip
-                              label={disputeSubTab === 1 ? 'Manually Reconciled' : 'Disputed'}
+                              label='Dispute Required'
                               size="small"
                               sx={{
-                                background: disputeSubTab === 1 ? '#dcfce7' : '#fee2e2',
-                                color: disputeSubTab === 1 ? '#059669' : '#dc2626',
+                                background: '#fee2e2',
+                                color: '#dc2626',
                                 fontWeight: 600,
                                 fontSize: '0.75rem',
                                 height: 24,
@@ -2848,6 +3269,36 @@ const OperationsCentrePage: React.FC = () => {
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>{remark}</Typography>
                         </TableCell>
+                        {disputeSubTab === 1 && (
+                          <>
+                            <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                              <Chip label={claimStatus || 'ELIGIBLE'} size="small" sx={{ background: claimStatus === 'FILED' ? '#e0e7ff' : '#f3f4f6', color: claimStatus === 'FILED' ? '#4338ca' : '#4b5563', fontWeight: 600, fontSize: '0.75rem' }} />
+                            </TableCell>
+                            <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                              <Typography variant="body2" sx={{ color: '#4b5563', fontSize: '0.75rem' }}>{claimReason || row.originalData?.metadata?.mismatch_reason || 'N/A'}</Typography>
+                            </TableCell>
+                            <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                              {claimStatus !== 'FILED' ? (
+                                <Button size="small" variant="contained" onClick={() => openClaimDialog(orderId, platform)} sx={{ background: '#7A5DBF', color: 'white', textTransform: 'none', fontSize: '0.75rem', py: 0.5, minHeight: 28, '&:hover': { background: '#624a9e' } }}>
+                                  File Claim
+                                </Button>
+                              ) : (
+                                <Chip
+                                  label="Claim Raised"
+                                  size="small"
+                                  sx={{
+                                    background: '#dcfce7',
+                                    color: '#059669',
+                                    fontWeight: 600,
+                                    fontSize: '0.75rem',
+                                    height: 24,
+                                    '& .MuiChip-label': { px: 1 },
+                                  }}
+                                />
+                              )}
+                            </TableCell>
+                          </>
+                        )}
                       </TableRow>
                     );
                   }
@@ -2884,6 +3335,7 @@ const OperationsCentrePage: React.FC = () => {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Minimal Raise Dispute Dialog */}
       <Dialog open={raiseDialogOpen} onClose={closeRaiseDispute} PaperProps={{ sx: { borderRadius: 1, minWidth: 420 } }}>
@@ -2903,7 +3355,7 @@ const OperationsCentrePage: React.FC = () => {
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2 }}>
           <Button variant="text" onClick={closeRaiseDispute} sx={{ color: '#111827' }}>Cancel</Button>
-          <Button variant="contained" onClick={sendRaiseDispute} sx={{ boxShadow: 'none' }}>Send</Button>
+          <Button variant="contained" onClick={sendRaiseDispute} sx={{ boxShadow: 'none', background: '#7A5DBF', '&:hover': { background: '#624a9e' } }}>Send</Button>
         </DialogActions>
       </Dialog>
 
@@ -3019,7 +3471,113 @@ const OperationsCentrePage: React.FC = () => {
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2 }}>
           <Button variant="text" onClick={closeNoteDialog} sx={{ color: '#111827' }}>Cancel</Button>
-          <Button variant="contained" onClick={confirmManualAction} sx={{ boxShadow: 'none' }}>Submit</Button>
+          <Button variant="contained" onClick={confirmManualAction} sx={{ boxShadow: 'none', background: '#7A5DBF', '&:hover': { background: '#624a9e' } }}>Submit</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Claim Ticket Dialog */}
+      <Dialog open={claimDialogOpen} onClose={closeClaimDialog} PaperProps={{ sx: { borderRadius: 2, minWidth: 400 } }}>
+        <DialogTitle sx={{ pb: 1 }}>Mark Claim Filed</DialogTitle>
+        <DialogContent sx={{ pb: 1 }}>
+          <Typography variant="body2" sx={{ color: '#4b5563', mb: 2 }}>
+            Enter the ticket ID provided by {pendingClaim?.platform === 'flipkart' ? 'Flipkart' : 'Amazon'} after filing the claim.
+          </Typography>
+          <TextField
+            label="Ticket ID"
+            placeholder="e.g. TICK-123456"
+            value={claimTicketInput}
+            onChange={(e) => setClaimTicketInput(e.target.value)}
+            fullWidth
+            size="small"
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button variant="text" onClick={closeClaimDialog} sx={{ color: '#111827' }}>Cancel</Button>
+          <Button variant="contained" onClick={handleMarkClaimFiled} sx={{ boxShadow: 'none', background: '#7A5DBF', '&:hover': { background: '#624a9e' } }}>Submit</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Claim Batch Dialog */}
+      <Dialog open={batchClaimDialogOpen} onClose={closeBatchClaimDialog} PaperProps={{ sx: { borderRadius: 2, minWidth: 400 } }}>
+        <DialogTitle sx={{ pb: 1 }}>Mark Batch Claim Filed</DialogTitle>
+        <DialogContent sx={{ pb: 1 }}>
+          <Typography variant="body2" sx={{ color: '#4b5563', mb: 3 }}>
+            You are marking the entire batch of <b>{selectedBatchForClaim?.total_orders}</b> orders for <b>{selectedBatchForClaim?.reason}</b> as filed. Enter the Ticket ID (or Case ID) from {selectedBatchForClaim?.platform} Seller Central.
+          </Typography>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>Ticket ID / Case ID</Typography>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="e.g. CASE-98127391"
+            value={claimTicketInput}
+            onChange={(e) => setClaimTicketInput(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button variant="text" onClick={closeBatchClaimDialog} sx={{ color: '#111827' }}>Cancel</Button>
+          <Button variant="contained" onClick={handleMarkBatchFiledSubmit} disabled={!claimTicketInput} sx={{ background: '#7A5DBF', color: 'white', '&:hover': { background: '#624a9e' } }}>
+            Confirm File
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Track Claim Status Dialog */}
+      <Dialog open={trackClaimDialogOpen} onClose={closeTrackClaimDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ borderBottom: '1px solid #e5e7eb', pb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>Track Claim Status</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {selectedBatchForTracking && (
+            <Box>
+              <Box sx={{ mb: 3, p: 2, background: '#f9fafb', borderRadius: 2 }}>
+                <Typography variant="body2" color="text.secondary">Batch Reason: <strong style={{ color: '#111827' }}>{selectedBatchForTracking.reason}</strong></Typography>
+                <Typography variant="body2" color="text.secondary">Total Orders: <strong style={{ color: '#111827' }}>{selectedBatchForTracking.total_orders}</strong></Typography>
+                <Typography variant="body2" color="text.secondary">Platform: <strong style={{ color: '#111827' }}>{selectedPlatform.toUpperCase()}</strong></Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Claim Ticket ID: <strong style={{ color: '#111827' }}>{selectedBatchForTracking.ticket_id || 'TICKET-XYZ-123'}</strong></Typography>
+              </Box>
+
+              <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>Status Timeline</Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, position: 'relative' }}>
+                <Box sx={{ position: 'absolute', left: 11, top: 20, bottom: 20, width: 2, background: '#e5e7eb', zIndex: 0 }} />
+                
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, zIndex: 1 }}>
+                  <Box sx={{ width: 24, height: 24, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, mt: 0.5 }}>
+                    <CheckCircleIcon sx={{ fontSize: 16, color: 'white' }} />
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>Claim Filed Successfully</Typography>
+                    <Typography variant="caption" sx={{ color: '#6b7280' }}>Your batch has been successfully submitted to the platform.</Typography>
+                  </Box>
+                </Box>
+                
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, zIndex: 1 }}>
+                  <Box sx={{ width: 24, height: 24, borderRadius: '50%', background: '#3b82f6', border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, mt: 0.5 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: 'white' }} />
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>Under Review</Typography>
+                    <Typography variant="caption" sx={{ color: '#6b7280' }}>The marketplace is currently reviewing the evidence and order details.</Typography>
+                  </Box>
+                </Box>
+
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, zIndex: 1, opacity: 0.5 }}>
+                  <Box sx={{ width: 24, height: 24, borderRadius: '50%', background: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, mt: 0.5 }} />
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>Awaiting Platform Decision</Typography>
+                    <Typography variant="caption" sx={{ color: '#6b7280' }}>Resolution expected within 3-5 business days.</Typography>
+                  </Box>
+                </Box>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 3, borderTop: '1px solid #e5e7eb' }}>
+          <Button onClick={closeTrackClaimDialog} variant="outlined" sx={{ textTransform: 'none', fontWeight: 600, borderColor: '#e5e7eb', color: '#374151' }}>
+            Close
+          </Button>
+          <Button onClick={closeTrackClaimDialog} variant="contained" sx={{ textTransform: 'none', fontWeight: 600, background: '#7A5DBF', '&:hover': { background: '#624a9e' }, boxShadow: 'none' }}>
+            View Full Log
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -3179,6 +3737,36 @@ const OperationsCentrePage: React.FC = () => {
           </Box>
         </Box>
       )}
+      </Box>
+
+      {/* Transaction Sheet Overlay */}
+      <Drawer
+        anchor="right"
+        open={showTransactionSheet}
+        onClose={() => {
+          setShowTransactionSheet(false);
+        }}
+        PaperProps={{
+          sx: { width: '100%', maxWidth: '100vw' }
+        }}
+        transitionDuration={350}
+        keepMounted={false}
+      >
+        <TransactionSheet
+          onBack={() => {
+            setShowTransactionSheet(false);
+          }}
+          initialTab={1} // 1 = Mismatched
+          dateRange={{ start: customStartDate, end: customEndDate }}
+          initialPlatforms={
+            selectedPlatform &&
+            (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c')
+              ? [selectedPlatform]
+              : undefined
+          }
+        />
+      </Drawer>
+
     </Box>
   );
 };
