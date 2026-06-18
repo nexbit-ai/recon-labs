@@ -315,11 +315,13 @@ const OperationsCentrePage: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const from = params.get('from');
     const to = params.get('to');
-    if (from && to) return { start: from, end: to, kind: 'custom' as const };
+    const kindParam = params.get('dateRange');
+    if (from && to) return { start: from, end: to, kind: kindParam || 'custom' };
     try {
       const lsFrom = localStorage.getItem('recon_selected_date_from') || '';
       const lsTo = localStorage.getItem('recon_selected_date_to') || '';
-      if (lsFrom && lsTo) return { start: lsFrom, end: lsTo, kind: 'custom' as const };
+      const lsKind = localStorage.getItem('recon_selected_date_kind') || '';
+      if (lsFrom && lsTo) return { start: lsFrom, end: lsTo, kind: lsKind || 'custom' };
     } catch { }
     const now = new Date();
     const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0];
@@ -415,9 +417,9 @@ const OperationsCentrePage: React.FC = () => {
   // Date range options
   const dateRangeOptions = [
     { value: 'today', label: 'Today', dates: 'Today' },
-    { value: 'this-week', label: 'This week', dates: 'This week' },
     { value: 'this-month', label: 'This month', dates: 'This month' },
-    { value: 'this-year', label: 'This year', dates: 'Jan 1 - Dec 31' },
+    { value: 'this-year', label: 'Current Fiscal Year', dates: 'Current Fiscal Year' },
+    { value: 'last-fiscal-year', label: 'Last Fiscal Year', dates: 'Last Fiscal Year' },
     { value: 'custom', label: 'Custom date range', dates: 'Custom' }
   ];
 
@@ -920,14 +922,25 @@ const OperationsCentrePage: React.FC = () => {
       } else if (selectedDateRange === 'this-year') {
         const now = new Date();
         const currentYear = now.getFullYear();
-
-        // Use UTC dates to avoid timezone issues
-        const firstDay = new Date(Date.UTC(currentYear, 0, 1)); // January 1st (month 0)
-        const lastDay = new Date(Date.UTC(currentYear, 11, 31)); // December 31st (month 11)
-
-        // Format dates as YYYY-MM-DD using UTC methods
-        params.order_date_from = firstDay.toISOString().split('T')[0];
-        params.order_date_to = lastDay.toISOString().split('T')[0];
+        const currentMonth = now.getMonth();
+        if (currentMonth >= 3) {
+          params.order_date_from = `${currentYear}-04-01`;
+          params.order_date_to = `${currentYear + 1}-03-31`;
+        } else {
+          params.order_date_from = `${currentYear - 1}-04-01`;
+          params.order_date_to = `${currentYear}-03-31`;
+        }
+      } else if (selectedDateRange === 'last-fiscal-year') {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+        if (currentMonth >= 3) {
+          params.order_date_from = `${currentYear - 1}-04-01`;
+          params.order_date_to = `${currentYear}-03-31`;
+        } else {
+          params.order_date_from = `${currentYear - 2}-04-01`;
+          params.order_date_to = `${currentYear - 1}-03-31`;
+        }
 
       } else if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
         params.order_date_from = customStartDate;
@@ -2403,23 +2416,24 @@ const OperationsCentrePage: React.FC = () => {
             </Box>
 
             {/* Date Range Selector */}
-            <Button
-              variant="outlined"
-              endIcon={<KeyboardArrowDownIcon />}
-              startIcon={<CalendarTodayIcon />}
-              onClick={(event) => setDateRangeMenuAnchor(event.currentTarget)}
-              sx={{
-                borderColor: '#6B7280', color: '#6B7280', textTransform: 'none',
-                minWidth: 200, minHeight: 36, px: 1.5, fontSize: '0.7875rem',
-                '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' },
-              }}
-            >
-              <Box sx={{ textAlign: 'left' }}>
-                <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
-                  {getCurrentDateRangeText()}
-                </Typography>
-              </Box>
-            </Button>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
+              <Button
+                variant="outlined"
+                endIcon={<KeyboardArrowDownIcon />}
+                startIcon={<CalendarTodayIcon />}
+                onClick={(event) => setDateRangeMenuAnchor(event.currentTarget)}
+                sx={{
+                  borderColor: '#6B7280', color: '#6B7280', textTransform: 'none',
+                  minWidth: 200, minHeight: 36, px: 1.5, fontSize: '0.7875rem',
+                  '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' },
+                }}
+              >
+                <Box sx={{ textAlign: 'left' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
+                    {getCurrentDateRangeText()}
+                  </Typography>
+                </Box>
+              </Button>
             <Menu
               anchorEl={dateRangeMenuAnchor}
               open={Boolean(dateRangeMenuAnchor)}
@@ -2440,7 +2454,7 @@ const OperationsCentrePage: React.FC = () => {
 
             {/* Custom Calendar Popup */}
             {showCustomDatePicker && (
-              <Box ref={calendarPopupRef} sx={{ position: 'absolute', top: 120, right: 24, zIndex: 1000, mt: 1, bgcolor: 'white', borderRadius: 2, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', border: '1px solid #e5e7eb', p: 1.8, minWidth: 270 }}>
+              <Box ref={calendarPopupRef} sx={{ position: 'absolute', top: '100%', left: 0, zIndex: 1000, mt: 1, bgcolor: 'white', borderRadius: 2, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', border: '1px solid #e5e7eb', p: 1.8, minWidth: 270 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.8, px: 0.9 }}>
                   <IconButton size="small" onClick={() => handleCalendarMonthChange(-1)} sx={{ color: '#6b7280' }}>
                     <KeyboardArrowDownIcon sx={{ transform: 'rotate(90deg)' }} />
@@ -2464,6 +2478,7 @@ const OperationsCentrePage: React.FC = () => {
                 </Box>
               </Box>
             )}
+            </Box>
 
             {/* Filter Button */}
             <Button variant="outlined" startIcon={<FilterIcon />} onClick={(event) => openFilterPopover(activeFilterColumn || 'Order ID', event.currentTarget)} sx={{ borderColor: '#6B7280', color: '#6B7280', textTransform: 'none', minWidth: 120, minHeight: 36, px: 1.5, fontSize: '0.7875rem', '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' } }}>
@@ -3645,98 +3660,6 @@ const OperationsCentrePage: React.FC = () => {
           />
         </Box>
       </Popover>
-
-      {/* Custom Date Picker Popup */}
-      {showCustomDatePicker && (
-        <Box
-          onClick={(e) => e.stopPropagation()}
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.3)',
-            zIndex: 1399,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Box
-            onClick={(e) => e.stopPropagation()}
-            sx={{
-              background: '#ffffff',
-              borderRadius: '12px',
-              p: 3,
-              maxWidth: '400px',
-              width: '100%',
-              mx: 2,
-              boxShadow:
-                '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            }}
-          >
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#111827' }}>
-              Select Custom Date Range
-            </Typography>
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
-              <TextField
-                label="Start Date"
-                type="date"
-                value={tempStartDate}
-                onChange={(e) => setTempStartDate(e.target.value)}
-                fullWidth
-                size="small"
-                InputLabelProps={{ shrink: true }}
-              />
-              <TextField
-                label="End Date"
-                type="date"
-                value={tempEndDate}
-                onChange={(e) => setTempEndDate(e.target.value)}
-                fullWidth
-                size="small"
-                InputLabelProps={{ shrink: true }}
-              />
-            </Box>
-
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setShowCustomDatePicker(false);
-                  setTempStartDate('');
-                  setTempEndDate('');
-                }}
-                sx={{ textTransform: 'none' }}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="contained"
-                onClick={() => {
-                  if (tempStartDate && tempEndDate) {
-                    setCustomStartDate(tempStartDate);
-                    setCustomEndDate(tempEndDate);
-                    setSelectedDateRange('custom');
-                    setShowCustomDatePicker(false);
-                    fetchAllTabsData();
-                  }
-                }}
-                disabled={!tempStartDate || !tempEndDate}
-                sx={{
-                  textTransform: 'none',
-                  background: '#1f2937',
-                  '&:hover': { background: '#374151' },
-                }}
-              >
-                Apply
-              </Button>
-            </Box>
-          </Box>
-        </Box>
-      )}
       </Box>
 
       {/* Transaction Sheet Overlay */}
