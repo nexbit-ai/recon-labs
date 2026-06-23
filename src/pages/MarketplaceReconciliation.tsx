@@ -75,26 +75,26 @@ import {
   ReferenceLine,
 } from 'recharts';
 
-// Enhanced mock data for the new sales dashboard
+// Enhanced mock data for the restaurant finance dashboard
 const enhancedMockData = {
   enhancedKPIs: {
-    netRevenue: { value: 3857600, growth: 10, trend: 'up', label: 'Net Revenue' },
-    grossRevenue: { value: 4030000, growth: -8, trend: 'down', label: 'Gross Revenue' },
-    returns: { value: 172399, growth: 10, trend: 'up', label: 'Returns' }
+    netRevenue: { value: 3857600, growth: 10, trend: 'up', label: 'Net Payout' },
+    grossRevenue: { value: 5180000, growth: -8, trend: 'down', label: 'Gross Order Value' },
+    returns: { value: 272399, growth: 10, trend: 'up', label: 'Cancellations & Refunds' }
   },
   monthlyData: [
-    { month: 'Oct 2024', gross: 1000000, net: 500000, returns: 0 },
-    { month: 'Nov 2024', gross: 1200000, net: 600000, returns: 0 },
-    { month: 'Dec 2024', gross: 4000000, net: 2500000, returns: 800000 },
-    { month: 'Jan 2024', gross: 3000000, net: 2000000, returns: 1200000 },
-    { month: 'Feb 2024', gross: 3500000, net: 2200000, returns: 1200000 },
-    { month: 'Mar 2024', gross: 4200000, net: 3200000, returns: 800000 },
-    { month: 'Apr 2024', gross: 3800000, net: 2800000, returns: 600000 },
-    { month: 'May 2024', gross: 3500000, net: 2200000, returns: 1000000 },
-    { month: 'Jun 2024', gross: 4000000, net: 2800000, returns: 800000 },
-    { month: 'Jul 2024', gross: 4200000, net: 3000000, returns: 600000 },
-    { month: 'Aug 2024', gross: 4400000, net: 3200000, returns: 400000 },
-    { month: 'Sep 2024', gross: 4500000, net: 3000000, returns: 200000 }
+    { month: 'Oct 2024', gross: 1000000, net: 620000, returns: 0 },
+    { month: 'Nov 2024', gross: 1200000, net: 740000, returns: 0 },
+    { month: 'Dec 2024', gross: 4000000, net: 2480000, returns: 180000 },
+    { month: 'Jan 2025', gross: 3000000, net: 1860000, returns: 220000 },
+    { month: 'Feb 2025', gross: 3500000, net: 2170000, returns: 310000 },
+    { month: 'Mar 2025', gross: 4200000, net: 2604000, returns: 280000 },
+    { month: 'Apr 2025', gross: 3800000, net: 2356000, returns: 190000 },
+    { month: 'May 2025', gross: 3500000, net: 2030000, returns: 350000 },
+    { month: 'Jun 2025', gross: 4000000, net: 2320000, returns: 260000 },
+    { month: 'Jul 2025', gross: 4200000, net: 2604000, returns: 210000 },
+    { month: 'Aug 2025', gross: 4400000, net: 2728000, returns: 160000 },
+    { month: 'Sep 2025', gross: 4500000, net: 2790000, returns: 120000 }
   ]
 };
 
@@ -122,23 +122,15 @@ const BUCKET_COLORS: Record<AgeBucketKey, string> = {
 };
 
 const PROVIDER_AGEING_DATA: ProviderAgeing[] = [
-  { provider: 'Blue Dart', type: 'Logistics (COD)', averageDaysToSettle: 6.2, distribution: { '<=1d': 5, '2-3d': 18, '4-7d': 42, '8-14d': 25, '15-30d': 8, '>30d': 2 } },
-  { provider: 'DTDC', type: 'Logistics (COD)', averageDaysToSettle: 7.9, distribution: { '<=1d': 4, '2-3d': 15, '4-7d': 38, '8-14d': 28, '15-30d': 12, '>30d': 3 } },
-  { provider: 'Delhivery', type: 'Logistics (COD)', averageDaysToSettle: 5.6, distribution: { '<=1d': 7, '2-3d': 22, '4-7d': 45, '8-14d': 20, '15-30d': 5, '>30d': 1 } },
-  { provider: 'Ecom Express', type: 'Logistics (COD)', averageDaysToSettle: 6.8, distribution: { '<=1d': 6, '2-3d': 20, '4-7d': 40, '8-14d': 24, '15-30d': 8, '>30d': 2 } },
-  { provider: 'PayU', type: 'Payment Gateway', averageDaysToSettle: 2.3, distribution: { '<=1d': 35, '2-3d': 45, '4-7d': 15, '8-14d': 4, '15-30d': 1, '>30d': 0 } },
-  { provider: 'Paytm', type: 'Payment Gateway', averageDaysToSettle: 2.0, distribution: { '<=1d': 40, '2-3d': 42, '4-7d': 12, '8-14d': 4, '15-30d': 2, '>30d': 0 } },
-  { provider: 'Razorpay', type: 'Payment Gateway', averageDaysToSettle: 1.8, distribution: { '<=1d': 48, '2-3d': 40, '4-7d': 9, '8-14d': 2, '15-30d': 1, '>30d': 0 } },
-  { provider: 'Cashfree', type: 'Payment Gateway', averageDaysToSettle: 2.5, distribution: { '<=1d': 32, '2-3d': 46, '4-7d': 17, '8-14d': 4, '15-30d': 1, '>30d': 0 } },
+  { provider: 'Zomato', type: 'Payment Gateway', averageDaysToSettle: 6.2, distribution: { '<=1d': 5, '2-3d': 18, '4-7d': 42, '8-14d': 25, '15-30d': 8, '>30d': 2 } },
+  { provider: 'Swiggy', type: 'Payment Gateway', averageDaysToSettle: 7.1, distribution: { '<=1d': 4, '2-3d': 15, '4-7d': 38, '8-14d': 28, '15-30d': 12, '>30d': 3 } },
+  { provider: 'Direct Channel', type: 'Payment Gateway', averageDaysToSettle: 2.0, distribution: { '<=1d': 40, '2-3d': 42, '4-7d': 12, '8-14d': 4, '15-30d': 2, '>30d': 0 } },
 ];
 
 const D2C_PROVIDER_AGEING_DATA: ProviderAgeing[] = [
-  { provider: 'Razorpay', type: 'Payment Gateway', averageDaysToSettle: 1.2, distribution: { '<=1d': 65, '2-3d': 25, '4-7d': 8, '8-14d': 2, '15-30d': 0, '>30d': 0 } },
-  { provider: 'PayU', type: 'Payment Gateway', averageDaysToSettle: 1.5, distribution: { '<=1d': 58, '2-3d': 32, '4-7d': 7, '8-14d': 3, '15-30d': 0, '>30d': 0 } },
-  { provider: 'Cashfree', type: 'Payment Gateway', averageDaysToSettle: 2.1, distribution: { '<=1d': 45, '2-3d': 40, '4-7d': 11, '8-14d': 3, '15-30d': 1, '>30d': 0 } },
-  { provider: 'Delhivery', type: 'Logistics (COD)', averageDaysToSettle: 4.8, distribution: { '<=1d': 15, '2-3d': 35, '4-7d': 35, '8-14d': 12, '15-30d': 2, '>30d': 1 } },
-  { provider: 'Blue Dart', type: 'Logistics (COD)', averageDaysToSettle: 5.2, distribution: { '<=1d': 12, '2-3d': 30, '4-7d': 40, '8-14d': 14, '15-30d': 3, '>30d': 1 } },
-  { provider: 'Shiprocket', type: 'Logistics (COD)', averageDaysToSettle: 5.9, distribution: { '<=1d': 8, '2-3d': 25, '4-7d': 42, '8-14d': 18, '15-30d': 5, '>30d': 2 } },
+  { provider: 'Zomato', type: 'Payment Gateway', averageDaysToSettle: 6.2, distribution: { '<=1d': 8, '2-3d': 22, '4-7d': 40, '8-14d': 22, '15-30d': 6, '>30d': 2 } },
+  { provider: 'Swiggy', type: 'Payment Gateway', averageDaysToSettle: 7.1, distribution: { '<=1d': 5, '2-3d': 18, '4-7d': 38, '8-14d': 26, '15-30d': 10, '>30d': 3 } },
+  { provider: 'Direct Channel', type: 'Payment Gateway', averageDaysToSettle: 2.0, distribution: { '<=1d': 45, '2-3d': 40, '4-7d': 11, '8-14d': 3, '15-30d': 1, '>30d': 0 } },
 ];
 
 // Helper function to map provider code to display name
@@ -242,7 +234,117 @@ const MarketplaceReconciliation: React.FC = () => {
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
   const [reconciliationData, setReconciliationData] = useState<MarketplaceReconciliationResponse>(mockReconciliationData);
-  const [mainSummary, setMainSummary] = useState<MainSummaryResponse | null>(null);
+  // Demo dummy data — realistic Zomato/Swiggy numbers for restaurant demo
+  const demoMainSummary: MainSummaryResponse = {
+    filters: { status: 'all', platform: ['zomato'], date_field: 'invoice_date', start_date: '2026-04-01', end_date: '2027-03-31' },
+    summary: {
+      total_transactions_amount: 51800000,   // Gross Order Value (POS billed)
+      total_transaction_orders: 4210,
+      net_sales_amount: 33836255,             // Net Payout (after all deductions)
+      net_sales_orders: 3850,
+      total_return_amount: 2184730,           // Cancelled/Refunded orders
+      total_return_orders: 212,
+      total_cancellations_amount: 1605528,    // Platform-cancelled orders
+      total_cancellations_orders: 148,
+      total_reconciled_amount: 38943210,
+      total_reconciled_count: 3820,
+      total_unreconciled_amount: 893303,
+      total_unreconciled_count: 4,
+      total_manually_reconciled_or_disputed_count: 186,
+      prev_return_or_cancelled_orders: 104,
+      prev_return_or_cancelled_amount: 1543600,
+    } as any,
+    commission: [
+      {
+        platform: 'zomato',
+        total_amount_settled: 33836255,
+        total_commission: -11396000,    // ~22% aggregator commission
+        total_gst_on_commission: -2051280, // 18% GST on commission
+        total_tds_amount: -518000,       // TDS ~1%
+        total_tcs_amount: -103600,
+      } as any,
+    ] as any,
+    Reconcile: {
+      providers: {
+        flipkart: {
+          platform: 'zomato',
+          total_count: 2180,
+          total_sale_amount: 23943210,
+          total_comission: -5267506,
+          total_gst_on_comission: -948151,
+        },
+        cod: [
+          {
+            platform: 'swiggy',
+            total_count: 1640,
+            total_sale_amount: 15000000,
+            total_comission: -4200000,
+            total_gst_on_comission: -756000,
+          },
+        ],
+      },
+    },
+    UnReconcile: {
+      summary: {
+        total_difference_amount: -893303,
+        total_orders_count: 155,
+        total_matched_orders: 3820,
+        total_less_payment_received_orders: 98,
+        total_less_payment_received_amount: -623140,
+        total_more_payment_received_orders: 57,
+        total_more_payment_received_amount: 270163,
+      },
+      providers: {
+        flipkart: {
+          platform: 'zomato',
+          total_count: 72,
+          total_sale_amount: 623140,
+          total_comission: 0,
+          total_gst_on_comission: 0,
+        },
+        cod: [
+          {
+            platform: 'swiggy',
+            total_count: 83,
+            total_sale_amount: 270163,
+            total_comission: 0,
+            total_gst_on_comission: 0,
+          },
+        ],
+      },
+      reasons: [
+        { name: 'Commission Tier Mismatch', count: 72, amount: 623140 },
+        { name: 'Unapproved Promo Deduction', count: 43, amount: 184290 },
+        { name: 'Cancellation Not Credited', count: 28, amount: 124760 },
+        { name: 'TDS Deduction Mismatch', count: 12, amount: 68213 },
+      ],
+    },
+    Unsettled: {
+      summary: {
+        total_amount: 3183258,
+        total_order_count: 426,
+      },
+      providers: {
+        flipkart: {
+          platform: 'zomato',
+          total_count: 286,
+          total_sale_amount: 2241190,
+          total_comission: 0,
+          total_gst_on_comission: 0,
+        },
+        cod: [
+          {
+            platform: 'swiggy',
+            total_count: 140,
+            total_sale_amount: 942068,
+            total_comission: 0,
+            total_gst_on_comission: 0,
+          },
+        ],
+      },
+    } as any,
+  } as any as MainSummaryResponse;
+  const [mainSummary, setMainSummary] = useState<MainSummaryResponse | null>(demoMainSummary);
   const [reconciliationStatus, setReconciliationStatus] = useState<ReconciliationStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -315,12 +417,12 @@ const MarketplaceReconciliation: React.FC = () => {
 
   // Sales overview data state
   const [salesOverview, setSalesOverview] = useState({
-    netRevenue: { value: "33836255", label: "Net Revenue" },
-    grossRevenue: { value: "42126513", label: "Gross Revenue" },
-    returns: { value: "8290258", label: "Returns" },
+    netRevenue: { value: "33836255", label: "Net Payout" },
+    grossRevenue: { value: "51800000", label: "Gross Order Value" },
+    returns: { value: "3790258", label: "Cancellations & Refunds" },
     monthData: [
-      { month: "March 2025", gross: "44112585", net: "37085655", returns: "7026930" },
-      { month: "April 2025", gross: "35614873", net: "29894054", returns: "5720819" }
+      { month: "March 2025", gross: "52112585", net: "32309803", returns: "4406130" },
+      { month: "April 2025", gross: "43614873", net: "27041021", returns: "3789419" }
     ]
   });
   const [activeMainTab, setActiveMainTab] = useState<'recon' | 'dispute'>('recon');
@@ -930,7 +1032,10 @@ const MarketplaceReconciliation: React.FC = () => {
   const DISPLAY_NAME_MAP: Record<string, string> = {
     paytm: 'Paytm',
     payu: 'PayU',
-    flipkart: 'Flipkart',
+    flipkart: 'Zomato',
+    amazon: 'Swiggy',
+    zomato: 'Zomato',
+    swiggy: 'Swiggy',
     grow_simple: 'Grow Simple',
     shiprocket: 'Shiprocket',
     delhivery: 'Delhivery',
@@ -1061,10 +1166,17 @@ const MarketplaceReconciliation: React.FC = () => {
         const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
         // ms is ApiResponse<any>; data is payload
         const payload = (ms as any).data as MainSummaryResponse;
-        setMainSummary(payload);
-        // Update reasons from UnReconcile for UI where needed
-        if (payload?.UnReconcile?.reasons?.length) {
-          setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count, amount: r.amount || 0 })));
+        // Only use real API data if it has actual transactions — otherwise keep demo data
+        const hasMeaningfulData = payload?.summary && (
+          Number((payload.summary as any).total_transaction_orders) > 0 ||
+          Number((payload.summary as any).total_transactions_amount) > 0
+        );
+        if (hasMeaningfulData) {
+          setMainSummary(payload);
+          // Update reasons from UnReconcile for UI where needed
+          if (payload?.UnReconcile?.reasons?.length) {
+            setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count, amount: r.amount || 0 })));
+          }
         }
       } catch (e) {
         // Non-fatal for now
@@ -1097,9 +1209,15 @@ const MarketplaceReconciliation: React.FC = () => {
         };
         const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
         const payload = (ms as any).data as MainSummaryResponse;
-        setMainSummary(payload);
-        if (payload?.UnReconcile?.reasons?.length) {
-          setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count, amount: r.amount || 0 })));
+        const hasMeaningfulData2 = payload?.summary && (
+          Number((payload.summary as any).total_transaction_orders) > 0 ||
+          Number((payload.summary as any).total_transactions_amount) > 0
+        );
+        if (hasMeaningfulData2) {
+          setMainSummary(payload);
+          if (payload?.UnReconcile?.reasons?.length) {
+            setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count, amount: r.amount || 0 })));
+          }
         }
       } catch (e) {
         console.warn('main-summary fetch failed', e);
@@ -1505,8 +1623,8 @@ const MarketplaceReconciliation: React.FC = () => {
       // Map platform value to capitalized format for API
       const platformMap: Record<string, string> = {
         'd2c': 'D2C',
-        'flipkart': 'Flipkart',
-        'amazon': 'Amazon',
+        'flipkart': 'Zomato',
+        'amazon': 'Swiggy',
         'other': 'Other',
       };
       const platformParam = selectedPlatform ? platformMap[selectedPlatform] : undefined;
@@ -1581,11 +1699,9 @@ const MarketplaceReconciliation: React.FC = () => {
 
   // Available platforms
   const availablePlatforms = [
-    { value: 'flipkart' as Platform, label: 'Flipkart' },
-    { value: 'amazon' as Platform, label: 'Amazon' },
-    { value: 'amazon_uk' as Platform, label: 'Amazon UK' },
-    { value: 'd2c' as Platform, label: 'D2C' },
-    { value: 'other' as Platform, label: 'Other (CRED)' },
+    { value: 'flipkart' as Platform, label: 'Zomato' },
+    { value: 'amazon' as Platform, label: 'Swiggy' },
+    { value: 'd2c' as Platform, label: 'Direct Channel' },
   ];
 
   // Generate D2C dummy data
@@ -3183,7 +3299,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, minHeight: isD2C ? 456 : 376 }}>
 
                     <Typography variant="h5" sx={{ fontWeight: 700, color: '#111827', textAlign: 'center' }}>
-                      {selectedPlatform === 'd2c' ? 'Data Sources Not Connected' : `${selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : 'Flipkart'} Not Connected`}
+                      {selectedPlatform === 'd2c' ? 'Data Sources Not Connected' : `${selectedPlatform === 'amazon' ? 'Swiggy' : 'Zomato'} Not Connected`}
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#6B7280', textAlign: 'center', mb: 2 }}>
                       You need to connect your seller account to sync data automatically.
@@ -3212,7 +3328,7 @@ const MarketplaceReconciliation: React.FC = () => {
                 {syncView === 'credentials' && (
                   <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2.5, minHeight: isD2C ? 456 : 376 }}>
                     <Typography variant="h5" sx={{ fontWeight: 700, color: '#111827', textAlign: 'center', mb: 1 }}>
-                      Connect {selectedPlatform === 'd2c' ? 'Data Sources' : selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : 'Flipkart'}
+                      Connect {selectedPlatform === 'd2c' ? 'Direct Channel' : selectedPlatform === 'amazon' ? 'Swiggy' : 'Zomato'}
                     </Typography>
                     <TextField
                       fullWidth
@@ -3300,26 +3416,26 @@ const MarketplaceReconciliation: React.FC = () => {
                         const ordersCountStr = countVal > 0 ? countVal.toLocaleString('en-IN') + ' ' : '';
                         const ordersAmountStr = amountVal > 0 ? `(${getCurrencySymbol()}${Math.round(amountVal).toLocaleString(getCurrencyLocale())}) ` : '';
                         
-                        const platformName = selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : selectedPlatform === 'flipkart' ? 'Flipkart' : selectedPlatform === 'other' ? 'CRED' : 'Marketplace';
+                        const platformName = selectedPlatform === 'amazon' ? 'Swiggy' : selectedPlatform === 'flipkart' ? 'Zomato' : 'Direct Channel';
                         
                         const shouldShowNumbers = isD2C ? syncStep >= 4 : syncStep >= 2;
                         const message = shouldShowNumbers ? `Reconciling your ${ordersCountStr}orders ${ordersAmountStr}`.trim() : 'Reconciling your orders';
 
                         return isD2C ? [
-                          { step: 1, label: 'Fetching orders from Shopify' },
-                          { step: 2, label: 'Finding settlement reports from Paytm, PayU' },
-                          { step: 3, label: 'Syncing with logistics partners — Delhivery, BlueDart, Shiprocket' },
+                          { step: 1, label: 'Fetching orders from your POS system' },
+                          { step: 2, label: 'Pulling direct channel payment settlements' },
+                          { step: 3, label: 'Matching POS orders against payment gateway records' },
                           { step: 4, label: message },
-                          { step: 5, label: 'Calculating expected settlement amount' },
+                          { step: 5, label: 'Calculating expected net payout amount' },
                           { step: 6, label: 'Calculating difference between expected and actual' },
                           { step: 7, label: 'Finding the reasons of mismatch' },
                           { step: 8, label: 'Reconciliation done' },
                         ] : [
-                          { step: 1, label: `Fetching data from ${platformName}` },
+                          { step: 1, label: `Fetching settlement data from ${platformName}` },
                           { step: 2, label: message },
-                          { step: 3, label: 'Calculating expected settlement amount' },
-                          { step: 4, label: 'Calculating difference between expected and actual' },
-                          { step: 5, label: 'Finding the reasons of mismatch' },
+                          { step: 3, label: 'Calculating expected net payout (Gross - Commission - GST - TDS)' },
+                          { step: 4, label: 'Calculating difference between expected and actual payout' },
+                          { step: 5, label: 'Finding reasons of mismatch (Commission Tier, Promo Deductions)' },
                           { step: 6, label: 'Reconciliation done' },
                         ];
                       })().filter(({ step }) => step <= syncStep).map(({ step, label }) => (
@@ -3522,10 +3638,10 @@ const MarketplaceReconciliation: React.FC = () => {
 
                     return (
                       <Box sx={{ p: 3 }}>
-                        {/* Equation Row: Net Sales = Gross Sales - Returns - Cancellations */}
+                        {/* Equation Row: Net Payout = Gross Order Value - Commission - Cancellations */}
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                           <Metric
-                            label="Net Sales"
+                            label="Net Payout"
                             amount={netSalesAmount}
                             count={netSalesCount}
                             onClick={() => {
@@ -3534,11 +3650,11 @@ const MarketplaceReconciliation: React.FC = () => {
                             }}
                           />
                           <Operator symbol="=" />
-                          <Metric label="Gross Sales" amount={grossSalesAmount} count={grossSalesCount} />
-                          <Operator symbol="-" />
-                          <Metric label="Returns" amount={returnsAmount} count={returnsCount} />
+                          <Metric label="Gross Order Value" amount={grossSalesAmount} count={grossSalesCount} />
                           <Operator symbol="-" />
                           <Metric label="Cancellations" amount={cancellationsAmount} count={cancellationsCount} />
+                          <Operator symbol="-" />
+                          <Metric label="Refunds" amount={returnsAmount} count={returnsCount} />
                         </Box>
 
                         {/* Previous Return/Cancellations below equation */}
@@ -4171,7 +4287,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                                         <Typography variant="body1" sx={{ color: '#374151', fontWeight: 600, fontSize: '1.1rem' }}>
-                                          Gross Sales
+                                          Gross Order Value
                                         </Typography>
                                         <Typography variant="h6" sx={{ color: '#111827', fontWeight: 700, fontSize: '1.2rem' }}>
                                           {formatCurrency(expectedSalesAmount)}
@@ -5268,8 +5384,9 @@ const MarketplaceReconciliation: React.FC = () => {
               const providerData = commissionArray
                 .map((item, idx) => {
                   const commissionValue = item.total_commission || 0; // Only show commission, not GST on commission
+                  const pName = DISPLAY_NAME_MAP[norm(item.platform || '')] || (item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1)) || `Platform ${idx + 1}`;
                   return {
-                    name: item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1) || `Platform ${idx + 1}`,
+                    name: pName,
                     value: Math.abs(commissionValue), // Use absolute value for display
                     originalSignedValue: commissionValue, // Keep original for calculations
                     color: platformColors[item.platform?.toLowerCase() || ''] || palette2[idx % palette2.length],
@@ -6244,7 +6361,7 @@ const MarketplaceReconciliation: React.FC = () => {
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600 }}>
-                  {selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : selectedPlatform === 'flipkart' ? 'Flipkart' : 'Other (CRED)'} - Sales vs Settlement
+                  {selectedPlatform === 'amazon' ? 'Swiggy' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : selectedPlatform === 'flipkart' ? 'Zomato' : 'Other'} - Sales vs Settlement
                 </Typography>
                 {marketplaceGrowthData.length > 0 && (
                   <Button

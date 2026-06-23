@@ -34,16 +34,16 @@ const Pricing = () => {
           >
             <CardContent sx={{ flexGrow: 1, p: 6, display: 'flex', flexDirection: 'column' }}>
               <Typography variant="h4" component="h2" gutterBottom fontWeight="700" sx={{ color: '#111' }}>
-                Standard
+                Starter
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'baseline', mb: 2, mt: 4 }}>
                 <Typography variant="h2" component="span" fontWeight="800" sx={{ fontSize: '3rem', letterSpacing: '-0.02em' }}>
-                  ₹1.3 Lakh
+                  ₹1.2 Lakh
                 </Typography>
                 <Typography variant="body1" color="text.secondary" sx={{ ml: 1, fontWeight: 500 }}>
                   / month
                 </Typography>
-              </Box>
+              </Box> 
               <Typography variant="body1" color="text.secondary" mb={6}>
                 Perfect for growing businesses with moderate transaction volumes.
               </Typography>
@@ -149,7 +149,7 @@ const Pricing = () => {
             </Box>
             <CardContent sx={{ flexGrow: 1, p: 6, display: 'flex', flexDirection: 'column' }}>
               <Typography variant="h4" component="h2" gutterBottom fontWeight="700" sx={{ color: '#111' }}>
-                Premium
+                Growth
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'baseline', mb: 2, mt: 4 }}>
                 <Typography variant="h2" component="span" fontWeight="800" sx={{ fontSize: '3rem', letterSpacing: '-0.02em' }}>

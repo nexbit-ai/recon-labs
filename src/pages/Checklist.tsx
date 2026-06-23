@@ -127,44 +127,44 @@ const initialTasks: Task[] = [
     title: 'Automated Dispute Filing',
     tags: [
       { label: 'Pending', type: 'danger' },
-      { label: 'Logistics', type: 'default' }
+      { label: 'Aggregator', type: 'default' }
     ],
-    subtitle: 'REC-001 · Delhivery · Identified 342 orders with weight anomalies',
+    subtitle: 'REC-001 · Zomato · Identified 156 orders with incorrect commission tier applied',
     amount: '₹1,45,000',
     actionText: 'Assign to Agent',
     status: 'requires_action',
     aiConfidence: 96,
-    aiInsights: "Nex AI Analysis: Highly correlated with Delhivery's North zone volumetric scanning recalibration on Mar 12.",
+    aiInsights: "Nex AI Analysis: Zomato applied Gold-tier commission (28%) to orders that qualify for Silver-tier (22%) under the April promotional contract.",
     trendData: [{val: 10}, {val: 15}, {val: 20}, {val: 18}, {val: 45}, {val: 90}, {val: 145}],
   },
   {
     id: 2,
-    title: 'Marketplace Commission Audit',
+    title: 'Aggregator Commission Audit',
     tags: [
       { label: 'Done', type: 'default' },
-      { label: 'Marketplace', type: 'default' }
+      { label: 'Platform', type: 'default' }
     ],
-    subtitle: 'REC-002 · Flipkart · Excess commission on 12% of electronics',
+    subtitle: 'REC-002 · Swiggy · Excess commission on promotional orders not pre-approved by outlet',
     amount: '₹2,10,500',
     actionText: 'Assign to Agent',
     status: 'review',
     aiConfidence: 88,
-    aiInsights: "Nex AI Analysis: Flipkart Beauty category rate card shifted on May 1st, causing systemic overcharges.",
+    aiInsights: "Nex AI Analysis: Swiggy auto-enrolled 214 orders into a platform-wide discount campaign without outlet consent, deducting promo costs from net payout.",
     trendData: [{val: 210}, {val: 210}, {val: 210}, {val: 210}, {val: 210}, {val: 210}, {val: 210}],
   },
   {
     id: 3,
-    title: 'High-Risk RTO Anomaly',
+    title: 'Payout Shortfall Alert',
     tags: [
       { label: 'Pending', type: 'danger' },
       { label: 'Rules', type: 'default' }
     ],
-    subtitle: 'REC-003 · D2C Platform · 40% spike in RTOs in North region',
+    subtitle: 'REC-003 · Swiggy · 23% deviation in expected weekly payout vs POS-recorded gross sales',
     amount: '₹56,550',
     actionText: 'Assign to Agent',
     status: 'requires_action',
     aiConfidence: 91,
-    aiInsights: "Nex AI Analysis: Spike in fake orders originating from 3 specific IP ranges in UP.",
+    aiInsights: "Nex AI Analysis: Settlement cycle delay of 9 days detected for week ending Jun 14. Expected ₹2.4L; received ₹1.84L. TDS and GST on fees account for only 4.2% delta; remaining 18.8% gap is unexplained.",
     trendData: [{val: 5}, {val: 6}, {val: 5}, {val: 8}, {val: 25}, {val: 45}, {val: 56}],
   },
 ];
@@ -172,43 +172,43 @@ const initialTasks: Task[] = [
 const cfoDailyTasks: Task[] = [
   {
     id: 101,
-    title: 'Daily Cash Flow Summary',
+    title: 'Daily Aggregator Payout Summary',
     tags: [{ label: 'Done', type: 'default' }],
-    subtitle: 'REC-CFO-1 · Verify T-1 incoming settlements across Amazon, Flipkart, and Razorpay',
+    subtitle: 'REC-CFO-1 · Verify T-1 net payouts from Zomato, Swiggy, and Direct ordering channel',
     actionText: 'Assign to Agent',
     status: 'review',
   },
   {
     id: 102,
-    title: 'Daily Returns Refund Report',
+    title: 'Order Cancellation Reconciliation',
     tags: [{ label: 'Pending', type: 'danger' }],
-    subtitle: 'REC-CFO-2 · Review incoming returns and match against refunds issued',
+    subtitle: 'REC-CFO-2 · Match platform-cancelled orders against POS records and verify refund credits',
     actionText: 'Assign to Agent',
     status: 'requires_action',
   },
   {
     id: 103,
-    title: 'Gross Margin Reconciliation',
+    title: 'Net Margin vs Gross Sales Report',
     tags: [{ label: 'Done', type: 'default' }],
-    subtitle: 'REC-CFO-3 · Review 4% dip in net margins correlated with Q3 logistics surge',
+    subtitle: 'REC-CFO-3 · Validate 6.2% dip in net margins vs POS gross — attributed to Swiggy commission hike in May',
     actionText: 'Assign to Agent',
     status: 'review',
   },
   {
     id: 104,
-    title: 'Total Marketplace Settlement Daily Report',
+    title: 'Weekly Aggregator Settlement Report',
     tags: [{ label: 'Pending', type: 'danger' }],
-    subtitle: 'REC-CFO-4 · Reconcile total incoming settlements from Amazon, Flipkart, Myntra',
+    subtitle: 'REC-CFO-4 · Reconcile weekly net settlements from Zomato and Swiggy against outlet-level POS data',
     actionText: 'Assign to Agent',
     status: 'requires_action',
   },
 ];
 
 const suggestedQueries = [
-  "Do a flipkart Recon for march 26",
-  "Is 2025 complete recon completed",
-  "Analyze Amazon TAT for Q3",
-  "Explain Flipkart fee hike in May",
+  "Do a Zomato recon for June 2026",
+  "Is Q1 FY26 aggregator recon complete?",
+  "Analyze Swiggy settlement TAT for Q3",
+  "Explain Swiggy commission hike in May",
 ];
 
 const monthNames = [
@@ -378,45 +378,45 @@ const Checklist: React.FC = () => {
 
   const getLoadingSteps = (query: string): string[] => {
     const q = query.toLowerCase();
-    if (q.includes('flipkart recon') || q.includes('march 26')) {
+    if (q.includes('zomato recon') || q.includes('june 2026') || q.includes('june')) {
       return [
-        "Scanning Flipkart March settlement data...",
-        "Fetching sales manifest from ledger...",
-        "Cross-referencing Order IDs against settlements...",
-        "Identifying fee and discount discrepancies...",
+        "Scanning Zomato June settlement data...",
+        "Fetching POS gross sales manifest from ledger...",
+        "Cross-referencing Order IDs against Zomato payouts...",
+        "Identifying commission tier and promo deduction discrepancies...",
         "Running reconciliation engine benchmarks...",
       ];
     }
-    if (q.includes('2025') || q.includes('completed')) {
+    if (q.includes('q1') || q.includes('fy26') || q.includes('complete')) {
       return [
-        "Accessing FY 2025 marketplace archives...",
-        "Aggregating monthly settlement reports...",
-        "Verifying Amazon pending dispute counts...",
-        "Scanning D2C gateway logs for Sept-Dec...",
-        "Validating net-to-gross revenue mapping...",
+        "Accessing Q1 FY2026 aggregator settlement archives...",
+        "Aggregating monthly Zomato and Swiggy payout reports...",
+        "Verifying pending dispute counts with Swiggy...",
+        "Scanning direct ordering channel logs for Dec-Mar...",
+        "Validating net payout vs POS gross revenue mapping...",
       ];
     }
-    if (q.includes('tat') || q.includes('amazon')) {
+    if (q.includes('tat') || q.includes('swiggy settlement')) {
       return [
-        "Fetching provider settlement ageing logs...",
-        "Calculating weighted average TAT for Q3...",
-        "Aggregating COD partner performance metrics...",
-        "Compiling quarterly trend distribution...",
+        "Fetching Swiggy settlement ageing logs...",
+        "Calculating weighted average settlement TAT for Q3...",
+        "Aggregating weekly payout cycle metrics...",
+        "Compiling quarterly delay trend distribution...",
       ];
     }
-    if (q.includes('fee') || q.includes('may')) {
+    if (q.includes('commission') || q.includes('fee') || q.includes('may')) {
       return [
-        "Retrieving Flipkart historical rate cards...",
-        "Detecting marketplace fee structure changes...",
-        "Calculating commission impact on beauty categories...",
-        "Benchmarking net settlement vs expected sales...",
+        "Retrieving Swiggy historical commission rate cards...",
+        "Detecting aggregator fee structure changes...",
+        "Calculating commission impact on promotional orders...",
+        "Benchmarking net payout vs contracted commission rates...",
       ];
     }
     return [
-      "Accessing financial data vault...",
-      "Cross-referencing transaction logs...",
-      "Anonymizing sensitive customer profiles...",
-      "Generating operations summary...",
+      "Accessing aggregator settlement data vault...",
+      "Cross-referencing POS and platform transaction logs...",
+      "Validating commission, TDS, and GST deductions...",
+      "Generating payout reconciliation summary...",
     ];
   };
 
@@ -476,9 +476,9 @@ const Checklist: React.FC = () => {
   const getAIResponse = (query: string): { text: string; chartData?: any[]; chartType?: 'bar' | 'line'; hasDownload?: boolean; downloadName?: string } => {
     const q = query.toLowerCase();
     
-    if (q.includes('automated dispute filing') || q.includes('delhivery')) {
+    if (q.includes('automated dispute filing') || q.includes('zomato') || q.includes('commission tier')) {
       return {
-        text: "I've analyzed the Delhivery weight anomalies (REC-001). We identified 342 orders where the courier billed for a higher volumetric weight than our internal manifest.\n\nSummary:\n• Total Orders Flagged: 342\n• Overcharge Value: ₹1,45,000\n• Root Cause: Probable scanner recalibration at North Zone Hub.\n\nHere is the trend of overcharges over the past 7 days. Would you like me to automatically file a bulk dispute with Delhivery with the attached evidence, or would you like to close this action item?",
+        text: "I've analyzed the Zomato commission tier discrepancy (REC-001). We identified 156 orders where the Gold-tier commission (28%) was applied instead of the contracted Silver-tier rate (22%) for outlet ID ZOM-BLR-042.\n\nSummary:\n• Total Orders Flagged: 156\n• Overcharge Value: ₹1,45,000\n• Root Cause: Rate card not updated after April 1st contract renewal.\n\nHere is the trend of overcharges over the past 7 days. Would you like me to automatically file a bulk dispute with Zomato with the attached evidence, or would you like to close this action item?",
         chartType: 'line',
         chartData: [
           { name: 'Mon', value: 10 },
@@ -492,50 +492,50 @@ const Checklist: React.FC = () => {
       };
     }
 
-    if (q.includes('daily cash flow summary') || q.includes('cfo-1')) {
+    if (q.includes('daily aggregator payout summary') || q.includes('cfo-1') || q.includes('payout summary')) {
       return {
-        text: "I've compiled the T-1 Cash Flow Summary (REC-CFO-1). We've processed the incoming settlements for Amazon, Flipkart, and Razorpay.\n\nSummary:\n• Total Expected: ₹14,50,000\n• Actual Received: ₹14,25,000\n• Variance: ₹25,000 (pending Razorpay T+2 hold)\n\nThe chart below compares expected vs actual. Shall I authorize the ledger sync for the verified amounts?",
+        text: "I've compiled the T-1 Aggregator Payout Summary (REC-CFO-1). We've processed the incoming net settlements for Zomato, Swiggy, and Direct ordering channel.\n\nSummary:\n• Total Expected: ₹14,50,000\n• Actual Received: ₹14,25,000\n• Variance: ₹25,000 (Swiggy TDS hold pending adjustment)\n\nThe chart below compares expected vs actual payout by aggregator. Shall I authorize the ledger sync for the verified amounts?",
         chartType: 'bar',
         chartData: [
-          { name: 'Amazon', value: 450000 },
-          { name: 'Flipkart', value: 380000 },
-          { name: 'Razorpay', value: 595000 },
+          { name: 'Zomato', value: 580000 },
+          { name: 'Swiggy', value: 620000 },
+          { name: 'Direct', value: 225000 },
         ]
       };
     }
 
-    if (q.includes('daily returns refund report') || q.includes('cfo-2') || q.includes('returns')) {
+    if (q.includes('order cancellation') || q.includes('cfo-2') || q.includes('cancellation')) {
       return {
-        text: "Generating Daily Returns Refund Report (REC-CFO-2)... \n\nThe report has been compiled successfully. It includes all unmatched RTOs and excess refunds issued for yesterday.\n\nSummary:\n• Total Returns: 1,452\n• Unmatched Refunds: 45\n\nYou can download the full report below. Shall I automatically dispute the unmatched refunds?",
+        text: "Generating Order Cancellation Reconciliation (REC-CFO-2)...\n\nThe report has been compiled successfully. It includes all platform-cancelled orders and verifies credits issued against POS records.\n\nSummary:\n• Total Cancelled Orders: 312\n• Unmatched Credits: 38\n• Avg. delay in credit posting: 3.2 days\n\nYou can download the full reconciliation report below. Shall I automatically flag the unmatched credits for dispute?",
         hasDownload: true,
-        downloadName: 'Daily_Returns_Refund_Report.csv'
+        downloadName: 'Order_Cancellation_Reconciliation.csv'
       };
     }
 
-    if (q.includes('gross margin reconciliation') || q.includes('cfo-3')) {
+    if (q.includes('net margin') || q.includes('gross sales report') || q.includes('cfo-3')) {
       return {
-        text: "I've analyzed the Gross Margin Variance (REC-CFO-3). Net margins have dipped by 4% compared to the Q2 baseline.\n\nSummary:\n• Total Variance: -4%\n• Root Cause: 65% of the drop is correlated with the Q3 logistics surge and volumetric weight penalties.\n\nThe chart below tracks margin degradation over the month. Would you like me to flag the specific SKUs causing this anomaly?",
+        text: "I've analyzed the Net Margin vs Gross Sales variance (REC-CFO-3). Net margins have dipped by 6.2% compared to the Q2 baseline.\n\nSummary:\n• Total Variance: -6.2%\n• Root Cause: 72% of the drop correlates with Swiggy raising platform commission from 22% to 26% in May for Bangalore outlets.\n\nThe chart below tracks net margin vs POS gross by week. Would you like me to flag the impacted outlet-weeks for contract review?",
         chartType: 'line',
         chartData: [
           { name: 'Week 1', value: 22.5 },
           { name: 'Week 2', value: 21.0 },
-          { name: 'Week 3', value: 19.5 },
-          { name: 'Week 4', value: 18.5 },
+          { name: 'Week 3', value: 18.5 },
+          { name: 'Week 4', value: 16.3 },
         ]
       };
     }
 
-    if (q.includes('total marketplace settlement daily report') || q.includes('cfo-4')) {
+    if (q.includes('weekly aggregator settlement') || q.includes('cfo-4') || q.includes('settlement report')) {
       return {
-        text: "Generating Total Marketplace Settlement Daily Report (REC-CFO-4)... \n\nThe report is ready. It aggregates T-1 settlements from Amazon, Flipkart, and Myntra, matching them against expected sales ledger entries.\n\nYou can download the detailed settlement reconciliation below.",
+        text: "Generating Weekly Aggregator Settlement Report (REC-CFO-4)...\n\nThe report is ready. It aggregates net payouts from Zomato and Swiggy for all outlets, cross-matched against POS gross sales and deduction breakdowns (commission, GST on fees, TDS, promo costs).\n\nYou can download the detailed settlement reconciliation below.",
         hasDownload: true,
-        downloadName: 'Marketplace_Settlements_Daily.csv'
+        downloadName: 'Weekly_Aggregator_Settlement_Report.csv'
       };
     }
 
-    if (q.includes('high-risk rto anomaly') || q.includes('rto')) {
+    if (q.includes('payout shortfall') || q.includes('shortfall') || q.includes('deviation')) {
       return {
-        text: "I've investigated the RTO anomaly for the D2C Platform (REC-003). There's a 40% sudden spike in Return to Origin (RTO) orders originating from the North region.\n\nSummary:\n• Total Potential Loss: ₹56,550\n• Suspicious Activity: High concentration of fake addresses from 3 specific IP blocks in UP.\n\nThis looks like targeted fraudulent behavior. I recommend instantly blocking these IP ranges and blacklisting the associated phone numbers. Shall I proceed with the block, or close this alert?",
+        text: "I've investigated the Swiggy payout shortfall (REC-003). There's a 23% deviation between the expected weekly payout and actual net received, based on POS-recorded gross sales.\n\nSummary:\n• Total Shortfall: ₹56,550\n• Settlement Cycle: 9 days vs contracted 7-day cycle\n• Known deductions (TDS 1% + GST on fees 18%): account for 4.2% delta\n• Unexplained gap: 18.8% — likely unapproved promo deduction from Swiggy's end.\n\nI recommend raising a formal query with Swiggy Seller Support. Shall I auto-draft the dispute or close this alert?",
         chartType: 'line',
         chartData: [
           { name: 'W1', value: 5 },
@@ -549,9 +549,9 @@ const Checklist: React.FC = () => {
       };
     }
 
-    if (q.includes('flipkart recon') || q.includes('march 26')) {
+    if (q.includes('zomato recon') || q.includes('june 2026')) {
       return {
-        text: "I've initiated the Flipkart reconciliation for March 2026. Data ingestion is 100% complete. I found a gross discrepancy of ₹12,45,600 across 114 transactions, primarily due to 'Seller Share Discount' mismatches.\n\nMatching the dashboard figures: Gross Revenue is recorded at ₹4.41 Cr with Net settlement at ₹3.70 Cr.\n\nWould you like me to flag these 114 items for dispute?",
+        text: "I've initiated the Zomato reconciliation for June 2026. Data ingestion is 100% complete. I found a gross discrepancy of ₹12,45,600 across 114 orders, primarily due to 'Unapproved Promo Deduction' and 'Commission Tier Mismatch'.\n\nMatching POS figures: Gross Order Value is recorded at ₹4.41 Cr with Zomato net payout at ₹3.07 Cr (after 28% commission + GST on fees + TDS).\n\nWould you like me to flag these 114 orders for dispute?",
         chartType: 'bar',
         chartData: [
           { name: 'Matched', value: 2450 },
@@ -561,53 +561,38 @@ const Checklist: React.FC = () => {
       };
     }
 
-    if (q.includes('2025') && q.includes('completed')) {
+    if ((q.includes('q1') || q.includes('fy26')) && q.includes('complete')) {
       return {
-        text: "Summary for FY 2025 (Dashboard Integrety):\n\n• Flipkart: 100% Completed\n• Amazon: 98.2% Completed (Sept pending)\n• D2C/Razorpay: 100% Completed\n\nTotal Net Revenue: ₹3,85,76,000 (₹3.85 Cr)\nTotal Gross Revenue: ₹4,03,00,000 (₹4.03 Cr)\nTotal Returns: ₹82,90,258\n\nThe 8.2% leakage is primarily attributed to unrecovered Amazon RTO claims.",
+        text: "Summary for Q1 FY2026 Aggregator Reconciliation:\n\n• Zomato: 100% Completed\n• Swiggy: 97.8% Completed (June week 4 pending)\n• Direct Channel: 100% Completed\n\nTotal Net Payout Received: ₹3,85,76,000 (₹3.85 Cr)\nTotal POS Gross Sales: ₹5,18,00,000 (₹5.18 Cr)\nTotal Platform Deductions: ₹1,32,23,742 (commission + GST on fees + TDS)\n\nThe 2.2% unreconciled gap is primarily attributed to unapproved Swiggy promo deductions in June.",
       };
     }
 
-    if (q.includes('tat') || q.includes('amazon')) {
+    if (q.includes('tat') || q.includes('settlement tat') || q.includes('swiggy settlement')) {
       return {
-        text: "Amazon TAT analysis compared to platform benchmarks:\n\nAverage settlement is 2.3 days. Razorpay is leading at 1.8d. Current pending settlements for Q3 total ₹12.4 Lakh. Here is the ageing trend for the last 3 months:",
+        text: "Swiggy settlement TAT analysis for Q3:\n\nAverage settlement cycle is 7.4 days vs contracted 7 days. Zomato is at 6.8 days. Current pending settlements for Q3 total ₹12.4 Lakh. Here is the ageing trend for the last 3 months:",
         chartType: 'line',
         chartData: [
-          { name: 'July', value: 2.1 },
-          { name: 'Aug', value: 2.5 },
-          { name: 'Sept', value: 2.3 },
+          { name: 'April', value: 6.8 },
+          { name: 'May', value: 7.2 },
+          { name: 'June', value: 7.4 },
         ]
       };
     }
     
-    if (q.includes('fee') || q.includes('may')) {
+    if (q.includes('commission') || q.includes('fee') || q.includes('may')) {
       return {
-        text: "In May 2025, the rate card shift (+5% Fixed Fee) impacted 14% of Beauty category orders. This aligns with the dashboard dip in Net Revenue for that period. Impact analysis:\n\nExpected Fees: ₹32,00,000\nActual Charged: ₹34,20,000\nVariance: ₹2,20,000",
+        text: "In May 2026, the Swiggy commission rate hike (+4% for Bangalore outlets) impacted 26% of all delivery orders. This aligns with the dashboard dip in Net Payout for that period. Impact analysis:\n\nExpected Commission (22%): ₹32,00,000\nActual Commission Charged (26%): ₹38,86,000\nVariance: ₹6,86,000",
         chartType: 'bar',
         chartData: [
           { name: 'Apr Fees', value: 32.0 },
-          { name: 'May Fees', value: 34.2 },
-          { name: 'Jun Fees', value: 34.0 },
-        ]
-      };
-    }
-    
-    if (q.includes('amazon') || q.includes('trend')) {
-      return {
-        text: "Amazon payments are trending positive compared to February. Your settlement-to-sale ratio has improved by 4.2% across major categories.",
-        chartType: 'line',
-        chartData: [
-          { name: 'Feb W1', value: 85 },
-          { name: 'Feb W2', value: 87 },
-          { name: 'Feb W3', value: 86 },
-          { name: 'Feb W4', value: 88 },
-          { name: 'Mar W1', value: 90 },
-          { name: 'Mar W2', value: 92.2 },
+          { name: 'May Fees', value: 38.86 },
+          { name: 'Jun Fees', value: 38.5 },
         ]
       };
     }
 
     return {
-      text: "I'm on it. I've scanned the relevant reports. Most operations are within tolerance levels. I recommend focusing on the Amazon weight disputes for this peak period. Shall I run a deep dive or close this item?",
+      text: "I'm on it. I've scanned the relevant Zomato and Swiggy settlement reports. Most payout cycles are within tolerance. I recommend focusing on the Swiggy commission discrepancies for this settlement period. Shall I run a deep dive or close this item?",
     };
   };
 

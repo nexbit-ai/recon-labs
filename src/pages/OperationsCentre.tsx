@@ -2022,9 +2022,9 @@ const OperationsCentrePage: React.FC = () => {
       { label: 'Approved', color: '#111827', bg: '#e5e7eb', step: 4 }
     ];
     
-    const amazonReasons = ['FBA Loss', 'Fee Adjustment', 'SAFE-T Claim'];
-    const d2cReasons = ['Short Collection', 'Gateway Error', 'Missing Settlement'];
-    const reasons = selectedPlatform === 'amazon' ? amazonReasons : d2cReasons;
+    const zomatoReasons = ['Commission Tier Mismatch', 'Unapproved Promo Deduction', 'Payout Shortfall'];
+    const swiggyReasons = ['Commission Overcharge', 'Cancellation Not Credited', 'TDS Deduction Mismatch'];
+    const reasons = selectedPlatform === 'amazon' ? swiggyReasons : zomatoReasons;
     
     // Synthesize realistic batches from unreconciled data
     let batches: any[] = [];
@@ -2440,7 +2440,7 @@ const OperationsCentrePage: React.FC = () => {
                   minWidth: 'auto', minHeight: 36, px: 1.5, fontSize: '0.7875rem', '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107,114,128,0.04)' }
                 }}
               >
-                {selectedPlatform === 'flipkart' ? 'Flipkart' : selectedPlatform === 'amazon' ? 'Amazon' : 'D2C'}
+                {selectedPlatform === 'flipkart' ? 'Zomato' : selectedPlatform === 'amazon' ? 'Swiggy' : 'Direct Channel'}
               </Button>
               <Menu
                 anchorEl={platformMenuAnchorEl}
@@ -2482,8 +2482,8 @@ const OperationsCentrePage: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Radio size="small" checked={selectedPlatform === p} value={p} />
                           <Box>
-                            <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p === 'flipkart' ? 'Flipkart' : p === 'amazon' ? 'Amazon' : 'D2C'}</Typography>
-                            <Typography variant="caption" sx={{ color: '#6b7280' }}>{p === 'd2c' ? 'Website / D2C' : 'E-commerce marketplace'}</Typography>
+                            <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p === 'flipkart' ? 'Zomato' : p === 'amazon' ? 'Swiggy' : 'Direct Channel'}</Typography>
+                            <Typography variant="caption" sx={{ color: '#6b7280' }}>{p === 'd2c' ? 'Website / Direct ordering' : 'Food aggregator platform'}</Typography>
                           </Box>
                         </Box>
                       </MenuItem>
@@ -3166,7 +3166,7 @@ const OperationsCentrePage: React.FC = () => {
 
       {/* Minimal Raise Dispute Dialog */}
       <Dialog open={raiseDialogOpen} onClose={closeRaiseDispute} PaperProps={{ sx: { borderRadius: 1, minWidth: 420 } }}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Raise dispute to Flipkart</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Raise dispute to {selectedPlatform === 'amazon' ? 'Swiggy' : selectedPlatform === 'flipkart' ? 'Zomato' : 'Direct Channel'}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ color: '#374151', mb: 2 }}>Total orders: {selectedRaiseGroup?.count || 0}</Typography>
           <TextField
