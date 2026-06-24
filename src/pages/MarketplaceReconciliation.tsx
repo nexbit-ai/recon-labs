@@ -238,30 +238,30 @@ const MarketplaceReconciliation: React.FC = () => {
   const demoMainSummary: MainSummaryResponse = {
     filters: { status: 'all', platform: ['zomato'], date_field: 'invoice_date', start_date: '2026-04-01', end_date: '2027-03-31' },
     summary: {
-      total_transactions_amount: 51800000,   // Gross Order Value (POS billed)
-      total_transaction_orders: 4210,
-      net_sales_amount: 33836255,             // Net Payout (after all deductions)
-      net_sales_orders: 3850,
-      total_return_amount: 2184730,           // Cancelled/Refunded orders
-      total_return_orders: 212,
-      total_cancellations_amount: 1605528,    // Platform-cancelled orders
-      total_cancellations_orders: 148,
-      total_reconciled_amount: 38943210,
-      total_reconciled_count: 3820,
-      total_unreconciled_amount: 893303,
+      total_transactions_amount: 4500000,   // Gross Order Value (POS billed)
+      total_transaction_orders: 9000,
+      net_sales_amount: 3000000,             // Net Payout (after all deductions)
+      net_sales_orders: 8800,
+      total_return_amount: 100000,           // Cancelled/Refunded orders
+      total_return_orders: 200,
+      total_cancellations_amount: 50000,    // Platform-cancelled orders
+      total_cancellations_orders: 100,
+      total_reconciled_amount: 3500000,
+      total_reconciled_count: 8500,
+      total_unreconciled_amount: 89330,
       total_unreconciled_count: 4,
-      total_manually_reconciled_or_disputed_count: 186,
-      prev_return_or_cancelled_orders: 104,
-      prev_return_or_cancelled_amount: 1543600,
+      total_manually_reconciled_or_disputed_count: 18,
+      prev_return_or_cancelled_orders: 10,
+      prev_return_or_cancelled_amount: 15436,
     } as any,
     commission: [
       {
         platform: 'zomato',
-        total_amount_settled: 33836255,
-        total_commission: -11396000,    // ~22% aggregator commission
-        total_gst_on_commission: -2051280, // 18% GST on commission
-        total_tds_amount: -518000,       // TDS ~1%
-        total_tcs_amount: -103600,
+        total_amount_settled: 3000000,
+        total_commission: -1000000,    // ~22% aggregator commission
+        total_gst_on_commission: -180000, // 18% GST on commission
+        total_tds_amount: -45000,       // TDS ~1%
+        total_tcs_amount: -9000,
       } as any,
     ] as any,
     Reconcile: {
@@ -3588,8 +3588,9 @@ const MarketplaceReconciliation: React.FC = () => {
                     const grossSalesAmount = Math.abs(Number(s?.total_transactions_amount || 0));
                     const grossSalesCount = Number(s?.total_transaction_orders || 0);
 
-                    const returnsAmount = Math.abs(Number(s?.total_return_amount || 0));
-                    const returnsCount = Number(s?.total_return_orders || 0);
+                    // Commission from API
+                    const commissionArray = (mainSummary as any)?.commission as Array<{ total_commission: number, total_gst_on_commission: number }>;
+                    const commissionAmount = Math.abs(commissionArray?.reduce((acc, item) => acc + (item.total_commission || 0) + (item.total_gst_on_commission || 0), 0) || 0);
 
                     const cancellationsAmount = Math.abs(Number(s?.total_cancellations_amount || 0));
                     const cancellationsCount = Number(s?.total_cancellations_orders || 0);
@@ -3638,7 +3639,7 @@ const MarketplaceReconciliation: React.FC = () => {
 
                     return (
                       <Box sx={{ p: 3 }}>
-                        {/* Equation Row: Net Payout = Gross Order Value - Commission - Cancellations */}
+                        {/* Equation Row: Net Payout = Gross Order Value - Cancellations - Commission */}
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                           <Metric
                             label="Net Payout"
@@ -3654,15 +3655,15 @@ const MarketplaceReconciliation: React.FC = () => {
                           <Operator symbol="-" />
                           <Metric label="Cancellations" amount={cancellationsAmount} count={cancellationsCount} />
                           <Operator symbol="-" />
-                          <Metric label="Refunds" amount={returnsAmount} count={returnsCount} />
+                          <Metric label="Commission & Charges" amount={commissionAmount} count={grossSalesCount} />
                         </Box>
 
-                        {/* Previous Return/Cancellations below equation */}
+                        {/* Previous Cancellations below equation */}
                         {(prevReturnOrCancelledAmount > 0 || prevReturnOrCancelledCount > 0) && (
                           <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                               <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25 }}>
-                                Previous Return/Cancellations
+                                Previous Cancellations
                               </Typography>
                               <Typography sx={{ fontSize: '1rem', fontWeight: 400, color: '#111827' }}>
                                 {getCurrencySymbol()}{Math.round(prevReturnOrCancelledAmount).toLocaleString(getCurrencyLocale())} • {Number(prevReturnOrCancelledCount || 0).toLocaleString('en-IN')} orders
@@ -5804,544 +5805,104 @@ const MarketplaceReconciliation: React.FC = () => {
           );
         })()}
 
-        {/* Return Summary & Refund Ageing Analysis - For all platforms */}
+        {/* Active Locations & Performance Dashboard */}
         {(() => {
-          const returnedSkus = [
-            { sku: 'SHS-RUN-AIR-10', name: 'Air Zoom Running Shoes', qty: 412, amount: 184500, rate: '4.8%' },
-            { sku: 'APP-TEE-ORG-MD', name: 'Organic Cotton Crewneck Tee', qty: 384, amount: 48000, rate: '4.2%' },
-            { sku: 'SHI-GOL-30G', name: 'Pure Himalayan Shilajit 30g', qty: 320, amount: 210500, rate: '3.9%' },
-            { sku: 'APP-HD-FLC-LG', name: 'Unisex Fleece Pullover Hoodie', qty: 290, amount: 145000, rate: '3.5%' },
-            { sku: 'SHS-SNE-CLS-09', name: 'Classic Canvas Sneakers', qty: 240, amount: 72000, rate: '3.1%' },
-            { sku: 'HLT-DIA-JU-1L', name: 'Dia Free Juice 1L', qty: 210, amount: 105000, rate: '2.8%' },
-            { sku: 'APP-JGR-SLM-SM', name: 'Slim Fit Athletic Joggers', qty: 180, amount: 89000, rate: '2.5%' },
-            { sku: 'SHS-TRL-OUT-11', name: 'Outdoor Trail Hiking Shoes', qty: 154, amount: 46200, rate: '2.2%' },
-            { sku: 'HLT-ASHWA-60', name: 'Ashwagandha Capsules (60 Cap)', qty: 130, amount: 78000, rate: '1.9%' },
-            { sku: 'APP-JKT-WND-XL', name: 'Water-Resistant Windbreaker', qty: 110, amount: 44000, rate: '1.6%' },
-            { sku: 'SHS-SPO-LGT-08', name: 'Lightweight Sports Trainers', qty: 95, amount: 28500, rate: '1.4%' },
-            { sku: 'HLT-GOJI-100', name: 'Goji Berry Extract 100ml', qty: 78, amount: 39000, rate: '1.1%' }
+          const topLocations = [
+            { name: 'Connaught Place', city: 'Delhi', orders: 1250, amount: 412500, growth: '+12%' },
+            { name: 'Bandra West', city: 'Mumbai', orders: 1120, amount: 369600, growth: '+8%' },
+            { name: 'Koramangala', city: 'Bengaluru', orders: 980, amount: 323400, growth: '+15%' },
+            { name: 'Jubilee Hills', city: 'Hyderabad', orders: 850, amount: 280500, growth: '+5%' },
+            { name: 'Salt Lake', city: 'Kolkata', orders: 720, amount: 237600, growth: '+9%' },
+            { name: 'Viman Nagar', city: 'Pune', orders: 650, amount: 214500, growth: '+11%' },
           ];
-
-          const returnedWarehouses = [
-            { name: 'Mumbai Apex WH', city: 'Mumbai', qty: 645, amount: 322500, pct: '26.8%' },
-            { name: 'Delhi NCR Hub', city: 'Gurugram', qty: 512, amount: 256000, pct: '21.3%' },
-            { name: 'Bengaluru Central WH', city: 'Bengaluru', qty: 420, amount: 210000, pct: '17.5%' },
-            { name: 'Hyderabad Logistics WH', city: 'Hyderabad', qty: 280, amount: 140000, pct: '11.6%' },
-            { name: 'Chennai Port WH', city: 'Chennai', qty: 184, amount: 92000, pct: '7.6%' },
-            { name: 'Pune Regional WH', city: 'Pune', qty: 120, amount: 60000, pct: '5.0%' },
-            { name: 'Kolkata East WH', city: 'Kolkata', qty: 95, amount: 47500, pct: '3.9%' },
-            { name: 'Ahmedabad Industrial WH', city: 'Ahmedabad', qty: 68, amount: 34000, pct: '2.8%' },
-            { name: 'Jaipur Heritage WH', city: 'Jaipur', qty: 45, amount: 22500, pct: '1.9%' },
-            { name: 'Indore Central WH', city: 'Indore', qty: 32, amount: 16000, pct: '1.3%' },
-            { name: 'Lucknow Avadh WH', city: 'Lucknow', qty: 22, amount: 11000, pct: '0.9%' },
-            { name: 'Chandigarh City WH', city: 'Chandigarh', qty: 15, amount: 7500, pct: '0.6%' }
-          ];
-
-          // Sourced from mainSummary dynamic values where possible
-          const s = mainSummary?.summary as any;
-          const totalReturnOrders = Number(s?.total_return_orders || 248);
-          const totalReturnAmount = Number(s?.total_return_amount || 172399);
-
-          // Boost more payment received values for D2C view (85% of amount, 80% of count of unreconciled total)
-          const unrecSummary = (mainSummary as any)?.UnReconcile?.summary || {};
-          const totalUnrecAmount = Number(unrecSummary.total_difference_amount || 0);
-          const totalUnrecCount = Number(unrecSummary.total_orders_count || 0);
-          const baseUnrecVal = Math.abs(totalUnrecAmount) || 150000;
-          const morePaymentAmount = Math.round(baseUnrecVal * 0.85);
-          const morePaymentOrders = Math.round((totalUnrecCount || 45) * 0.80);
-
-          const displayBuckets = ['<=2 days', '3-5 days', '6-10 days', '11-15 days', '>15 days'] as const;
-          const displayColors: Record<string, string> = {
-            '<=2 days': '#2e7d32',   // green
-            '3-5 days': '#cbd5e1',   // slate-200
-            '6-10 days': '#94a3b8',  // slate-400
-            '11-15 days': '#64748b', // slate-500
-            '>15 days': '#1f2937',   // slate-800
-          };
-
-          // Excluded providers to filter out of the D2C Refund Ageing Analysis
-          const excludedProviders = ['zippee', 'zippee blaze', 'zippee loginext', 'amazon_logistics', 'amazon_logistics_d2c', 'amazon logistics'];
-
-          const filteredAgeingData = ageingData.filter((item) => {
-            const pName = getProviderDisplayName(item.settlement_provider).toLowerCase().trim();
-            return !excludedProviders.some(ex => pName.includes(ex) || ex.includes(pName));
-          });
-
-          const d2cRawData = filteredAgeingData.length === 0
-            ? D2C_PROVIDER_AGEING_DATA.map((p) => {
-                const row: any = {
-                  provider: p.provider,
-                  avgTat: p.averageDaysToSettle,
-                  '<=1d': p.distribution['<=1d'],
-                  '2-3d': p.distribution['2-3d'],
-                  '4-7d': p.distribution['4-7d'],
-                  '8-14d': p.distribution['8-14d'],
-                  '15-30d': p.distribution['15-30d'],
-                  '>30d': p.distribution['>30d'],
-                };
-                return row;
-              })
-            : filteredAgeingData.map((item) => {
-                const row: any = {
-                  provider: getProviderDisplayName(item.settlement_provider),
-                  avgTat: item.averageDaysToSettle,
-                  '<=1d': item.distribution['<=1d'] || 0,
-                  '2-3d': item.distribution['2-3d'] || 0,
-                  '4-7d': item.distribution['4-7d'] || 0,
-                  '8-14d': item.distribution['8-14d'] || 0,
-                  '15-30d': item.distribution['15-30d'] || 0,
-                  '>30d': item.distribution['>30d'] || 0,
-                };
-                return row;
-              });
-
-          const d2cAgeingChartData = d2cRawData.map((item: any) => {
-            return {
-              provider: item.provider,
-              avgTat: item.avgTat,
-              '<=2 days': item['<=1d'] || 0,
-              '3-5 days': item['2-3d'] || 0,
-              '6-10 days': item['4-7d'] || 0,
-              '11-15 days': item['8-14d'] || 0,
-              '>15 days': (item['15-30d'] || 0) + (item['>30d'] || 0),
-            };
-          });
-
-          const d2cOverallAvgTAT = d2cRawData.length > 0
-            ? (d2cRawData.reduce((sum: number, p: any) => sum + p.avgTat, 0) / d2cRawData.length).toFixed(1)
-            : '0.0';
 
           return (
-            <>
-              {/* Return Summary Card */}
-              <Paper sx={{
-                p: 3,
-                mb: 6,
-                background: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: '16px',
-                boxShadow: 'none'
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
-                  <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>
-                    Return Summary
-                  </Typography>
-                </Box>
+            <Paper sx={{
+              p: 3,
+              mb: 6,
+              background: '#ffffff',
+              border: '1px solid #e5e7eb',
+              borderRadius: '16px',
+              boxShadow: 'none'
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
+                <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>
+                  Locations & Performance
+                </Typography>
+              </Box>
 
-                <Grid container spacing={3}>
-                  {/* Mini Cards */}
-                  <Grid item xs={12} md={8}>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6}>
-                        <Paper sx={{ p: 2.5, bgcolor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: 'none' }}>
-                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
-                            Total Return Orders
-                          </Typography>
-                          <Typography variant="h4" sx={{ mt: 1, color: '#1f2937', fontWeight: 700, fontSize: '1.75rem' }}>
-                            {Number(totalReturnOrders).toLocaleString('en-IN')}
-                          </Typography>
-                        </Paper>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Paper sx={{ p: 2.5, bgcolor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: 'none' }}>
-                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
-                            Total Return Amount
-                          </Typography>
-                          <Typography variant="h4" sx={{ mt: 1, color: '#1f2937', fontWeight: 700, fontSize: '1.75rem' }}>
-                            {formatCurrency(totalReturnAmount)}
-                          </Typography>
-                        </Paper>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Paper sx={{ p: 2.5, bgcolor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: 'none' }}>
-                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
-                            More Payment Received Orders
-                          </Typography>
-                          <Typography variant="h4" sx={{ mt: 1, color: '#1f2937', fontWeight: 700, fontSize: '1.75rem' }}>
-                            {Number(morePaymentOrders).toLocaleString('en-IN')}
-                          </Typography>
-                        </Paper>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Paper sx={{ p: 2.5, bgcolor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: 'none' }}>
-                          <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
-                            More Payment Received Amount
-                          </Typography>
-                          <Typography variant="h4" sx={{ mt: 1, color: '#1f2937', fontWeight: 700, fontSize: '1.75rem' }}>
-                            {formatCurrency(morePaymentAmount)}
-                          </Typography>
-                        </Paper>
-                      </Grid>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={4}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6} md={12}>
+                      <Paper sx={{ p: 2.5, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', boxShadow: 'none' }}>
+                        <Typography variant="caption" sx={{ color: '#166534', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                          Active Locations
+                        </Typography>
+                        <Typography variant="h4" sx={{ mt: 1, color: '#14532d', fontWeight: 700, fontSize: '1.75rem' }}>
+                          12
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6} md={12}>
+                      <Paper sx={{ p: 2.5, bgcolor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', boxShadow: 'none' }}>
+                        <Typography variant="caption" sx={{ color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                          Cities Present
+                        </Typography>
+                        <Typography variant="h4" sx={{ mt: 1, color: '#1e3a8a', fontWeight: 700, fontSize: '1.75rem' }}>
+                          6
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Paper sx={{ p: 2.5, bgcolor: '#fdf4ff', border: '1px solid #fbcfe8', borderRadius: '12px', boxShadow: 'none' }}>
+                        <Typography variant="caption" sx={{ color: '#86198f', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                          Avg Orders / Location
+                        </Typography>
+                        <Typography variant="h4" sx={{ mt: 1, color: '#701a75', fontWeight: 700, fontSize: '1.75rem' }}>
+                          750 / mo
+                        </Typography>
+                      </Paper>
                     </Grid>
                   </Grid>
-
-                  {/* Donut Chart (Return Status) */}
-                  <Grid item xs={12} md={4}>
-                    <Paper sx={{ p: 2, border: '1px solid #e5e7eb', borderRadius: '12px', bgcolor: '#ffffff', boxShadow: 'none', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1, textAlign: 'center' }}>
-                        Return Reconciliation Status
-                      </Typography>
-                      <Box sx={{ width: '100%', height: 210 }}>
-                        <ResponsiveContainer>
-                          <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-                            <Pie
-                              data={[
-                                { name: 'Restocked', value: 92, color: '#10b981' },
-                                { name: 'Delayed', value: 5, color: '#f59e0b' },
-                                { name: 'Disputed', value: 3, color: '#ef4444' }
-                              ]}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              innerRadius="78%"
-                              outerRadius="86%"
-                              paddingAngle={2}
-                            >
-                              <Cell fill="#10b981" />
-                              <Cell fill="#f59e0b" />
-                              <Cell fill="#ef4444" />
-                            </Pie>
-                            <RechartsTooltip formatter={(v) => `${v}%`} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, mt: 1, flexWrap: 'wrap' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#10b981' }} />
-                          <Typography variant="caption" sx={{ color: '#4b5563', fontWeight: 500 }}>Restocked (92%)</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#f59e0b' }} />
-                          <Typography variant="caption" sx={{ color: '#4b5563', fontWeight: 500 }}>Delayed (5%)</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#ef4444' }} />
-                          <Typography variant="caption" sx={{ color: '#4b5563', fontWeight: 500 }}>Disputed (3%)</Typography>
-                        </Box>
-                      </Box>
-                    </Paper>
-                  </Grid>
                 </Grid>
 
-                {/* Lists side by side */}
-                <Grid container spacing={3} sx={{ mt: 3 }}>
-                  <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 2.5, border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: 'none' }}>
-                      <Typography variant="subtitle1" sx={{ color: '#1f2937', fontWeight: 600, mb: 2 }}>
-                        Top Returned SKUs
-                      </Typography>
-                      <Box sx={{ maxHeight: 290, overflowY: 'auto', pr: 1, '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.1)', borderRadius: '4px' } }}>
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>SKU</TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>QTY</TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>AMOUNT</TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>RATE</TableCell>
+                <Grid item xs={12} md={8}>
+                  <Paper sx={{ p: 2.5, border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: 'none', height: '100%' }}>
+                    <Typography variant="subtitle1" sx={{ color: '#1f2937', fontWeight: 600, mb: 2 }}>
+                      Top Performing Locations
+                    </Typography>
+                    <Box sx={{ overflowY: 'auto' }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>LOCATION</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>ORDERS</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>REVENUE</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>GROWTH</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {topLocations.map((item, idx) => (
+                            <TableRow key={idx} sx={{ '&:hover': { bgcolor: '#f9fafb' } }}>
+                              <TableCell sx={{ py: 1.5, px: 1, borderBottom: '1px solid #f1f3f4' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', fontSize: '0.85rem' }}>{item.name}</Typography>
+                                <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>{item.city}</Typography>
+                              </TableCell>
+                              <TableCell align="right" sx={{ py: 1.5, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.85rem', fontWeight: 500 }}>{item.orders.toLocaleString('en-IN')}</TableCell>
+                              <TableCell align="right" sx={{ py: 1.5, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.85rem', fontWeight: 500 }}>{formatCurrency(item.amount)}</TableCell>
+                              <TableCell align="right" sx={{ py: 1.5, px: 1, borderBottom: '1px solid #f1f3f4', color: '#10b981', fontSize: '0.85rem', fontWeight: 600 }}>{item.growth}</TableCell>
                             </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {returnedSkus.map((item, idx) => (
-                              <TableRow key={idx} sx={{ '&:hover': { bgcolor: '#f9fafb' } }}>
-                                <TableCell sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4' }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', fontSize: '0.8rem' }}>{item.sku}</Typography>
-                                  <Typography variant="caption" sx={{ color: '#9ca3af', fontSize: '0.7rem' }}>{item.name}</Typography>
-                                </TableCell>
-                                <TableCell align="right" sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.8rem', fontWeight: 500 }}>{item.qty}</TableCell>
-                                <TableCell align="right" sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.8rem', fontWeight: 500 }}>{formatCurrency(item.amount, true)}</TableCell>
-                                <TableCell align="right" sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.8rem', fontWeight: 600 }}>{item.rate}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </Box>
-                    </Paper>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 2.5, border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: 'none' }}>
-                      <Typography variant="subtitle1" sx={{ color: '#1f2937', fontWeight: 600, mb: 2 }}>
-                        Top Returned Warehouses
-                      </Typography>
-                      <Box sx={{ maxHeight: 290, overflowY: 'auto', pr: 1, '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,0,0,0.1)', borderRadius: '4px' } }}>
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>WAREHOUSE</TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>QTY</TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>AMOUNT</TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: '#9ca3af', borderBottom: '1px solid #f1f3f4', px: 1 }}>SHARE</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {returnedWarehouses.map((item, idx) => (
-                              <TableRow key={idx} sx={{ '&:hover': { bgcolor: '#f9fafb' } }}>
-                                <TableCell sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4' }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', fontSize: '0.8rem' }}>{item.name}</Typography>
-                                  <Typography variant="caption" sx={{ color: '#9ca3af', fontSize: '0.7rem' }}>{item.city}</Typography>
-                                </TableCell>
-                                <TableCell align="right" sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.8rem', fontWeight: 500 }}>{item.qty}</TableCell>
-                                <TableCell align="right" sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.8rem', fontWeight: 500 }}>{formatCurrency(item.amount, true)}</TableCell>
-                                <TableCell align="right" sx={{ py: 1, px: 1, borderBottom: '1px solid #f1f3f4', color: '#374151', fontSize: '0.8rem', fontWeight: 600 }}>{item.pct}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </Box>
-                    </Paper>
-                  </Grid>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </Box>
+                  </Paper>
                 </Grid>
-              </Paper>
-
-              {/* Refund Ageing Analysis Card */}
-              <Paper sx={{
-                p: 3,
-                mb: 6,
-                background: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: '16px',
-                boxShadow: 'none'
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>
-                    Refund Ageing Analysis
-                  </Typography>
-                  <Chip
-                    label={ageingLoading ? 'Loading...' : `Avg TAT: ${d2cOverallAvgTAT} days`}
-                    sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 700 }}
-                  />
-                </Box>
-                <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: 3, px: 1 }}>
-                  {displayBuckets.map((b) => (
-                    <Box key={b} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: displayColors[b] }} />
-                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#4b5563' }}>
-                        {b}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-                <Box sx={{ width: '100%', height: 380 }}>
-                  {ageingLoading ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                      <CircularProgress />
-                    </Box>
-                  ) : filteredAgeingData.length === 1 ? (
-                    // Single-vendor minimalist greyscale layout
-                    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                      {(() => {
-                        const single = filteredAgeingData[0];
-                        const total = AGE_BUCKETS.reduce((sum, bucket) => sum + (single.distribution[bucket] || 0), 0);
-                        const percents = displayBuckets.map((bucket) => {
-                          let value = 0;
-                          if (bucket === '<=2 days') value = single.distribution['<=1d'] || 0;
-                          else if (bucket === '3-5 days') value = single.distribution['2-3d'] || 0;
-                          else if (bucket === '6-10 days') value = single.distribution['4-7d'] || 0;
-                          else if (bucket === '11-15 days') value = single.distribution['8-14d'] || 0;
-                          else if (bucket === '>15 days') value = (single.distribution['15-30d'] || 0) + (single.distribution['>30d'] || 0);
-
-                          return {
-                            bucket,
-                            value: total > 0 ? (value / total) * 100 : 0
-                          };
-                        });
-                        const GREYS: Record<string, string> = {
-                          '<=2 days': '#d9d9d9',
-                          '3-5 days': '#bfbfbf',
-                          '6-10 days': '#a6a6a6',
-                          '11-15 days': '#8c8c8c',
-                          '>15 days': '#595959',
-                        };
-                        return (
-                          <>
-                            <Typography variant="h2" sx={{ color: '#111827', fontWeight: 700, lineHeight: 1, mb: 0.5 }}>
-                              {Number(single.averageDaysToSettle).toFixed(1)}
-                              <Typography component="span" variant="h6" sx={{ color: '#6b7280', fontWeight: 500, ml: 1 }}>days</Typography>
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: '#6b7280', mb: 2 }}>
-                              {getProviderDisplayName(single.settlement_provider)}
-                            </Typography>
-                            <Box sx={{ width: '100%', maxWidth: 720 }}>
-                              <Box sx={{ height: 16, borderRadius: '9999px', overflow: 'hidden', bgcolor: '#e5e7eb' }}>
-                                <Box sx={{ display: 'flex', width: '100%', height: '100%' }}>
-                                  {percents.map(({ bucket, value }) => (
-                                    <Box key={bucket} sx={{ width: `${value}%`, height: '100%', bgcolor: GREYS[bucket] }} />
-                                  ))}
-                                </Box>
-                              </Box>
-                              <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 1 }}>
-                                {percents.map(({ bucket, value }) => (
-                                  <Box key={bucket} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                    <Box sx={{ width: 10, height: 10, borderRadius: 2, bgcolor: GREYS[bucket], border: '1px solid #e5e7eb' }} />
-                                    <Typography variant="caption" sx={{ color: '#9ca3af', fontWeight: 600 }}>{Math.round(value)}%</Typography>
-                                    <Typography variant="caption" sx={{ color: '#4b5563', ml: 0.5 }}>{bucket}</Typography>
-                                  </Box>
-                                ))}
-                              </Box>
-                            </Box>
-                          </>
-                        );
-                      })()}
-                    </Box>
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={d2cAgeingChartData} margin={{ top: 40, right: 10, left: -20, bottom: 0 }} barCategoryGap={"25%"}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="provider" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} interval={0} height={60} angle={-25} textAnchor="end" />
-                        <YAxis unit="%" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                        <RechartsTooltip 
-                          formatter={(v: any, name: string) => [`${Number(v).toFixed(1)}%`, name]} 
-                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontFamily: '"Inter", sans-serif' }}
-                          itemStyle={{ fontSize: '13px', fontWeight: 600 }}
-                          labelStyle={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}
-                        />
-                        {displayBuckets.map((b, idx) => (
-                          <Bar 
-                            key={b} 
-                            dataKey={b} 
-                            stackId="a" 
-                            fill={displayColors[b]} 
-                            radius={idx === displayBuckets.length - 1 ? [4, 4, 0, 0] : 0} 
-                            barSize={16}
-                            maxBarSize={16}
-                          >
-                            {idx === displayBuckets.length - 1 && (
-                              <LabelList
-                                dataKey="avgTat"
-                                position="top"
-                                formatter={(v: number) => `${Number(v).toFixed(1)}d`}
-                                style={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
-                              />
-                            )}
-                          </Bar>
-                        ))}
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </Box>
-              </Paper>
-            </>
+              </Grid>
+            </Paper>
           );
         })()}
-
-        {/* Refund Ageing Analysis for other platforms */}
-        <Paper sx={{
-            p: 3,
-            mb: 6,
-            background: '#ffffff',
-            border: '1px solid #e5e7eb',
-            borderRadius: '16px',
-            boxShadow: 'none'
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>
-                Payment Ageing Analysis
-              </Typography>
-              <Chip
-                label={ageingLoading ? 'Loading...' : `Avg TAT: ${overallAvgTAT} days`}
-                sx={{ bgcolor: '#e6f4ea', color: '#1b5e20', fontWeight: 700 }}
-              />
-            </Box>
-            <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mb: 3, px: 1 }}>
-              {AGE_BUCKETS.map((b) => (
-                <Box key={b} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: BUCKET_COLORS[b] }} />
-                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#4b5563' }}>
-                    {b}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
-            <Box sx={{ width: '100%', height: 380 }}>
-              {ageingLoading ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                  <CircularProgress />
-                </Box>
-              ) : ageingData.length === 1 ? (
-                // Single-vendor minimalist greyscale layout
-                <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                  {(() => {
-                    const single = ageingData[0];
-                    const total = AGE_BUCKETS.reduce((sum, bucket) => sum + (single.distribution[bucket] || 0), 0);
-                    const percents = AGE_BUCKETS.map((bucket) => ({
-                      bucket,
-                      value: total > 0 ? ((single.distribution[bucket] || 0) / total) * 100 : 0,
-                    }));
-                    const GREYS: Record<typeof AGE_BUCKETS[number], string> = {
-                      '<=1d': '#d9d9d9',
-                      '2-3d': '#bfbfbf',
-                      '4-7d': '#a6a6a6',
-                      '8-14d': '#8c8c8c',
-                      '15-30d': '#737373',
-                      '>30d': '#595959',
-                    };
-                    return (
-                      <>
-                        <Typography variant="h2" sx={{ color: '#111827', fontWeight: 700, lineHeight: 1, mb: 0.5 }}>
-                          {Number(single.averageDaysToSettle).toFixed(1)}
-                          <Typography component="span" variant="h6" sx={{ color: '#6b7280', fontWeight: 500, ml: 1 }}>days</Typography>
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#6b7280', mb: 2 }}>
-                          {getProviderDisplayName(single.settlement_provider)}
-                        </Typography>
-                        <Box sx={{ width: '100%', maxWidth: 720 }}>
-                          <Box sx={{ height: 16, borderRadius: '9999px', overflow: 'hidden', bgcolor: '#e5e7eb' }}>
-                            <Box sx={{ display: 'flex', width: '100%', height: '100%' }}>
-                              {percents.map(({ bucket, value }) => (
-                                <Box key={bucket} sx={{ width: `${value}%`, height: '100%', bgcolor: GREYS[bucket] }} />
-                              ))}
-                            </Box>
-                          </Box>
-                          <Box sx={{ mt: 1.5, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 1 }}>
-                            {percents.map(({ bucket, value }) => (
-                              <Box key={bucket} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Box sx={{ width: 10, height: 10, borderRadius: 2, bgcolor: GREYS[bucket], border: '1px solid #e5e7eb' }} />
-                                <Typography variant="caption" sx={{ color: '#9ca3af', fontWeight: 600 }}>{Math.round(value)}%</Typography>
-                                <Typography variant="caption" sx={{ color: '#4b5563' }}>{bucket}</Typography>
-                              </Box>
-                            ))}
-                          </Box>
-                        </Box>
-                      </>
-                    );
-                  })()}
-                </Box>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={ageingChartData} margin={{ top: 40, right: 10, left: -20, bottom: 0 }} barCategoryGap={"25%"}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="provider" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} interval={0} height={60} angle={-25} textAnchor="end" />
-                    <YAxis unit="%" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                    <RechartsTooltip 
-                      formatter={(v: any, name: string) => [`${Number(v).toFixed(1)}%`, name]} 
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontFamily: '"Inter", sans-serif' }}
-                      itemStyle={{ fontSize: '13px', fontWeight: 600 }}
-                      labelStyle={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}
-                    />
-                    {AGE_BUCKETS.map((b, idx) => (
-                      <Bar 
-                        key={b} 
-                        dataKey={b} 
-                        stackId="a" 
-                        fill={BUCKET_COLORS[b]} 
-                        radius={idx === AGE_BUCKETS.length - 1 ? [4, 4, 0, 0] : 0} 
-                        barSize={16}
-                      >
-                        {idx === AGE_BUCKETS.length - 1 && (
-                          <LabelList
-                            dataKey="avgTat"
-                            position="top"
-                            formatter={(v: number) => `${Number(v).toFixed(1)}d`}
-                            style={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
-                          />
-                        )}
-                      </Bar>
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </Box>
-          </Paper>
 
         {/* Month on Month Growth Section */}
         <Paper sx={{
