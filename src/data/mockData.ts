@@ -89,6 +89,7 @@ const PLATFORM_WEIGHTS: Record<Platform, number> = {
   nykaa: 0.18,      // 18% - Nykaa
   blinkit: 0.24,    // 24% - Blinkit
   zepto: 0.26,      // 26% - Zepto
+  instamart: 0.25,  // 25% - Instamart
   offline: 0.32,    // 32% - Offline Store
   offlinestore: 0.32, // 32% - Offline Store
 };
