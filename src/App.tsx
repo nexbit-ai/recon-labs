@@ -31,6 +31,9 @@ import Logistics from './pages/Logistics';
 import Pricing from './pages/Pricing';
 import Integrations from './pages/Integrations';
 
+// B2B module (Nexbit) — isolated subtree with its own theme + shell
+import B2BApp from './b2b/B2BApp';
+
 // Components
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -391,7 +394,10 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/authenticate" element={<Authenticate />} />
-            
+
+            {/* B2B module (Nexbit) — frontend-only, isolated theme + shell */}
+            <Route path="/b2b/*" element={<B2BApp />} />
+
             {/* Main application routes with Layout and Protection */}
             <Route path="/" element={
               <ProtectedRoute>

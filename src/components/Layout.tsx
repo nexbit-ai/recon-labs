@@ -52,6 +52,7 @@ import {
 // import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
 // @ts-ignore
 import logo from '../assets/logo_fresh.jpg';
+import ProductToggle from '../b2b/components/ProductToggle';
 
 const drawerWidth = 168;
 
@@ -138,7 +139,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           style={{ width: 48, height: 48, marginBottom: 16, display: 'block' }}
         />
       </Toolbar>
-      <Box sx={{ px: 2, mb: 1, mt: -1 }}>
+      {/* Top-level B2C / B2B product toggle */}
+      <Box sx={{ px: 2, mt: -1, mb: 2 }}>
+        <ProductToggle />
+      </Box>
+      <Box sx={{ px: 2, mb: 1 }}>
         <Typography variant="caption" sx={{ color: '#9ca3af', fontWeight: 600, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', mb: 0.5 }}>
           Organization
         </Typography>
