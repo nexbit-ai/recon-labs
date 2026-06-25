@@ -1433,12 +1433,14 @@ const MarketplaceReconciliation: React.FC = () => {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(loadPlatformFromStorage());
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [tempSelectedPlatform, setTempSelectedPlatform] = useState<Platform | null>(null);
+  const [qcModel, setQcModel] = useState<'SOR' | 'OR'>('SOR');
 
   const isD2C = selectedPlatform === 'd2c';
   const totalSyncSteps = isD2C ? 8 : 6;
-  const isMarketplace = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c';
+  const isQC = selectedPlatform === 'blinkit' || selectedPlatform === 'zepto' || selectedPlatform === 'instamart';
+  const isMarketplace = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || isQC;
   const [connectedPlatforms, setConnectedPlatforms] = useState<Set<string>>(new Set());
-  const isConnected = !isMarketplace || connectedPlatforms.has(selectedPlatform);
+  const isConnected = !isMarketplace || isQC || connectedPlatforms.has(selectedPlatform);
 
   const startSyncSimulation = () => {
     setSyncView('syncing');
@@ -1586,6 +1588,9 @@ const MarketplaceReconciliation: React.FC = () => {
     { value: 'amazon_uk' as Platform, label: 'Amazon UK' },
     { value: 'd2c' as Platform, label: 'D2C' },
     { value: 'other' as Platform, label: 'Other (CRED)' },
+    { value: 'blinkit' as Platform, label: 'Blinkit' },
+    { value: 'zepto' as Platform, label: 'Zepto' },
+    { value: 'instamart' as Platform, label: 'Instamart' },
   ];
 
   // Generate D2C dummy data
@@ -1669,6 +1674,100 @@ const MarketplaceReconciliation: React.FC = () => {
     const d2cData = buildD2CDemoData();
     setReconciliationData(d2cData);
   };
+
+  // Generate Quick Commerce demo data
+  const buildQuickCommerceDemoData = (model: 'SOR' | 'OR'): MarketplaceReconciliationResponse => {
+    if (model === 'SOR') {
+      return {
+        grossSales: "1250000",
+        ordersDelivered: { amount: "1250000", number: 4500 },
+        ordersReturned: { amount: "45000", number: 150 }, // High returns in Q-commerce
+        commission: { totalCommission: "187500", commissionRate: "15.00" }, // 15% commission
+        settledSales: "950000",
+        summaryData: {
+          totalTransaction: { amount: "1250000", number: 4500 },
+          netSalesAsPerSalesReport: { amount: "1205000", number: 4350 },
+          paymentReceivedAsPerSettlementReport: { amount: "950000", number: 4100 },
+          totalUnreconciled: { 
+            amount: "67500", number: 250,
+            lessPaymentReceivedFromFlipkart: { amount: "45000", number: 180 }, // Representing missing settlements
+            excessPaymentReceivedFromFlipkart: { amount: "22500", number: 70 }
+          },
+          totalReconciled: { amount: "950000", number: 4100 },
+          pendingPaymentFromMarketplace: { amount: "15000", number: 50 },
+          pendingDeductions: { amount: "35000", number: 100 }, // Representing storage & inwarding
+          returnedOrCancelledOrders: { amount: "45000", number: 150 }
+        },
+        totalTDS: "12500",
+        totalTDA: "0",
+        monthOrdersPayoutReceived: "950000",
+        monthOrdersAwaitedSettlement: { salesAmount: "15000", salesOrders: 50 },
+        unsettledReturns: { returnAmount: "10000", returnsOrders: 30 },
+        difference: "67500",
+        returnRate: "3.3",
+        commissionRate: "15.00"
+      };
+    } else {
+      // OR (Outright) Model
+      return {
+        grossSales: "3500000", // Larger PO based values
+        ordersDelivered: { amount: "3500000", number: 25000 },
+        ordersReturned: { amount: "0", number: 0 }, // Outright implies platform bought it
+        commission: { totalCommission: "0", commissionRate: "0.00" }, // No commission, but ad spend deducted later
+        settledSales: "3100000",
+        summaryData: {
+          totalTransaction: { amount: "3500000", number: 25000 },
+          netSalesAsPerSalesReport: { amount: "3500000", number: 25000 },
+          paymentReceivedAsPerSettlementReport: { amount: "3100000", number: 23000 },
+          totalUnreconciled: { 
+            amount: "185000", number: 1200,
+            lessPaymentReceivedFromFlipkart: { amount: "185000", number: 1200 }, // Representing GRN Shortages
+            excessPaymentReceivedFromFlipkart: { amount: "0", number: 0 }
+          },
+          totalReconciled: { amount: "3100000", number: 23000 },
+          pendingPaymentFromMarketplace: { amount: "55000", number: 800 },
+          pendingDeductions: { amount: "160000", number: 1000 }, // Representing mandatory ad wallet deductions
+          returnedOrCancelledOrders: { amount: "0", number: 0 }
+        },
+        totalTDS: "35000",
+        totalTDA: "0",
+        monthOrdersPayoutReceived: "3100000",
+        monthOrdersAwaitedSettlement: { salesAmount: "55000", salesOrders: 800 },
+        unsettledReturns: { returnAmount: "0", returnsOrders: 0 },
+        difference: "185000",
+        returnRate: "0.0",
+        commissionRate: "0.00"
+      };
+    }
+  };
+
+  const applyQuickCommerceDemoData = () => {
+    const qcData = buildQuickCommerceDemoData(qcModel);
+    setReconciliationData(qcData);
+
+    setMainSummary({
+      summary: {
+        total_transactions_amount: Number(qcData.grossSales),
+        total_transaction_orders: qcData.ordersDelivered?.number || 0,
+        total_return_amount: Number(qcData.ordersReturned?.amount || 0),
+        total_return_orders: qcData.ordersReturned?.number || 0,
+        total_cancellations_amount: 0,
+        total_cancellations_orders: 0,
+        net_sales_amount: Number(qcData.summaryData?.netSalesAsPerSalesReport?.amount || 0),
+        net_sales_orders: qcData.summaryData?.netSalesAsPerSalesReport?.number || 0,
+        prev_return_or_cancelled_amount: 0,
+        prev_return_or_cancelled_orders: 0
+      },
+      partyComposition: { rows: [] },
+      UnReconcile: { reasons: [] }
+    } as any);
+  };
+
+  useEffect(() => {
+    if (isQC) {
+      applyQuickCommerceDemoData();
+    }
+  }, [selectedPlatform, qcModel]);
 
   // Generate available months (last 12 months)
   const generateAvailableMonths = () => {
@@ -3049,6 +3148,43 @@ const MarketplaceReconciliation: React.FC = () => {
                     </Box>
                   )}
 
+                  {/* QC Model Toggle */}
+                  {isQC && (
+                    <Box sx={{ display: 'flex', border: '1px solid #d1d5db', borderRadius: '8px', overflow: 'hidden', height: 36 }}>
+                      <Button
+                        onClick={() => setQcModel('SOR')}
+                        sx={{
+                          borderRadius: 0,
+                          minWidth: '60px',
+                          textTransform: 'none',
+                          fontSize: '0.7875rem',
+                          fontWeight: qcModel === 'SOR' ? 600 : 400,
+                          backgroundColor: qcModel === 'SOR' ? 'rgba(122, 93, 191, 0.1)' : 'transparent',
+                          color: qcModel === 'SOR' ? '#7A5DBF' : '#6b7280',
+                          borderRight: '1px solid #d1d5db',
+                          '&:hover': { backgroundColor: qcModel === 'SOR' ? 'rgba(122, 93, 191, 0.15)' : '#f9fafb' }
+                        }}
+                      >
+                        SOR
+                      </Button>
+                      <Button
+                        onClick={() => setQcModel('OR')}
+                        sx={{
+                          borderRadius: 0,
+                          minWidth: '60px',
+                          textTransform: 'none',
+                          fontSize: '0.7875rem',
+                          fontWeight: qcModel === 'OR' ? 600 : 400,
+                          backgroundColor: qcModel === 'OR' ? 'rgba(122, 93, 191, 0.1)' : 'transparent',
+                          color: qcModel === 'OR' ? '#7A5DBF' : '#6b7280',
+                          '&:hover': { backgroundColor: qcModel === 'OR' ? 'rgba(122, 93, 191, 0.15)' : '#f9fafb' }
+                        }}
+                      >
+                        OR
+                      </Button>
+                    </Box>
+                  )}
+
                   {/* Platform Selector */}
                   <Button
                     variant="outlined"
@@ -3486,7 +3622,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     const prevReturnOrCancelledAmount = Math.abs(Number(s?.prev_return_or_cancelled_amount || 0));
                     const prevReturnOrCancelledCount = Number(s?.prev_return_or_cancelled_orders || 0);
 
-                    const Metric = ({ label, amount, count, onClick }: { label: string; amount: number; count: number; onClick?: () => void }) => (
+                    const Metric = ({ label, amount, count, unitLabel = 'orders', onClick }: { label: string; amount: number; count: number; unitLabel?: string; onClick?: () => void }) => (
                       <Box
                         onClick={onClick}
                         sx={{
@@ -3497,7 +3633,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           cursor: onClick ? 'pointer' : 'default'
                         }}
                       >
-                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25 }}>
+                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25, textAlign: 'center' }}>
                           {label}
                         </Typography>
                         <Typography sx={{ fontSize: '1.5rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
@@ -3508,7 +3644,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             {Number(count || 0).toLocaleString('en-IN')}
                           </Typography>
                           <Typography sx={{ flex: 1, textAlign: 'left', pl: 0, fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
-                            orders
+                            {unitLabel}
                           </Typography>
                         </Box>
                       </Box>
@@ -3525,20 +3661,21 @@ const MarketplaceReconciliation: React.FC = () => {
                         {/* Equation Row: Net Sales = Gross Sales - Returns - Cancellations */}
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                           <Metric
-                            label="Net Sales"
+                            label={isQC && qcModel === 'OR' ? "Ack GRN Value" : "Net Sales"}
                             amount={netSalesAmount}
                             count={netSalesCount}
+                            unitLabel={isQC && qcModel === 'OR' ? "GRNs" : "orders"}
                             onClick={() => {
                               setInitialTsTab(4); // Open Transaction Sheet with "Sales Report" tab
                               setShowTransactionSheet(true);
                             }}
                           />
                           <Operator symbol="=" />
-                          <Metric label="Gross Sales" amount={grossSalesAmount} count={grossSalesCount} />
+                          <Metric label={isQC && qcModel === 'OR' ? "Total PO Value" : "Gross Sales"} amount={grossSalesAmount} count={grossSalesCount} unitLabel={isQC && qcModel === 'OR' ? "POs" : "orders"} />
                           <Operator symbol="-" />
-                          <Metric label="Returns" amount={returnsAmount} count={returnsCount} />
+                          <Metric label={isQC && qcModel === 'OR' ? "GRN Shortages" : "Returns"} amount={returnsAmount} count={returnsCount} unitLabel={isQC && qcModel === 'OR' ? "items" : "orders"} />
                           <Operator symbol="-" />
-                          <Metric label="Cancellations" amount={cancellationsAmount} count={cancellationsCount} />
+                          <Metric label={isQC && qcModel === 'OR' ? "Wallet Deductions" : "Cancellations"} amount={cancellationsAmount} count={cancellationsCount} unitLabel={isQC && qcModel === 'OR' ? "deductions" : "orders"} />
                         </Box>
 
                         {/* Previous Return/Cancellations below equation */}
@@ -3546,10 +3683,10 @@ const MarketplaceReconciliation: React.FC = () => {
                           <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
                             <Box sx={{ textAlign: 'center' }}>
                               <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25 }}>
-                                Previous Return/Cancellations
+                                {isQC && qcModel === 'OR' ? "Previous Adjustments" : "Previous Return/Cancellations"}
                               </Typography>
                               <Typography sx={{ fontSize: '1rem', fontWeight: 400, color: '#111827' }}>
-                                {getCurrencySymbol()}{Math.round(prevReturnOrCancelledAmount).toLocaleString(getCurrencyLocale())} • {Number(prevReturnOrCancelledCount || 0).toLocaleString('en-IN')} orders
+                                {getCurrencySymbol()}{Math.round(prevReturnOrCancelledAmount).toLocaleString(getCurrencyLocale())} • {Number(prevReturnOrCancelledCount || 0).toLocaleString('en-IN')} {isQC && qcModel === 'OR' ? "adjustments" : "orders"}
                               </Typography>
                             </Box>
                           </Box>
@@ -5228,14 +5365,15 @@ const MarketplaceReconciliation: React.FC = () => {
         </Grid>
 
         {/* Commission & Charges Summary (replaces Settlement/Unsettled section) */}
-        <Card sx={{
-          mb: 6,
-          background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
-          borderRadius: '16px',
-          border: '1px solid #f1f3f4',
-          boxShadow: 'none',
-          overflow: 'hidden',
-        }}>
+        {!isQC && (
+          <Card sx={{
+            mb: 6,
+            background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+            borderRadius: '16px',
+            border: '1px solid #f1f3f4',
+            boxShadow: 'none',
+            overflow: 'hidden',
+          }}>
           <CardContent sx={{ p: 5 }}>
             {(() => {
               const commissionArray = (mainSummary as any)?.commission as Array<{
@@ -5510,6 +5648,7 @@ const MarketplaceReconciliation: React.FC = () => {
             })()}
           </CardContent>
         </Card>
+        )}
 
         {/* Party Composition Section - Only for D2C */}
         {selectedPlatform === 'd2c' && (() => {
@@ -6108,14 +6247,15 @@ const MarketplaceReconciliation: React.FC = () => {
         })()}
 
         {/* Refund Ageing Analysis for other platforms */}
-        <Paper sx={{
-            p: 3,
-            mb: 6,
-            background: '#ffffff',
-            border: '1px solid #e5e7eb',
-            borderRadius: '16px',
-            boxShadow: 'none'
-          }}>
+        {!isQC && (
+          <Paper sx={{
+              p: 3,
+              mb: 6,
+              background: '#ffffff',
+              border: '1px solid #e5e7eb',
+              borderRadius: '16px',
+              boxShadow: 'none'
+            }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
               <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>
                 Payment Ageing Analysis
@@ -6225,16 +6365,18 @@ const MarketplaceReconciliation: React.FC = () => {
               )}
             </Box>
           </Paper>
+        )}
 
         {/* Month on Month Growth Section */}
-        <Paper sx={{
-          p: 3,
-          mb: 6,
-          background: '#ffffff',
-          border: '1px solid #e5e7eb',
-          borderRadius: '16px',
-          boxShadow: 'none'
-        }}>
+        {!isQC && (
+          <Paper sx={{
+            p: 3,
+            mb: 6,
+            background: '#ffffff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '16px',
+            boxShadow: 'none'
+          }}>
           <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600, mb: 4 }}>
             Month on Month Growth
           </Typography>
@@ -6972,6 +7114,7 @@ const MarketplaceReconciliation: React.FC = () => {
             </Box>
           )}
         </Paper>
+        )}
 
         {/* Provider TAT Summary removed; avg TAT is annotated on bars above */}
 

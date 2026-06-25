@@ -71,7 +71,7 @@ export interface FinanceMockData {
   returns_table: SalesRow[];
 }
 
-export type Platform = 'shopify' | 'amazon' | 'flipkart' | 'myntra' | 'd2c' | 'other' | 'amazon_uk' | 'nykaa' | 'blinkit' | 'zepto' | 'offline' | 'offlinestore';
+export type Platform = 'shopify' | 'amazon' | 'flipkart' | 'myntra' | 'd2c' | 'other' | 'amazon_uk' | 'nykaa' | 'blinkit' | 'zepto' | 'instamart' | 'offline' | 'offlinestore';
 
 export interface PlatformData {
   [key: string]: FinanceMockData;
