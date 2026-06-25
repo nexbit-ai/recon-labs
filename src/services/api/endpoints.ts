@@ -414,7 +414,45 @@ export const unicommerceAuthAPI = {
 };
 
 // Export all APIs
+
+
+ 
+// Logistics API
+export const logisticsAPI = {
+  getLogisticCostDashboard: (params?: {
+    provider?: string;
+    page?: number;
+    limit?: number;
+    view?: 'all' | 'mismatch';
+    start_date?: string;
+    end_date?: string;
+    search?: string;
+    reason?: string;
+  }) =>
+    apiService.get<any>(API_CONFIG.ENDPOINTS.LOGISTIC_DELHIVERY_COST, params),
+
+  getRateCardConfig: (params?: {
+    provider?: string;
+    start_date?: string;
+    end_date?: string;
+  }) =>
+    apiService.get<any>(API_CONFIG.ENDPOINTS.LOGISTIC_RATE_CARD, params),
+
+  updateRateCardConfig: (payload: {
+    updates: Array<{ id: string; raw_value: string }>;
+  }) => apiService.post<any>(API_CONFIG.ENDPOINTS.LOGISTIC_RATE_CARD_UPDATE, payload),
+
+  uploadMasterWeight: (file: File) =>
+    apiService.upload<any>(API_CONFIG.ENDPOINTS.LOGISTIC_MASTER_WEIGHT_UPLOAD, file, undefined),
+
+  recalculate: (params: { provider: string }) =>
+    apiService.post<any>(API_CONFIG.ENDPOINTS.LOGISTIC_RECALCULATE, params),
+};
+
+
+
 export const api = {
+  logistics: logisticsAPI,
   auth: authAPI,
   user: userAPI,
   reconciliation: reconciliationAPI,
@@ -441,5 +479,4 @@ export const api = {
   shiprocketAuth: shiprocketAuthAPI,
   unicommerceAuth: unicommerceAuthAPI,
 };
-
-export default api; 
+export default api;

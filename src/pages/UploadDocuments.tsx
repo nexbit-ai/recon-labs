@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, Typography, Paper, Grid, Breadcrumbs, Link, Chip, Button, Alert, CircularProgress, Drawer, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, MenuItem } from '@mui/material';
+import { Box, Typography, Paper, Grid, Breadcrumbs, Link, Chip, Button, Alert, CircularProgress, Drawer, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, MenuItem, Card, CardContent } from '@mui/material';
 import { 
   CalendarToday as CalendarIcon,
   CheckCircle as CheckCircleIcon,
@@ -59,9 +59,11 @@ const vendors: Vendor[] = [
   // D2C logistics partner - uses report_type "amazon_logistics"
   { id: 'amazon_logistics', name: 'Amazon Logistics' },
   // D2C payment gateway partner - uses report_type "cashfree"
+  { id: 'cashfree', name: 'Cashfree' },
   { id: 'cashfree_payments', name: 'Cashfree Payments' },
-  // D2C logistics partner - uses report_type "zippee-loginext"
-  { id: 'zippee-loginext', name: 'Zippee' },
+  // D2C logistics partner - uses report_type "zippee-loginext" and "zippee-blaze"
+  { id: 'zippee-loginext', name: 'Zippee Loginext' },
+  { id: 'zippee-blaze', name: 'Zippee Blaze' },
   // D2C logistics partner - uses report_type "ekart"
   { id: 'ekart', name: 'Ekart' },
   // Portal partner - uses report_types "cred_sales" and "cred_settlement"
@@ -87,7 +89,7 @@ const getAcceptForVendor = (vendorId?: string | null) => getExtensionsForVendor(
 const getFormatLabelForVendor = (vendorId?: string | null) =>
   isFlipkartVendor(vendorId) ? 'CSV/XLSX' : 'CSV only';
 
-type ViewType = 'years' | 'marketplace' | 'd2c';
+type ViewType = 'years' | 'marketplace' | 'd2c' | 'logistic';
 
 type UploadProcessingStatus = 'none' | 'pending' | 'processing';
 
@@ -108,6 +110,14 @@ const UploadDocuments: React.FC = () => {
   const [lastMileStatusFile, setLastMileStatusFile] = useState<File | null>(null);
   // Unicommerce Sales file
   const [unicommerceFile, setUnicommerceFile] = useState<File | null>(null);
+  // Delhivery logistics recon CSV
+  const [delhiveryLogisticReconFile, setDelhiveryLogisticReconFile] = useState<File | null>(null);
+  // Shadowfax logistics recon CSV
+  const [shadowfaxLogisticReconFile, setShadowfaxLogisticReconFile] = useState<File | null>(null);
+  // Logistic rate-card CSV
+  const [logisticRateCardFile, setLogisticRateCardFile] = useState<File | null>(null);
+  // Logistic master-weight CSV
+  const [logisticMasterWeightFile, setLogisticMasterWeightFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
   const [reconciliationStatus, setReconciliationStatus] = useState<UploadListResponse['reconciliation_status']>(undefined);
@@ -188,6 +198,18 @@ const UploadDocuments: React.FC = () => {
     setSelectedYear(year);
     setSelectedMonth(monthIndex);
     setCurrentView('d2c');
+    setUploadStatus(null);
+    setHoveredYear(null);
+    setHoveredMonth(null);
+    
+    // Fetch uploaded documents for this month
+    await fetchUploadedDocuments(year, monthIndex);
+  };
+
+  const handleNavigateToLogistic = async (year: number, monthIndex: number) => {
+    setSelectedYear(year);
+    setSelectedMonth(monthIndex);
+    setCurrentView('logistic');
     setUploadStatus(null);
     setHoveredYear(null);
     setHoveredMonth(null);
@@ -324,7 +346,7 @@ const UploadDocuments: React.FC = () => {
       console.log('🔐 Using API key + custom JWT token:', headers);
       
       // Make API call with proper headers
-      const response = await fetch(`${API_CONFIG.BASE_URL}/v1/recon/upload`, {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/v1/logistic/upload`, {
         method: 'POST',
         headers,
         body: formData,
@@ -358,6 +380,251 @@ const UploadDocuments: React.FC = () => {
       setUploadStatus({
         type: 'error',
         message: error instanceof Error ? error.message : 'Failed to upload file. Please try again.'
+      });
+    } finally {
+      setUploadingVendor(null);
+    }
+  };
+
+  const handleLogisticGenericUpload = async (file: File | null, type: 'delhivery' | 'shadowfax') => {
+    const reportType = type === 'delhivery' ? 'delhivery_logistic_racon' : 'shadowfax_logistic_recon';
+    const providerName = vendors.find((v) => v.id === type)?.name || type;
+
+    if (!file || selectedYear === null || selectedMonth === null) {
+      return;
+    }
+
+    setUploadingVendor(reportType);
+    setUploadStatus(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append(
+        'description',
+        `${providerName} logistic recon CSV for ${months[selectedMonth]} ${selectedYear}`
+      );
+      formData.append('month', months[selectedMonth]);
+      formData.append('year', selectedYear.toString());
+      formData.append('report_type', reportType);
+
+      // Generate a custom JWT token with the hardcoded organization_id (same pattern as other uploads)
+      let customToken: string | null = null;
+      if (session) {
+        try {
+          const customSessionData = {
+            member_id: session.member_id,
+            member_session_id: session.member_session_id,
+            organization_id: API_CONFIG.ORG_ID,
+            organization_slug: session.organization_slug,
+            roles: session.roles,
+          };
+          customToken = await JWTService.generateToken(customSessionData);
+        } catch (error) {
+          console.error('❌ Failed to generate custom token:', error);
+        }
+      }
+
+      const headers: Record<string, string> = {
+        'x-api-key': API_CONFIG.API_KEY,
+        'x-org-id': API_CONFIG.ORG_ID,
+      };
+
+      if (customToken) {
+        headers['Authorization'] = `Bearer ${customToken}`;
+      }
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/v1/logistic/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+        console.error('❌ Upload error response:', errorData);
+        if (response.status === 400) {
+          throw new Error(`Please upload the correct ${providerName} logistic recon file`);
+        }
+        throw new Error(
+          errorData.message || errorData.error || `Upload failed with status ${response.status}`
+        );
+      }
+
+      await response.json();
+
+      setUploadStatus({
+        type: 'success',
+        message: `Successfully uploaded ${file.name} (${providerName} logistic recon)`,
+      });
+
+      if (type === 'delhivery') setDelhiveryLogisticReconFile(null);
+      else setShadowfaxLogisticReconFile(null);
+
+      // Refresh the uploaded documents list
+      if (selectedYear !== null && selectedMonth !== null) {
+        await fetchUploadedDocuments(selectedYear, selectedMonth);
+      }
+    } catch (error) {
+      console.error('❌ Upload error:', error);
+      setUploadStatus({
+        type: 'error',
+        message:
+          error instanceof Error ? error.message : 'Failed to upload file. Please try again.',
+      });
+    } finally {
+      setUploadingVendor(null);
+    }
+  };
+
+  const handleDelhiveryLogisticReconUpload = async (file: File | null) => handleLogisticGenericUpload(file, 'delhivery');
+  const handleShadowfaxLogisticReconUpload = async (file: File | null) => handleLogisticGenericUpload(file, 'shadowfax');
+
+  const handleLogisticRateCardUpload = async (file: File | null) => {
+    const reportType = 'logistic_rate_card';
+
+    if (!file || selectedYear === null || selectedMonth === null) {
+      return;
+    }
+
+    setUploadingVendor(reportType);
+    setUploadStatus(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('description', `Logistic rate-card CSV for ${months[selectedMonth]} ${selectedYear}`);
+      formData.append('month', months[selectedMonth]);
+      formData.append('year', selectedYear.toString());
+      formData.append('report_type', reportType);
+
+      let customToken: string | null = null;
+      if (session) {
+        try {
+          const customSessionData = {
+            member_id: session.member_id,
+            member_session_id: session.member_session_id,
+            organization_id: API_CONFIG.ORG_ID,
+            organization_slug: session.organization_slug,
+            roles: session.roles,
+          };
+          customToken = await JWTService.generateToken(customSessionData);
+        } catch (error) {
+          console.error('❌ Failed to generate custom token:', error);
+        }
+      }
+
+      const headers: Record<string, string> = {
+        'x-api-key': API_CONFIG.API_KEY,
+        'x-org-id': API_CONFIG.ORG_ID,
+      };
+      if (customToken) {
+        headers['Authorization'] = `Bearer ${customToken}`;
+      }
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/v1/logistic/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+        if (response.status === 400) {
+          throw new Error('Please upload the correct Logistic rate-card CSV');
+        }
+        throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
+      }
+
+      await response.json();
+
+      setUploadStatus({
+        type: 'success',
+        message: `Successfully uploaded ${file.name} (Logistic rate-card)`,
+      });
+      setLogisticRateCardFile(null);
+
+      if (selectedYear !== null && selectedMonth !== null) {
+        await fetchUploadedDocuments(selectedYear, selectedMonth);
+      }
+    } catch (error) {
+      setUploadStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to upload file. Please try again.',
+      });
+    } finally {
+      setUploadingVendor(null);
+    }
+  };
+
+  const handleLogisticMasterWeightUpload = async (file: File | null) => {
+    const reportType = 'logistic_master_weight';
+
+    if (!file || selectedYear === null || selectedMonth === null) {
+      return;
+    }
+
+    setUploadingVendor(reportType);
+    setUploadStatus(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('description', `Logistic master-weight CSV for ${months[selectedMonth]} ${selectedYear}`);
+      formData.append('month', months[selectedMonth]);
+      formData.append('year', selectedYear.toString());
+      formData.append('report_type', reportType);
+
+      let customToken: string | null = null;
+      if (session) {
+        try {
+          const customSessionData = {
+            member_id: session.member_id,
+            member_session_id: session.member_session_id,
+            organization_id: API_CONFIG.ORG_ID,
+            organization_slug: session.organization_slug,
+            roles: session.roles,
+          };
+          customToken = await JWTService.generateToken(customSessionData);
+        } catch (error) {
+          console.error('❌ Failed to generate custom token:', error);
+        }
+      }
+
+      const headers: Record<string, string> = {
+        'x-api-key': API_CONFIG.API_KEY,
+        'x-org-id': API_CONFIG.ORG_ID,
+      };
+      if (customToken) {
+        headers['Authorization'] = `Bearer ${customToken}`;
+      }
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/v1/logistic/master-weight/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+        if (response.status === 400) {
+          throw new Error('Please upload the correct Logistic master-weight CSV');
+        }
+        throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
+      }
+
+      await response.json();
+
+      setUploadStatus({
+        type: 'success',
+        message: `Successfully uploaded ${file.name} (Logistic master-weight)`,
+      });
+      setLogisticMasterWeightFile(null);
+
+    } catch (error) {
+      setUploadStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to upload file. Please try again.',
       });
     } finally {
       setUploadingVendor(null);
@@ -834,6 +1101,19 @@ const UploadDocuments: React.FC = () => {
       .sort((a, b) => new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime())[0];
   };
 
+  const findUploadForReportType = (reportType: string): UploadedDocument | undefined => {
+    const matching = uploadedDocuments.filter((doc) => {
+      const rt = (doc.report_type || '').toLowerCase();
+      return rt === reportType.toLowerCase() && doc.inactive !== true;
+    });
+
+    if (!matching.length) return undefined;
+
+    return matching
+      .slice()
+      .sort((a, b) => new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime())[0];
+  };
+
   // Check if a vendor already has an uploaded document
   const isVendorUploaded = (vendorId: string, kind?: 'sales' | 'sales_b2b' | 'settlement'): boolean => {
     return !!findUploadForVendor(vendorId, kind);
@@ -884,6 +1164,15 @@ const UploadDocuments: React.FC = () => {
   const lastmileDoc = getUploadedDocument('lastmile');
   const lastmileStatus = getUploadProcessingStatus(lastmileDoc);
 
+  const delhiveryLogisticReconDoc = findUploadForReportType('delhivery_logistic_racon');
+  const delhiveryLogisticReconStatus = getUploadProcessingStatus(delhiveryLogisticReconDoc);
+  const shadowfaxLogisticReconDoc = findUploadForReportType('shadowfax_logistic_recon');
+  const shadowfaxLogisticReconStatus = getUploadProcessingStatus(shadowfaxLogisticReconDoc);
+  const logisticRateCardDoc = findUploadForReportType('logistic_rate_card');
+  const logisticRateCardStatus = getUploadProcessingStatus(logisticRateCardDoc);
+  const logisticMasterWeightDoc = findUploadForReportType('logistic_master_weight');
+  const logisticMasterWeightStatus = getUploadProcessingStatus(logisticMasterWeightDoc);
+
   const drawerSalesDoc = rightPanelVendor ? getUploadedDocument(rightPanelVendor, 'sales') : undefined;
   const drawerSalesStatus = getUploadProcessingStatus(drawerSalesDoc);
   const drawerSalesB2BDoc = rightPanelVendor === 'amazon' ? getUploadedDocument('amazon', 'sales_b2b') : undefined;
@@ -900,7 +1189,7 @@ const UploadDocuments: React.FC = () => {
             Upload Settlement Sheets
           </Typography>
           
-          {(currentView === 'marketplace' || currentView === 'd2c') && selectedYear && selectedMonth !== null && (
+          {(currentView === 'marketplace' || currentView === 'd2c' || currentView === 'logistic') && selectedYear && selectedMonth !== null && (
             <Breadcrumbs separator={<ChevronRightIcon fontSize="small" />} aria-label="breadcrumb">
               <Box 
                 sx={{ 
@@ -920,7 +1209,7 @@ const UploadDocuments: React.FC = () => {
                 {months[selectedMonth]}
               </Typography>
               <Typography variant="body2" sx={{ color: '#111111', fontWeight: 600 }}>
-                {currentView === 'marketplace' ? 'Marketplace' : 'D2C'}
+                {currentView === 'marketplace' ? 'Marketplace' : currentView === 'd2c' ? 'D2C' : 'Logistics'}
               </Typography>
             </Breadcrumbs>
           )}
@@ -1146,6 +1435,22 @@ const UploadDocuments: React.FC = () => {
                                         D2C
                                       </Typography>
                                     </MenuItem>
+                                    {year === 2026 && (
+                                      <MenuItem
+                                        onClick={() => handleNavigateToLogistic(year, monthIndex)}
+                                        sx={{
+                                          py: 1.5,
+                                          px: 2,
+                                          '&:hover': {
+                                            background: '#f8fafc'
+                                          }
+                                        }}
+                                      >
+                                        <Typography variant="body2" fontWeight={600}>
+                                          Logistics
+                                        </Typography>
+                                      </MenuItem>
+                                    )}
                     </Box>
                                 )}
                               </Box>
@@ -1266,7 +1571,7 @@ const UploadDocuments: React.FC = () => {
                           ) : flipkartSalesStatus === 'pending' ? (
                             <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
                           ) : (
-                            <Typography variant="body2" fontWeight={700} color="#6b7280">1</Typography>
+                            <></>
                           )}
                         </Box>
                         
@@ -1416,7 +1721,7 @@ const UploadDocuments: React.FC = () => {
                           ) : !isVendorUploaded('flipkart', 'sales') ? (
                             <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
                           ) : (
-                            <Typography variant="body2" fontWeight={700} color="#6b7280">2</Typography>
+                            <></>
                     )}
                   </Box>
                         
@@ -1548,7 +1853,7 @@ const UploadDocuments: React.FC = () => {
                           ) : amazonSalesStatus === 'pending' ? (
                             <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
                           ) : (
-                            <Typography variant="body2" fontWeight={700} color="#6b7280">1</Typography>
+                            <></>
                           )}
                         </Box>
                         
@@ -1698,7 +2003,7 @@ const UploadDocuments: React.FC = () => {
                           ) : !isVendorUploaded('amazon', 'sales') ? (
                             <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
                           ) : (
-                            <Typography variant="body2" fontWeight={700} color="#6b7280">2</Typography>
+                            <></>
                         )}
                       </Box>
                         
@@ -1857,7 +2162,7 @@ const UploadDocuments: React.FC = () => {
                           ) : !isVendorUploaded('amazon', 'sales_b2b') ? (
                             <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
                           ) : (
-                            <Typography variant="body2" fontWeight={700} color="#6b7280">3</Typography>
+                            <></>
                           )}
                         </Box>
                         
@@ -1987,7 +2292,7 @@ const UploadDocuments: React.FC = () => {
                           ) : amazonUkSalesStatus === 'pending' ? (
                             <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
                           ) : (
-                            <Typography variant="body2" fontWeight={700} color="#6b7280">1</Typography>
+                            <></>
                           )}
                         </Box>
                         
@@ -2137,7 +2442,7 @@ const UploadDocuments: React.FC = () => {
                           ) : !isVendorUploaded('amazon_uk', 'sales') ? (
                             <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
                           ) : (
-                            <Typography variant="body2" fontWeight={700} color="#6b7280">2</Typography>
+                            <></>
                           )}
                         </Box>
                         
@@ -2491,6 +2796,527 @@ const UploadDocuments: React.FC = () => {
           </Paper>
         )}
 
+        {/* Logistic View - Delhivery only */}
+        {currentView === 'logistic' && selectedMonth !== null && selectedYear !== 2026 && (
+          <Paper
+            elevation={0}
+            sx={{ p: 4, background: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Typography variant="h6" color="text.secondary">
+              Logistic uploads are currently only enabled for the year 2026.
+            </Typography>
+            <Button sx={{ mt: 2 }} onClick={handleBackToYears}>
+              Back to Years
+            </Button>
+          </Paper>
+        )}
+
+        {/* Logistic View - Delhivery only */}
+        {currentView === 'logistic' && selectedMonth !== null && selectedYear === 2026 && (
+          <Paper
+            elevation={0}
+            sx={{ p: 4, background: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', minHeight: '60vh' }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4 }}>
+              <Button
+                onClick={handleBackToYears}
+                startIcon={<ChevronRightIcon sx={{ transform: 'rotate(180deg)' }} />}
+                sx={{ minWidth: 'auto', px: 1 }}
+              >
+                Back
+              </Button>
+              <Typography variant="h6" fontWeight={700} color="#1e293b">
+                Logistics Uploads - {months[selectedMonth]} {selectedYear}
+              </Typography>
+            </Box>
+
+            {/* Upload Status Alert */}
+            {uploadStatus && (
+              <Alert
+                severity={uploadStatus.type}
+                sx={{ mb: 4 }}
+                onClose={() => setUploadStatus(null)}
+              >
+                {uploadStatus.message}
+              </Alert>
+            )}
+
+            <Box sx={{ mb: 5 }}>
+              <Typography
+                variant="subtitle1"
+                sx={{
+                  fontWeight: 700,
+                  color: '#4a5568',
+                  mb: 3,
+                  ml: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  '&::after': {
+                    content: '""',
+                    flex: 1,
+                    height: '1px',
+                    bgcolor: '#e2e8f0',
+                    ml: 2,
+                    opacity: 0.6
+                  }
+                }}
+              >
+                Configuration & Master Data
+              </Typography>
+              <Grid container spacing={2}>
+
+                  <Grid item xs={12} sm={6} md={3} lg={3}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          boxShadow: '0 8px 16px rgba(0,0,0,0.04)',
+                          borderColor: '#2563eb',
+                        },
+                        borderRadius: 1.5,
+                        border: '1px solid #edf2f7',
+                        background: '#fff',
+                      }}
+                    >
+                      <CardContent sx={{ p: 2.5, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <Box
+                          sx={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            mb: 2,
+                            backgroundColor: logisticRateCardStatus === 'processing' ? '#16a34a' : logisticRateCardStatus === 'pending' ? '#f59e0b' : '#f8fafc',
+                            border: logisticRateCardStatus !== 'none' ? 'none' : '1px solid #f1f5f9',
+                          }}
+                        >
+                          {logisticRateCardStatus === 'processing' ? (
+                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : logisticRateCardStatus === 'pending' ? (
+                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
+                          ) : (
+                            <CloudUploadIcon sx={{ fontSize: 20, color: '#94a3b8' }} />
+                          )}
+                        </Box>
+
+                        <Typography variant="subtitle1" sx={{ mb: 0.8, fontWeight: 700, color: '#1a202c', fontSize: '0.9rem' }}>
+                          Rate-card
+                        </Typography>
+
+                        {logisticRateCardDoc && logisticRateCardStatus !== 'none' && (
+                          <Typography
+                            variant="caption"
+                            color={logisticRateCardStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px', mb: 1 }}
+                          >
+                            {logisticRateCardDoc.filename} • {logisticRateCardStatus === 'processing' ? 'Processed' : 'Pending'}
+                          </Typography>
+                        )}
+
+                        <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
+                          <input
+                            accept={getAcceptForVendor('delhivery')}
+                            style={{ display: 'none' }}
+                            id="logistic-rate-card-upload"
+                            type="file"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              if (file) {
+                                if (!validateFileType(file, 'delhivery', 'Rate-card CSV')) {
+                                  e.target.value = '';
+                                  return;
+                                }
+                                setLogisticRateCardFile(file);
+                                handleLogisticRateCardUpload(file);
+                              }
+                              e.target.value = '';
+                            }}
+                            disabled={!!uploadingVendor}
+                          />
+
+                          <label htmlFor="logistic-rate-card-upload" style={{ width: '100%' }}>
+                            <Button
+                              variant={logisticRateCardDoc ? 'outlined' : 'contained'}
+                              component="span"
+                              size="small"
+                              fullWidth
+                              disabled={!!uploadingVendor || logisticRateCardStatus === 'processing'}
+                              endIcon={uploadingVendor === 'logistic_rate_card' ? <CircularProgress size={14} /> : null}
+                              sx={{ 
+                                py: 0.6,
+                                borderRadius: 1,
+                                fontWeight: 700,
+                                textTransform: 'none',
+                                fontSize: '0.75rem',
+                              }}
+                            >
+                              {uploadingVendor === 'logistic_rate_card'
+                                ? 'Uploading...'
+                                : logisticRateCardDoc
+                                  ? 'Re-upload'
+                                  : 'Upload'}
+                            </Button>
+                          </label>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3} lg={3}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          boxShadow: '0 8px 16px rgba(0,0,0,0.04)',
+                          borderColor: '#2563eb',
+                        },
+                        borderRadius: 1.5,
+                        border: '1px solid #edf2f7',
+                        background: '#fff',
+                      }}
+                    >
+                      <CardContent sx={{ p: 2.5, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <Box
+                          sx={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            mb: 2,
+                            backgroundColor: logisticMasterWeightStatus === 'processing' ? '#16a34a' : logisticMasterWeightStatus === 'pending' ? '#f59e0b' : '#f8fafc',
+                            border: logisticMasterWeightStatus !== 'none' ? 'none' : '1px solid #f1f5f9',
+                          }}
+                        >
+                          {logisticMasterWeightStatus === 'processing' ? (
+                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : logisticMasterWeightStatus === 'pending' ? (
+                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
+                          ) : (
+                            <CloudUploadIcon sx={{ fontSize: 20, color: '#94a3b8' }} />
+                          )}
+                        </Box>
+
+                        <Typography variant="subtitle1" sx={{ mb: 0.8, fontWeight: 700, color: '#1a202c', fontSize: '0.9rem' }}>
+                          Master Weight
+                        </Typography>
+
+                        {logisticMasterWeightDoc && logisticMasterWeightStatus !== 'none' && (
+                          <Typography
+                            variant="caption"
+                            color={logisticMasterWeightStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px', mb: 1 }}
+                          >
+                            {logisticMasterWeightDoc.filename} • {logisticMasterWeightStatus === 'processing' ? 'Processed' : 'Pending'}
+                          </Typography>
+                        )}
+
+                        <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
+                          <input
+                            accept={getAcceptForVendor('delhivery')}
+                            style={{ display: 'none' }}
+                            id="logistic-master-weight-upload"
+                            type="file"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              if (file) {
+                                if (!validateFileType(file, 'delhivery', 'Master Weight CSV')) {
+                                  e.target.value = '';
+                                  return;
+                                }
+                                setLogisticMasterWeightFile(file);
+                                handleLogisticMasterWeightUpload(file);
+                              }
+                              e.target.value = '';
+                            }}
+                            disabled={!!uploadingVendor}
+                          />
+
+                          <label htmlFor="logistic-master-weight-upload" style={{ width: '100%' }}>
+                            <Button
+                              variant={logisticMasterWeightDoc ? 'outlined' : 'contained'}
+                              component="span"
+                              size="small"
+                              fullWidth
+                              disabled={!!uploadingVendor || logisticMasterWeightStatus === 'processing'}
+                              endIcon={uploadingVendor === 'logistic_master_weight' ? <CircularProgress size={14} /> : null}
+                              sx={{ 
+                                py: 0.6,
+                                borderRadius: 1,
+                                fontWeight: 700,
+                                textTransform: 'none',
+                                fontSize: '0.75rem',
+                              }}
+                            >
+                              {uploadingVendor === 'logistic_master_weight'
+                                ? 'Uploading...'
+                                : logisticMasterWeightDoc
+                                  ? 'Re-upload'
+                                  : 'Upload'}
+                            </Button>
+                          </label>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+              </Grid>
+            </Box>
+
+            <Box sx={{ mb: 5 }}>
+              <Typography
+                variant="subtitle1"
+                sx={{
+                  fontWeight: 700,
+                  color: '#4a5568',
+                  mb: 3,
+                  ml: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  '&::after': {
+                    content: '""',
+                    flex: 1,
+                    height: '1px',
+                    bgcolor: '#e2e8f0',
+                    ml: 2,
+                    opacity: 0.6
+                  }
+                }}
+              >
+                Logistic Providers
+              </Typography>
+              <Grid container spacing={2}>
+
+                  <Grid item xs={12} sm={6} md={3} lg={3}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          boxShadow: '0 8px 16px rgba(0,0,0,0.04)',
+                          borderColor: '#2563eb',
+                        },
+                        borderRadius: 1.5,
+                        border: '1px solid #edf2f7',
+                        background: '#fff',
+                      }}
+                    >
+                      <CardContent sx={{ p: 2.5, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <Box
+                          sx={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            mb: 2,
+                            backgroundColor: delhiveryLogisticReconStatus === 'processing' ? '#16a34a' : delhiveryLogisticReconStatus === 'pending' ? '#f59e0b' : '#f8fafc',
+                            border: delhiveryLogisticReconStatus !== 'none' ? 'none' : '1px solid #f1f5f9',
+                          }}
+                        >
+                          {delhiveryLogisticReconStatus === 'processing' ? (
+                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : delhiveryLogisticReconStatus === 'pending' ? (
+                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
+                          ) : (
+                            <CloudUploadIcon sx={{ fontSize: 20, color: '#94a3b8' }} />
+                          )}
+                        </Box>
+
+                        <Typography variant="subtitle1" sx={{ mb: 0.8, fontWeight: 700, color: '#1a202c', fontSize: '0.9rem' }}>
+                          Delhivery
+                        </Typography>
+
+                        {delhiveryLogisticReconDoc && delhiveryLogisticReconStatus !== 'none' && (
+                          <Typography
+                            variant="caption"
+                            color={delhiveryLogisticReconStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px', mb: 1 }}
+                          >
+                            {delhiveryLogisticReconDoc.filename} • {delhiveryLogisticReconStatus === 'processing' ? 'Processed' : 'Pending'}
+                          </Typography>
+                        )}
+
+                        <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
+                          <input
+                            accept={getAcceptForVendor('delhivery')}
+                            style={{ display: 'none' }}
+                            id="delhivery-logistic-recon-upload"
+                            type="file"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              if (file) {
+                                if (!validateFileType(file, 'delhivery', 'Delhivery CSV')) {
+                                  e.target.value = '';
+                                  return;
+                                }
+                                setDelhiveryLogisticReconFile(file);
+                                handleDelhiveryLogisticReconUpload(file);
+                              }
+                              e.target.value = '';
+                            }}
+                            disabled={!!uploadingVendor}
+                          />
+
+                          <label htmlFor="delhivery-logistic-recon-upload" style={{ width: '100%' }}>
+                            <Button
+                              variant={delhiveryLogisticReconDoc ? 'outlined' : 'contained'}
+                              component="span"
+                              size="small"
+                              fullWidth
+                              disabled={!!uploadingVendor || delhiveryLogisticReconStatus === 'processing'}
+                              endIcon={uploadingVendor === 'delhivery_logistic_racon' ? <CircularProgress size={14} /> : null}
+                              sx={{ 
+                                py: 0.6,
+                                borderRadius: 1,
+                                fontWeight: 700,
+                                textTransform: 'none',
+                                fontSize: '0.75rem',
+                              }}
+                            >
+                              {uploadingVendor === 'delhivery_logistic_racon'
+                                ? 'Uploading...'
+                                : delhiveryLogisticReconDoc
+                                  ? 'Re-upload'
+                                  : 'Upload'}
+                            </Button>
+                          </label>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3} lg={3}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          boxShadow: '0 8px 16px rgba(0,0,0,0.04)',
+                          borderColor: '#2563eb',
+                        },
+                        borderRadius: 1.5,
+                        border: '1px solid #edf2f7',
+                        background: '#fff',
+                      }}
+                    >
+                      <CardContent sx={{ p: 2.5, flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <Box
+                          sx={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            mb: 2,
+                            backgroundColor: shadowfaxLogisticReconStatus === 'processing' ? '#16a34a' : shadowfaxLogisticReconStatus === 'pending' ? '#f59e0b' : '#f8fafc',
+                            border: shadowfaxLogisticReconStatus !== 'none' ? 'none' : '1px solid #f1f5f9',
+                          }}
+                        >
+                          {shadowfaxLogisticReconStatus === 'processing' ? (
+                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : shadowfaxLogisticReconStatus === 'pending' ? (
+                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
+                          ) : (
+                            <CloudUploadIcon sx={{ fontSize: 20, color: '#94a3b8' }} />
+                          )}
+                        </Box>
+
+                        <Typography variant="subtitle1" sx={{ mb: 0.8, fontWeight: 700, color: '#1a202c', fontSize: '0.9rem' }}>
+                          Shadowfax
+                        </Typography>
+
+                        {shadowfaxLogisticReconDoc && shadowfaxLogisticReconStatus !== 'none' && (
+                          <Typography
+                            variant="caption"
+                            color={shadowfaxLogisticReconStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px', mb: 1 }}
+                          >
+                            {shadowfaxLogisticReconDoc.filename} • {shadowfaxLogisticReconStatus === 'processing' ? 'Processed' : 'Pending'}
+                          </Typography>
+                        )}
+
+                        <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
+                          <input
+                            accept={getAcceptForVendor('shadowfax')}
+                            style={{ display: 'none' }}
+                            id="shadowfax-logistic-recon-upload"
+                            type="file"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              if (file) {
+                                if (!validateFileType(file, 'shadowfax', 'Shadowfax CSV')) {
+                                  e.target.value = '';
+                                  return;
+                                }
+                                setShadowfaxLogisticReconFile(file);
+                                handleShadowfaxLogisticReconUpload(file);
+                              }
+                              e.target.value = '';
+                            }}
+                            disabled={!!uploadingVendor}
+                          />
+
+                          <label htmlFor="shadowfax-logistic-recon-upload" style={{ width: '100%' }}>
+                            <Button
+                              variant={shadowfaxLogisticReconDoc ? 'outlined' : 'contained'}
+                              component="span"
+                              size="small"
+                              fullWidth
+                              disabled={!!uploadingVendor || shadowfaxLogisticReconStatus === 'processing'}
+                              endIcon={uploadingVendor === 'shadowfax_logistic_recon' ? <CircularProgress size={14} /> : null}
+                              sx={{ 
+                                py: 0.6,
+                                borderRadius: 1,
+                                fontWeight: 700,
+                                textTransform: 'none',
+                                fontSize: '0.75rem',
+                              }}
+                            >
+                              {uploadingVendor === 'shadowfax_logistic_recon'
+                                ? 'Uploading...'
+                                : shadowfaxLogisticReconDoc
+                                  ? 'Re-upload'
+                                  : 'Upload'}
+                            </Button>
+                          </label>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+              </Grid>
+            </Box>
+          </Paper>
+        )}
+
         {/* D2C View - 2 steps: Sales file, D2C Settlement */}
         {currentView === 'd2c' && selectedMonth !== null && (
                   <Paper
@@ -2588,7 +3414,7 @@ const UploadDocuments: React.FC = () => {
                       ) : unicommerceStatus === 'pending' ? (
                       <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
                       ) : (
-                        <Typography variant="body2" fontWeight={700} color="#6b7280">1</Typography>
+                        <></>
                         )}
                       </Box>
                   
@@ -2713,7 +3539,7 @@ const UploadDocuments: React.FC = () => {
                     border: '2px solid #d1d5db',
                     position: 'relative'
                   }}>
-                    <Typography variant="body2" fontWeight={700} color="#6b7280">2</Typography>
+                    <></>
                     </Box>
                   
                   {/* Step Title */}

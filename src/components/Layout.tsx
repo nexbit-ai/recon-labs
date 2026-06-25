@@ -50,6 +50,7 @@ const drawerWidth = 168;
 const menuItems = [
   { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation', upcoming: false },
   { text: 'Claims', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
+  { text: 'Logistics', icon: <StorageIcon />, path: '/logistics', upcoming: false },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping', upcoming: true },
   { text: 'Checklist', icon: <ChecklistIcon />, path: '/checklist', upcoming: true },
   // { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
