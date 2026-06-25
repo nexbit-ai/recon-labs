@@ -5,10 +5,10 @@ import { StytchB2BUIClient } from '@stytch/vanilla-js/b2b';
 import { tokenManager } from '../services/api/tokenManager';
 import { useUser } from '../contexts/UserContext';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
+import B2BCopilot from './B2BCopilot';
 import {
   Box,
   Drawer,
-  IconButton,
   List,
   ListItem,
   ListItemButton,
@@ -17,69 +17,49 @@ import {
   Toolbar,
   Typography,
   useTheme,
-  Avatar,
   Menu,
   MenuItem,
   Select,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  CircularProgress,
 } from '@mui/material';
 import {
-  Menu as MenuIcon,
-  DashboardOutlined as DashboardIcon,
-  ChecklistOutlined as ChecklistIcon,
-  EditOutlined as EditIcon,
-  CloudUploadOutlined as UploadIcon,
-  AssessmentOutlined as AssessmentIcon,
-  SettingsOutlined as SettingsIcon,
-  AttachMoneyOutlined as AttachMoneyIcon,
-  StorageOutlined as StorageIcon,
-  // ChatOutlined as ChatIcon,
-  StorefrontOutlined as StorefrontIcon,
-  ReceiptOutlined as ReceiptIcon,
-  AccountBalanceOutlined as AccountBalanceIcon,
-  ReportProblemOutlined as ReportProblemIcon,
+  HomeOutlined as OverviewIcon,
+  MoveToInboxOutlined as InboxIcon,
+  TrendingUpOutlined as RecoveriesIcon,
+  AccessTimeOutlined as OutstandingIcon,
+  GavelOutlined as DisputesIcon,
+  StorefrontOutlined as PlatformsIcon,
+  BalanceOutlined as AccountingIcon,
+  TimelineOutlined as ActivityIcon,
   LogoutOutlined as LogoutIcon,
-  KeyboardArrowUp as KeyboardArrowUpIcon,
-  PersonOutlined as PersonIcon,
-  ExtensionOutlined as ExtensionIcon,
   MoreVert as MoreVertIcon,
-
 } from '@mui/icons-material';
-// import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
 // @ts-ignore
 import logo from '../assets/logo_fresh.jpg';
 
 const drawerWidth = 168;
 
-const menuItems = [
-  { text: 'Actions', icon: <ChecklistIcon />, path: '/checklist', upcoming: false },
-  { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation', upcoming: false },
-  { text: 'Claims', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
-  { text: 'Logistics', icon: <StorageIcon />, path: '/logistics', upcoming: false },
-  { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping', upcoming: false },
-  // { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
+const b2bMenuItems = [
+  { text: 'Overview', icon: <OverviewIcon />, path: '/b2b/overview' },
+  { text: 'Inbox', icon: <InboxIcon />, path: '/b2b/inbox' },
+  { text: 'Recoveries', icon: <RecoveriesIcon />, path: '/b2b/recoveries' },
+  { text: 'Outstanding', icon: <OutstandingIcon />, path: '/b2b/outstanding' },
+  { text: 'Disputes', icon: <DisputesIcon />, path: '/b2b/disputes' },
+  { text: 'Platforms', icon: <PlatformsIcon />, path: '/b2b/platforms' },
+  { text: 'Accounting', icon: <AccountingIcon />, path: '/b2b/accounting' },
+  { text: 'Activity', icon: <ActivityIcon />, path: '/b2b/activity' },
 ];
 
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const B2BLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const { session } = useStytchMemberSession();
   const { memberName, selectedOrganization, setSelectedOrganization } = useUser();
-  // const { user, logout } = useAuth(); // Authentication disabled
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
-
-  
   const [settingsAnchorEl, setSettingsAnchorEl] = React.useState<null | HTMLElement>(null);
 
-  // Capitalize first letter of member name
-  const displayName = memberName 
+  const displayName = memberName
     ? memberName.charAt(0).toUpperCase() + memberName.slice(1).toLowerCase()
     : 'User';
 
@@ -97,18 +77,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const handleMenuOption = (option: string) => {
     setSettingsAnchorEl(null);
-    if (option === 'Settings') {
-      // Navigate to settings page or show settings modal
-      console.log('Settings clicked');
-    } else if (option === 'Logout') {
-      // Start smooth logout with blur overlay
+    if (option === 'Logout') {
       setIsLoggingOut(true);
-      
-      // Wait for blur animation, then navigate
       setTimeout(() => {
         navigate('/login', { replace: true });
-        
-        // Clean up after navigation
         queueMicrotask(() => {
           try {
             const stytchClient = new StytchB2BUIClient(
@@ -123,7 +95,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           } catch {}
           setIsLoggingOut(false);
         });
-      }, 300); // Match CSS transition duration
+      }, 300);
     }
   };
 
@@ -175,46 +147,28 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </Select>
       </Box>
       <List sx={{ flex: 1 }}>
-        {menuItems.map((item) => (
+        {b2bMenuItems.map((item) => (
           <ListItem key={item.text} disablePadding>
             <ListItemButton
-              onClick={() => {
-                // Prevent navigation for upcoming features
-                if (item.upcoming) {
-                  return;
-                }
-                navigate(item.path);
-              }}
-              selected={location.pathname === item.path && !item.upcoming}
-              disabled={item.upcoming}
+              onClick={() => navigate(item.path)}
+              selected={location.pathname === item.path}
               sx={{
                 borderRadius: 0,
                 mr: 1.5,
                 my: 0.25,
-                opacity: item.upcoming ? 0.5 : 1,
-                cursor: item.upcoming ? 'not-allowed' : 'pointer',
-                '&.Mui-disabled': {
-                  opacity: 0.5,
-                  cursor: 'not-allowed',
-                },
                 '&.Mui-selected': {
                   backgroundColor: theme.palette.primary.main + '15',
                   '&:hover': {
                     backgroundColor: theme.palette.primary.main + '25',
                   },
                 },
-                '&:hover': {
-                  backgroundColor: item.upcoming ? 'transparent' : undefined,
-                },
               }}
             >
               <ListItemIcon
                 sx={{
-                  color: item.upcoming 
-                    ? 'text.disabled' 
-                    : location.pathname === item.path 
-                      ? theme.palette.primary.main 
-                      : 'inherit',
+                  color: location.pathname === item.path
+                    ? theme.palette.primary.main
+                    : 'inherit',
                   minWidth: 28,
                   '& .MuiSvgIcon-root': {
                     fontSize: 18,
@@ -226,11 +180,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <ListItemText
                 primary={item.text}
                 sx={{
-                  color: item.upcoming 
-                    ? 'text.disabled' 
-                    : location.pathname === item.path 
-                      ? theme.palette.primary.main 
-                      : 'inherit',
+                  color: location.pathname === item.path
+                    ? theme.palette.primary.main
+                    : 'inherit',
                 }}
               />
             </ListItemButton>
@@ -238,60 +190,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         ))}
       </List>
       <Box sx={{ mb: 2 }}>
-        {/* Integrations nav button */}
-        <ListItem disablePadding>
-          <ListItemButton
-            onClick={() => navigate('/integrations')}
-            selected={location.pathname === '/integrations'}
-            sx={{
-              borderRadius: 0,
-              mr: 2,
-              my: 0.25,
-              '&.Mui-selected': {
-                backgroundColor: theme.palette.primary.main + '15',
-                '&:hover': {
-                  backgroundColor: theme.palette.primary.main + '25',
-                },
-              },
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 36 }}>
-              <ExtensionIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary={<Typography sx={{ fontWeight: 500 }}>Integrations</Typography>}
-              sx={{ color: location.pathname === '/integrations' ? theme.palette.primary.main : 'inherit' }}
-            />
-          </ListItemButton>
-        </ListItem>
-
-        {/* Upload nav button added instead of Data Sources (was here) */}
-        <ListItem disablePadding>
-          <ListItemButton
-            onClick={() => navigate('/upload-documents')}
-            selected={location.pathname === '/upload-documents'}
-            sx={{
-              borderRadius: 0,
-              mr: 1.5,
-              my: 0.25,
-              '&.Mui-selected': {
-                backgroundColor: theme.palette.primary.main + '15',
-                '&:hover': {
-                  backgroundColor: theme.palette.primary.main + '25',
-                },
-              },
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 28 }}>
-              <UploadIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary={<Typography sx={{ fontWeight: 500 }}>Upload</Typography>}
-              sx={{ color: location.pathname === '/upload-documents' ? theme.palette.primary.main : 'inherit' }}
-            />
-          </ListItemButton>
-        </ListItem>
-        {/* Data Sources nav commented out: only upload is now shown to user. */}
         <ListItem disablePadding>
           <ListItemButton onClick={handleSettingsClick} sx={{ borderRadius: 0, mr: 1.5, my: 0.25, display: 'flex', alignItems: 'center' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', overflow: 'hidden' }}>
@@ -329,15 +227,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <Box sx={{ display: 'flex' }}>
-      {/* Logout overlay with blur effect */}
+      {/* Logout overlay */}
       {isLoggingOut && (
         <Box
           sx={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             backgroundColor: 'rgba(255, 255, 255, 0.8)',
             backdropFilter: 'blur(8px)',
             zIndex: 9999,
@@ -347,26 +242,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             transition: 'all 0.3s ease-in-out',
           }}
         >
-          <Box
-            sx={{
-              textAlign: 'center',
-              color: 'text.primary',
-            }}
-          >
-            <Typography variant="h6" sx={{ mb: 1 }}>
-              Logging out...
-            </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.7 }}>
-              Please wait
-            </Typography>
+          <Box sx={{ textAlign: 'center', color: 'text.primary' }}>
+            <Typography variant="h6" sx={{ mb: 1 }}>Logging out...</Typography>
+            <Typography variant="body2" sx={{ opacity: 0.7 }}>Please wait</Typography>
           </Box>
         </Box>
       )}
-      
+
       <Box
         component="nav"
-        sx={{ 
-          width: { sm: drawerWidth }, 
+        sx={{
+          width: { sm: drawerWidth },
           flexShrink: { sm: 0 },
           borderRadius: 0,
         }}
@@ -375,13 +261,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           variant="temporary"
           open={mobileOpen}
           onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true,
-          }}
+          ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: drawerWidth,
               borderRadius: 0,
             },
@@ -393,8 +277,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: drawerWidth,
               borderRadius: 0,
             },
@@ -414,15 +298,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           pt: 0,
         }}
       >
-        {/* Page Content Wrapper */}
         <Box sx={{ p: 0 }}>
           {children}
         </Box>
-
-
       </Box>
+      <B2BCopilot />
     </Box>
   );
 };
 
-export default Layout; 
+export default B2BLayout;

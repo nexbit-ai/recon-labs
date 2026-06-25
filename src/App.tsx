@@ -33,9 +33,21 @@ import Integrations from './pages/Integrations';
 
 // Components
 import Layout from './components/Layout';
+import B2BLayout from './components/B2BLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import SessionMonitor from './components/SessionMonitor';
 import { UserProvider } from './contexts/UserContext';
+import { WorkspaceProvider } from './contexts/WorkspaceContext';
+
+// B2B Pages
+import B2BOverview from './pages/b2b/B2BDashboard';
+import B2BInbox from './pages/b2b/B2BInbox';
+import B2BRecoveries from './pages/b2b/B2BReconciliation';
+import B2BOutstanding from './pages/b2b/B2BVendors';
+import B2BDisputes from './pages/b2b/B2BPayables';
+import B2BPlatforms from './pages/b2b/B2BPlatforms';
+import B2BAccounting from './pages/b2b/B2BAccounting';
+import B2BActivity from './pages/b2b/B2BReports';
 
 const theme = createTheme({
   palette: {
@@ -382,6 +394,7 @@ function App() {
       <CssBaseline />
       <StytchB2BProvider stytch={stytch}>
         <UserProvider>
+          <WorkspaceProvider>
           <SessionMonitor />
           <Router>
           <Routes>
@@ -473,8 +486,51 @@ function App() {
                 <Layout><Integrations /></Layout>
               </ProtectedRoute>
             } />
+
+            {/* ─── B2B Routes ─── */}
+            <Route path="/b2b/overview" element={
+              <ProtectedRoute>
+                <B2BLayout><B2BOverview /></B2BLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/b2b/inbox" element={
+              <ProtectedRoute>
+                <B2BLayout><B2BInbox /></B2BLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/b2b/recoveries" element={
+              <ProtectedRoute>
+                <B2BLayout><B2BRecoveries /></B2BLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/b2b/outstanding" element={
+              <ProtectedRoute>
+                <B2BLayout><B2BOutstanding /></B2BLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/b2b/disputes" element={
+              <ProtectedRoute>
+                <B2BLayout><B2BDisputes /></B2BLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/b2b/platforms" element={
+              <ProtectedRoute>
+                <B2BLayout><B2BPlatforms /></B2BLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/b2b/accounting" element={
+              <ProtectedRoute>
+                <B2BLayout><B2BAccounting /></B2BLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/b2b/activity" element={
+              <ProtectedRoute>
+                <B2BLayout><B2BActivity /></B2BLayout>
+              </ProtectedRoute>
+            } />
           </Routes>
         </Router>
+        </WorkspaceProvider>
         </UserProvider>
       </StytchB2BProvider>
     </ThemeProvider>
