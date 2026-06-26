@@ -6,6 +6,7 @@ import {
   StorefrontOutlined,
   DescriptionOutlined,
   AutoAwesomeOutlined,
+  FileUploadOutlined,
 } from '@mui/icons-material';
 import type { SvgIconComponent } from '@mui/icons-material';
 

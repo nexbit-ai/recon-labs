@@ -9,6 +9,7 @@ import { b2bTheme } from './theme/b2bTokens';
 import B2BShell from './layout/B2BShell';
 import { SECTIONS } from './layout/sections';
 import Placeholder from './views/Placeholder';
+import Upload from './views/Upload';
 import Overview from './views/Overview';
 import Reconciliation from './views/Reconciliation';
 import Disputes from './views/Disputes';
@@ -20,6 +21,7 @@ import Integrations from '../pages/Integrations';
 
 // Sections with a real view built; the rest fall back to a titled placeholder.
 const VIEWS: Record<string, React.ReactNode> = {
+  upload: <Upload />,
   overview: <Overview />,
   reconciliation: <Reconciliation />,
   disputes: <Disputes />,
@@ -37,6 +39,7 @@ const B2BApp: React.FC = () => (
           {SECTIONS.map((s) => (
             <Route key={s.key} path={s.path} element={VIEWS[s.key] ?? <Placeholder title={s.title} />} />
           ))}
+          <Route path="upload" element={<Upload />} />
           <Route path="integrations" element={<Integrations />} />
           <Route path="*" element={<Navigate to="overview" replace />} />
         </Route>

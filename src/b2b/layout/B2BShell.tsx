@@ -113,12 +113,12 @@ const B2BShell: React.FC = () => {
           ))}
         </Box>
 
-        {/* Upload (opens the analysis modal) + Integrations + workspace badge */}
+        {/* Upload (opens the /b2b/upload view) + Integrations + workspace badge */}
         <Box sx={{ p: `${space.lg}px`, display: 'flex', flexDirection: 'column', gap: `${space.md}px` }}>
           <Button
             fullWidth
             disableElevation
-            onClick={() => setUploadOpen(true)}
+            onClick={() => navigate('/b2b/upload')}
             startIcon={<FileUploadOutlined sx={{ fontSize: 20 }} />}
             sx={{
               borderRadius: 0,
