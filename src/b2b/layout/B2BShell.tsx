@@ -4,7 +4,7 @@
 import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Box, Button, Typography } from '@mui/material';
-import { FileUploadOutlined } from '@mui/icons-material';
+import { FileUploadOutlined, ExtensionOutlined } from '@mui/icons-material';
 import { colors, hairline, shell, type, space } from '../theme/b2bTokens';
 import { SECTIONS, type SectionDef } from './sections';
 import { workspace, fiscalPeriod } from '../mock';
@@ -113,7 +113,7 @@ const B2BShell: React.FC = () => {
           ))}
         </Box>
 
-        {/* Upload settlement (opens the analysis modal) + workspace badge */}
+        {/* Upload (opens the analysis modal) + Integrations + workspace badge */}
         <Box sx={{ p: `${space.lg}px`, display: 'flex', flexDirection: 'column', gap: `${space.md}px` }}>
           <Button
             fullWidth
@@ -130,7 +130,25 @@ const B2BShell: React.FC = () => {
               '&:hover': { bgcolor: colors.inkHover },
             }}
           >
-            Upload settlement
+            Upload
+          </Button>
+          <Button
+            fullWidth
+            disableElevation
+            onClick={() => navigate('/b2b/integrations')}
+            startIcon={<ExtensionOutlined sx={{ fontSize: 20 }} />}
+            sx={{
+              borderRadius: 0,
+              bgcolor: colors.paper,
+              color: colors.ink,
+              border: hairline,
+              fontSize: 13,
+              fontWeight: 600,
+              py: `${space.md}px`,
+              '&:hover': { bgcolor: colors.grey100 },
+            }}
+          >
+            Integrations
           </Button>
           <Box sx={{ border: hairline, p: `${space.md}px` }}>
             <Typography sx={{ ...type.label, color: colors.grey500, display: 'block' }}>Workspace</Typography>

@@ -15,6 +15,8 @@ import Disputes from './views/Disputes';
 import Channels from './views/Channels';
 import Contracts from './views/Contracts';
 import AskNex from './views/AskNex';
+// Reuse the exact same Integrations module from the B2C app.
+import Integrations from '../pages/Integrations';
 
 // Sections with a real view built; the rest fall back to a titled placeholder.
 const VIEWS: Record<string, React.ReactNode> = {
@@ -35,6 +37,7 @@ const B2BApp: React.FC = () => (
           {SECTIONS.map((s) => (
             <Route key={s.key} path={s.path} element={VIEWS[s.key] ?? <Placeholder title={s.title} />} />
           ))}
+          <Route path="integrations" element={<Integrations />} />
           <Route path="*" element={<Navigate to="overview" replace />} />
         </Route>
       </Routes>
