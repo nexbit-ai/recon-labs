@@ -1,17 +1,14 @@
-// Generic section placeholder — renders only the page title for now.
-// View content is built in later steps; this keeps every nav destination live.
+// Generic section placeholder — renders only the page title. Kept as the router
+// fallback; all six sections now have real views.
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { colors, type } from '../theme/b2bTokens';
+import { PageTitle } from '../components/primitives';
 
 const Placeholder: React.FC<{ title: string }> = ({ title }) => (
   <Box>
-    <Typography component="h1" sx={{ ...type.pageTitle, color: colors.ink }}>
-      {title}
-    </Typography>
-    <Typography sx={{ ...type.body, color: colors.grey500, mt: 1 }}>
-      No content yet.
-    </Typography>
+    <PageTitle>{title}</PageTitle>
+    <Typography sx={{ ...type.body, color: colors.grey500 }}>No content yet.</Typography>
   </Box>
 );
 

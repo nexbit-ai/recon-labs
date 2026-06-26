@@ -9,6 +9,8 @@ import { colors, hairline, shell, type, space } from '../theme/b2bTokens';
 import { SECTIONS, type SectionDef } from './sections';
 import { workspace, fiscalPeriod } from '../mock';
 import ProductToggle from '../components/ProductToggle';
+import UploadSettlementModal from '../components/UploadSettlementModal';
+import { Pressable } from '../components/primitives';
 // @ts-ignore — same Nexbit logo used across the B2C UI
 import logo from '../../assets/logo_fresh.jpg';
 
@@ -19,9 +21,9 @@ const NavItem: React.FC<{ section: SectionDef; active: boolean; onClick: () => v
 }) => {
   const Icon = section.icon;
   return (
-    <Box
+    <Pressable
       role="tab"
-      aria-selected={active}
+      selected={active}
       onClick={onClick}
       sx={{
         display: 'flex',
@@ -29,8 +31,6 @@ const NavItem: React.FC<{ section: SectionDef; active: boolean; onClick: () => v
         gap: `${space.md}px`,
         height: 44,
         px: `${space.lg}px`,
-        cursor: 'pointer',
-        userSelect: 'none',
         borderLeft: active ? `2px solid ${colors.accent}` : '2px solid transparent',
         bgcolor: active ? colors.accentWash : 'transparent',
         color: active ? colors.accent : colors.grey700,
@@ -41,7 +41,7 @@ const NavItem: React.FC<{ section: SectionDef; active: boolean; onClick: () => v
       <Typography sx={{ fontSize: type.body.fontSize, fontWeight: active ? 600 : 500, color: 'inherit' }}>
         {section.label}
       </Typography>
-    </Box>
+    </Pressable>
   );
 };
 
@@ -67,6 +67,7 @@ const Pill: React.FC<{ children: React.ReactNode; dot?: boolean }> = ({ children
 const B2BShell: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [uploadOpen, setUploadOpen] = React.useState(false);
 
   const active =
     SECTIONS.find((s) => location.pathname.startsWith(`/b2b/${s.path}`)) ?? SECTIONS[0];
@@ -85,6 +86,7 @@ const B2BShell: React.FC = () => {
           position: 'sticky',
           top: 0,
           height: '100vh',
+          overflowY: 'auto',
         }}
       >
         {/* Brand logo + toggle */}
@@ -111,11 +113,12 @@ const B2BShell: React.FC = () => {
           ))}
         </Box>
 
-        {/* Upload settlement (no behaviour yet) + workspace badge */}
+        {/* Upload settlement (opens the analysis modal) + workspace badge */}
         <Box sx={{ p: `${space.lg}px`, display: 'flex', flexDirection: 'column', gap: `${space.md}px` }}>
           <Button
             fullWidth
             disableElevation
+            onClick={() => setUploadOpen(true)}
             startIcon={<FileUploadOutlined sx={{ fontSize: 20 }} />}
             sx={{
               borderRadius: 0,
@@ -124,7 +127,7 @@ const B2BShell: React.FC = () => {
               fontSize: 13,
               fontWeight: 600,
               py: `${space.md}px`,
-              '&:hover': { bgcolor: '#000000' },
+              '&:hover': { bgcolor: colors.inkHover },
             }}
           >
             Upload settlement
@@ -149,6 +152,7 @@ const B2BShell: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            gap: `${space.lg}px`,
             px: `${shell.canvasPaddingX}px`,
             position: 'sticky',
             top: 0,
@@ -156,15 +160,25 @@ const B2BShell: React.FC = () => {
             zIndex: 1,
           }}
         >
-          <Box>
+          <Box sx={{ minWidth: 0 }}>
             <Typography sx={{ ...type.label, color: colors.grey500, display: 'block' }}>
               {active.label}
             </Typography>
-            <Typography sx={{ fontSize: 15, fontWeight: 600, lineHeight: '18px', color: colors.ink }}>
+            <Typography
+              sx={{
+                fontSize: 14,
+                fontWeight: 600,
+                lineHeight: '18px',
+                color: colors.ink,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
               {active.title}
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px` }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px`, flexShrink: 0 }}>
             <Pill>{fiscalPeriod.pill}</Pill>
             <Pill dot>Live sync</Pill>
           </Box>
@@ -185,6 +199,8 @@ const B2BShell: React.FC = () => {
           </Box>
         </Box>
       </Box>
+
+      <UploadSettlementModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
     </Box>
   );
 };

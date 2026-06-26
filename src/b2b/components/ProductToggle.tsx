@@ -2,15 +2,13 @@
 // two products. Square, monochrome, active side = ink fill. Route-based:
 // B2C -> existing app at '/', B2B -> '/b2b'. Default is B2C.
 //
-// Self-contained styling (no B2B theme dependency) because it also renders
-// inside the B2C app.
+// Colours come from the shared b2b tokens (plain constants — no theme/runtime
+// dependency), so it renders identically inside the B2C app.
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Box } from '@mui/material';
-
-const INK = '#111111';
-const HAIRLINE = '#E5E7EB';
-const GREY700 = '#6B7280';
+import { colors } from '../theme/b2bTokens';
+import { Pressable } from './primitives';
 
 const ProductToggle: React.FC = () => {
   const navigate = useNavigate();
@@ -18,9 +16,9 @@ const ProductToggle: React.FC = () => {
   const isB2B = location.pathname.startsWith('/b2b');
 
   const segment = (label: string, active: boolean, onClick: () => void) => (
-    <Box
+    <Pressable
       role="tab"
-      aria-selected={active}
+      selected={active}
       onClick={active ? undefined : onClick}
       sx={{
         px: 1.5,
@@ -33,30 +31,27 @@ const ProductToggle: React.FC = () => {
         letterSpacing: '0.06em',
         textTransform: 'uppercase',
         cursor: active ? 'default' : 'pointer',
-        userSelect: 'none',
-        borderRadius: 0,
-        bgcolor: active ? INK : 'transparent',
-        color: active ? '#FFFFFF' : GREY700,
+        bgcolor: active ? colors.ink : 'transparent',
+        color: active ? colors.paper : colors.grey700,
         transition: 'background-color 0.15s ease, color 0.15s ease',
-        '&:hover': active ? undefined : { color: INK, bgcolor: '#F5F5F5' },
+        '&:hover': active ? undefined : { color: colors.ink, bgcolor: colors.grey100 },
       }}
     >
       {label}
-    </Box>
+    </Pressable>
   );
 
   return (
     <Box
       sx={{
         display: 'inline-flex',
-        border: `1px solid ${HAIRLINE}`,
-        borderRadius: 0,
+        border: `1px solid ${colors.grey200}`,
         overflow: 'hidden',
-        bgcolor: '#FFFFFF',
+        bgcolor: colors.paper,
       }}
     >
       {segment('B2C', !isB2B, () => navigate('/'))}
-      <Box sx={{ width: '1px', bgcolor: HAIRLINE }} />
+      <Box sx={{ width: '1px', bgcolor: colors.grey200 }} />
       {segment('B2B', isB2B, () => navigate('/b2b'))}
     </Box>
   );

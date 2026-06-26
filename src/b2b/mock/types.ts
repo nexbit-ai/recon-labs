@@ -103,9 +103,11 @@ export interface DisputePipeline {
 export interface RateCardLine {
   code: string;
   label: string;
-  /** Contracted basis, e.g. "8% of GMV" or "₹14 / unit". */
+  /** Contracted basis / value, e.g. "16% of GMV" or "₹18 / order". */
   contracted: string;
   authorised: boolean;
+  /** Short note for an unauthorised line, e.g. "no signed basis". */
+  note?: string;
 }
 
 export interface AskNexQA {

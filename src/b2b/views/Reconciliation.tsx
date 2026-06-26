@@ -10,6 +10,7 @@ import { Box, Typography, Button } from '@mui/material';
 import { ExpandMoreOutlined } from '@mui/icons-material';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
+import { cardSx, ChannelTag, ColumnLabel, PageTitle, Pressable } from '../components/primitives';
 import { formatRupees } from '../lib/format';
 import { reconLineItems, type ReconLineItem, type ReconStatus } from '../mock';
 
@@ -24,17 +25,10 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'matched', label: 'Matched' },
 ];
 
-const cardSx = { bgcolor: colors.paper, border: hairline } as const;
 const labelSx = { ...type.label, color: colors.grey700 } as const;
 
 // −₹2,85,200 for negatives, ₹0 for zero, ₹X otherwise — always tabular.
 const signed = (n: number): string => (n < 0 ? `−${formatRupees(Math.abs(n))}` : formatRupees(n));
-
-const ChannelTag: React.FC<{ name: string }> = ({ name }) => (
-  <Box component="span" sx={{ ...type.label, color: colors.grey500 }}>
-    {name}
-  </Box>
-);
 
 // Square hairline-bordered status label — ink/grey only, never coloured.
 const StatusLabel: React.FC<{ status: ReconStatus }> = ({ status }) => {
@@ -61,14 +55,6 @@ const StatusLabel: React.FC<{ status: ReconStatus }> = ({ status }) => {
   );
 };
 
-const HeaderCell: React.FC<{ children?: React.ReactNode; align?: 'left' | 'right' }> = ({
-  children,
-  align = 'left',
-}) => (
-  <Box component="span" sx={{ ...labelSx, color: colors.grey500, textAlign: align, overflow: 'hidden' }}>
-    {children}
-  </Box>
-);
 
 const RowDetail: React.FC<{ line: ReconLineItem }> = ({ line }) => {
   const navigate = useNavigate();
@@ -195,9 +181,7 @@ const Reconciliation: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
     >
-      <Typography component="h1" sx={{ ...type.pageTitle, color: colors.ink, mb: `${space.xl}px` }}>
-        Reconciliation
-      </Typography>
+      <PageTitle>Reconciliation</PageTitle>
 
       {/* ── CONTROL ROW ─────────────────────────────────────── */}
       <Box
@@ -214,10 +198,10 @@ const Reconciliation: React.FC = () => {
           {FILTERS.map((f, i) => {
             const active = filter === f.key;
             return (
-              <Box
+              <Pressable
                 key={f.key}
                 role="tab"
-                aria-selected={active}
+                selected={active}
                 onClick={() => setFilter(f.key)}
                 sx={{
                   px: `${space.lg}px`,
@@ -225,7 +209,6 @@ const Reconciliation: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   cursor: active ? 'default' : 'pointer',
-                  userSelect: 'none',
                   borderLeft: i === 0 ? 'none' : hairline,
                   bgcolor: active ? colors.accent : 'transparent',
                   color: active ? colors.paper : colors.grey700,
@@ -235,7 +218,7 @@ const Reconciliation: React.FC = () => {
                 }}
               >
                 {f.label}
-              </Box>
+              </Pressable>
             );
           })}
         </Box>
@@ -245,8 +228,9 @@ const Reconciliation: React.FC = () => {
         </Typography>
       </Box>
 
-      {/* ── TABLE ───────────────────────────────────────────── */}
-      <Box sx={cardSx}>
+      {/* ── TABLE (scrolls horizontally on narrow viewports) ── */}
+      <Box sx={{ ...cardSx, overflowX: 'auto' }}>
+       <Box sx={{ minWidth: 880 }}>
         {/* Column header */}
         <Box
           sx={{
@@ -260,13 +244,13 @@ const Reconciliation: React.FC = () => {
             borderBottom: hairline,
           }}
         >
-          <HeaderCell>Channel</HeaderCell>
-          <HeaderCell>SKU</HeaderCell>
-          <HeaderCell>GRN / settlement</HeaderCell>
-          <HeaderCell align="right">Expected</HeaderCell>
-          <HeaderCell align="right">Paid</HeaderCell>
-          <HeaderCell align="right">Status</HeaderCell>
-          <HeaderCell />
+          <ColumnLabel>Channel</ColumnLabel>
+          <ColumnLabel>SKU</ColumnLabel>
+          <ColumnLabel>GRN / settlement</ColumnLabel>
+          <ColumnLabel align="right">Expected</ColumnLabel>
+          <ColumnLabel align="right">Paid</ColumnLabel>
+          <ColumnLabel align="right">Status</ColumnLabel>
+          <ColumnLabel />
         </Box>
 
         {rows.map((li, idx) => {
@@ -274,9 +258,8 @@ const Reconciliation: React.FC = () => {
           return (
             <Box key={li.id} sx={{ borderBottom: idx < rows.length - 1 ? hairline : 'none' }}>
               {/* Clickable row */}
-              <Box
-                role="button"
-                aria-expanded={expanded}
+              <Pressable
+                ariaLabel={`${li.channel} ${li.skuLabel}, ${li.status}`}
                 onClick={() => setExpandedId(expanded ? null : li.id)}
                 sx={{
                   display: 'grid',
@@ -285,7 +268,6 @@ const Reconciliation: React.FC = () => {
                   gap: `${space.lg}px`,
                   px: `${space.xl}px`,
                   height: 56,
-                  cursor: 'pointer',
                   bgcolor: expanded ? colors.grey100 : 'transparent',
                   transition: 'background-color 0.12s ease',
                   '&:hover': { bgcolor: colors.grey100 },
@@ -332,7 +314,7 @@ const Reconciliation: React.FC = () => {
                     transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
                   }}
                 />
-              </Box>
+              </Pressable>
 
               {/* Expandable detail — one open at a time */}
               <AnimatePresence initial={false}>
@@ -357,6 +339,7 @@ const Reconciliation: React.FC = () => {
             <Typography sx={{ fontSize: type.body.fontSize, color: colors.grey500 }}>No lines in this view.</Typography>
           </Box>
         )}
+       </Box>
       </Box>
     </Box>
   );

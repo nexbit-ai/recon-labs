@@ -11,11 +11,19 @@ import { SECTIONS } from './layout/sections';
 import Placeholder from './views/Placeholder';
 import Overview from './views/Overview';
 import Reconciliation from './views/Reconciliation';
+import Disputes from './views/Disputes';
+import Channels from './views/Channels';
+import Contracts from './views/Contracts';
+import AskNex from './views/AskNex';
 
 // Sections with a real view built; the rest fall back to a titled placeholder.
 const VIEWS: Record<string, React.ReactNode> = {
   overview: <Overview />,
   reconciliation: <Reconciliation />,
+  disputes: <Disputes />,
+  channels: <Channels />,
+  contracts: <Contracts />,
+  ask: <AskNex />,
 };
 
 const B2BApp: React.FC = () => (

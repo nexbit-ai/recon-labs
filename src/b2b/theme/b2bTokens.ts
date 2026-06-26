@@ -13,10 +13,17 @@ export const colors = {
   accent: '#7A5DBF',
   accentHover: '#6A4FB0',
   accentWash: 'rgba(122, 93, 191, 0.06)',
+  inkHover: '#000000', // primary-button hover only (spec §6: ink → #000)
 } as const;
 
 // Semantic aliases
 export const hairline = `1px solid ${colors.grey200}`;
+
+// Square, accent keyboard focus ring for custom (non-MUI) interactive elements.
+export const focusRingSx = {
+  outline: 'none',
+  '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: '2px' },
+} as const;
 
 // ── TYPOGRAPHY ──────────────────────────────────────────────────────────────
 export const fontFamily =
@@ -27,6 +34,8 @@ export const type = {
   pageTitle: { fontSize: 28, lineHeight: '36px', fontWeight: 600 },
   sectionTitle: { fontSize: 18, lineHeight: '26px', fontWeight: 600 },
   metric: { fontSize: 36, lineHeight: '40px', fontWeight: 500, fontVariantNumeric: 'tabular-nums' as const },
+  // Secondary metric for stat blocks / tiles / pipeline counts (one unified size).
+  statValue: { fontSize: 24, lineHeight: '30px', fontWeight: 600, fontVariantNumeric: 'tabular-nums' as const },
   body: { fontSize: 14, lineHeight: '20px', fontWeight: 400 },
   label: {
     fontSize: 11,
@@ -101,7 +110,15 @@ export const b2bTheme = createTheme({
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
-        root: { borderRadius: 0, boxShadow: 'none', textTransform: 'none', fontWeight: 600, padding: '10px 20px' },
+        root: {
+          borderRadius: 0,
+          boxShadow: 'none',
+          textTransform: 'none',
+          fontWeight: 600,
+          padding: '10px 20px',
+          // Square accent keyboard focus ring (spec §6).
+          '&:focus-visible': { outline: `2px solid ${colors.accent}`, outlineOffset: '2px' },
+        },
       },
     },
     MuiChip: { styleOverrides: { root: { borderRadius: 0, fontWeight: 500 } } },

@@ -10,6 +10,7 @@ import { Box, Typography, Button } from '@mui/material';
 import { motion, useReducedMotion } from 'framer-motion';
 import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
 import CountUpMetric from '../components/CountUpMetric';
+import { cardSx as cardBase, ChannelTag, SectionTitle, PageTitle, Pressable } from '../components/primitives';
 import { formatRupees, formatCompactINR, formatPercent } from '../lib/format';
 import {
   headlineByKey,
@@ -24,19 +25,12 @@ import {
 
 const DISPUTES_ROUTE = '/b2b/disputes';
 
-// ── shared style fragments ──────────────────────────────────────────────────
-const cardSx = { bgcolor: colors.paper, border: hairline, p: `${space.xl}px` } as const;
+// Padded card (shared surface + section padding) and the caption helper.
+const cardSx = { ...cardBase, p: `${space.xl}px` } as const;
 const labelSx = { ...type.label, color: colors.grey700 } as const;
 
 const Caption: React.FC<{ children: React.ReactNode; sx?: object }> = ({ children, sx }) => (
   <Typography sx={{ fontSize: type.body.fontSize, color: colors.grey700, ...sx }}>{children}</Typography>
-);
-
-// Uppercase channel tag — represents a channel by NAME, never by colour.
-const ChannelTag: React.FC<{ name: string }> = ({ name }) => (
-  <Box component="span" sx={{ ...labelSx, color: colors.grey500 }}>
-    {name}
-  </Box>
 );
 
 // Square hairline-bordered label for issue type — grey/ink, never a colour badge.
@@ -61,13 +55,12 @@ const TypeChip: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 const FileDisputeLink: React.FC<{ onClick: () => void }> = ({ onClick }) => (
-  <Box
-    role="button"
+  <Pressable
+    ariaLabel="File dispute"
     onClick={onClick}
     sx={{
       mt: `${space.sm}px`,
       display: 'inline-block',
-      cursor: 'pointer',
       fontSize: 13,
       fontWeight: 500,
       color: colors.accent,
@@ -75,11 +68,7 @@ const FileDisputeLink: React.FC<{ onClick: () => void }> = ({ onClick }) => (
     }}
   >
     File dispute →
-  </Box>
-);
-
-const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <Typography sx={{ ...type.sectionTitle, color: colors.ink }}>{children}</Typography>
+  </Pressable>
 );
 
 const Overview: React.FC = () => {
@@ -109,9 +98,7 @@ const Overview: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
     >
-      <Typography component="h1" sx={{ ...type.pageTitle, color: colors.ink, mb: `${space.xl}px` }}>
-        Settlement overview
-      </Typography>
+      <PageTitle>Settlement overview</PageTitle>
 
       {/* ── HERO ROW ─────────────────────────────────────────── */}
       <Box
@@ -134,7 +121,7 @@ const Overview: React.FC = () => {
               border: hairline,
               px: `${space.sm}px`,
               py: '3px',
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: 600,
               color: colors.ink,
               ...tabularNums,
@@ -157,7 +144,7 @@ const Overview: React.FC = () => {
               fontWeight: 600,
               px: `${space.lg}px`,
               py: `${space.md}px`,
-              '&:hover': { bgcolor: '#000000' },
+              '&:hover': { bgcolor: colors.inkHover },
             }}
           >
             Review recovery pipeline →
