@@ -520,6 +520,7 @@ const Logistics: React.FC = () => {
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+          {loading && <CircularProgress size={20} sx={{ color: '#000000' }} />}
           <FormControl size="small" sx={{ minWidth: 160 }}>
             <Select
               value={platform}
@@ -747,12 +748,7 @@ const Logistics: React.FC = () => {
             <Box sx={{ height: 360 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={summary?.slab_distribution || []}>
-                  <defs>
-                    <linearGradient id="slabGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#60a5fa" stopOpacity={0.1} />
-                    </linearGradient>
-                  </defs>
+
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} />
                   <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} tickFormatter={(val) => `${val}%`} />
@@ -778,7 +774,7 @@ const Logistics: React.FC = () => {
                     yAxisId="left"
                     name="Order Share %"
                     dataKey="order_share"
-                    fill="url(#slabGradient)"
+                    fill="#7A5DBF"
                     radius={[6, 6, 0, 0]}
                     barSize={40}
                     animationDuration={1500}
@@ -805,18 +801,26 @@ const Logistics: React.FC = () => {
             <CardContent sx={{ p: 3 }}>
               <Box sx={{ height: 320 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={summary?.zone_distribution || []}>
-                    <defs>
-                      <linearGradient id="zoneGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#a855f7" stopOpacity={0.1} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} tickFormatter={(val) => `₹${val / 1000}k`} />
+                  <PieChart>
+                    <Pie
+                      data={summary?.zone_distribution || []}
+                      dataKey="value"
+                      nameKey="label"
+                      cx="45%"
+                      cy="50%"
+                      innerRadius="78%"
+                      outerRadius="86%"
+                      paddingAngle={1}
+                      cornerRadius={1}
+                      stroke="none"
+                      animationDuration={1500}
+                    >
+                      {(summary?.zone_distribution || []).map((_, i) => {
+                        const PIE_COLORS = ['#2563eb', '#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#0f766e', '#84cc16', '#64748b'];
+                        return <Cell key={`cell-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />;
+                      })}
+                    </Pie>
                     <RechartsTooltip
-                      cursor={{ fill: 'rgba(99, 102, 241, 0.05)' }}
                       contentStyle={{
                         borderRadius: '12px',
                         border: 'none',
@@ -827,8 +831,37 @@ const Logistics: React.FC = () => {
                       itemStyle={{ color: '#fff' }}
                       formatter={(val: number) => [toCurrency(val), 'Leakage']}
                     />
-                    <Bar dataKey="value" fill="url(#zoneGradient)" radius={[6, 6, 0, 0]} barSize={32} animationDuration={1500} />
-                  </BarChart>
+                    <Legend
+                      layout="vertical"
+                      verticalAlign="middle"
+                      align="right"
+                      content={(props) => {
+                        const { payload } = props;
+                        if (!payload) return null;
+                        const totalLeakage = (summary?.zone_distribution || []).reduce((sum, item) => sum + (item.value || 0), 0);
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingLeft: '10px', width: '270px' }}>
+                            {payload.map((entry: any, index: number) => {
+                              const data = entry.payload;
+                              const percentage = totalLeakage > 0 ? ((data.value / totalLeakage) * 100).toFixed(1) : '0.0';
+                              return (
+                                <div key={`item-${index}`} style={{ display: 'flex', alignItems: 'center' }}>
+                                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: entry.color, flexShrink: 0 }} />
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: 1, marginLeft: '12px' }}>
+                                    <span style={{ color: '#374151', fontWeight: 500, fontSize: '0.85rem' }}>{entry.value}</span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                      <span style={{ color: '#6b7280', fontSize: '0.75rem', fontVariantNumeric: 'tabular-nums' }}>{toCurrency(data.value)}</span>
+                                      <span style={{ color: '#111827', fontWeight: 700, fontSize: '0.8rem', minWidth: '40px', textAlign: 'right' }}>{percentage}%</span>
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      }}
+                    />
+                  </PieChart>
                 </ResponsiveContainer>
               </Box>
             </CardContent>
