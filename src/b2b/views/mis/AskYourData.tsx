@@ -9,13 +9,14 @@
 // it, proving chat ↔ page consistency.
 import React from 'react';
 import { Box, Typography, TextField } from '@mui/material';
-import { AutoAwesomeOutlined, ArrowUpwardOutlined } from '@mui/icons-material';
+import { AutoAwesomeOutlined, ArrowUpwardOutlined, FileDownloadOutlined, AutorenewOutlined } from '@mui/icons-material';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { colors, hairline, type, space, tabularNums } from '../../theme/b2bTokens';
 import { Pressable } from '../../components/primitives';
 import { formatINRShort, formatPercent } from '../../lib/format';
 import { misData } from '../../mock';
 import { statusColors } from './misTokens';
+import { downloadAnswerReport, type AnswerReportId } from './misExcel';
 
 // ── Answer model ─────────────────────────────────────────────────────────────
 type AnswerTone = 'positive' | 'warning' | 'neutral' | 'ink' | 'accent';
@@ -159,6 +160,16 @@ const ENTRIES = buildEntries();
 const SOURCE = `Source: reconciled ledger · ${misData.period} · ${misData.reconciliation.totalTransactions.toLocaleString('en-IN')} txns`;
 const GREETING = `Ask me anything about ${misData.period}.`;
 
+// Chat entry id → downloadable CFO report id. A missing/unknown id yields no
+// download button (never crashes). Only these 5 real answers map to a report.
+const REPORT_BY_ENTRY: Record<string, AnswerReportId> = {
+  'net-revenue': 'net-revenue',
+  'worst-channel': 'losing-channel',
+  'kill-skus': 'kill-skus',
+  disputes: 'disputes',
+  ebitda: 'ebitda',
+};
+
 // Case-insensitive keyword scoring; highest score wins, ties break by order.
 function matchEntry(text: string): QAEntry | null {
   const t = text.toLowerCase();
@@ -178,7 +189,7 @@ function matchEntry(text: string): QAEntry | null {
 type Msg =
   | { id: string; role: 'assistant'; kind: 'text'; text: string }
   | { id: string; role: 'assistant'; kind: 'typing' }
-  | { id: string; role: 'assistant'; kind: 'answer'; answer: AnswerContent }
+  | { id: string; role: 'assistant'; kind: 'answer'; answer: AnswerContent; reportId?: AnswerReportId }
   | { id: string; role: 'assistant'; kind: 'fallback' }
   | { id: string; role: 'user'; text: string };
 
@@ -190,6 +201,8 @@ const AskYourData: React.FC = () => {
     { id: 'greeting', role: 'assistant', kind: 'text', text: GREETING },
   ]);
   const [input, setInput] = React.useState('');
+  // Per-answer-card download state, keyed by that message's unique id.
+  const [dlState, setDlState] = React.useState<Record<string, 'preparing' | 'error'>>({});
   const threadRef = React.useRef<HTMLDivElement>(null);
   const idc = React.useRef(0);
   const timers = React.useRef<number[]>([]);
@@ -213,7 +226,7 @@ const AskYourData: React.FC = () => {
       setMessages((prev) => {
         const base = prev.filter((m) => m.id !== TYPING_ID);
         const reply: Msg = entry
-          ? { id: nextId(), role: 'assistant', kind: 'answer', answer: entry.answer }
+          ? { id: nextId(), role: 'assistant', kind: 'answer', answer: entry.answer, reportId: REPORT_BY_ENTRY[entry.id] }
           : { id: nextId(), role: 'assistant', kind: 'fallback' };
         return [...base, reply];
       });
@@ -245,6 +258,23 @@ const AskYourData: React.FC = () => {
     timers.current.push(to);
   };
 
+  // Generate + download the CFO Excel for one answer card. Guards double-clicks,
+  // shows an inline preparing/error state, and never throws.
+  const onDownload = async (msgId: string, reportId: AnswerReportId) => {
+    if (dlState[msgId] === 'preparing') return;
+    setDlState((s) => ({ ...s, [msgId]: 'preparing' }));
+    try {
+      await downloadAnswerReport(reportId);
+      setDlState((s) => {
+        const next = { ...s };
+        delete next[msgId];
+        return next;
+      });
+    } catch {
+      setDlState((s) => ({ ...s, [msgId]: 'error' }));
+    }
+  };
+
   const NexTag = (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px`, mb: `${space.sm}px` }}>
       <Box sx={{ width: 20, height: 20, bgcolor: colors.accentWash, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -254,51 +284,99 @@ const AskYourData: React.FC = () => {
     </Box>
   );
 
-  const renderAnswer = (a: AnswerContent) => (
-    <Box sx={{ border: hairline, p: `${space.lg}px` }}>
-      {NexTag}
-      <Typography sx={{ ...type.statValue, color: TONE_COLOR[a.tone], ...tabularNums }}>{a.headline}</Typography>
-      <Typography sx={{ ...type.body, color: colors.grey700, mt: `${space.sm}px` }}>{a.sentence}</Typography>
-      {a.lines && (
-        <Box sx={{ mt: `${space.md}px`, borderTop: hairline }}>
-          {a.lines.map((l, i) => (
-            <Typography
-              key={i}
-              sx={{
-                fontSize: 13,
-                lineHeight: '18px',
-                color: colors.grey700,
-                py: `${space.xs}px`,
-                borderBottom: i < a.lines!.length - 1 ? hairline : 'none',
-                ...tabularNums,
-              }}
-            >
-              {l}
-            </Typography>
-          ))}
-        </Box>
-      )}
-      {a.drill && (
-        <Pressable
-          ariaLabel={a.drill.label}
-          onClick={() => drillTo(a.drill!.region)}
-          sx={{
-            mt: `${space.md}px`,
-            display: 'inline-block',
-            fontSize: 13,
-            fontWeight: 500,
-            color: colors.accent,
-            '&:hover': { color: colors.accentHover },
-          }}
-        >
-          {a.drill.label}
-        </Pressable>
-      )}
-      <Typography sx={{ ...type.label, color: colors.grey500, mt: `${space.md}px`, display: 'block', ...tabularNums }}>
-        {SOURCE}
-      </Typography>
-    </Box>
-  );
+  const renderAnswer = (m: Extract<Msg, { kind: 'answer' }>) => {
+    const a = m.answer;
+    const preparing = dlState[m.id] === 'preparing';
+    const errored = dlState[m.id] === 'error';
+    return (
+      <Box sx={{ border: hairline, p: `${space.lg}px` }}>
+        {NexTag}
+        <Typography sx={{ ...type.statValue, color: TONE_COLOR[a.tone], ...tabularNums }}>{a.headline}</Typography>
+        <Typography sx={{ ...type.body, color: colors.grey700, mt: `${space.sm}px` }}>{a.sentence}</Typography>
+        {a.lines && (
+          <Box sx={{ mt: `${space.md}px`, borderTop: hairline }}>
+            {a.lines.map((l, i) => (
+              <Typography
+                key={i}
+                sx={{
+                  fontSize: 13,
+                  lineHeight: '18px',
+                  color: colors.grey700,
+                  py: `${space.xs}px`,
+                  borderBottom: i < a.lines!.length - 1 ? hairline : 'none',
+                  ...tabularNums,
+                }}
+              >
+                {l}
+              </Typography>
+            ))}
+          </Box>
+        )}
+
+        {/* Footer actions: drill-down link + secondary CFO download */}
+        {(a.drill || m.reportId) && (
+          <Box sx={{ mt: `${space.md}px`, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: `${space.lg}px` }}>
+            {a.drill && (
+              <Pressable
+                ariaLabel={a.drill.label}
+                onClick={() => drillTo(a.drill!.region)}
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: colors.accent,
+                  '&:hover': { color: colors.accentHover },
+                }}
+              >
+                {a.drill.label}
+              </Pressable>
+            )}
+            {m.reportId && (
+              <Pressable
+                ariaLabel="Download"
+                disabled={preparing}
+                onClick={() => onDownload(m.id, m.reportId!)}
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: `${space.xs}px`,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: preparing ? colors.grey500 : colors.accent,
+                  '&:hover': preparing ? undefined : { color: colors.accentHover },
+                }}
+              >
+                {preparing ? (
+                  <Box
+                    component={motion.span}
+                    animate={reduce ? undefined : { rotate: 360 }}
+                    transition={reduce ? undefined : { duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                    sx={{ display: 'inline-flex' }}
+                  >
+                    <AutorenewOutlined sx={{ fontSize: 15 }} />
+                  </Box>
+                ) : (
+                  <FileDownloadOutlined sx={{ fontSize: 15 }} />
+                )}
+                {preparing ? 'Preparing…' : 'Download'}
+              </Pressable>
+            )}
+          </Box>
+        )}
+
+        {errored && (
+          <Typography sx={{ mt: `${space.sm}px`, fontSize: 13, color: colors.grey700 }}>
+            Couldn't generate file — try again
+          </Typography>
+        )}
+
+        <Typography sx={{ ...type.label, color: colors.grey500, mt: `${space.md}px`, display: 'block', ...tabularNums }}>
+          {SOURCE}
+        </Typography>
+      </Box>
+    );
+  };
 
   const renderMessage = (m: Msg) => {
     if (m.role === 'user') {
@@ -355,7 +433,7 @@ const AskYourData: React.FC = () => {
         </Box>
       );
     }
-    return renderAnswer(m.answer);
+    return renderAnswer(m);
   };
 
   return (

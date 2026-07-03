@@ -88,7 +88,7 @@ const AIPoweredMIS: React.FC = () => {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 340px' },
+          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 400px' },
           gap: `${REGION_GAP}px`,
           alignItems: 'start',
           mt: `${REGION_GAP}px`,
