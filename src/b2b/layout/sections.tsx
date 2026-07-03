@@ -1,4 +1,4 @@
-// The six Nexbit B2B sections — single source for both the sidebar nav and routing.
+// The Nexbit B2B sections — single source for both the sidebar nav and routing.
 import {
   DashboardOutlined,
   ReceiptLongOutlined,
@@ -7,6 +7,7 @@ import {
   DescriptionOutlined,
   AutoAwesomeOutlined,
   FileUploadOutlined,
+  InsightsOutlined,
 } from '@mui/icons-material';
 import type { SvgIconComponent } from '@mui/icons-material';
 
@@ -28,4 +29,5 @@ export const SECTIONS: SectionDef[] = [
   { key: 'channels', label: 'Channels', title: 'Channels', path: 'channels', icon: StorefrontOutlined },
   { key: 'contracts', label: 'Contracts', title: 'Contracts & rate cards', path: 'contracts', icon: DescriptionOutlined },
   { key: 'ask', label: 'Ask Nex', title: 'Ask Nex', path: 'ask', icon: AutoAwesomeOutlined },
+  { key: 'mis', label: 'AI-Powered MIS', title: 'AI-Powered MIS', path: 'mis', icon: InsightsOutlined },
 ];
