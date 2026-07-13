@@ -222,7 +222,14 @@ const MarketplaceReconciliation: React.FC = () => {
   const { setMemberName } = useUser();
   const { hasValidCredentials, isInitialized } = useOrganization();
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
-  const [syncTriggered, setSyncTriggered] = useState(false);
+  const [syncTriggered, setSyncTriggered] = useState(() => {
+    return localStorage.getItem('recon_sync_triggered') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('recon_sync_triggered', String(syncTriggered));
+  }, [syncTriggered]);
+
   const [syncOpen, setSyncOpen] = useState(false);
   const [syncStep, setSyncStep] = useState(0);
   const [syncView, setSyncView] = useState<'syncing' | 'connect-prompt' | 'credentials'>('syncing');
@@ -1439,7 +1446,18 @@ const MarketplaceReconciliation: React.FC = () => {
   const totalSyncSteps = isD2C ? 8 : 6;
   const isQC = selectedPlatform === 'blinkit' || selectedPlatform === 'zepto' || selectedPlatform === 'instamart';
   const isMarketplace = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || isQC;
-  const [connectedPlatforms, setConnectedPlatforms] = useState<Set<string>>(new Set());
+  const [connectedPlatforms, setConnectedPlatforms] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('recon_connected_platforms');
+      if (saved) return new Set(JSON.parse(saved));
+    } catch {}
+    return new Set();
+  });
+
+  useEffect(() => {
+    localStorage.setItem('recon_connected_platforms', JSON.stringify(Array.from(connectedPlatforms)));
+  }, [connectedPlatforms]);
+
   const isConnected = !isMarketplace || isQC || connectedPlatforms.has(selectedPlatform);
 
   const startSyncSimulation = () => {
