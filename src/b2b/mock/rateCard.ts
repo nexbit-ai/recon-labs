@@ -16,7 +16,7 @@ export const blinkitRateCard: RateCardLine[] = [
 
 export const blinkitRateCardMeta = {
   channel: 'Blinkit' as const,
-  contractRef: 'BLK-SUPERYOU-FY26',
+  contractRef: 'BLK-CTR-FY26',
   effective: 'FY26',
   source: 'Extracted from agreement + 3 email amendments',
 } as const;

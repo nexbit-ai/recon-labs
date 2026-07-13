@@ -43,9 +43,14 @@ import {
   KeyboardArrowDown as KeyboardArrowDownIcon,
 } from '@mui/icons-material';
 import {
-  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Line, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend
+  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, ComposedChart, Line, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip, Legend
 } from 'recharts';
-import { api, apiUtils } from '../services/api';
+import {
+  getMockLogisticsDashboard,
+  getMockRateCardRows,
+  updateMockRateCardRows,
+  mockDelay,
+} from '../data/mockLogisticsData';
 
 const REASON_SIMPLE_LABELS: Record<string, string> = {
   // No mapping; show raw backend labels for consistency
@@ -201,7 +206,6 @@ const Logistics: React.FC = () => {
   const [endDate, setEndDate] = useState(lastFY.end);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const [debugSkipCOD, setDebugSkipCOD] = useState(false);
 
   type Platform = 'delhivery' | 'shadowfax' | 'bluedart' | 'shiprocket';
   const [platform, setPlatform] = useState<Platform>('delhivery');
@@ -247,10 +251,9 @@ const Logistics: React.FC = () => {
 
     setMasterWeightUploadLoading(true);
     try {
-      await api.logistics.uploadMasterWeight(file);
+      // Demo build: no backend — simulate the upload and refresh.
+      await mockDelay(700);
       await fetchDashboard();
-    } catch (err: any) {
-      setError(apiUtils.formatError(err));
     } finally {
       setMasterWeightUploadLoading(false);
       event.target.value = '';
@@ -277,23 +280,20 @@ const Logistics: React.FC = () => {
         return;
       }
 
-      const params: Record<string, any> = { provider: platform, page, limit, view };
-      if (startDate) params.start_date = startDate;
-      if (endDate) params.end_date = endDate;
-      if (search) params.search = search;
-      if (selectedReason) params.reason = selectedReason;
-      if (debugSkipCOD) params.debug_skip = 'cod';
-
-      const response = await api.logistics.getLogisticCostDashboard(params);
-      const payload = (response.data || {}) as LogisticDashboardResponse;
+      // Demo build: all data is served from frontend mocks — no backend calls.
+      await mockDelay();
+      const payload = getMockLogisticsDashboard({
+        provider: platform,
+        page,
+        limit,
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+        search: search || undefined,
+        reason: selectedReason || undefined,
+      }) as LogisticDashboardResponse;
       setSummary(payload.summary || {});
       setOrders(Array.isArray(payload.orders) ? payload.orders : []);
       setPagination(payload.pagination || {});
-    } catch (err: any) {
-      setError(apiUtils.formatError(err));
-      setSummary({});
-      setOrders([]);
-      setPagination({});
     } finally {
       setLoading(false);
     }
@@ -308,22 +308,13 @@ const Logistics: React.FC = () => {
     setConfigLoading(true);
     setConfigError(null);
     try {
-      const resp = await api.logistics.getRateCardConfig({
-        provider: platform,
-        start_date: startDate,
-        end_date: endDate,
-      });
-      const payload = resp.data || {};
-      const rows = Array.isArray(payload.rows) ? payload.rows : [];
+      // Demo build: rate card comes from frontend mocks.
+      await mockDelay(250);
+      const rows = getMockRateCardRows(platform);
       setRateCardRows(rows);
       setConfigEdits({});
       const firstServiceType = rows[0]?.service_type || '';
       setConfigServiceType(firstServiceType);
-    } catch (err: any) {
-      setConfigError(apiUtils.formatError(err));
-      setRateCardRows([]);
-      setConfigEdits({});
-      setConfigServiceType('');
     } finally {
       setConfigLoading(false);
     }
@@ -337,11 +328,11 @@ const Logistics: React.FC = () => {
     setConfigLoading(true);
     setConfigError(null);
     try {
-      await api.logistics.updateRateCardConfig({ updates });
+      // Demo build: persist edits into the in-memory mock for this session.
+      await mockDelay(300);
+      updateMockRateCardRows(updates);
       setConfigEdits({});
       await loadRateCardConfig();
-    } catch (err: any) {
-      setConfigError(apiUtils.formatError(err));
     } finally {
       setConfigLoading(false);
     }
@@ -350,7 +341,7 @@ const Logistics: React.FC = () => {
   useEffect(() => {
     void fetchDashboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [platform, page, limit, startDate, endDate, search, debugSkipCOD, selectedReason]);
+  }, [platform, page, limit, startDate, endDate, search, selectedReason]);
 
   useEffect(() => {
     if (configOpen) {
@@ -452,10 +443,17 @@ const Logistics: React.FC = () => {
               e.stopPropagation();
               setIsDownloading(true);
               try {
-                // Fetch ALL results for CSV export (limit 100k)
-                const params = { provider: platform, page: 1, limit: 100000, view, start_date: startDate, end_date: endDate, search };
-                const resp = await api.logistics.getLogisticCostDashboard(params);
-                const allOrders = (resp.data?.orders || []) as LogisticOrder[];
+                // Demo build: export all mock results (limit 100k)
+                await mockDelay(500);
+                const resp = getMockLogisticsDashboard({
+                  provider: platform,
+                  page: 1,
+                  limit: 100000,
+                  start_date: startDate || undefined,
+                  end_date: endDate || undefined,
+                  search: search || undefined,
+                });
+                const allOrders = (resp.orders || []) as LogisticOrder[];
 
                 const headers = ['Order ID', 'Order Date', 'Zone', 'Item Qty', 'SKUs', 'Billed Wt', 'Expected Cost', 'Actual Cost', 'Difference', 'Reason', 'Breakup Trace'];
                 const csvContent = allOrders.map(o => [
@@ -481,8 +479,6 @@ const Logistics: React.FC = () => {
                 a.click();
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
-              } catch (err: any) {
-                setError("Failed to generate export: " + apiUtils.formatError(err));
               } finally {
                 setIsDownloading(false);
               }
@@ -511,13 +507,7 @@ const Logistics: React.FC = () => {
           { title: 'Mismatching Orders', value: summary?.mismatch_orders, color: '#6366F1', icon: <ErrorOutlineIcon /> },
           { title: 'Absolute Leakage', value: summary?.abs_difference, isCurrency: true, color: '#0f172a', icon: <AssessmentIcon /> }
         ].map((kpi, idx) => {
-          let displayValue = kpi.value;
-          if (kpi.title === 'Absolute Leakage' && platform === 'delhivery' && Math.abs(Number(kpi.value) - 36274.39) < 1) {
-            displayValue = 98786;
-          }
-          if (kpi.title === 'Matching Orders' && platform === 'delhivery' && Number(kpi.value) === 652909) {
-            displayValue = 252909;
-          }
+          const displayValue = kpi.value;
 
           return (
             <Grid item xs={12} sm={6} md={4} key={idx}>
@@ -561,71 +551,67 @@ const Logistics: React.FC = () => {
             Weight Slab Efficiency Matrix
           </Typography>
         </Box>
-        <Grid container spacing={4}>
-          <Grid item xs={12} md={8}>
-            <Box sx={{ height: 360 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={summary?.slab_distribution || []}>
-                  <defs>
-                    <linearGradient id="slabGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#60a5fa" stopOpacity={0.1} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} />
-                  <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} tickFormatter={(val) => `${val}%`} />
-                  <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} tickFormatter={(val) => `₹${val}`} />
-                  <RechartsTooltip
-                    cursor={{ fill: 'rgba(99, 102, 241, 0.05)' }}
-                    contentStyle={{
-                      borderRadius: '12px',
-                      border: 'none',
-                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                      backgroundColor: '#0f172a',
-                      color: '#fff'
-                    }}
-                    itemStyle={{ color: '#fff' }}
-                  />
-                  <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ paddingBottom: '20px' }} />
-                  <Bar
-                    yAxisId="left"
-                    name="Order Share %"
-                    dataKey="order_share"
-                    fill="url(#slabGradient)"
-                    radius={[6, 6, 0, 0]}
-                    barSize={40}
-                    animationDuration={1500}
-                  />
-                  <Line yAxisId="right" type="monotone" name="Cost per Order (Avg)" dataKey="avg_cost" stroke="#10b981" strokeWidth={4} dot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 8, strokeWidth: 0 }} animationDuration={1500} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Stack spacing={2}>
-              {(summary?.slab_distribution || []).map((s, i) => (
-                <Box key={i} sx={{ p: 2, borderRadius: '12px', bgcolor: '#f8fafc', border: '1px solid #f1f5f9' }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="body2" sx={{ fontWeight: 800, color: '#0f172a' }}>{s.label} Slab</Typography>
-                    <Typography variant="caption" sx={{ fontWeight: 900, color: '#6366F1' }}>Avg ₹{s.avg_cost?.toFixed(0)} / order</Typography>
-                  </Stack>
-                  <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 0.5 }}>Order Volume</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                        {toInteger(platform === 'delhivery' ? s.count * (252909.0 / 652909.0) : s.count)} orders
-                      </Typography>
-                    </Box>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 0.5 }}>Revenue Contribution</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>{s.revenue_share?.toFixed(1)}%</Typography>
-                    </Box>
-                  </Stack>
-                </Box>
-              ))}
-            </Stack>
-          </Grid>
+        <Box sx={{ height: 340, mb: 4 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={summary?.slab_distribution || []} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="slabGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#60a5fa" stopOpacity={0.1} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} />
+              <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} tickFormatter={(val) => `${val}%`} />
+              <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} tickFormatter={(val) => `₹${val}`} />
+              <RechartsTooltip
+                cursor={{ fill: 'rgba(99, 102, 241, 0.05)' }}
+                contentStyle={{
+                  borderRadius: '12px',
+                  border: 'none',
+                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                  backgroundColor: '#0f172a',
+                  color: '#fff'
+                }}
+                itemStyle={{ color: '#fff' }}
+              />
+              <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ paddingBottom: '20px' }} />
+              <Bar
+                yAxisId="left"
+                name="Order Share %"
+                dataKey="order_share"
+                fill="url(#slabGradient)"
+                radius={[6, 6, 0, 0]}
+                barSize={44}
+                animationDuration={1500}
+              />
+              <Line yAxisId="right" type="monotone" name="Cost per Order (Avg)" dataKey="avg_cost" stroke="#10b981" strokeWidth={4} dot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 8, strokeWidth: 0 }} animationDuration={1500} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </Box>
+        <Grid container spacing={2}>
+          {(summary?.slab_distribution || []).map((s, i) => (
+            <Grid item xs={12} sm={6} md={4} key={i}>
+              <Box sx={{ p: 2, height: '100%', borderRadius: '12px', bgcolor: '#f8fafc', border: '1px solid #f1f5f9' }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="body2" sx={{ fontWeight: 800, color: '#0f172a' }}>{s.label} Slab</Typography>
+                  <Typography variant="caption" sx={{ fontWeight: 900, color: '#6366F1' }}>Avg ₹{s.avg_cost?.toFixed(0)} / order</Typography>
+                </Stack>
+                <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 0.5 }}>Order Volume</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      {toInteger(s.count)} orders
+                    </Typography>
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 0.5 }}>Revenue Contribution</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{s.revenue_share?.toFixed(1)}%</Typography>
+                  </Box>
+                </Stack>
+              </Box>
+            </Grid>
+          ))}
         </Grid>
       </Card>
 
@@ -824,7 +810,7 @@ const Logistics: React.FC = () => {
                             </Box>
                           </TableCell>
                           <TableCell align="center" sx={{ fontWeight: 600 }}>
-                            {toInteger(platform === 'delhivery' ? r.count * (252909.0 / 652909.0) : r.count)}
+                            {toInteger(r.count)}
                           </TableCell>
                           <TableCell align="right" sx={{ fontWeight: 900, color: '#6366F1' }}>{toCurrency(r.value)}</TableCell>
                         </TableRow>

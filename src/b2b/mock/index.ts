@@ -5,6 +5,7 @@ export * from './brands';
 export * from './settlements';
 export * from './receivables';
 export * from './rateCard';
+export * from './contracts';
 export * from './askNex';
 export * from './mis';
 

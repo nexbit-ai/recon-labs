@@ -110,6 +110,50 @@ export interface RateCardLine {
   note?: string;
 }
 
+/** One channel's full signed contract: the rate card plus its provenance. */
+export interface ChannelContract {
+  channel: ChannelName;
+  /** Marketplace settlement model, e.g. "Quick-commerce (SOR)". */
+  model: string;
+  contractRef: string;
+  effective: string;
+  /** How Nex assembled the rate card, e.g. "Agreement + 3 email amendments". */
+  source: string;
+  rateCard: RateCardLine[];
+}
+
+export type DiscountType = 'percent' | 'perUnit';
+export type DiscountStatus = 'Active' | 'Scheduled' | 'Ended';
+
+/**
+ * A secondary (promotional) discount a marketplace runs on specific SKUs for a
+ * bounded date window — e.g. Blinkit marks down three SKUs in week 1 of the
+ * month. The brand co-funds it. Recon needs this declared so the settlement
+ * deduction reconciles instead of flagging as unexplained variance: the
+ * "expected amount to receive" is lowered by the brand-funded promo cost for
+ * exactly this window and SKU set.
+ */
+export interface SecondaryDiscount {
+  id: string;
+  channel: ChannelName;
+  /** Human name of the promo, e.g. "Month-Start Blitz". */
+  name: string;
+  /** SKUs the discount applies to (ids into `skus`). */
+  skuIds: string[];
+  discountType: DiscountType;
+  /** Percent off (percent) or ₹ off per unit (perUnit). */
+  discountValue: number;
+  /** Share of the markdown the brand funds, 0–100. Rest is platform-funded. */
+  brandFundedPct: number;
+  /** ISO date 'YYYY-MM-DD', inclusive. */
+  startDate: string;
+  endDate: string;
+  /** Units sold on these SKUs during the window — drives the impact math. */
+  unitsInWindow: number;
+  /** Avg selling price (₹/unit) — used to cost a percent discount. */
+  avgSellingPrice: number;
+}
+
 export interface AskNexQA {
   id: string;
   question: string;

@@ -21,16 +21,18 @@ export const channels: Channel[] = [
   { name: 'Instamart', model: 'Quick-commerce (OR)', connected: true },
 ];
 
-// SuperYou's real product range used across reconciliation fixtures.
+// Generic SKU catalogue used across the contract / discount fixtures. Ids are
+// stable internal codes (referenced by secondaryDiscounts); product & label are
+// shown as neutral SKU-N handles rather than real product names.
 export const skus: Sku[] = [
-  { id: 'PW6-CHO', product: 'Protein Wafer 6-pack', variant: 'Choco', label: 'Protein Wafer 6-pack — Choco' },
-  { id: 'PW6-PB', product: 'Protein Wafer 6-pack', variant: 'Peanut Butter', label: 'Protein Wafer 6-pack — Peanut Butter' },
-  { id: 'MGC-CO', product: 'Multigrain Chips', variant: 'Cream & Onion', label: 'Multigrain Chips — Cream & Onion' },
-  { id: 'MGC-CHE', product: 'Multigrain Chips', variant: 'Cheese', label: 'Multigrain Chips — Cheese' },
-  { id: 'SYP-CHO', product: 'SuperYou Pro 1kg', variant: 'Chocolate', label: 'SuperYou Pro 1kg — Chocolate' },
-  { id: 'SYP-CC', product: 'SuperYou Pro 1kg', variant: 'Cold Coffee', label: 'SuperYou Pro 1kg — Cold Coffee' },
-  { id: 'SYP-MC', product: 'SuperYou Pro 1kg', variant: 'Masala Chai', label: 'SuperYou Pro 1kg — Masala Chai' },
-  { id: 'SYP-UNF', product: 'SuperYou Pro 1kg', variant: 'Unflavoured', label: 'SuperYou Pro 1kg — Unflavoured' },
+  { id: 'PW6-CHO', product: 'SKU-8F2K', variant: '', label: 'SKU-8F2K' },
+  { id: 'PW6-PB', product: 'SKU-QN41', variant: '', label: 'SKU-QN41' },
+  { id: 'MGC-CO', product: 'SKU-7XR2', variant: '', label: 'SKU-7XR2' },
+  { id: 'MGC-CHE', product: 'SKU-B93V', variant: '', label: 'SKU-B93V' },
+  { id: 'SYP-CHO', product: 'SKU-K5T0', variant: '', label: 'SKU-K5T0' },
+  { id: 'SYP-CC', product: 'SKU-2W9M', variant: '', label: 'SKU-2W9M' },
+  { id: 'SYP-MC', product: 'SKU-DZ63', variant: '', label: 'SKU-DZ63' },
+  { id: 'SYP-UNF', product: 'SKU-5HJ8', variant: '', label: 'SKU-5HJ8' },
 ];
 
 export const skuById = (id: string): Sku | undefined => skus.find((s) => s.id === id);
