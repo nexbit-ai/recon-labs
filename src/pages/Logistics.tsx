@@ -31,6 +31,7 @@ import {
   Typography,
   Tooltip,
   Divider,
+  Checkbox,
   Chip,
 } from '@mui/material';
 import {
@@ -197,6 +198,29 @@ const Logistics: React.FC = () => {
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
+
+  const [processingCount, setProcessingCount] = useState<number>(0);
+
+  useEffect(() => {
+    const fetchProcessingStatus = async () => {
+      try {
+        const response = await api.uploadList.getUploadList({});
+        if (response && Array.isArray(response)) {
+          const pending = response.filter((job: any) => 
+            (job.status === 'pending' || job.status === 'processing') && 
+            (job.report_type === 'delhivery_logistic_racon' || job.report_type === 'shadowfax_logistic_recon' || job.report_type === 'logistic_master_weight')
+          );
+          setProcessingCount(pending.length);
+        }
+      } catch (err) {
+        console.error('Failed to fetch processing status', err);
+      }
+    };
+    
+    fetchProcessingStatus();
+    const interval = setInterval(fetchProcessingStatus, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Custom Calendar state
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
@@ -520,6 +544,20 @@ const Logistics: React.FC = () => {
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+          {processingCount > 0 && (
+            <Chip 
+              label={`${processingCount} file${processingCount > 1 ? 's' : ''} processing`} 
+              size="small" 
+              sx={{ 
+                height: 28, 
+                fontSize: '0.75rem', 
+                bgcolor: '#eff6ff', 
+                color: '#1d4ed8',
+                fontWeight: 600,
+                border: '1px solid #bfdbfe'
+              }} 
+            />
+          )}
           {loading && <CircularProgress size={20} sx={{ color: '#000000' }} />}
           <FormControl size="small" sx={{ minWidth: 160 }}>
             <Select

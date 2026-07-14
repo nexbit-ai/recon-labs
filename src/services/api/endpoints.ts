@@ -134,9 +134,9 @@ export const manualActionsAPI = {
 // Claims API
 export const claimsAPI = {
   // Evaluate aged claims
-  evaluateAgedClaims: () =>
+  evaluateAgedClaims: (platform?: string) =>
     apiService.post<{ success: boolean; message: string; data: { newly_eligible_orders: number } }>(
-      '/claims/evaluate'
+      platform ? `/claims/evaluate?platform=${platform}` : '/claims/evaluate'
     ),
 
   markClaimFiled: (orderId: string, payload: { ticket_id: string; platform: string }) =>
