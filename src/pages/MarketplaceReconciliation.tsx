@@ -342,7 +342,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   // Main transactions tab state
-  const [transactionsTab, setTransactionsTab] = useState<number>(0); // 0: matched, 1: mismatched (both within Settled)
+  const [transactionsTab, setTransactionsTab] = useState<number>(0); // 0: mismatched, 1: matched (both within Settled)
   const handleTransactionsTabChange = (_: any, value: number) => setTransactionsTab(value);
 
   // Settled/Unsettled main tab state
@@ -4141,7 +4141,7 @@ const MarketplaceReconciliation: React.FC = () => {
                         )}
                       </Box>
 
-                      {/* Switch for Matched/Mismatched (only when Settled is selected) */}
+                      {/* Switch for Mismatched/Matched (only when Settled is selected) */}
                       {settledUnsettledTab === 0 && (
                         <Box
                           sx={{
@@ -4153,8 +4153,8 @@ const MarketplaceReconciliation: React.FC = () => {
                             mb: 2
                           }}
                         >
-                          <Typography sx={{ fontWeight: 700, color: transactionsTab === 0 ? '#065f46' : '#6b7280' }}>
-                            Matched
+                          <Typography sx={{ fontWeight: 700, color: transactionsTab === 0 ? '#991b1b' : '#6b7280' }}>
+                            Mismatched
                           </Typography>
                           <Box
                             role="switch"
@@ -4173,7 +4173,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               height: 32,
                               borderRadius: 9999,
                               cursor: 'pointer',
-                              backgroundColor: transactionsTab === 1 ? '#fee2e2' : '#d1fae5',
+                              backgroundColor: transactionsTab === 1 ? '#d1fae5' : '#fee2e2',
                               transition: 'background-color 150ms ease',
                               boxShadow: 'inset 0 0 0 1px #e5e7eb',
                             }}
@@ -4187,7 +4187,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                 left: transactionsTab === 1 ? '50%' : 4,
                                 right: transactionsTab === 1 ? 4 : '50%',
                                 borderRadius: 9999,
-                                backgroundColor: transactionsTab === 1 ? '#ef4444' : '#10b981',
+                                backgroundColor: transactionsTab === 1 ? '#10b981' : '#ef4444',
                                 opacity: 0.25,
                                 transition: 'all 150ms ease',
                               }}
@@ -4207,8 +4207,8 @@ const MarketplaceReconciliation: React.FC = () => {
                               }}
                             />
                           </Box>
-                          <Typography sx={{ fontWeight: 700, color: transactionsTab === 1 ? '#991b1b' : '#6b7280' }}>
-                            Mismatched
+                          <Typography sx={{ fontWeight: 700, color: transactionsTab === 1 ? '#065f46' : '#6b7280' }}>
+                            Matched
                           </Typography>
                         </Box>
                       )}
@@ -4917,6 +4917,16 @@ const MarketplaceReconciliation: React.FC = () => {
                               {/* Tab Content for D2C */}
                               {unreconciledTab === 0 && (
                                 <Box>
+                                  <Typography variant="h6" sx={{
+                                    fontWeight: 600,
+                                    color: '#1f2937',
+                                    mb: 2,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1
+                                  }}>
+                                    ✨ Unreconciled by Reasons
+                                  </Typography>
                                   {unreconciledReasons.length === 0 ? (
                                     <Box sx={{
                                       py: 4,
@@ -4931,108 +4941,38 @@ const MarketplaceReconciliation: React.FC = () => {
                                       </Typography>
                                     </Box>
                                   ) : (
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                      {/* Contract Breaches Group */}
-                                      <Box>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                                          <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#374151' }}>
-                                            Contract Breaches
-                                          </Typography>
-                                          <Button 
-                                            variant="outlined" 
-                                            size="small" 
-                                            onClick={() => setContractDialogOpen(true)}
-                                            sx={{ 
-                                              color: '#374151', 
-                                              borderColor: '#e5e7eb', 
-                                              textTransform: 'none', 
-                                              fontWeight: 600,
-                                              '&:hover': {
-                                                backgroundColor: '#f3f4f6',
-                                                borderColor: '#d1d5db'
-                                              }
-                                            }}
-                                          >
-                                            View Contract
-                                          </Button>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                          {[
-                                            { reason: 'Charging Fees on Pre-Fulfillment Cancellations', count: 191, amount: 233122.10 },
-                                            { reason: 'Incorrect Commission Tiering', count: 112, amount: 40071.28 }
-                                          ].map((r, idx) => (
-                                            <Grow in key={`contract-breach-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
-                                              <Box sx={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                py: 2,
-                                                px: 3,
-                                                borderRadius: 2,
-                                                background: '#f9fafb',
-                                                border: '1px solid #f1f3f4',
-                                                transition: 'all 0.2s ease',
-                                                '&:hover': {
-                                                  background: '#f3f4f6',
-                                                  borderColor: '#e5e7eb'
-                                                }
-                                              }}>
-                                                <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
-                                                  {r.reason}
-                                                </Typography>
-                                                <Box sx={{ textAlign: 'right' }}>
-                                                  <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
-                                                    {r.count.toLocaleString('en-IN')}
-                                                  </Typography>
-                                                  <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
-                                                    {formatCurrency(Math.abs(r.amount))}
-                                                  </Typography>
-                                                </Box>
-                                              </Box>
-                                            </Grow>
-                                          ))}
-                                        </Box>
-                                      </Box>
-
-                                      {/* Other Group */}
-                                      <Box>
-                                        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#374151', mb: 1.5 }}>
-                                          Other
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                          {unreconciledReasons.map((r, idx) => (
-                                            <Grow in key={`${r.reason}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
-                                              <Box sx={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                py: 2,
-                                                px: 3,
-                                                borderRadius: 2,
-                                                background: '#f9fafb',
-                                                border: '1px solid #f1f3f4',
-                                                transition: 'all 0.2s ease',
-                                                '&:hover': {
-                                                  background: '#f3f4f6',
-                                                  borderColor: '#e5e7eb'
-                                                }
-                                              }}>
-                                                <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
-                                                  {r.reason}
-                                                </Typography>
-                                                <Box sx={{ textAlign: 'right' }}>
-                                                  <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
-                                                    {r.count.toLocaleString('en-IN')}
-                                                  </Typography>
-                                                  <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
-                                                    {formatCurrency(Math.abs(r.amount))}
-                                                  </Typography>
-                                                </Box>
-                                              </Box>
-                                            </Grow>
-                                          ))}
-                                        </Box>
-                                      </Box>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                      {unreconciledReasons.map((r, idx) => (
+                                        <Grow in key={`${r.reason}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
+                                          <Box sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            py: 2,
+                                            px: 3,
+                                            borderRadius: 2,
+                                            background: '#f9fafb',
+                                            border: '1px solid #f1f3f4',
+                                            transition: 'all 0.2s ease',
+                                            '&:hover': {
+                                              background: '#f3f4f6',
+                                              borderColor: '#e5e7eb'
+                                            }
+                                          }}>
+                                            <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
+                                              {r.reason}
+                                            </Typography>
+                                            <Box sx={{ textAlign: 'right' }}>
+                                              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
+                                                {r.count.toLocaleString('en-IN')}
+                                              </Typography>
+                                              <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                                                {formatCurrency(Math.abs(r.amount))}
+                                              </Typography>
+                                            </Box>
+                                          </Box>
+                                        </Grow>
+                                      ))}
                                     </Box>
                                   )}
                                 </Box>
@@ -5374,6 +5314,18 @@ const MarketplaceReconciliation: React.FC = () => {
                             <>
                               {/* Direct Reasons Display for Flipkart/Amazon */}
                               <Box sx={{ mt: 4 }}>
+                                {selectedPlatform !== 'flipkart' && (
+                                  <Typography variant="h6" sx={{
+                                    fontWeight: 600,
+                                    color: '#1f2937',
+                                    mb: 2,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1
+                                  }}>
+                                    ✨ Unreconciled by Reasons
+                                  </Typography>
+                                )}
                                 {unreconciledReasons.length === 0 ? (
                                   <Box sx={{
                                     py: 4,
@@ -5387,7 +5339,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                       All Good! No unreconciled transactions by reasons.
                                     </Typography>
                                   </Box>
-                                ) : (
+                                ) : selectedPlatform === 'flipkart' ? (
                                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                                     {/* Contract Breaches Group */}
                                     <Box>
@@ -5490,6 +5442,40 @@ const MarketplaceReconciliation: React.FC = () => {
                                         ))}
                                       </Box>
                                     </Box>
+                                  </Box>
+                                ) : (
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                    {unreconciledReasons.map((r, idx) => (
+                                      <Grow in key={`${r.reason}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
+                                        <Box sx={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          py: 2,
+                                          px: 3,
+                                          borderRadius: 2,
+                                          background: '#f9fafb',
+                                          border: '1px solid #f1f3f4',
+                                          transition: 'all 0.2s ease',
+                                          '&:hover': {
+                                            background: '#f3f4f6',
+                                            borderColor: '#e5e7eb'
+                                          }
+                                        }}>
+                                          <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
+                                            {r.reason}
+                                          </Typography>
+                                          <Box sx={{ textAlign: 'right' }}>
+                                            <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
+                                              {r.count.toLocaleString('en-IN')}
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                                              {formatCurrency(Math.abs(r.amount))}
+                                            </Typography>
+                                          </Box>
+                                        </Box>
+                                      </Grow>
+                                    ))}
                                   </Box>
                                 )}
                               </Box>
