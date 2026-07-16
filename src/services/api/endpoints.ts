@@ -189,7 +189,7 @@ export const monthOnMonthGrowthAPI = {
 
 // Upload List API
 export const uploadListAPI = {
-  getUploadList: (params: { report_type: string; platform?: string }) =>
+  getUploadList: (params?: { report_type?: string; platform?: string }) =>
     apiService.get<any>('/recon/upload-list', params),
 };
 
