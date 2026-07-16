@@ -1807,6 +1807,7 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
 
   // D2C-specific CSV filters (with _in suffix support)
   'Settlement Provider': { apiParam: 'settlement_provider', type: 'enum', supportedPlatforms: ['d2c'] },
+  'Payment Mode': { apiParam: 'payment_mode', type: 'enum', supportedPlatforms: ['d2c'] },
 };
 
 // Mapping of sortable UI columns to backend sort_by values
