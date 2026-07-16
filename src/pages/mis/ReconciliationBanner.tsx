@@ -5,10 +5,10 @@
 // formatINRShort; the recovered figure is the one accent-worthy positive.
 import React from 'react';
 import { Box, Typography } from '@mui/material';
-import { colors, hairline, type, space, tabularNums } from '../../theme/b2bTokens';
-import { cardSx } from '../../components/primitives';
-import { formatINRShort } from '../../lib/format';
-import type { ReconciliationCompleteness } from '../../mock';
+import { colors, hairline, radii, type, space, tabularNums } from './tokens';
+import { cardSx } from './primitives';
+import { formatINRShort } from './format';
+import type { ReconciliationCompleteness } from './misData';
 import { statusColors } from './misTokens';
 
 // One segment of the completeness bar + its legend entry.
@@ -72,7 +72,15 @@ const ReconciliationBanner: React.FC<{ data: ReconciliationCompleteness }> = ({ 
         <Box
           role="img"
           aria-label={segments.map((s) => `${s.label} ${s.pct}%`).join(', ')}
-          sx={{ display: 'flex', width: '100%', height: 10, mt: `${space.lg}px`, bgcolor: colors.grey100, overflow: 'hidden' }}
+          sx={{
+            display: 'flex',
+            width: '100%',
+            height: 10,
+            mt: `${space.lg}px`,
+            bgcolor: colors.grey100,
+            borderRadius: `${radii.bar}px`,
+            overflow: 'hidden',
+          }}
         >
           {segments.map((s) => (
             <Box key={s.key} sx={{ flexBasis: `${s.pct}%`, flexGrow: 0, flexShrink: 0, minWidth: 0, bgcolor: s.color }} />
@@ -83,7 +91,7 @@ const ReconciliationBanner: React.FC<{ data: ReconciliationCompleteness }> = ({ 
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: `${space.lg}px`, mt: `${space.md}px` }}>
           {segments.map((s) => (
             <Box key={s.key} sx={{ display: 'inline-flex', alignItems: 'center', gap: `${space.sm}px` }}>
-              <Box sx={{ width: 8, height: 8, bgcolor: s.color, flexShrink: 0 }} />
+              <Box sx={{ width: 8, height: 8, borderRadius: radii.dot, bgcolor: s.color, flexShrink: 0 }} />
               <Typography sx={{ ...type.label, color: colors.grey700, ...tabularNums }}>
                 {s.label} · {s.pct}%
               </Typography>

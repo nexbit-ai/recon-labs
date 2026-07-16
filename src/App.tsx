@@ -28,6 +28,7 @@ import Assistant from './pages/Assistant';
 import AIReconciliation from './pages/AIReconciliation';
 import Bookkeeping from './pages/Bookkeeping';
 import Logistics from './pages/Logistics';
+import AIPoweredMIS from './pages/mis/AIPoweredMIS';
 import Pricing from './pages/Pricing';
 import Integrations from './pages/Integrations';
 
@@ -467,6 +468,11 @@ function App() {
             <Route path="/logistics" element={
               <ProtectedRoute>
                 <Layout><Logistics /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/mis" element={
+              <ProtectedRoute>
+                <Layout><AIPoweredMIS /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/money" element={

@@ -16,7 +16,6 @@ import Disputes from './views/Disputes';
 import Channels from './views/Channels';
 import Contracts from './views/Contracts';
 import AskNex from './views/AskNex';
-import AIPoweredMIS from './views/AIPoweredMIS';
 // Reuse the exact same Integrations module from the B2C app.
 import Integrations from '../pages/Integrations';
 
@@ -29,7 +28,6 @@ const VIEWS: Record<string, React.ReactNode> = {
   channels: <Channels />,
   contracts: <Contracts />,
   ask: <AskNex />,
-  mis: <AIPoweredMIS />,
 };
 
 const B2BApp: React.FC = () => (

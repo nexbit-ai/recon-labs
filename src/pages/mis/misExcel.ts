@@ -7,7 +7,7 @@
 // identical. Download is triggered by writing xlsx.writeBuffer() to a Blob and
 // clicking a temporary object-URL anchor — no file-saver dependency.
 import ExcelJS from 'exceljs';
-import { misData } from '../../mock';
+import { misData } from './misData';
 
 export type AnswerReportId = 'net-revenue' | 'losing-channel' | 'kill-skus' | 'disputes' | 'ebitda';
 
@@ -18,7 +18,7 @@ const MONEY_FMT = '[>=10000000]"₹"#\\,##\\,##\\,##0;[>=100000]"₹"#\\,##\\,##
 // Percent stored as points (e.g. 82.0), displayed "82.0%"; negatives red in parens.
 const PCT_FMT = '0.0"%";[Red](0.0"%")';
 
-// ── Palette (ARGB) — mirrors the on-screen b2b tokens ───────────────────────
+// ── Palette (ARGB) — mirrors the on-screen tokens ────────────────────────────
 const INK = 'FF111111';
 const GREY700 = 'FF6B7280';
 const MUTED = 'FF9CA3AF';

@@ -11,10 +11,10 @@ import React from 'react';
 import { Box, Typography, TextField } from '@mui/material';
 import { AutoAwesomeOutlined, ArrowUpwardOutlined, FileDownloadOutlined, AutorenewOutlined } from '@mui/icons-material';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { colors, hairline, type, space, tabularNums } from '../../theme/b2bTokens';
-import { Pressable } from '../../components/primitives';
-import { formatINRShort, formatPercent } from '../../lib/format';
-import { misData } from '../../mock';
+import { colors, hairline, radii, type, space, tabularNums } from './tokens';
+import { Pressable } from './primitives';
+import { formatINRShort, formatPercent } from './format';
+import { misData } from './misData';
 import { statusColors } from './misTokens';
 import { downloadAnswerReport, type AnswerReportId } from './misExcel';
 
@@ -252,6 +252,7 @@ const AskYourData: React.FC = () => {
     el.style.transition = 'outline-color 0.5s ease';
     el.style.outline = `2px solid ${colors.accent}`;
     el.style.outlineOffset = '3px';
+    el.style.borderRadius = `${radii.card}px`;
     const to = window.setTimeout(() => {
       el.style.outline = '2px solid transparent';
     }, 1400);
@@ -277,7 +278,7 @@ const AskYourData: React.FC = () => {
 
   const NexTag = (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px`, mb: `${space.sm}px` }}>
-      <Box sx={{ width: 20, height: 20, bgcolor: colors.accentWash, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Box sx={{ width: 20, height: 20, borderRadius: `${radii.chip}px`, bgcolor: colors.accentWash, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <AutoAwesomeOutlined sx={{ fontSize: 13, color: colors.accent }} />
       </Box>
       <Typography sx={{ ...type.label, color: colors.grey500 }}>Nex</Typography>
@@ -289,7 +290,7 @@ const AskYourData: React.FC = () => {
     const preparing = dlState[m.id] === 'preparing';
     const errored = dlState[m.id] === 'error';
     return (
-      <Box sx={{ border: hairline, p: `${space.lg}px` }}>
+      <Box sx={{ border: hairline, borderRadius: `${radii.panel}px`, p: `${space.lg}px` }}>
         {NexTag}
         <Typography sx={{ ...type.statValue, color: TONE_COLOR[a.tone], ...tabularNums }}>{a.headline}</Typography>
         <Typography sx={{ ...type.body, color: colors.grey700, mt: `${space.sm}px` }}>{a.sentence}</Typography>
@@ -386,6 +387,7 @@ const AskYourData: React.FC = () => {
             sx={{
               bgcolor: colors.ink,
               color: colors.paper,
+              borderRadius: `${radii.control}px`,
               px: `${space.md}px`,
               py: `${space.sm}px`,
               maxWidth: '85%',
@@ -401,7 +403,7 @@ const AskYourData: React.FC = () => {
     if (m.kind === 'text') {
       return (
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: `${space.sm}px` }}>
-          <Box sx={{ width: 20, height: 20, mt: '2px', flexShrink: 0, bgcolor: colors.accentWash, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Box sx={{ width: 20, height: 20, mt: '2px', flexShrink: 0, borderRadius: `${radii.chip}px`, bgcolor: colors.accentWash, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <AutoAwesomeOutlined sx={{ fontSize: 13, color: colors.accent }} />
           </Box>
           <Typography sx={{ ...type.body, color: colors.grey700 }}>{m.text}</Typography>
@@ -410,14 +412,14 @@ const AskYourData: React.FC = () => {
     }
     if (m.kind === 'typing') {
       return (
-        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: `${space.xs}px`, border: hairline, px: `${space.md}px`, py: `${space.sm}px` }}>
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: `${space.xs}px`, border: hairline, borderRadius: `${radii.control}px`, px: `${space.md}px`, py: `${space.sm}px` }}>
           {[0, 1, 2].map((i) => (
             <Box
               key={i}
               component={motion.span}
               animate={reduce ? undefined : { opacity: [0.3, 1, 0.3] }}
               transition={reduce ? undefined : { duration: 0.9, repeat: Infinity, ease: 'easeInOut', delay: i * 0.15 }}
-              sx={{ width: 6, height: 6, bgcolor: colors.grey500 }}
+              sx={{ width: 6, height: 6, borderRadius: radii.dot, bgcolor: colors.grey500 }}
             />
           ))}
         </Box>
@@ -425,7 +427,7 @@ const AskYourData: React.FC = () => {
     }
     if (m.kind === 'fallback') {
       return (
-        <Box sx={{ border: hairline, p: `${space.lg}px` }}>
+        <Box sx={{ border: hairline, borderRadius: `${radii.panel}px`, p: `${space.lg}px` }}>
           {NexTag}
           <Typography sx={{ ...type.body, color: colors.ink }}>
             I can answer that from your reconciled data — try one of these:
@@ -477,6 +479,7 @@ const AskYourData: React.FC = () => {
             onClick={() => onChip(e)}
             sx={{
               border: hairline,
+              borderRadius: `${radii.chip}px`,
               px: `${space.md}px`,
               py: `${space.sm}px`,
               fontSize: 13,
@@ -516,6 +519,7 @@ const AskYourData: React.FC = () => {
             width: 36,
             height: 36,
             flexShrink: 0,
+            borderRadius: `${radii.control}px`,
             bgcolor: input.trim() && !busy ? colors.ink : colors.grey100,
             color: input.trim() && !busy ? colors.paper : colors.grey500,
             display: 'flex',

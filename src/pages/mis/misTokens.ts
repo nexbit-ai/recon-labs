@@ -1,11 +1,9 @@
 // Local semantic status colours for the AI-Powered MIS page only.
-// The core B2B system is monochrome + one accent and has no positive/warning
-// tokens, but the reconciliation-completeness bar needs three semantically
-// distinct segments. These are deliberately DESATURATED (enterprise, not neon)
-// to stay in the spirit of the monochrome look, and centralised here so no
-// component hardcodes a hex value inline. MIS-scoped — never imported by the
-// shared shell/views.
-import { colors } from '../../theme/b2bTokens';
+// Three semantically distinct segments for the reconciliation-completeness bar
+// and channel/SKU health. Deliberately DESATURATED (enterprise, not neon) to
+// stay calm within the mostly-monochrome page. Centralised so no component
+// hardcodes a hex value inline.
+import { colors } from './tokens';
 
 export const statusColors = {
   /** Matched / reconciled — muted green. */

@@ -7,9 +7,9 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { WarningAmberOutlined } from '@mui/icons-material';
 import { motion, useReducedMotion } from 'framer-motion';
-import { colors, type, space, hairline, tabularNums } from '../../theme/b2bTokens';
-import { formatPercent } from '../../lib/format';
-import type { SkuProfitability as SkuRow } from '../../mock';
+import { colors, type, space, hairline, radii, tabularNums } from './tokens';
+import { formatPercent } from './format';
+import type { SkuProfitability as SkuRow } from './misData';
 import { statusColors } from './misTokens';
 
 // Channels treated as quick-commerce, for the dynamic kill-list summary phrasing.
@@ -28,7 +28,7 @@ const rowVariant = {
 const ChannelChip: React.FC<{ name: string }> = ({ name }) => (
   <Box
     component="span"
-    sx={{ ...type.label, color: colors.grey700, bgcolor: colors.grey100, px: `${space.sm}px`, py: '2px' }}
+    sx={{ ...type.label, color: colors.grey700, bgcolor: colors.grey100, borderRadius: `${radii.chip}px`, px: `${space.sm}px`, py: '2px' }}
   >
     {name}
   </Box>
@@ -46,6 +46,7 @@ const SkuLine: React.FC<{ sku: SkuRow; first: boolean }> = ({ sku, first }) => {
         py: `${space.sm}px`,
         px: negative ? `${space.sm}px` : 0,
         mx: negative ? `-${space.sm}px` : 0,
+        borderRadius: negative ? `${radii.panel}px` : 0,
         borderTop: first ? 'none' : hairline,
         bgcolor: negative ? statusColors.warningWash : 'transparent',
       }}
@@ -111,6 +112,7 @@ const SkuProfitability: React.FC<{ skus: SkuRow[]; startDelay?: number }> = ({ s
           gap: `${space.xs}px`,
           bgcolor: statusColors.warningWash,
           color: statusColors.warning,
+          borderRadius: `${radii.chip}px`,
           px: `${space.sm}px`,
           py: '4px',
         }}

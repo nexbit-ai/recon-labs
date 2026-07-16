@@ -6,9 +6,9 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { motion, useReducedMotion } from 'framer-motion';
-import { colors, hairline, type, space, tabularNums } from '../../theme/b2bTokens';
-import { formatINRShort, formatPercent } from '../../lib/format';
-import type { ChannelMISPerformance, ChannelHealth } from '../../mock';
+import { colors, hairline, radii, type, space, tabularNums } from './tokens';
+import { formatINRShort, formatPercent } from './format';
+import type { ChannelMISPerformance, ChannelHealth } from './misData';
 import { statusColors } from './misTokens';
 
 type Tone = 'positive' | 'warning' | 'neutral';
@@ -85,6 +85,7 @@ const ChannelPerformance: React.FC<{ channels: ChannelMISPerformance[]; startDel
                 py: `${space.sm}px`,
                 px: negative ? `${space.sm}px` : 0,
                 mx: negative ? `-${space.sm}px` : 0,
+                borderRadius: negative ? `${radii.panel}px` : 0,
                 borderTop: i === 0 ? 'none' : hairline,
                 bgcolor: negative ? statusColors.warningWash : 'transparent',
               }}
@@ -106,6 +107,7 @@ const ChannelPerformance: React.FC<{ channels: ChannelMISPerformance[]; startDel
                       ...type.label,
                       color: TONE_COLOR[meta.tone],
                       bgcolor: TONE_WASH[meta.tone],
+                      borderRadius: `${radii.chip}px`,
                       px: `${space.sm}px`,
                       py: '3px',
                     }}
@@ -117,7 +119,17 @@ const ChannelPerformance: React.FC<{ channels: ChannelMISPerformance[]; startDel
 
               {/* Line 2: GMV bar (size) + value */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.md}px`, mt: `${space.xs}px` }}>
-                <Box sx={{ position: 'relative', flex: 1, height: 8, bgcolor: colors.grey100, minWidth: 0 }}>
+                <Box
+                  sx={{
+                    position: 'relative',
+                    flex: 1,
+                    height: 8,
+                    bgcolor: colors.grey100,
+                    borderRadius: `${radii.bar}px`,
+                    overflow: 'hidden',
+                    minWidth: 0,
+                  }}
+                >
                   <Box
                     component={motion.div}
                     variants={reduce ? undefined : barVariant}
@@ -128,6 +140,7 @@ const ChannelPerformance: React.FC<{ channels: ChannelMISPerformance[]; startDel
                       left: 0,
                       width: `${(row.gmv / maxGmv) * 100}%`,
                       minWidth: 2,
+                      borderRadius: `${radii.bar}px`,
                       bgcolor: colors.ink,
                       transformOrigin: 'left',
                     }}

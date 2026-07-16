@@ -1,10 +1,10 @@
 // Period selector for the MIS header. Static/mock: it opens a native-looking
 // menu of recent periods but selecting one only updates the label — the demo
-// data is always June 2026. Square corners, hairline border, accent focus ring.
+// data is always June 2026. Rounded control, hairline border, accent focus ring.
 import React from 'react';
 import { Box, Menu, MenuItem, Typography } from '@mui/material';
 import { KeyboardArrowDownOutlined, CheckOutlined } from '@mui/icons-material';
-import { colors, hairline, type, space, focusRingSx } from '../../theme/b2bTokens';
+import { colors, hairline, radii, type, space, focusRingSx } from './tokens';
 
 // A short trailing window of periods for the mock dropdown.
 const RECENT_PERIODS = (current: string) =>
@@ -32,6 +32,7 @@ const PeriodSelector: React.FC<{ period: string }> = ({ period }) => {
           px: `${space.md}px`,
           bgcolor: colors.paper,
           border: hairline,
+          borderRadius: `${radii.control}px`,
           color: colors.ink,
           fontFamily: 'inherit',
           fontSize: type.body.fontSize,

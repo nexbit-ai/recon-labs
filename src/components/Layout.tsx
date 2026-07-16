@@ -41,6 +41,7 @@ import {
   StorefrontOutlined as StorefrontIcon,
   ReceiptOutlined as ReceiptIcon,
   AccountBalanceOutlined as AccountBalanceIcon,
+  InsightsOutlined as InsightsIcon,
   ReportProblemOutlined as ReportProblemIcon,
   LogoutOutlined as LogoutIcon,
   KeyboardArrowUp as KeyboardArrowUpIcon,
@@ -62,6 +63,7 @@ const menuItems = [
   { text: 'Claims', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
   { text: 'Logistics', icon: <StorageIcon />, path: '/logistics', upcoming: false },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping', upcoming: false },
+  { text: 'AI-Powered MIS', icon: <InsightsIcon />, path: '/mis', upcoming: false },
   // { text: 'Chat', icon: <ChatIcon />, path: '/assistant' },
 ];
 

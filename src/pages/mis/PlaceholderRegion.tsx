@@ -1,15 +1,14 @@
-// Labeled empty region for the MIS scaffold. Renders a section header over an
-// empty, height-reserved card body so the skeleton already reads as the final
-// layout. No data/charts inside yet — later steps fill `children`. Uses the same
-// card surface as the reconciliation banner so the skeleton is cohesive.
+// Labeled region card for the MIS page. Renders a section header over a card
+// body that holds the region's chart/content. Uses the same rounded card
+// surface as the reconciliation banner so the layout is cohesive.
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material';
-import { colors, hairline, type, space } from '../../theme/b2bTokens';
-import { cardSx, SectionTitle } from '../../components/primitives';
+import { colors, hairline, type, space } from './tokens';
+import { cardSx, SectionTitle } from './primitives';
 
 interface PlaceholderRegionProps {
-  /** Stable DOM id / reference handle for later steps. */
+  /** Stable DOM id / reference handle for drill-down scrolling. */
   id: string;
   title: string;
   /** Optional muted one-liner hinting what will render here. */

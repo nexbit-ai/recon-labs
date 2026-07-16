@@ -12,9 +12,9 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { ArrowUpwardOutlined, ArrowDownwardOutlined } from '@mui/icons-material';
 import { motion, useReducedMotion } from 'framer-motion';
-import { colors, hairline, type, space, tabularNums } from '../../theme/b2bTokens';
-import { formatINRShort, formatPercent } from '../../lib/format';
-import type { PnLLine, PriorMonthSummary } from '../../mock';
+import { colors, hairline, radii, type, space, tabularNums } from './tokens';
+import { formatINRShort, formatPercent } from './format';
+import type { PnLLine, PriorMonthSummary } from './misData';
 import { statusColors } from './misTokens';
 
 const BAR_HEIGHT = 20;
@@ -105,6 +105,7 @@ const PnLWaterfall: React.FC<{ lines: PnLLine[]; priorMonth: PriorMonthSummary; 
                 py: `${space.xs}px`,
                 px: row.isHero ? `${space.sm}px` : 0,
                 mx: row.isHero ? `-${space.sm}px` : 0,
+                borderRadius: row.isHero ? `${radii.panel}px` : 0,
                 borderTop: dividerAbove ? hairline : 'none',
                 bgcolor: row.isHero ? colors.accentWash : 'transparent',
               }}
@@ -136,6 +137,7 @@ const PnLWaterfall: React.FC<{ lines: PnLLine[]; priorMonth: PriorMonthSummary; 
                     left: `${row.leftPct}%`,
                     width: `${row.widthPct}%`,
                     minWidth: 2,
+                    borderRadius: `${radii.bar}px`,
                     bgcolor: barColor(row),
                     transformOrigin: 'left',
                   }}
