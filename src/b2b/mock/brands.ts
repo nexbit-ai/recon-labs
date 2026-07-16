@@ -4,7 +4,7 @@ import type { Channel, Sku } from './types';
 export const workspace = {
   brand: 'SuperYou',
   category: 'FMCG · Protein-forward snacking',
-  channelsConnectedLabel: 'Foxtale · 5 channels connected',
+  channelsConnectedLabel: 'FXT · 5 channels connected',
 } as const;
 
 export const fiscalPeriod = {

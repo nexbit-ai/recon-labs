@@ -12,6 +12,9 @@ import type {
 export const headline: HeadlineMetric[] = [
   { key: 'settled', label: 'Settled this quarter', value: 14_20_00_000, display: '₹14.2 Cr', unit: 'inr' },
   { key: 'leakage', label: 'Leakage detected (Q1)', value: 38_60_000, display: '₹38.6L', unit: 'inr' },
+  // Receivable = what all 5 portals owed you this quarter = settled + leakage.
+  // Received = the settled portion; the gap is the leakage.
+  { key: 'receivable', label: 'Receivable this quarter', value: 14_58_60_000, display: '₹14.59 Cr', unit: 'inr' },
   { key: 'recoverable', label: 'Recoverable now', value: 22_40_000, display: '₹22.4L', unit: 'inr' },
   { key: 'expiring', label: 'Recoverable expiring within ~10 days', value: 6_80_000, display: '₹6.8L', unit: 'inr' },
   { key: 'recoveredYtd', label: 'Recovered YTD', value: 41_20_000, display: '₹41.2L', unit: 'inr' },
@@ -40,6 +43,23 @@ export const channelPerformance: ChannelPerformance[] = [
   { channel: 'Instamart', settled: 1_60_00_000, leakage: 4_60_000, netRealisationPct: 68, recoverable: 2_20_000 },
 ];
 
+// ── RECEIVED vs RECEIVABLE, per portal ──────────────────────────────────────
+// The Overview's "Received by portal" card reads this. For each portal:
+//   receivable = settled + leakage (what the portal owed you)
+//   received   = settled          (what landed correctly)
+//   pctReceived = received / receivable  (share received correctly)
+// Totals cross-foot to the 'settled', 'leakage' and 'receivable' headlines.
+export const channelReceived = channelPerformance.map((c) => ({
+  channel: c.channel,
+  receivable: c.settled + c.leakage,
+  received: c.settled,
+  pctReceived: (c.settled / (c.settled + c.leakage)) * 100,
+}));
+
+export const totalReceivable = channelPerformance.reduce((t, c) => t + c.settled + c.leakage, 0);
+export const totalReceived = channelPerformance.reduce((t, c) => t + c.settled, 0);
+export const pctReceivedOverall = (totalReceived / totalReceivable) * 100;
+
 // ── FLAGGED ISSUES (the five canonical exceptions) ──────────────────────────
 export const flaggedIssues: FlaggedIssue[] = [
   {
@@ -55,7 +75,7 @@ export const flaggedIssues: FlaggedIssue[] = [
     id: 'FL-002',
     channel: 'Instamart',
     title: 'Short-paid against GRN',
-    detail: '1,240 Foxtale Face Wash units accepted on GRN-IM-2291, never settled',
+    detail: '1,240 units of SKU-2291 (Face Wash) accepted on GRN-IM-2291, never settled',
     amount: 2_85_200,
     type: 'Short payment',
     confidence: 'High',
@@ -64,7 +84,7 @@ export const flaggedIssues: FlaggedIssue[] = [
     id: 'FL-003',
     channel: 'Amazon',
     title: 'FBA weight band misclassified',
-    detail: '980 units of Foxtale Sunscreen SPF 50 billed at the 2kg band',
+    detail: '980 units of SKU-8841 (Sunscreen SPF 50) billed at the 2kg band',
     amount: 1_42_000,
     type: 'Overcharge',
     confidence: 'High',
@@ -73,7 +93,7 @@ export const flaggedIssues: FlaggedIssue[] = [
     id: 'FL-004',
     channel: 'Flipkart',
     title: 'Commission above contracted rate',
-    detail: 'Foxtale Serum 30ml charged 22% vs 18% agreed',
+    detail: 'SKU-5519 (Serum 30ml) charged 22% vs 18% agreed',
     amount: 64_500,
     type: 'Rate variance',
     confidence: 'High',
@@ -99,7 +119,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-2291',
     channel: 'Instamart',
     skuId: 'FFW-GEN',
-    skuLabel: 'Foxtale Face Wash — Gentle',
+    skuLabel: 'SKU-2291 · Face Wash (Gentle)',
     ref: 'GRN-IM-2291',
     expected: 5_46_000,
     paid: 2_60_800,
@@ -117,7 +137,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-8841',
     channel: 'Amazon',
     skuId: 'FSS-DEW',
-    skuLabel: 'Foxtale Sunscreen SPF 50 — Dewy Finish',
+    skuLabel: 'SKU-8841 · Sunscreen SPF 50 (Dewy Finish)',
     ref: 'STL-AMZ-8841',
     expected: 7_18_000,
     paid: 5_76_000,
@@ -135,7 +155,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-7732',
     channel: 'Blinkit',
     skuId: 'FSR-VITC',
-    skuLabel: 'Foxtale Serum 30ml — Vitamin C',
+    skuLabel: 'SKU-7732 · Serum 30ml (Vitamin C)',
     ref: 'STL-BLK-7732',
     expected: 4_12_000,
     paid: 3_28_600,
@@ -153,7 +173,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-5519',
     channel: 'Flipkart',
     skuId: 'FSR-NIA',
-    skuLabel: 'Foxtale Serum 30ml — Niacinamide',
+    skuLabel: 'SKU-5519 · Serum 30ml (Niacinamide)',
     ref: 'STL-FLP-5519',
     expected: 3_61_500,
     paid: 2_97_000,
@@ -163,7 +183,7 @@ export const reconLineItems: ReconLineItem[] = [
       'Exact reference match on STL-FLP-5519. Commission recomputed at the contracted 18% — settlement applied 22%.',
     varianceBreakdown: [
       { label: 'Quantity variance', amount: 0, why: 'Order quantities reconciled exactly' },
-      { label: 'Deduction variance', amount: -58_600, why: 'Commission charged at 22% vs 18% contracted on Foxtale Serum 30ml' },
+      { label: 'Deduction variance', amount: -58_600, why: 'Commission charged at 22% vs 18% contracted on SKU-5519 (Serum 30ml)' },
       { label: 'Tax / TCS variance', amount: -5_900, why: 'GST charged on the excess commission' },
     ],
   },
@@ -171,7 +191,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-4410',
     channel: 'Zepto',
     skuId: 'FSS-MAT',
-    skuLabel: 'Foxtale Sunscreen SPF 50 — Matte Finish',
+    skuLabel: 'SKU-4410 · Sunscreen SPF 50 (Matte Finish)',
     ref: 'STL-ZEP-4410',
     expected: 2_88_000,
     paid: 2_46_800,
@@ -189,7 +209,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-9920',
     channel: 'Amazon',
     skuId: 'FSS-ULT',
-    skuLabel: 'Foxtale Sunscreen SPF 50 — Ultra Light',
+    skuLabel: 'SKU-9920 · Sunscreen SPF 50 (Ultra Light)',
     ref: 'STL-AMZ-9920',
     expected: 6_04_000,
     paid: 6_04_000,
@@ -206,7 +226,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-3301',
     channel: 'Flipkart',
     skuId: 'FFW-BRT',
-    skuLabel: 'Foxtale Face Wash — Brightening',
+    skuLabel: 'SKU-3301 · Face Wash (Brightening)',
     ref: 'STL-FLP-3301',
     expected: 3_92_000,
     paid: 3_92_000,
@@ -223,7 +243,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-1180',
     channel: 'Blinkit',
     skuId: 'FSS-AQU',
-    skuLabel: 'Foxtale Sunscreen SPF 50 — Aqua Gel',
+    skuLabel: 'SKU-1180 · Sunscreen SPF 50 (Aqua Gel)',
     ref: 'STL-BLK-1180',
     expected: 2_15_000,
     paid: 2_15_000,
@@ -240,7 +260,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-6627',
     channel: 'Zepto',
     skuId: 'FFW-HYD',
-    skuLabel: 'Foxtale Face Wash — Hydrating',
+    skuLabel: 'SKU-6627 · Face Wash (Hydrating)',
     ref: 'STL-ZEP-6627',
     expected: 4_80_000,
     paid: 4_05_300,
@@ -258,7 +278,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-2048',
     channel: 'Instamart',
     skuId: 'FSR-RET',
-    skuLabel: 'Foxtale Serum 30ml — Retinol',
+    skuLabel: 'SKU-2048 · Serum 30ml (Retinol)',
     ref: 'STL-IM-2048',
     expected: 3_36_000,
     paid: 2_84_700,
@@ -268,7 +288,7 @@ export const reconLineItems: ReconLineItem[] = [
       'Exact reference match on STL-IM-2048. Commission recomputed at the contracted 16% — settlement applied 20%.',
     varianceBreakdown: [
       { label: 'Quantity variance', amount: 0, why: 'Order quantities reconciled exactly' },
-      { label: 'Deduction variance', amount: -46_600, why: 'Commission charged at 20% vs 16% contracted on Foxtale Serum 30ml' },
+      { label: 'Deduction variance', amount: -46_600, why: 'Commission charged at 20% vs 16% contracted on SKU-2048 (Serum 30ml)' },
       { label: 'Tax / TCS variance', amount: -4_700, why: 'GST charged on the excess commission' },
     ],
   },
@@ -276,7 +296,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-7165',
     channel: 'Flipkart',
     skuId: 'FSS-TIN',
-    skuLabel: 'Foxtale Sunscreen SPF 50 — Tinted',
+    skuLabel: 'SKU-7165 · Sunscreen SPF 50 (Tinted)',
     ref: 'GRN-FLP-7165',
     expected: 4_25_000,
     paid: 1_98_400,
@@ -294,7 +314,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-8473',
     channel: 'Amazon',
     skuId: 'FFW-OIL',
-    skuLabel: 'Foxtale Face Wash — Oil-Control',
+    skuLabel: 'SKU-8473 · Face Wash (Oil-Control)',
     ref: 'STL-AMZ-8473',
     expected: 5_52_000,
     paid: 5_10_700,
@@ -312,7 +332,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-3958',
     channel: 'Blinkit',
     skuId: 'FSR-SAL',
-    skuLabel: 'Foxtale Serum 30ml — Salicylic Acid',
+    skuLabel: 'SKU-3958 · Serum 30ml (Salicylic Acid)',
     ref: 'STL-BLK-3958',
     expected: 3_74_000,
     paid: 3_15_500,
@@ -330,7 +350,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-5006',
     channel: 'Zepto',
     skuId: 'FSS-MIN',
-    skuLabel: 'Foxtale Sunscreen SPF 50 — Mineral',
+    skuLabel: 'SKU-5006 · Sunscreen SPF 50 (Mineral)',
     ref: 'STL-ZEP-5006',
     expected: 2_68_000,
     paid: 2_68_000,
@@ -347,7 +367,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-4127',
     channel: 'Instamart',
     skuId: 'FFW-EXF',
-    skuLabel: 'Foxtale Face Wash — Exfoliating',
+    skuLabel: 'SKU-4127 · Face Wash (Exfoliating)',
     ref: 'STL-IM-4127',
     expected: 3_05_000,
     paid: 3_05_000,
@@ -364,7 +384,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-9314',
     channel: 'Amazon',
     skuId: 'FSR-HYA',
-    skuLabel: 'Foxtale Serum 30ml — Hyaluronic',
+    skuLabel: 'SKU-9314 · Serum 30ml (Hyaluronic)',
     ref: 'STL-AMZ-9314',
     expected: 4_92_000,
     paid: 4_92_000,
@@ -381,7 +401,7 @@ export const reconLineItems: ReconLineItem[] = [
     id: 'RC-2570',
     channel: 'Blinkit',
     skuId: 'FSS-SPT',
-    skuLabel: 'Foxtale Sunscreen SPF 50 — Sport',
+    skuLabel: 'SKU-2570 · Sunscreen SPF 50 (Sport)',
     ref: 'STL-BLK-2570',
     expected: 1_88_000,
     paid: 1_88_000,

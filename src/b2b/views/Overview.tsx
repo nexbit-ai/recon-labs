@@ -11,16 +11,17 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
 import CountUpMetric from '../components/CountUpMetric';
 import { cardSx as cardBase, ChannelTag, SectionTitle, PageTitle, Pressable } from '../components/primitives';
-import { formatRupees, formatCompactINR, formatPercent } from '../lib/format';
+import { formatRupees, formatCompactINR, formatINRShort, formatPercent } from '../lib/format';
 import {
   headlineByKey,
-  channelPerformance,
+  channelReceived,
+  totalReceived,
+  pctReceivedOverall,
   flaggedIssues,
   flaggedIssuesTotal,
   recoveredYtdClaimsWon,
   netRealisationAssumptionPct,
   activeDisputes,
-  expiringSoonDisputes,
 } from '../mock';
 
 const DISPUTES_ROUTE = '/b2b/disputes';
@@ -76,17 +77,14 @@ const Overview: React.FC = () => {
   const reduce = useReducedMotion();
 
   // ── figures, all from the mock barrel ──
-  const recoverable = headlineByKey('recoverable');
-  const expiring = headlineByKey('expiring');
+  const receivable = headlineByKey('receivable');
+  const shortfall = headlineByKey('leakage');
   const recoveredYtd = headlineByKey('recoveredYtd');
   const netRealisation = headlineByKey('netRealisation');
-  const totalLeakage = headlineByKey('leakage');
 
-  const expiringDays = Math.max(...expiringSoonDisputes.map((d) => d.windowDaysRemaining));
   const netGap = (netRealisationAssumptionPct - netRealisation.value).toFixed(1);
 
   const issues = [...flaggedIssues].sort((a, b) => b.amount - a.amount);
-  const maxLeak = Math.max(...channelPerformance.map((c) => c.leakage));
   const deadlines = [...activeDisputes]
     .sort((a, b) => a.windowDaysRemaining - b.windowDaysRemaining)
     .slice(0, 3);
@@ -109,28 +107,34 @@ const Overview: React.FC = () => {
           mb: `${space.xl}px`,
         }}
       >
-        {/* Recoverable now (hero, count-up) */}
+        {/* Receivable this quarter (hero, count-up) — total owed by all portals,
+            with the correctly-received portion called out beneath it. */}
         <Box sx={cardSx}>
-          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px` }}>Recoverable now</Typography>
-          <CountUpMetric value={recoverable.value} format={formatCompactINR} />
+          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px` }}>Receivable this quarter</Typography>
+          <CountUpMetric value={receivable.value} format={formatINRShort} />
           <Box
             sx={{
               mt: `${space.md}px`,
               display: 'inline-flex',
-              alignItems: 'center',
+              alignItems: 'baseline',
+              gap: `${space.sm}px`,
               border: hairline,
               px: `${space.sm}px`,
               py: '3px',
               fontSize: 13,
-              fontWeight: 600,
               color: colors.ink,
               ...tabularNums,
             }}
           >
-            {expiring.display} expires in {expiringDays} days
+            <Box component="span" sx={{ fontWeight: 600 }}>{formatINRShort(totalReceived)} received</Box>
+            <Box component="span" sx={{ color: colors.grey700 }}>· {formatPercent(pctReceivedOverall)}</Box>
           </Box>
           <Caption sx={{ mt: `${space.md}px` }}>
-            Money you can still claw back across all 5 channels this quarter.
+            What all 5 portals owed you this quarter.{' '}
+            <Box component="span" sx={{ fontWeight: 600, color: colors.ink, ...tabularNums }}>
+              {shortfall.display}
+            </Box>{' '}
+            is still short and under recovery.
           </Caption>
           <Button
             disableElevation
@@ -147,7 +151,7 @@ const Overview: React.FC = () => {
               '&:hover': { bgcolor: colors.inkHover },
             }}
           >
-            Review recovery pipeline →
+            Review what's still short →
           </Button>
         </Box>
 
@@ -220,7 +224,7 @@ const Overview: React.FC = () => {
           >
             <SectionTitle>Flagged by Nex</SectionTitle>
             <Caption sx={{ ...type.label, color: colors.grey500, ...tabularNums }}>
-              {issues.length} of {flaggedIssuesTotal} issues · sorted by recoverable value
+              {issues.length} of {flaggedIssuesTotal} issues · sorted by amount
             </Caption>
           </Box>
 
@@ -261,26 +265,32 @@ const Overview: React.FC = () => {
 
         {/* RIGHT — stacked */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${space.xl}px` }}>
-          {/* Leakage by channel */}
+          {/* Received by portal — how much of each portal's receivable landed
+             correctly. Bar fill = % received; the sliver left is what's short. */}
           <Box sx={cardSx}>
             <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: `${space.lg}px` }}>
-              <SectionTitle>Leakage by channel</SectionTitle>
+              <SectionTitle>Received by portal</SectionTitle>
               <Caption sx={{ ...type.label, color: colors.grey500, ...tabularNums }}>
-                {totalLeakage.display} Q1
+                {formatPercent(pctReceivedOverall)} received
               </Caption>
             </Box>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${space.lg}px` }}>
-              {channelPerformance.map((c) => (
+              {channelReceived.map((c) => (
                 <Box key={c.channel}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: `${space.xs}px` }}>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: `${space.xs}px` }}>
                     <ChannelTag name={c.channel} />
-                    <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, ...tabularNums }}>
-                      {formatCompactINR(c.leakage)}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: `${space.sm}px` }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, ...tabularNums }}>
+                        {formatCompactINR(c.received)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: colors.grey500, ...tabularNums }}>
+                        {formatPercent(c.pctReceived)}
+                      </Typography>
+                    </Box>
                   </Box>
                   {/* greyscale bar — NOT colour-coded */}
                   <Box sx={{ height: 6, bgcolor: colors.grey100 }}>
-                    <Box sx={{ height: '100%', width: `${(c.leakage / maxLeak) * 100}%`, bgcolor: colors.ink }} />
+                    <Box sx={{ height: '100%', width: `${c.pctReceived}%`, bgcolor: colors.ink }} />
                   </Box>
                 </Box>
               ))}

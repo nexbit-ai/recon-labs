@@ -23,6 +23,7 @@ if (import.meta.env.DEV) {
   expect('Σ channel settled = ₹14.2 Cr', sum(channelPerformance.map((c) => c.settled)), headlineByKey('settled').value);
   expect('Σ channel leakage = ₹38.6L', sum(channelPerformance.map((c) => c.leakage)), headlineByKey('leakage').value);
   expect('Σ channel recoverable = ₹22.4L', sum(channelPerformance.map((c) => c.recoverable)), headlineByKey('recoverable').value);
+  expect('Σ channel receivable = ₹14.59 Cr', sum(channelPerformance.map((c) => c.settled + c.leakage)), headlineByKey('receivable').value);
   expect('Σ expiring-soon disputes = ₹6.8L', sumAmount(expiringSoonDisputes), headlineByKey('expiring').value);
 
   // Each recon line's breakdown must explain the gap exactly (residual = ₹0).
