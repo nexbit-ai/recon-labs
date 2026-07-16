@@ -4071,7 +4071,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           <Tab label="Payment Due" value={1} />
                           <Tab label="Settled" value={0} />
                         </Tabs>
-                        {settledUnsettledTab === 0 && transactionsTab === 0 && (
+                        {settledUnsettledTab === 0 && transactionsTab === 1 && (
                           <Button
                             variant="outlined"
                             size="small"
@@ -4094,7 +4094,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             View Matched Transactions
                           </Button>
                         )}
-                        {settledUnsettledTab === 0 && transactionsTab === 1 && (
+                        {settledUnsettledTab === 0 && transactionsTab === 0 && (
                           <Button
                             variant="outlined"
                             size="small"
@@ -4214,7 +4214,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       )}
 
                       {/* Tab Content */}
-                      {settledUnsettledTab === 0 && transactionsTab === 0 && (
+                      {settledUnsettledTab === 0 && transactionsTab === 1 && (
                         <Box>
                           {/* Reconciled Transactions Summary */}
                           {(() => {
@@ -4817,7 +4817,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           })()}
                         </Box>
                       )}
-                      {settledUnsettledTab === 0 && transactionsTab === 1 && (
+                      {settledUnsettledTab === 0 && transactionsTab === 0 && (
                         <Box>
                           {/* Total Unreconciled Summary */}
                           <Box sx={{
