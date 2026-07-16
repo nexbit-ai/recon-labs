@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useLocation, useNavigate } from 'react-router-dom';
+import CloseIcon from '@mui/icons-material/Close';
 import {
   Box,
   Typography,
@@ -345,8 +346,10 @@ const MarketplaceReconciliation: React.FC = () => {
   const handleTransactionsTabChange = (_: any, value: number) => setTransactionsTab(value);
 
   // Settled/Unsettled main tab state
-  const [settledUnsettledTab, setSettledUnsettledTab] = useState<number>(0); // 0: settled, 1: unsettled
+  const [settledUnsettledTab, setSettledUnsettledTab] = useState<number>(1); // 0: settled, 1: unsettled
   const handleSettledUnsettledTabChange = (_: any, value: number) => setSettledUnsettledTab(value);
+
+  const [contractDialogOpen, setContractDialogOpen] = useState<boolean>(false);
 
   // Underline for first two transaction tabs (Matched + Mismatched)
   const tabsGroupRef = useRef<HTMLDivElement | null>(null);
@@ -4065,8 +4068,8 @@ const MarketplaceReconciliation: React.FC = () => {
                             }
                           }}
                         >
-                          <Tab label="Settled" />
-                          <Tab label="Unsettled" />
+                          <Tab label="Payment Due" value={1} />
+                          <Tab label="Settled" value={0} />
                         </Tabs>
                         {settledUnsettledTab === 0 && transactionsTab === 0 && (
                           <Button
@@ -4914,16 +4917,6 @@ const MarketplaceReconciliation: React.FC = () => {
                               {/* Tab Content for D2C */}
                               {unreconciledTab === 0 && (
                                 <Box>
-                                  <Typography variant="h6" sx={{
-                                    fontWeight: 600,
-                                    color: '#1f2937',
-                                    mb: 2,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 1
-                                  }}>
-                                    ✨ Unreconciled by Reasons
-                                  </Typography>
                                   {unreconciledReasons.length === 0 ? (
                                     <Box sx={{
                                       py: 4,
@@ -4938,38 +4931,108 @@ const MarketplaceReconciliation: React.FC = () => {
                                       </Typography>
                                     </Box>
                                   ) : (
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                      {unreconciledReasons.map((r, idx) => (
-                                        <Grow in key={`${r.reason}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
-                                          <Box sx={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            py: 2,
-                                            px: 3,
-                                            borderRadius: 2,
-                                            background: '#f9fafb',
-                                            border: '1px solid #f1f3f4',
-                                            transition: 'all 0.2s ease',
-                                            '&:hover': {
-                                              background: '#f3f4f6',
-                                              borderColor: '#e5e7eb'
-                                            }
-                                          }}>
-                                            <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
-                                              {r.reason}
-                                            </Typography>
-                                            <Box sx={{ textAlign: 'right' }}>
-                                              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
-                                                {r.count.toLocaleString('en-IN')}
-                                              </Typography>
-                                              <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
-                                                {formatCurrency(Math.abs(r.amount))}
-                                              </Typography>
-                                            </Box>
-                                          </Box>
-                                        </Grow>
-                                      ))}
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                      {/* Contract Breaches Group */}
+                                      <Box>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                                          <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#374151' }}>
+                                            Contract Breaches
+                                          </Typography>
+                                          <Button 
+                                            variant="outlined" 
+                                            size="small" 
+                                            onClick={() => setContractDialogOpen(true)}
+                                            sx={{ 
+                                              color: '#374151', 
+                                              borderColor: '#e5e7eb', 
+                                              textTransform: 'none', 
+                                              fontWeight: 600,
+                                              '&:hover': {
+                                                backgroundColor: '#f3f4f6',
+                                                borderColor: '#d1d5db'
+                                              }
+                                            }}
+                                          >
+                                            View Contract
+                                          </Button>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                          {[
+                                            { reason: 'Charging Fees on Pre-Fulfillment Cancellations', count: 191, amount: 233122.10 },
+                                            { reason: 'Incorrect Commission Tiering', count: 112, amount: 40071.28 }
+                                          ].map((r, idx) => (
+                                            <Grow in key={`contract-breach-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
+                                              <Box sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                py: 2,
+                                                px: 3,
+                                                borderRadius: 2,
+                                                background: '#f9fafb',
+                                                border: '1px solid #f1f3f4',
+                                                transition: 'all 0.2s ease',
+                                                '&:hover': {
+                                                  background: '#f3f4f6',
+                                                  borderColor: '#e5e7eb'
+                                                }
+                                              }}>
+                                                <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
+                                                  {r.reason}
+                                                </Typography>
+                                                <Box sx={{ textAlign: 'right' }}>
+                                                  <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
+                                                    {r.count.toLocaleString('en-IN')}
+                                                  </Typography>
+                                                  <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                                                    {formatCurrency(Math.abs(r.amount))}
+                                                  </Typography>
+                                                </Box>
+                                              </Box>
+                                            </Grow>
+                                          ))}
+                                        </Box>
+                                      </Box>
+
+                                      {/* Other Group */}
+                                      <Box>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#374151', mb: 1.5 }}>
+                                          Other
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                          {unreconciledReasons.map((r, idx) => (
+                                            <Grow in key={`${r.reason}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
+                                              <Box sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                py: 2,
+                                                px: 3,
+                                                borderRadius: 2,
+                                                background: '#f9fafb',
+                                                border: '1px solid #f1f3f4',
+                                                transition: 'all 0.2s ease',
+                                                '&:hover': {
+                                                  background: '#f3f4f6',
+                                                  borderColor: '#e5e7eb'
+                                                }
+                                              }}>
+                                                <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
+                                                  {r.reason}
+                                                </Typography>
+                                                <Box sx={{ textAlign: 'right' }}>
+                                                  <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
+                                                    {r.count.toLocaleString('en-IN')}
+                                                  </Typography>
+                                                  <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                                                    {formatCurrency(Math.abs(r.amount))}
+                                                  </Typography>
+                                                </Box>
+                                              </Box>
+                                            </Grow>
+                                          ))}
+                                        </Box>
+                                      </Box>
                                     </Box>
                                   )}
                                 </Box>
@@ -5311,16 +5374,6 @@ const MarketplaceReconciliation: React.FC = () => {
                             <>
                               {/* Direct Reasons Display for Flipkart/Amazon */}
                               <Box sx={{ mt: 4 }}>
-                                <Typography variant="h6" sx={{
-                                  fontWeight: 600,
-                                  color: '#1f2937',
-                                  mb: 2,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 1
-                                }}>
-                                  ✨ Unreconciled by Reasons
-                                </Typography>
                                 {unreconciledReasons.length === 0 ? (
                                   <Box sx={{
                                     py: 4,
@@ -5335,38 +5388,108 @@ const MarketplaceReconciliation: React.FC = () => {
                                     </Typography>
                                   </Box>
                                 ) : (
-                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                    {unreconciledReasons.map((r, idx) => (
-                                      <Grow in key={`${r.reason}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
-                                        <Box sx={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'space-between',
-                                          py: 2,
-                                          px: 3,
-                                          borderRadius: 2,
-                                          background: '#f9fafb',
-                                          border: '1px solid #f1f3f4',
-                                          transition: 'all 0.2s ease',
-                                          '&:hover': {
-                                            background: '#f3f4f6',
-                                            borderColor: '#e5e7eb'
-                                          }
-                                        }}>
-                                          <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
-                                            {r.reason}
-                                          </Typography>
-                                          <Box sx={{ textAlign: 'right' }}>
-                                            <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
-                                              {r.count.toLocaleString('en-IN')}
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
-                                              {formatCurrency(Math.abs(r.amount))}
-                                            </Typography>
-                                          </Box>
-                                        </Box>
-                                      </Grow>
-                                    ))}
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                    {/* Contract Breaches Group */}
+                                    <Box>
+                                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#374151' }}>
+                                          Contract Breaches
+                                        </Typography>
+                                        <Button 
+                                          variant="outlined" 
+                                          size="small" 
+                                          onClick={() => setContractDialogOpen(true)}
+                                          sx={{ 
+                                            color: '#374151', 
+                                            borderColor: '#e5e7eb', 
+                                            textTransform: 'none', 
+                                            fontWeight: 600,
+                                            '&:hover': {
+                                              backgroundColor: '#f3f4f6',
+                                              borderColor: '#d1d5db'
+                                            }
+                                          }}
+                                        >
+                                          View Contract
+                                        </Button>
+                                      </Box>
+                                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                        {[
+                                          { reason: 'Charging Fees on Pre-Fulfillment Cancellations', count: 191, amount: 233122.10 },
+                                          { reason: 'Incorrect Commission Tiering', count: 112, amount: 40071.28 }
+                                        ].map((r, idx) => (
+                                          <Grow in key={`contract-breach-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
+                                            <Box sx={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'space-between',
+                                              py: 2,
+                                              px: 3,
+                                              borderRadius: 2,
+                                              background: '#f9fafb',
+                                              border: '1px solid #f1f3f4',
+                                              transition: 'all 0.2s ease',
+                                              '&:hover': {
+                                                background: '#f3f4f6',
+                                                borderColor: '#e5e7eb'
+                                              }
+                                            }}>
+                                              <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
+                                                {r.reason}
+                                              </Typography>
+                                              <Box sx={{ textAlign: 'right' }}>
+                                                <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
+                                                  {r.count.toLocaleString('en-IN')}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                                                  {formatCurrency(Math.abs(r.amount))}
+                                                </Typography>
+                                              </Box>
+                                            </Box>
+                                          </Grow>
+                                        ))}
+                                      </Box>
+                                    </Box>
+
+                                    {/* Other Group */}
+                                    <Box>
+                                      <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#374151', mb: 1.5 }}>
+                                        Other
+                                      </Typography>
+                                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                        {unreconciledReasons.map((r, idx) => (
+                                          <Grow in key={`${r.reason}-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
+                                            <Box sx={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'space-between',
+                                              py: 2,
+                                              px: 3,
+                                              borderRadius: 2,
+                                              background: '#f9fafb',
+                                              border: '1px solid #f1f3f4',
+                                              transition: 'all 0.2s ease',
+                                              '&:hover': {
+                                                background: '#f3f4f6',
+                                                borderColor: '#e5e7eb'
+                                              }
+                                            }}>
+                                              <Typography variant="body1" sx={{ fontWeight: 600, color: '#111827', fontSize: '1.1rem' }}>
+                                                {r.reason}
+                                              </Typography>
+                                              <Box sx={{ textAlign: 'right' }}>
+                                                <Typography variant="body1" sx={{ fontWeight: 700, color: '#1f2937', fontSize: '1.1rem' }}>
+                                                  {r.count.toLocaleString('en-IN')}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                                                  {formatCurrency(Math.abs(r.amount))}
+                                                </Typography>
+                                              </Box>
+                                            </Box>
+                                          </Grow>
+                                        ))}
+                                      </Box>
+                                    </Box>
                                   </Box>
                                 )}
                               </Box>
@@ -7251,6 +7374,123 @@ const MarketplaceReconciliation: React.FC = () => {
       </Box>
 
       {/* Sync modal removed; animation shown on the button icon itself */}
+
+      {/* Flipkart Contract Details Dialog */}
+      <Dialog 
+        open={contractDialogOpen} 
+        onClose={() => setContractDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          pb: 2,
+          borderBottom: '1px solid #e5e7eb'
+        }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#111827' }}>
+            Flipkart Seller Contract & Standard Charges
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Button
+              variant="contained"
+              size="small"
+              sx={{
+                bgcolor: '#111827',
+                color: '#fff',
+                textTransform: 'none',
+                fontWeight: 600,
+                boxShadow: 'none',
+                '&:hover': {
+                  bgcolor: '#374151',
+                  boxShadow: 'none',
+                }
+              }}
+            >
+              Upload
+            </Button>
+            <IconButton onClick={() => setContractDialogOpen(false)} size="small">
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {/* Section 1: Standard Charges */}
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#111827', mb: 2 }}>
+                1. Standard Fee Structure
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>Commission Fee</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    Percentage of order item value based on category (varies from 2% to 25%+). Misclassification can lead to incorrect tiering charges.
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>Shipping (Forward & Reverse)</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    Calculated based on product volumetric weight and shipping location (Local, Zonal, National). Volumetric anomalies are a common source of excess deductions.
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>Collection / Payment Gateway Fee</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    A small percentage fee (or flat rate) charged on all prepaid and postpaid transactions for payment processing.
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>Fixed Fee</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    A flat fee charged per order, tiered based on the order item value (e.g., ₹5 to ₹25+ per item).
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            {/* Section 2: Penalty & Breach Conditions */}
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#111827', mb: 2 }}>
+                2. Key Contract Breaches & Penalties
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box sx={{ p: 2, bgcolor: 'rgba(122, 93, 191, 0.05)', borderRadius: '8px', border: '1px solid rgba(122, 93, 191, 0.2)' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#7A5DBF', mb: 0.5 }}>Pre-Fulfillment Cancellations</Typography>
+                  <Typography variant="body2" sx={{ color: '#4b5563' }}>
+                    Seller-initiated cancellations (due to out-of-stock) incur direct financial penalties and negative account health metrics. Occasionally, fees are erroneously charged on these cancelled orders.
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>SLA / RTD Breaches</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    Failure to mark orders "Ready to Dispatch" (RTD) on time results in delayed payouts or penalty holds.
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>Customer Returns (RTO/RVP)</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    Sellers often bear return shipping charges. For damaged/swapped goods, sellers must claim via Seller Protection Fund (SPF), which has a strict window (often 7 days).
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            <Box sx={{ mt: 2, p: 2, bgcolor: '#f3f4f6', borderRadius: '8px' }}>
+              <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                *Disclaimer: Flipkart acts as an intermediary. Terms are subject to change based on the official Flipkart Seller Agreement and Rate Cards.
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
 
       {/* TransactionSheet Overlay */}
       <Drawer
