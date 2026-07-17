@@ -220,7 +220,7 @@ import { useOrganization } from '../hooks/useOrganization';
 import { useReconciliationStatus, formatReconciliationTimestamp } from '../hooks/useReconciliationStatus';
 
 const MarketplaceReconciliation: React.FC = () => {
-  const { setMemberName } = useUser();
+  const { setMemberName, selectedOrganization } = useUser();
   const { hasValidCredentials, isInitialized } = useOrganization();
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
   const [syncTriggered, setSyncTriggered] = useState(() => {
@@ -250,7 +250,35 @@ const MarketplaceReconciliation: React.FC = () => {
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
   const [reconciliationData, setReconciliationData] = useState<MarketplaceReconciliationResponse>(mockReconciliationData);
-  const [mainSummary, setMainSummary] = useState<MainSummaryResponse | null>(null);
+  const [mainSummaryRaw, setMainSummaryRaw] = useState<MainSummaryResponse | null>(null);
+  const mainSummary = useMemo(() => {
+    if (!mainSummaryRaw) return null;
+    if (selectedOrganization !== 'ALL') return mainSummaryRaw;
+    
+    // multiply specific summary numbers for the demo to simulate combined data
+    const clone = JSON.parse(JSON.stringify(mainSummaryRaw));
+    const factor = 4.2; 
+    if (clone.summary) {
+      const keysToMultiply = [
+        'total_transactions_amount', 'total_transaction_orders',
+        'total_return_amount', 'total_return_orders',
+        'total_cancellations_amount', 'total_cancellations_orders',
+        'net_sales_amount', 'net_sales_orders',
+        'total_reconciled_amount', 'total_reconciled_count',
+        'total_unreconciled_amount', 'total_unreconciled_count',
+        'total_manually_reconciled_or_disputed_count',
+        'total_manually_reconciled_or_disputed_amount',
+        'prev_return_or_cancelled_amount', 'prev_return_or_cancelled_orders'
+      ];
+      
+      keysToMultiply.forEach(key => {
+        if (clone.summary[key] !== undefined) {
+           clone.summary[key] = Math.round(Number(clone.summary[key]) * factor);
+        }
+      });
+    }
+    return clone as MainSummaryResponse;
+  }, [mainSummaryRaw, selectedOrganization]);
   const [reconciliationStatus, setReconciliationStatus] = useState<ReconciliationStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -350,6 +378,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const handleSettledUnsettledTabChange = (_: any, value: number) => setSettledUnsettledTab(value);
 
   const [contractDialogOpen, setContractDialogOpen] = useState<boolean>(false);
+  const [amazonContractDialogOpen, setAmazonContractDialogOpen] = useState<boolean>(false);
 
   // Underline for first two transaction tabs (Matched + Mismatched)
   const tabsGroupRef = useRef<HTMLDivElement | null>(null);
@@ -1071,7 +1100,7 @@ const MarketplaceReconciliation: React.FC = () => {
         const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
         // ms is ApiResponse<any>; data is payload
         const payload = (ms as any).data as MainSummaryResponse;
-        setMainSummary(payload);
+        setMainSummaryRaw(payload);
         // Update reasons from UnReconcile for UI where needed
         if (payload?.UnReconcile?.reasons?.length) {
           setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count, amount: r.amount || 0 })));
@@ -1107,7 +1136,7 @@ const MarketplaceReconciliation: React.FC = () => {
         };
         const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
         const payload = (ms as any).data as MainSummaryResponse;
-        setMainSummary(payload);
+        setMainSummaryRaw(payload);
         if (payload?.UnReconcile?.reasons?.length) {
           setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count, amount: r.amount || 0 })));
         }
@@ -1766,7 +1795,7 @@ const MarketplaceReconciliation: React.FC = () => {
     const qcData = buildQuickCommerceDemoData(qcModel);
     setReconciliationData(qcData);
 
-    setMainSummary({
+    setMainSummaryRaw({
       summary: {
         total_transactions_amount: Number(qcData.grossSales),
         total_transaction_orders: qcData.ordersDelivered?.number || 0,
@@ -5339,7 +5368,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                       All Good! No unreconciled transactions by reasons.
                                     </Typography>
                                   </Box>
-                                ) : selectedPlatform === 'flipkart' ? (
+                                ) : selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' ? (
                                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                                     {/* Contract Breaches Group */}
                                     <Box>
@@ -5350,7 +5379,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                         <Button 
                                           variant="outlined" 
                                           size="small" 
-                                          onClick={() => setContractDialogOpen(true)}
+                                          onClick={() => selectedPlatform === 'amazon' ? setAmazonContractDialogOpen(true) : setContractDialogOpen(true)}
                                           sx={{ 
                                             color: '#374151', 
                                             borderColor: '#e5e7eb', 
@@ -5366,10 +5395,13 @@ const MarketplaceReconciliation: React.FC = () => {
                                         </Button>
                                       </Box>
                                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                        {[
+                                        {(selectedPlatform === 'amazon' ? [
+                                          { reason: 'FBA Weight Handling Discrepancy', count: 145, amount: 154320.50 },
+                                          { reason: 'Incorrect Referral Fee Tier', count: 89, amount: 32050.00 }
+                                        ] : [
                                           { reason: 'Charging Fees on Pre-Fulfillment Cancellations', count: 191, amount: 233122.10 },
                                           { reason: 'Incorrect Commission Tiering', count: 112, amount: 40071.28 }
-                                        ].map((r, idx) => (
+                                        ]).map((r, idx) => (
                                           <Grow in key={`contract-breach-${idx}`} timeout={350} style={{ transitionDelay: `${idx * 200}ms` }}>
                                             <Box sx={{
                                               display: 'flex',
@@ -5490,6 +5522,72 @@ const MarketplaceReconciliation: React.FC = () => {
             </Card>
           </Grid>
         </Grid>
+
+        {/* All Organizations Performance Card */}
+        {selectedOrganization === 'ALL' && (
+          <Card sx={{
+            mb: 6,
+            background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+            borderRadius: '16px',
+            border: '1px solid #f1f3f4',
+            boxShadow: 'none',
+            overflow: 'hidden',
+          }}>
+            <CardContent sx={{ p: 4 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#111827' }}>
+                  Leakage by brand
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                  Myntra • Amazon • Flipkart • D2C
+                </Typography>
+              </Box>
+              
+              <Box sx={{ width: '100%', overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      <th style={{ padding: '12px 16px', color: '#6b7280', fontWeight: 600, fontSize: '0.875rem' }}>Brand</th>
+                      <th style={{ padding: '12px 16px', color: '#6b7280', fontWeight: 600, fontSize: '0.875rem' }}>Total Received</th>
+                      <th style={{ padding: '12px 16px', color: '#6b7280', fontWeight: 600, fontSize: '0.875rem' }}>Total Pending</th>
+                      <th style={{ padding: '12px 16px', color: '#6b7280', fontWeight: 600, fontSize: '0.875rem' }}>Recoverable</th>
+                      <th style={{ padding: '12px 16px', color: '#6b7280', fontWeight: 600, fontSize: '0.875rem', textAlign: 'right' }}>% of GMV</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { brand: 'ACME', received: '₹142.5 L', pending: '₹22.1 L', recoverable: '₹94 L', gmv: '2.1%', color: '#991b1b', bg: '#fee2e2' },
+                      { brand: 'Warby Parker', received: '₹95.2 L', pending: '₹18.4 L', recoverable: '₹61 L', gmv: '1.6%', color: '#9a3412', bg: '#ffedd5' },
+                      { brand: 'Glossier', received: '₹71.8 L', pending: '₹12.6 L', recoverable: '₹48 L', gmv: '1.3%', color: '#92400e', bg: '#fef3c7' },
+                      { brand: 'Casper', received: '₹34.4 L', pending: '₹5.2 L', recoverable: '₹22 L', gmv: '0.7%', color: '#166534', bg: '#dcfce7' }
+                    ].map((row, idx) => (
+                      <tr key={idx} style={{ borderBottom: idx === 3 ? 'none' : '1px solid #f3f4f6' }}>
+                        <td style={{ padding: '16px', fontWeight: 600, color: '#111827', fontSize: '0.95rem' }}>{row.brand}</td>
+                        <td style={{ padding: '16px', color: '#374151', fontSize: '0.95rem' }}>{row.received}</td>
+                        <td style={{ padding: '16px', color: '#374151', fontSize: '0.95rem' }}>{row.pending}</td>
+                        <td style={{ padding: '16px', color: '#374151', fontWeight: 600, fontSize: '0.95rem' }}>{row.recoverable}</td>
+                        <td style={{ padding: '16px', textAlign: 'right' }}>
+                          <Box sx={{ 
+                            display: 'inline-block', 
+                            px: 1.5, 
+                            py: 0.5, 
+                            borderRadius: '6px', 
+                            bgcolor: row.bg, 
+                            color: row.color, 
+                            fontWeight: 700, 
+                            fontSize: '0.85rem' 
+                          }}>
+                            {row.gmv}
+                          </Box>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Box>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Commission & Charges Summary (replaces Settlement/Unsettled section) */}
         {!isQC && (
@@ -5776,6 +5874,7 @@ const MarketplaceReconciliation: React.FC = () => {
           </CardContent>
         </Card>
         )}
+
 
         {/* Party Composition Section - Only for D2C */}
         {selectedPlatform === 'd2c' && (() => {
@@ -7477,6 +7576,124 @@ const MarketplaceReconciliation: React.FC = () => {
           </Box>
         </DialogContent>
       </Dialog>
+
+      {/* Amazon Contract Details Dialog */}
+      <Dialog 
+        open={amazonContractDialogOpen} 
+        onClose={() => setAmazonContractDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          pb: 2,
+          borderBottom: '1px solid #e5e7eb'
+        }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#111827' }}>
+            Amazon Seller Contract & Standard Charges
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Button
+              variant="contained"
+              size="small"
+              sx={{
+                bgcolor: '#111827',
+                color: '#fff',
+                textTransform: 'none',
+                fontWeight: 600,
+                boxShadow: 'none',
+                '&:hover': {
+                  bgcolor: '#374151',
+                  boxShadow: 'none',
+                }
+              }}
+            >
+              Upload
+            </Button>
+            <IconButton onClick={() => setAmazonContractDialogOpen(false)} size="small">
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {/* Section 1: Standard Charges */}
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#111827', mb: 2 }}>
+                1. Standard Fee Structure
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>Referral Fee</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    Percentage of the total sales price (including shipping) based on the product category (typically 2% to 15%+).
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>Closing Fee</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    A flat fee charged per item sold, tiered based on the price range of the item (e.g., ₹5 to ₹25+).
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>Weight Handling Fee (FBA & Easy Ship)</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    Shipping fees based on the item's volumetric/actual weight and delivery distance (Local, Regional, National). Discrepancies here are a major source of seller disputes.
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>Storage & Pick-and-Pack Fees (FBA)</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    Monthly storage fees based on average daily volume, and a per-unit fee for order fulfillment processing.
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            {/* Section 2: Penalty & Breach Conditions */}
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#111827', mb: 2 }}>
+                2. Key Contract Breaches & Penalties
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box sx={{ p: 2, bgcolor: 'rgba(239, 146, 65, 0.05)', borderRadius: '8px', border: '1px solid rgba(239, 146, 65, 0.2)' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#EF9241', mb: 0.5 }}>Refund Administration Fee</Typography>
+                  <Typography variant="body2" sx={{ color: '#4b5563' }}>
+                    For customer refunds, Amazon retains 20% of the original referral fee, up to a maximum amount (e.g., ₹300), rather than returning the full fee to the seller.
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>Performance Metrics (LDR / Pre-Fulfillment Cancellation)</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    Sellers must maintain a Late Dispatch Rate under 4% and a Pre-Fulfillment Cancellation Rate under 2.5%. Violations may result in Buy Box suppression or account suspension.
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', mb: 0.5 }}>FBA Removal/Disposal Fees</Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    Returning unsold or damaged inventory from Amazon fulfillment centers incurs per-unit removal or disposal fees.
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            <Box sx={{ mt: 2, p: 2, bgcolor: '#f3f4f6', borderRadius: '8px' }}>
+              <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
+                *Disclaimer: Amazon acts as a facilitator. Specific terms may vary based on your official Amazon Seller Services Agreement and rate cards.
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
+
 
       {/* TransactionSheet Overlay */}
       <Drawer

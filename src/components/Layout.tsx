@@ -172,6 +172,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             },
           }}
         >
+          <MenuItem value="ALL" sx={{ fontSize: '0.75rem', fontWeight: 500 }}>ALL</MenuItem>
           <MenuItem value="ACME" sx={{ fontSize: '0.75rem', fontWeight: 500 }}>ACME</MenuItem>
           <MenuItem value="Warby Parker" sx={{ fontSize: '0.75rem', fontWeight: 500 }}>Warby Parker</MenuItem>
           <MenuItem value="Glossier" sx={{ fontSize: '0.75rem', fontWeight: 500 }}>Glossier</MenuItem>
