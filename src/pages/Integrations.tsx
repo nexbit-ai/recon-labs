@@ -46,6 +46,8 @@ const categories: IntegrationCategory[] = [
       { id: 'myntra', name: 'Myntra', domain: 'myntra.com', status: 'available' },
       { id: 'nykaa', name: 'Nykaa', domain: 'nykaa.com', status: 'available' },
       { id: 'supertails', name: 'Supertails', domain: 'supertails.com', status: 'available' },
+      { id: '6thstreet', name: '6th Street', domain: '6thstreet.com', status: 'available' },
+      { id: 'namshi', name: 'Namshi', domain: 'namshi.com', status: 'available' },
     ]
   },
   {
