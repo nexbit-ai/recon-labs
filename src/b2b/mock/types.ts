@@ -1,7 +1,7 @@
 // Shared types for the B2B (Nexbit) mock-data layer.
 // Frontend-only fixtures — no backend, no fetch. All amounts in whole rupees.
 
-export type ChannelName = 'Amazon' | 'Flipkart' | 'Blinkit' | 'Zepto' | 'Instamart';
+export type ChannelName = 'Amazon' | 'Flipkart' | 'Blinkit' | 'Zepto' | 'Instamart' | 'Offline Stores';
 
 export interface Channel {
   name: ChannelName;
@@ -37,7 +37,7 @@ export interface ChannelPerformance {
   recoverable: number; // rupees recoverable now
 }
 
-export type IssueType = 'Contract breach' | 'Short payment' | 'Overcharge' | 'Rate variance' | 'Duplicate';
+export type IssueType = 'Contract breach' | 'Short payment' | 'Overcharge' | 'Rate variance' | 'Duplicate' | 'Overdue' | 'Pending' | 'Partial Pay' | 'In Term';
 export type Confidence = 'High' | 'Med' | 'Low';
 
 export interface FlaggedIssue {
@@ -74,6 +74,17 @@ export interface ReconLineItem {
   matchNote: string;
   /** Always three parts: Quantity, Deduction, Tax / TCS. Σ(amount) = paid - expected. */
   varianceBreakdown: VariancePart[];
+}
+
+export interface ReconPurchaseOrder {
+  id: string; // e.g., 'PO-ZEP-1049'
+  channel: ChannelName;
+  date: string;
+  expected: number; // Sum of expected across line items
+  paid: number; // Sum of paid across line items
+  variance: number; // expected - paid
+  status: ReconStatus;
+  lineItems: ReconLineItem[];
 }
 
 export type DisputeStatus = 'Drafted' | 'Filed' | 'In review' | 'Recovered';

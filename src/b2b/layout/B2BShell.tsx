@@ -1,7 +1,7 @@
 // B2B (Nexbit) shell: left sidebar + top bar + content canvas (via <Outlet/>).
 // Square surfaces, hairline borders, no shadows. Accent only for active nav,
 // the primary CTA-adjacent live-sync signal, and recovered amounts (in views).
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Box, Button, Typography } from '@mui/material';
 import { FileUploadOutlined, ExtensionOutlined } from '@mui/icons-material';
@@ -67,10 +67,12 @@ const Pill: React.FC<{ children: React.ReactNode; dot?: boolean }> = ({ children
 const B2BShell: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [uploadOpen, setUploadOpen] = React.useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [platformFilter, setPlatformFilter] = useState('all');
 
   const active =
     SECTIONS.find((s) => location.pathname.startsWith(`/b2b/${s.path}`)) ?? SECTIONS[0];
+  const isIntegrationsPage = location.pathname.includes('/integrations');
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: colors.paper, color: colors.ink }}>
@@ -122,12 +124,13 @@ const B2BShell: React.FC = () => {
             startIcon={<FileUploadOutlined sx={{ fontSize: 20 }} />}
             sx={{
               borderRadius: 0,
-              bgcolor: colors.ink,
-              color: colors.paper,
+              bgcolor: colors.paper,
+              color: colors.ink,
+              border: hairline,
               fontSize: 13,
               fontWeight: 600,
               py: `${space.md}px`,
-              '&:hover': { bgcolor: colors.inkHover },
+              '&:hover': { bgcolor: colors.grey100 },
             }}
           >
             Upload
@@ -150,57 +153,77 @@ const B2BShell: React.FC = () => {
           >
             Integrations
           </Button>
-          <Box sx={{ border: hairline, p: `${space.md}px` }}>
-            <Typography sx={{ ...type.label, color: colors.grey500, display: 'block' }}>Workspace</Typography>
-            <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, mt: '2px' }}>
-              {workspace.channelsConnectedLabel}
-            </Typography>
-          </Box>
+
         </Box>
       </Box>
 
       {/* ── MAIN ────────────────────────────────────────────────── */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Top bar */}
-        <Box
-          sx={{
-            height: shell.topBarHeight,
-            flexShrink: 0,
-            borderBottom: hairline,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: `${space.lg}px`,
-            px: `${shell.canvasPaddingX}px`,
-            position: 'sticky',
-            top: 0,
-            bgcolor: colors.paper,
-            zIndex: 1,
-          }}
-        >
-          <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ ...type.label, color: colors.grey500, display: 'block' }}>
-              {active.label}
-            </Typography>
-            <Typography
-              sx={{
-                fontSize: 14,
-                fontWeight: 600,
-                lineHeight: '18px',
-                color: colors.ink,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {active.title}
-            </Typography>
+        {!isIntegrationsPage && (
+          <Box
+            sx={{
+              height: shell.topBarHeight,
+              flexShrink: 0,
+              borderBottom: hairline,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: `${space.lg}px`,
+              px: `${shell.canvasPaddingX}px`,
+              position: 'sticky',
+              top: 0,
+              bgcolor: colors.paper,
+              zIndex: 1,
+            }}
+          >
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ ...type.label, color: colors.grey500, display: 'block' }}>
+                {active.label}
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  lineHeight: '18px',
+                  color: colors.ink,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {active.title}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px`, flexShrink: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px` }}>
+                <Typography sx={{ ...type.label, color: colors.grey700 }}>PLATFORM:</Typography>
+                <select 
+                  value={platformFilter} 
+                  onChange={(e) => setPlatformFilter(e.target.value)}
+                  style={{
+                    padding: '6px 12px',
+                    border: hairline,
+                    backgroundColor: colors.paper,
+                    color: colors.ink,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  <option value="all">All Channels</option>
+                  <option value="blinkit">Blinkit</option>
+                  <option value="zepto">Zepto</option>
+                  <option value="entitya">Entity A</option>
+                  <option value="entityb">Entity B</option>
+                </select>
+              </Box>
+              <Pill>{fiscalPeriod.pill}</Pill>
+            </Box>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px`, flexShrink: 0 }}>
-            <Pill>{fiscalPeriod.pill}</Pill>
-            <Pill dot>Live sync</Pill>
-          </Box>
-        </Box>
+        )}
 
         {/* Content canvas */}
         <Box sx={{ flex: 1, overflowY: 'auto' }}>
@@ -213,7 +236,7 @@ const B2BShell: React.FC = () => {
               pb: `${space.xxxl}px`,
             }}
           >
-            <Outlet />
+            <Outlet context={{ platformFilter }} />
           </Box>
         </Box>
       </Box>

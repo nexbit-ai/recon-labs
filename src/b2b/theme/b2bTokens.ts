@@ -66,7 +66,7 @@ export const space = {
 
 // ── SHELL DIMENSIONS ────────────────────────────────────────────────────────
 export const shell = {
-  sidebarWidth: 240,
+  sidebarWidth: 200,
   topBarHeight: 56,
   canvasMaxWidth: 1280,
   canvasPaddingX: 32,

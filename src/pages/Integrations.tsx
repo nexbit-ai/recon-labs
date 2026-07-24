@@ -1,20 +1,8 @@
 import React, { useState } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Paper, 
-  Grid, 
-  Breadcrumbs, 
-  Link, 
-  Chip,
-  Avatar
-} from '@mui/material';
-import { 
-  NavigateNext as NavigateNextIcon,
-  Home as HomeIcon,
-  ExtensionOutlined as ExtensionIcon
-} from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { Box, Typography, Grid } from '@mui/material';
+import { ExtensionOutlined as ExtensionIcon } from '@mui/icons-material';
+import { colors, hairline, type, space } from '../b2b/theme/b2bTokens';
+import { cardSx as cardBase, SectionTitle } from '../b2b/components/primitives';
 
 interface IntegrationItem {
   id: string;
@@ -94,7 +82,7 @@ const LogoImage: React.FC<{ domain: string; name: string }> = ({ domain, name })
   const googleUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
 
   if (error) {
-    return <ExtensionIcon sx={{ fontSize: 20, color: '#64748b' }} />;
+    return <ExtensionIcon sx={{ fontSize: 24, color: colors.grey500 }} />;
   }
 
   return (
@@ -113,78 +101,68 @@ const LogoImage: React.FC<{ domain: string; name: string }> = ({ domain, name })
         width: '100%',
         height: '100%',
         objectFit: 'contain',
-        padding: '4px'
       }}
     />
   );
 };
 
-const Integrations: React.FC = () => {
-  const navigate = useNavigate();
-
+// Square hairline-bordered label for status
+const StatusChip: React.FC<{ status: 'connected' | 'available' }> = ({ status }) => {
+  const isConnected = status === 'connected';
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: 'auto' }}>
-      {/* Breadcrumbs */}
-      <Breadcrumbs 
-        separator={<NavigateNextIcon fontSize="small" />} 
-        aria-label="breadcrumb"
-        sx={{ mb: 2 }}
-      >
-        <Link
-          underline="hover"
-          color="inherit"
-          href="#"
-          onClick={(e) => { e.preventDefault(); navigate('/marketplace-reconciliation'); }}
-          sx={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}
-        >
-          <HomeIcon sx={{ mr: 0.5, fontSize: '16px' }} />
-          Home
-        </Link>
-        <Typography color="text.primary" sx={{ fontSize: '12px', fontWeight: 500 }}>
-          Integrations
-        </Typography>
-      </Breadcrumbs>
+    <Box
+      component="span"
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        border: hairline,
+        color: isConnected ? colors.accent : colors.grey700,
+        borderColor: isConnected ? colors.accent : colors.grey200,
+        px: `${space.sm}px`,
+        py: '2px',
+        fontSize: 11,
+        fontWeight: 500,
+        letterSpacing: '0.04em',
+        textTransform: 'uppercase',
+      }}
+    >
+      {status}
+    </Box>
+  );
+};
 
-      <Typography variant="h2" sx={{ mb: 4, fontWeight: 800 }}>
-        Integrations
-      </Typography>
-
+const Integrations: React.FC = () => {
+  return (
+    <Box sx={{ width: '100%' }}>
       {categories.map((category) => (
-        <Box key={category.title} sx={{ mb: 6 }}>
-          <Typography variant="h3" sx={{ fontWeight: 700, mb: 3 }}>
-            {category.title}
-          </Typography>
+        <Box key={category.title} sx={{ mb: `${space.xxl}px` }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: `${space.lg}px`, borderBottom: hairline, pb: `${space.md}px` }}>
+            <SectionTitle>{category.title}</SectionTitle>
+          </Box>
 
           <Grid container spacing={3}>
             {category.items.map((item) => (
               <Grid item xs={12} sm={6} md={3} key={item.id}>
-                <Paper
+                <Box
                   sx={{
-                    p: 3,
+                    ...cardBase,
+                    p: `${space.xl}px`,
                     height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'flex-start',
                     cursor: 'pointer',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    transition: 'all 0.2s ease-in-out',
-                    border: '1.5px solid #e5e7eb',
+                    transition: 'border-color 0.15s ease-out',
                     '&:hover': {
-                      borderColor: '#111',
-                      boxShadow: '0 8px 16px rgba(0,0,0,0.05)',
-                      transform: 'translateY(-2px)',
+                      borderColor: colors.ink,
                     }
                   }}
                 >
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', mb: `${space.xl}px` }}>
                     <Box
                       sx={{ 
-                        width: 40, 
-                        height: 40, 
-                        borderRadius: '10px', 
-                        backgroundColor: '#f8fafc',
-                        border: '1px solid #f1f5f9',
+                        width: 48, 
+                        height: 48, 
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -193,25 +171,13 @@ const Integrations: React.FC = () => {
                     >
                       <LogoImage domain={item.domain} name={item.name} />
                     </Box>
-                    <Chip 
-                      label={item.status} 
-                      size="small"
-                      sx={{ 
-                        fontSize: '10px', 
-                        height: 20,
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        backgroundColor: item.status === 'connected' ? '#f0fdf4' : '#eff6ff',
-                        color: item.status === 'connected' ? '#16a34a' : '#2563eb',
-                        border: 'none'
-                      }}
-                    />
+                    <StatusChip status={item.status} />
                   </Box>
                   
-                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  <Typography sx={{ fontSize: type.sectionTitle.fontSize, fontWeight: type.sectionTitle.fontWeight, color: colors.ink }}>
                     {item.name}
                   </Typography>
-                </Paper>
+                </Box>
               </Grid>
             ))}
           </Grid>

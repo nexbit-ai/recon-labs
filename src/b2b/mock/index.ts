@@ -8,7 +8,7 @@ export * from './rateCard';
 export * from './contracts';
 export * from './askNex';
 
-import { headlineByKey, channelPerformance, reconLineItems } from './settlements';
+import { headlineByKey, channelPerformance, reconLineItems, reconPurchaseOrders } from './settlements';
 import { expiringSoonDisputes, sumAmount } from './receivables';
 
 // ── Dev-only cross-foot checks (stripped from production build) ──────────────
@@ -30,5 +30,14 @@ if (import.meta.env.DEV) {
     const residual = li.paid - li.expected - sum(li.varianceBreakdown.map((v) => v.amount));
     expect(`recon ${li.id} residual = ₹0`, residual, 0);
     expect(`recon ${li.id} variance = expected - paid`, li.variance, li.expected - li.paid);
+  });
+
+  // Verify Purchase Orders
+  reconPurchaseOrders.forEach((po) => {
+    const expected = sum(po.lineItems.map(li => li.expected));
+    const paid = sum(po.lineItems.map(li => li.paid));
+    expect(`po ${po.id} expected = sum(lineItems)`, po.expected, expected);
+    expect(`po ${po.id} paid = sum(lineItems)`, po.paid, paid);
+    expect(`po ${po.id} variance = expected - paid`, po.variance, po.expected - po.paid);
   });
 }

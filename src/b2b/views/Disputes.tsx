@@ -103,7 +103,6 @@ const Disputes: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
     >
-      <PageTitle>Disputes</PageTitle>
 
       {/* ── AGENT BANNER (ink hero card) ─────────────────────── */}
       <Box
@@ -120,21 +119,6 @@ const Disputes: React.FC = () => {
         }}
       >
         <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Box
-            component="span"
-            sx={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              border: `1px solid ${INK_HAIRLINE}`,
-              color: INK_SUB,
-              ...type.label,
-              px: `${space.sm}px`,
-              py: '3px',
-              mb: `${space.lg}px`,
-            }}
-          >
-            Agent ready
-          </Box>
 
           <AnimatePresence mode="wait" initial={false}>
             <Box
@@ -149,11 +133,6 @@ const Disputes: React.FC = () => {
                 {filed
                   ? `${disputePipeline.drafted} disputes filed`
                   : `${disputePipeline.drafted} disputes drafted, worth ${recoverable.display}`}
-              </Typography>
-              <Typography sx={{ mt: `${space.sm}px`, fontSize: type.body.fontSize, color: INK_SUB, maxWidth: 560 }}>
-                {filed
-                  ? 'Nex will track each ticket and re-file before any window lapses.'
-                  : "Nex wrote each claim in the platform's format with evidence attached. File in one click."}
               </Typography>
             </Box>
           </AnimatePresence>
@@ -246,91 +225,91 @@ const Disputes: React.FC = () => {
 
       {/* ── HIGH-VALUE CLAIMS TABLE (scrolls horizontally on narrow viewports) ── */}
       <Box sx={{ ...cardSx, overflowX: 'auto' }}>
-       <Box sx={{ minWidth: 760 }}>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: GRID,
-            alignItems: 'center',
-            gap: `${space.lg}px`,
-            px: `${space.xl}px`,
-            py: `${space.md}px`,
-            bgcolor: colors.grey100,
-            borderBottom: hairline,
-          }}
-        >
-          {(['ID', 'Channel', 'Reason', 'Amount', 'Status', ''] as const).map((h, i) => (
-            <ColumnLabel key={i} align={i === 3 ? 'right' : 'left'}>
-              {h}
-            </ColumnLabel>
-          ))}
-        </Box>
+        <Box sx={{ minWidth: 760 }}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: GRID,
+              alignItems: 'center',
+              gap: `${space.lg}px`,
+              px: `${space.xl}px`,
+              py: `${space.md}px`,
+              bgcolor: colors.grey100,
+              borderBottom: hairline,
+            }}
+          >
+            {(['ID', 'Channel', 'Reason', 'Amount', 'Status', ''] as const).map((h, i) => (
+              <ColumnLabel key={i} align={i === 3 ? 'right' : 'left'}>
+                {h}
+              </ColumnLabel>
+            ))}
+          </Box>
 
-        {rows.map((d, idx) => {
-          const status = displayStatus(d);
-          const recovered = status === 'Recovered';
-          const urgency: 'Urgent' | 'On track' | 'Closed' = recovered ? 'Closed' : d.urgent ? 'Urgent' : 'On track';
-          return (
-            <Box
-              key={d.id}
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: GRID,
-                alignItems: 'center',
-                gap: `${space.lg}px`,
-                px: `${space.xl}px`,
-                minHeight: 56,
-                py: `${space.md}px`,
-                borderBottom: idx < rows.length - 1 ? hairline : 'none',
-                transition: 'background-color 0.12s ease',
-                '&:hover': { bgcolor: colors.grey100 },
-              }}
-            >
-              <Typography sx={{ fontFamily: MONO, fontSize: 12.5, color: colors.grey700, ...tabularNums }}>
-                {d.id}
-              </Typography>
-              <ChannelTag name={d.channel} />
-              <Typography
-                sx={{ fontSize: type.body.fontSize, color: colors.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-              >
-                {d.reason}
-              </Typography>
-              <Typography
+          {rows.map((d, idx) => {
+            const status = displayStatus(d);
+            const recovered = status === 'Recovered';
+            const urgency: 'Urgent' | 'On track' | 'Closed' = recovered ? 'Closed' : d.urgent ? 'Urgent' : 'On track';
+            return (
+              <Box
+                key={d.id}
                 sx={{
-                  textAlign: 'right',
-                  fontSize: type.body.fontSize,
-                  fontWeight: 600,
-                  color: recovered ? colors.accent : colors.ink, // Recovered amounts may use accent
-                  ...tabularNums,
+                  display: 'grid',
+                  gridTemplateColumns: GRID,
+                  alignItems: 'center',
+                  gap: `${space.lg}px`,
+                  px: `${space.xl}px`,
+                  minHeight: 56,
+                  py: `${space.md}px`,
+                  borderBottom: idx < rows.length - 1 ? hairline : 'none',
+                  transition: 'background-color 0.12s ease',
+                  '&:hover': { bgcolor: colors.grey100 },
                 }}
               >
-                {formatRupees(d.amount)}
-              </Typography>
-              {/* Status with days remaining */}
-              {recovered ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.xs}px` }}>
-                  <CheckOutlined sx={{ fontSize: 16, color: colors.accent }} />
-                  <Typography sx={{ fontSize: type.body.fontSize, color: colors.ink }}>Recovered</Typography>
-                </Box>
-              ) : (
+                <Typography sx={{ fontFamily: MONO, fontSize: 12.5, color: colors.grey700, ...tabularNums }}>
+                  {d.id}
+                </Typography>
+                <ChannelTag name={d.channel} />
+                <Typography
+                  sx={{ fontSize: type.body.fontSize, color: colors.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                >
+                  {d.reason}
+                </Typography>
                 <Typography
                   sx={{
+                    textAlign: 'right',
                     fontSize: type.body.fontSize,
-                    color: colors.ink,
-                    fontWeight: d.urgent ? 600 : 400,
+                    fontWeight: 600,
+                    color: recovered ? colors.accent : colors.ink, // Recovered amounts may use accent
                     ...tabularNums,
                   }}
                 >
-                  {status} · {d.windowDaysRemaining}d
+                  {formatRupees(d.amount)}
                 </Typography>
-              )}
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <UrgencyLabel kind={urgency} />
+                {/* Status with days remaining */}
+                {recovered ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.xs}px` }}>
+                    <CheckOutlined sx={{ fontSize: 16, color: colors.accent }} />
+                    <Typography sx={{ fontSize: type.body.fontSize, color: colors.ink }}>Recovered</Typography>
+                  </Box>
+                ) : (
+                  <Typography
+                    sx={{
+                      fontSize: type.body.fontSize,
+                      color: colors.ink,
+                      fontWeight: d.urgent ? 600 : 400,
+                      ...tabularNums,
+                    }}
+                  >
+                    {status} · {d.windowDaysRemaining}d
+                  </Typography>
+                )}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <UrgencyLabel kind={urgency} />
+                </Box>
               </Box>
-            </Box>
-          );
-        })}
-       </Box>
+            );
+          })}
+        </Box>
       </Box>
     </Box>
   );
