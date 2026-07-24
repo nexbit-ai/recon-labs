@@ -18,6 +18,14 @@ interface IntegrationCategory {
 
 const categories: IntegrationCategory[] = [
   {
+    title: 'ERP',
+    items: [
+      { id: 'tally', name: 'Tally', domain: 'tallysolutions.com', status: 'available' },
+      { id: 'zoho', name: 'Zoho', domain: 'zoho.com', status: 'available' },
+      { id: 'sap', name: 'SAP', domain: 'sap.com', status: 'available' },
+    ]
+  },
+  {
     title: 'E-commerce',
     items: [
       { id: 'unicommerce', name: 'Unicommerce', domain: 'unicommerce.com', status: 'connected' },
@@ -70,7 +78,7 @@ const categories: IntegrationCategory[] = [
       { id: 'bharatpe', name: 'BharatPe', domain: 'bharatpe.com', status: 'available' },
       { id: 'mswipe', name: 'Mswipe', domain: 'mswipe.com', status: 'available' },
     ]
-  }
+  },
 ];
 
 const LogoImage: React.FC<{ domain: string; name: string }> = ({ domain, name }) => {

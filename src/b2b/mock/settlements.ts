@@ -434,7 +434,7 @@ export const reconPurchaseOrders: ReconPurchaseOrder[] = (() => {
     const paid = items.reduce((t, li) => t + li.paid, 0);
     const variance = expected - paid;
 
-    let status = 'Matched' as const;
+    let status: ReconStatus = 'Matched';
     if (variance > 0) {
       const errorStatuses = items.map((li) => li.status).filter((s) => s !== 'Matched');
       status = (errorStatuses.length > 0 ? errorStatuses[0] : 'Unpaid') as ReconStatus;
