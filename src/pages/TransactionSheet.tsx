@@ -57,6 +57,7 @@ import {
 } from '@mui/material';
 import ColumnFilterControls from '../components/ColumnFilterControls';
 import { api } from '../services/api';
+import { mockTransactionsApi } from './mockTransactionsApi';
 import { apiService } from '../services/api/apiService';
 import { API_CONFIG } from '../services/api/config';
 import { OrdersResponse, OrderItem, MarketplaceReconciliationResponse, TotalTransactionsResponse, TransactionRow as ApiTransactionRow, TransactionColumn, SalesTransactionsResponse, SalesTransactionsPagination } from '../services/api/types';
@@ -83,7 +84,7 @@ import {
 interface TransactionRow {
   "Order ID"?: string;
   "Order Item ID"?: string;
-  "Order Value": number;
+  "Expected Payout": number;
   "Settlement Value": number;
   "Invoice Date": string;
   "Settlement Date": string;
@@ -290,7 +291,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   return {
     "Order ID": backendOrderId || `ORD_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
     "Order Item ID": undefined,
-    "Order Value": orderValue,
+    "Expected Payout": orderValue,
     "Settlement Value": settlementValue,
     "Invoice Date": invoiceDate,
     "Settlement Date": settlementDate,
@@ -311,7 +312,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
 const mockTransactionData: TransactionData = {
   columns: [
     "Order Item ID",
-    "Order Value",
+    "Expected Payout",
     "Settlement Value",
     "Invoice Date",
     "Settlement Date",
@@ -323,7 +324,7 @@ const mockTransactionData: TransactionData = {
     // Settled Transactions (25 entries)
     {
       "Order Item ID": "FK12345",
-      "Order Value": 1200,
+      "Expected Payout": 1200,
       "Settlement Value": 1200,
       "Invoice Date": "2025-01-15",
       "Settlement Date": "2025-01-20",
@@ -333,7 +334,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12346",
-      "Order Value": 850,
+      "Expected Payout": 850,
       "Settlement Value": 850,
       "Invoice Date": "2025-01-16",
       "Settlement Date": "2025-01-21",
@@ -343,7 +344,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12347",
-      "Order Value": 2100,
+      "Expected Payout": 2100,
       "Settlement Value": 2100,
       "Invoice Date": "2025-01-17",
       "Settlement Date": "2025-01-22",
@@ -353,7 +354,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12349",
-      "Order Value": 1600,
+      "Expected Payout": 1600,
       "Settlement Value": 1600,
       "Invoice Date": "2025-01-19",
       "Settlement Date": "2025-01-24",
@@ -363,7 +364,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12350",
-      "Order Value": 950,
+      "Expected Payout": 950,
       "Settlement Value": 950,
       "Invoice Date": "2025-01-20",
       "Settlement Date": "2025-01-25",
@@ -373,7 +374,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12351",
-      "Order Value": 1800,
+      "Expected Payout": 1800,
       "Settlement Value": 1800,
       "Invoice Date": "2025-01-21",
       "Settlement Date": "2025-01-26",
@@ -383,7 +384,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12352",
-      "Order Value": 1350,
+      "Expected Payout": 1350,
       "Settlement Value": 1350,
       "Invoice Date": "2025-01-22",
       "Settlement Date": "2025-01-27",
@@ -393,7 +394,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12353",
-      "Order Value": 2200,
+      "Expected Payout": 2200,
       "Settlement Value": 2200,
       "Invoice Date": "2025-01-23",
       "Settlement Date": "2025-01-28",
@@ -403,7 +404,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12354",
-      "Order Value": 1100,
+      "Expected Payout": 1100,
       "Settlement Value": 1100,
       "Invoice Date": "2025-01-24",
       "Settlement Date": "2025-01-29",
@@ -413,7 +414,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12355",
-      "Order Value": 1700,
+      "Expected Payout": 1700,
       "Settlement Value": 1700,
       "Invoice Date": "2025-01-25",
       "Settlement Date": "2025-01-30",
@@ -423,7 +424,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12356",
-      "Order Value": 1400,
+      "Expected Payout": 1400,
       "Settlement Value": 1400,
       "Invoice Date": "2025-01-26",
       "Settlement Date": "2025-02-01",
@@ -433,7 +434,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12357",
-      "Order Value": 1900,
+      "Expected Payout": 1900,
       "Settlement Value": 1900,
       "Invoice Date": "2025-01-27",
       "Settlement Date": "2025-02-02",
@@ -443,7 +444,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12358",
-      "Order Value": 1250,
+      "Expected Payout": 1250,
       "Settlement Value": 1250,
       "Invoice Date": "2025-01-28",
       "Settlement Date": "2025-02-03",
@@ -453,7 +454,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12359",
-      "Order Value": 2300,
+      "Expected Payout": 2300,
       "Settlement Value": 2300,
       "Invoice Date": "2025-01-29",
       "Settlement Date": "2025-02-04",
@@ -463,7 +464,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12360",
-      "Order Value": 1000,
+      "Expected Payout": 1000,
       "Settlement Value": 1000,
       "Invoice Date": "2025-01-30",
       "Settlement Date": "2025-02-05",
@@ -473,7 +474,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12361",
-      "Order Value": 1550,
+      "Expected Payout": 1550,
       "Settlement Value": 1550,
       "Invoice Date": "2025-02-01",
       "Settlement Date": "2025-02-06",
@@ -483,7 +484,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12362",
-      "Order Value": 2000,
+      "Expected Payout": 2000,
       "Settlement Value": 2000,
       "Invoice Date": "2025-02-02",
       "Settlement Date": "2025-02-07",
@@ -493,7 +494,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12363",
-      "Order Value": 1150,
+      "Expected Payout": 1150,
       "Settlement Value": 1150,
       "Invoice Date": "2025-02-03",
       "Settlement Date": "2025-02-08",
@@ -503,7 +504,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12364",
-      "Order Value": 1750,
+      "Expected Payout": 1750,
       "Settlement Value": 1750,
       "Invoice Date": "2025-02-04",
       "Settlement Date": "2025-02-09",
@@ -513,7 +514,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12365",
-      "Order Value": 1300,
+      "Expected Payout": 1300,
       "Settlement Value": 1300,
       "Invoice Date": "2025-02-05",
       "Settlement Date": "2025-02-10",
@@ -523,7 +524,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12366",
-      "Order Value": 1850,
+      "Expected Payout": 1850,
       "Settlement Value": 1850,
       "Invoice Date": "2025-02-06",
       "Settlement Date": "2025-02-11",
@@ -533,7 +534,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12367",
-      "Order Value": 1450,
+      "Expected Payout": 1450,
       "Settlement Value": 1450,
       "Invoice Date": "2025-02-07",
       "Settlement Date": "2025-02-12",
@@ -543,7 +544,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12368",
-      "Order Value": 1950,
+      "Expected Payout": 1950,
       "Settlement Value": 1950,
       "Invoice Date": "2025-02-08",
       "Settlement Date": "2025-02-13",
@@ -553,7 +554,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12369",
-      "Order Value": 1200,
+      "Expected Payout": 1200,
       "Settlement Value": 1200,
       "Invoice Date": "2025-02-09",
       "Settlement Date": "2025-02-14",
@@ -564,7 +565,7 @@ const mockTransactionData: TransactionData = {
     // Settled Transactions with Discrepancies (10 entries)
     {
       "Order Item ID": "FK12348",
-      "Order Value": 750,
+      "Expected Payout": 750,
       "Settlement Value": 750,
       "Invoice Date": "2025-01-18",
       "Settlement Date": "2025-01-23",
@@ -574,7 +575,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12370",
-      "Order Value": 800,
+      "Expected Payout": 800,
       "Settlement Value": 800,
       "Invoice Date": "2025-02-10",
       "Settlement Date": "2025-02-15",
@@ -584,7 +585,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12371",
-      "Order Value": 650,
+      "Expected Payout": 650,
       "Settlement Value": 650,
       "Invoice Date": "2025-02-11",
       "Settlement Date": "2025-02-16",
@@ -594,7 +595,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12372",
-      "Order Value": 900,
+      "Expected Payout": 900,
       "Settlement Value": 900,
       "Invoice Date": "2025-02-12",
       "Settlement Date": "2025-02-17",
@@ -604,7 +605,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12373",
-      "Order Value": 550,
+      "Expected Payout": 550,
       "Settlement Value": 550,
       "Invoice Date": "2025-02-13",
       "Settlement Date": "2025-02-18",
@@ -614,7 +615,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12374",
-      "Order Value": 700,
+      "Expected Payout": 700,
       "Settlement Value": 700,
       "Invoice Date": "2025-02-14",
       "Settlement Date": "2025-02-19",
@@ -624,7 +625,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12375",
-      "Order Value": 450,
+      "Expected Payout": 450,
       "Settlement Value": 450,
       "Invoice Date": "2025-02-15",
       "Settlement Date": "2025-02-20",
@@ -634,7 +635,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12376",
-      "Order Value": 600,
+      "Expected Payout": 600,
       "Settlement Value": 600,
       "Invoice Date": "2025-02-16",
       "Settlement Date": "2025-02-21",
@@ -644,7 +645,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12377",
-      "Order Value": 850,
+      "Expected Payout": 850,
       "Settlement Value": 850,
       "Invoice Date": "2025-02-17",
       "Settlement Date": "2025-02-22",
@@ -654,7 +655,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12378",
-      "Order Value": 500,
+      "Expected Payout": 500,
       "Settlement Value": 500,
       "Invoice Date": "2025-02-18",
       "Settlement Date": "2025-02-23",
@@ -665,7 +666,7 @@ const mockTransactionData: TransactionData = {
     // Unsettled Transactions (15 entries)
     {
       "Order Item ID": "FK12379",
-      "Order Value": 750,
+      "Expected Payout": 750,
       "Settlement Value": 750,
       "Invoice Date": "2025-02-19",
       "Settlement Date": "",
@@ -675,7 +676,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12380",
-      "Order Value": 400,
+      "Expected Payout": 400,
       "Settlement Value": 400,
       "Invoice Date": "2025-02-20",
       "Settlement Date": "",
@@ -685,7 +686,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12381",
-      "Order Value": 650,
+      "Expected Payout": 650,
       "Settlement Value": 650,
       "Invoice Date": "2025-02-21",
       "Settlement Date": "",
@@ -695,7 +696,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12382",
-      "Order Value": 900,
+      "Expected Payout": 900,
       "Settlement Value": 900,
       "Invoice Date": "2025-02-22",
       "Settlement Date": "",
@@ -705,7 +706,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12383",
-      "Order Value": 550,
+      "Expected Payout": 550,
       "Settlement Value": 550,
       "Invoice Date": "2025-02-23",
       "Settlement Date": "",
@@ -715,7 +716,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12384",
-      "Order Value": 800,
+      "Expected Payout": 800,
       "Settlement Value": 800,
       "Invoice Date": "2025-02-24",
       "Settlement Date": "",
@@ -725,7 +726,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12385",
-      "Order Value": 700,
+      "Expected Payout": 700,
       "Settlement Value": 700,
       "Invoice Date": "2025-02-25",
       "Settlement Date": "",
@@ -735,7 +736,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12386",
-      "Order Value": 600,
+      "Expected Payout": 600,
       "Settlement Value": 600,
       "Invoice Date": "2025-02-26",
       "Settlement Date": "",
@@ -745,7 +746,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12387",
-      "Order Value": 850,
+      "Expected Payout": 850,
       "Settlement Value": 850,
       "Invoice Date": "2025-02-27",
       "Settlement Date": "",
@@ -755,7 +756,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12388",
-      "Order Value": 500,
+      "Expected Payout": 500,
       "Settlement Value": 500,
       "Invoice Date": "2025-02-28",
       "Settlement Date": "",
@@ -765,7 +766,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12389",
-      "Order Value": 750,
+      "Expected Payout": 750,
       "Settlement Value": 750,
       "Invoice Date": "2025-03-01",
       "Settlement Date": "",
@@ -775,7 +776,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12390",
-      "Order Value": 650,
+      "Expected Payout": 650,
       "Settlement Value": 650,
       "Invoice Date": "2025-03-02",
       "Settlement Date": "",
@@ -785,7 +786,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12391",
-      "Order Value": 900,
+      "Expected Payout": 900,
       "Settlement Value": 900,
       "Invoice Date": "2025-03-03",
       "Settlement Date": "",
@@ -795,7 +796,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12392",
-      "Order Value": 550,
+      "Expected Payout": 550,
       "Settlement Value": 550,
       "Invoice Date": "2025-03-04",
       "Settlement Date": "",
@@ -805,7 +806,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12393",
-      "Order Value": 800,
+      "Expected Payout": 800,
       "Settlement Value": 800,
       "Invoice Date": "2025-03-05",
       "Settlement Date": "",
@@ -815,7 +816,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12394",
-      "Order Value": 700,
+      "Expected Payout": 700,
       "Settlement Value": 700,
       "Invoice Date": "2025-03-06",
       "Settlement Date": "",
@@ -825,7 +826,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12395",
-      "Order Value": 600,
+      "Expected Payout": 600,
       "Settlement Value": 600,
       "Invoice Date": "2025-03-07",
       "Settlement Date": "",
@@ -835,7 +836,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12396",
-      "Order Value": 850,
+      "Expected Payout": 850,
       "Settlement Value": 850,
       "Invoice Date": "2025-03-08",
       "Settlement Date": "",
@@ -845,7 +846,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12397",
-      "Order Value": 500,
+      "Expected Payout": 500,
       "Settlement Value": 500,
       "Invoice Date": "2025-03-09",
       "Settlement Date": "",
@@ -855,7 +856,7 @@ const mockTransactionData: TransactionData = {
     },
     {
       "Order Item ID": "FK12398",
-      "Order Value": 750,
+      "Expected Payout": 750,
       "Settlement Value": 750,
       "Invoice Date": "2025-03-10",
       "Settlement Date": "",
@@ -885,7 +886,7 @@ const TransactionDetailsPopup: React.FC<{
   // Debug logging removed
 
   // Get values from the actual API response structure
-  const orderValue = transaction["Order Value"] || 0;
+  const orderValue = transaction["Expected Payout"] || 0;
 
   // Extract values from calculation.inputs
   const calculationInputs = originalData.calculation?.inputs || {};
@@ -1316,115 +1317,145 @@ const TransactionDetailsPopup: React.FC<{
 const BreakupsModal: React.FC<{
   open: boolean;
   onClose: () => void;
-  breakups: any; // This is now the full row
+  breakups: any;
   orderId: string;
   anchorEl: HTMLElement | null;
   formatCurrency: (amount: number) => string;
 }> = ({ open, onClose, breakups, orderId, anchorEl, formatCurrency }) => {
   if (!open || !breakups || !anchorEl) return null;
 
-  // Extract metadata from the row (check both originalData.metadata and metadata)
-  const metadata = (breakups as any)?.originalData?.metadata ||
-    (breakups as any)?.metadata || {};
-
-  // Extract order_value and settlement_value from metadata
-  const orderValue = metadata?.order_value || {};
-  const settlementValue = metadata?.settlement_value || {};
-  const diff = metadata?.diff || 0;
-  const mismatchReason = metadata?.mismatch_reason || '';
-
-  // Convert snake_case keys to readable format: remove underscores and capitalize first letter
-  const formatKey = (key: string) => {
-    return key.split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+  const rowData = (breakups as any)?.originalData || breakups || {};
+  const eventType = rowData.event_type || 'Sale';
+  const invoiceDateStr = rowData.invoice_date || new Date().toISOString();
+  const invoiceDate = new Date(invoiceDateStr);
+  
+  const addDays = (date: Date, days: number) => {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result.toISOString();
   };
 
+  const formatDateWithTime = (dateStr: string) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) + ' • ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
 
+  const settlementDateStr = rowData.settlement_date;
+  const settlementAmount = rowData.settlement_amount;
+  const expectedPayout = rowData.order_value;
 
-  // Format value based on type
-  const formatValue = (value: any): string => {
-    if (typeof value === 'number') {
-      return formatCurrency(value);
+  // Mock deductions
+  const commission = expectedPayout * 0.05; // 5%
+  const tds = expectedPayout * 0.01; // 1%
+  const tcs = expectedPayout * 0.01; // 1%
+  const discount = 100;
+  
+  const originalOrderValue = expectedPayout + commission + tds + tcs + discount;
+
+  const steps: any[] = [];
+
+  // 1. Order Placed
+  steps.push({
+    title: 'Order Placed',
+    date: formatDateWithTime(invoiceDateStr),
+    amount: formatCurrency(originalOrderValue),
+    breakdown: [
+      { label: 'Commission', amount: `-${formatCurrency(commission)}` },
+      { label: 'TDS', amount: `-${formatCurrency(tds)}` },
+      { label: 'TCS', amount: `-${formatCurrency(tcs)}` },
+      { label: 'Discount', amount: `-${formatCurrency(discount)}` },
+      { label: 'Expected Payout', amount: formatCurrency(expectedPayout), isTotal: true }
+    ]
+  });
+
+  if (eventType.toLowerCase() === 'sale') {
+    steps.push({
+      title: 'Order Delivered',
+      date: formatDateWithTime(addDays(invoiceDate, 3))
+    });
+    if (settlementDateStr) {
+      steps.push({
+        title: 'Settlement Done',
+        date: formatDateWithTime(settlementDateStr),
+        amount: formatCurrency(settlementAmount)
+      });
     }
-    return String(value || '');
-  };
+  } else if (eventType.toLowerCase() === 'return') {
+    steps.push({
+      title: 'Order Delivered',
+      date: formatDateWithTime(addDays(invoiceDate, 3))
+    });
+    steps.push({
+      title: 'Return Initiated',
+      date: formatDateWithTime(addDays(invoiceDate, 5))
+    });
+    if (settlementDateStr) {
+      steps.push({
+        title: 'Settlement Deducted',
+        date: formatDateWithTime(settlementDateStr),
+        amount: formatCurrency(settlementAmount)
+      });
+    }
+  } else if (eventType.toLowerCase() === 'cancelled') {
+    steps.push({
+      title: 'Order Cancelled',
+      date: formatDateWithTime(addDays(invoiceDate, 1))
+    });
+    if (settlementDateStr) {
+      steps.push({
+        title: 'Settlement Deducted',
+        date: formatDateWithTime(settlementDateStr),
+        amount: formatCurrency(settlementAmount)
+      });
+    }
+  }
 
-  // Extract buyer_invoice_amount from order_value and get remaining fields
-  const buyerInvoiceAmount = orderValue?.buyer_invoice_amount || 0;
-  const orderValueOtherFields = Object.entries(orderValue)
-    .filter(([key]) => key !== 'buyer_invoice_amount')
-    .map(([key, value]) => ({
-      label: formatKey(key),
-      value: value
-    }));
-
-  // Extract settlement_amount from settlement_value and get remaining fields
-  const settlementAmount = settlementValue?.settlement_amount || 0;
-  const settlementValueOtherFields = Object.entries(settlementValue)
-    .filter(([key]) => key !== 'settlement_amount')
-    .map(([key, value]) => ({
-      label: formatKey(key),
-      value: value
-    }));
-
-  // Calculate smart positioning similar to TransactionDetailsPopup
+  // Calculate smart positioning
   const getPopupPosition = () => {
     const rect = anchorEl.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
-    const popupHeight = 400; // Height for breakups popup
+    const popupHeight = 400; 
     const popupWidth = 400;
     const offset = 12;
 
-    // Calculate vertical position with better viewport awareness
     let top: number;
     let animationDirection: 'up' | 'down' = 'down';
     let maxHeight: number | undefined;
 
-    // Check available space above and below
     const spaceBelow = viewportHeight - rect.bottom;
     const spaceAbove = rect.top;
 
     if (spaceBelow >= popupHeight + offset) {
-      // Enough space below - show below
       top = rect.bottom + offset;
       animationDirection = 'down';
     } else if (spaceAbove >= popupHeight + offset) {
-      // Enough space above - show above
       top = rect.top - popupHeight - offset;
       animationDirection = 'up';
     } else {
-      // Not enough space either way - find optimal position
       if (spaceBelow > spaceAbove) {
-        // More space below - position at bottom with scroll
         top = Math.max(offset, viewportHeight - popupHeight - offset);
         maxHeight = popupHeight;
         animationDirection = 'down';
       } else {
-        // More space above - position at top with scroll
         top = offset;
         maxHeight = popupHeight;
         animationDirection = 'up';
       }
     }
 
-    // Ensure minimum height for scrollable content
     if (maxHeight && maxHeight < 300) {
       maxHeight = 300;
     }
 
-    // Calculate horizontal position
     let left: number;
     if (rect.left + popupWidth <= viewportWidth) {
-      // Enough space to the right - align with left edge
       left = rect.left;
     } else {
-      // Not enough space - align with right edge
       left = Math.max(offset, viewportWidth - popupWidth - offset);
     }
 
-    // Final validation: ensure popup is always within viewport bounds
     if (top < offset) {
       top = offset;
       maxHeight = Math.min(popupHeight, viewportHeight - offset * 2);
@@ -1433,7 +1464,6 @@ const BreakupsModal: React.FC<{
       top = Math.max(offset, viewportHeight - (maxHeight || popupHeight) - offset);
     }
 
-    // Ensure horizontal position is also within viewport
     if (left < offset) {
       left = offset;
     }
@@ -1448,7 +1478,6 @@ const BreakupsModal: React.FC<{
 
   return (
     <>
-      {/* Backdrop */}
       <Box
         onClick={onClose}
         sx={{
@@ -1461,17 +1490,11 @@ const BreakupsModal: React.FC<{
           zIndex: 1399,
           animation: 'fadeIn 0.2s ease-out',
           '@keyframes fadeIn': {
-            '0%': {
-              opacity: 0,
-            },
-            '100%': {
-              opacity: 1,
-            },
+            '0%': { opacity: 0 },
+            '100%': { opacity: 1 },
           },
         }}
       />
-
-      {/* Popup */}
       <Box
         onClick={(e) => e.stopPropagation()}
         sx={{
@@ -1488,29 +1511,8 @@ const BreakupsModal: React.FC<{
           animation: position.animationDirection === 'down'
             ? 'fadeInScaleDown 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
             : 'fadeInScaleUp 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-          '@keyframes fadeInScaleDown': {
-            '0%': {
-              opacity: 0,
-              transform: 'scale(0.95) translateY(-10px)',
-            },
-            '100%': {
-              opacity: 1,
-              transform: 'scale(1) translateY(0)',
-            },
-          },
-          '@keyframes fadeInScaleUp': {
-            '0%': {
-              opacity: 0,
-              transform: 'scale(0.95) translateY(10px)',
-            },
-            '100%': {
-              opacity: 1,
-              transform: 'scale(1) translateY(0)',
-            },
-          },
         }}
       >
-        {/* Header */}
         <Box
           sx={{
             p: 2,
@@ -1518,14 +1520,17 @@ const BreakupsModal: React.FC<{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            background: '#fafafa',
+            borderTopLeftRadius: '12px',
+            borderTopRightRadius: '12px',
           }}
         >
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#111827' }}>
-              Transaction Breakups
+              Order Journey
             </Typography>
             <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
-              Order ID: {orderId}
+              ID: {orderId}
             </Typography>
           </Box>
           <IconButton
@@ -1534,7 +1539,7 @@ const BreakupsModal: React.FC<{
             sx={{
               p: 0.5,
               '&:hover': {
-                background: '#f3f4f6',
+                background: '#e5e7eb',
               },
             }}
           >
@@ -1542,234 +1547,83 @@ const BreakupsModal: React.FC<{
           </IconButton>
         </Box>
 
-        {/* Content */}
-        <Box sx={{ p: 2, maxHeight: position.maxHeight ? `${position.maxHeight - 80}px` : '300px', overflowY: 'auto' }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {/* Order Value Section */}
-            {/* Buyer Invoice Amount - shown first */}
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                p: 1.5,
-                background: '#f0f9ff',
-                borderRadius: '6px',
-                border: '1px solid #bae6fd',
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 600,
-                  color: '#0c4a6e',
-                  fontSize: '0.875rem',
-                }}
-              >
-                Buyer Invoice Amount
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 700,
-                  color: '#0c4a6e',
-                  fontSize: '0.875rem',
-                }}
-              >
-                {formatCurrency(buyerInvoiceAmount)}
-              </Typography>
-            </Box>
-
-            {/* Other Order Value fields */}
-            {orderValueOtherFields.map((item, index) => (
-              <Box
-                key={index}
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  p: 1.5,
-                  pl: 3,
-                  background: '#f9fafb',
-                  borderRadius: '6px',
-                  border: '1px solid #e5e7eb',
-                }}
-              >
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontWeight: 500,
-                    color: '#374151',
-                    fontSize: '0.75rem',
-                  }}
-                >
-                  {item.label}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontWeight: 600,
-                    color: '#111827',
-                    fontSize: '0.75rem',
-                  }}
-                >
-                  {formatValue(item.value)}
-                </Typography>
-              </Box>
-            ))}
-
-            {/* Divider */}
-            <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
-
-            {/* Settlement Value Section */}
-            {/* Settlement Amount - shown first */}
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                p: 1.5,
-                background: '#fef2f2',
-                borderRadius: '6px',
-                border: '1px solid #fecaca',
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 600,
-                  color: '#991b1b',
-                  fontSize: '0.875rem',
-                }}
-              >
-                Settlement Amount
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 700,
-                  color: '#991b1b',
-                  fontSize: '0.875rem',
-                }}
-              >
-                {formatCurrency(settlementAmount)}
-              </Typography>
-            </Box>
-
-            {/* Other Settlement Value fields */}
-            {settlementValueOtherFields.map((item, index) => (
-              <Box
-                key={index}
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  p: 1.5,
-                  pl: 3,
-                  background: '#f9fafb',
-                  borderRadius: '6px',
-                  border: '1px solid #e5e7eb',
-                }}
-              >
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontWeight: 500,
-                    color: '#374151',
-                    fontSize: '0.75rem',
-                  }}
-                >
-                  {item.label}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontWeight: 600,
-                    color: '#111827',
-                    fontSize: '0.75rem',
-                  }}
-                >
-                  {formatValue(item.value)}
-                </Typography>
-              </Box>
-            ))}
-
-            {/* Divider */}
-            <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
-
-            {/* Difference */}
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                p: 1.5,
-                background: diff === 0 ? '#f0fdf4' : '#fef2f2',
-                borderRadius: '6px',
-                border: diff === 0 ? '1px solid #86efac' : '1px solid #fca5a5',
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 700,
-                  color: diff === 0 ? '#166534' : '#991b1b',
-                  fontSize: '0.875rem',
-                }}
-              >
-                Difference
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 800,
-                  color: diff === 0 ? '#166534' : '#991b1b',
-                  fontSize: '0.875rem',
-                }}
-              >
-                {formatCurrency(diff)}
-              </Typography>
-            </Box>
-
-            {/* Mismatch Reason - show if available */}
-            {mismatchReason && (
-              <>
-                {/* Divider */}
-                <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
-                <Box
-                  sx={{
+        <Box sx={{ p: 3, maxHeight: position.maxHeight ? `${position.maxHeight - 80}px` : '300px', overflowY: 'auto' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            {steps.map((step, index) => {
+              const isLast = index === steps.length - 1;
+              return (
+                <Box key={index} sx={{ display: 'flex', gap: 2, position: 'relative', pb: isLast ? 0 : 3 }}>
+                  {!isLast && (
+                    <Box sx={{ position: 'absolute', top: 24, left: 11, bottom: -4, width: '2px', background: '#e5e7eb' }} />
+                  )}
+                  
+                  <Box sx={{ 
+                    width: 24, 
+                    height: 24, 
+                    borderRadius: '50%', 
+                    background: '#f9fafb', 
+                    border: '2px solid #d1d5db',
                     display: 'flex',
-                    justifyContent: 'space-between',
                     alignItems: 'center',
-                    p: 1.5,
-                    background: '#f9fafb',
-                    borderRadius: '6px',
-                    border: '1px solid #e5e7eb',
-                  }}
-                >
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontWeight: 500,
-                      color: '#374151',
-                      fontSize: '0.75rem',
-                    }}
-                  >
-                    Mismatch Reason
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontWeight: 600,
-                      color: '#111827',
-                      fontSize: '0.75rem',
-                    }}
-                  >
-                    {mismatchReason}
-                  </Typography>
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    zIndex: 1,
+                    mt: 0.25
+                  }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: '#9ca3af' }} />
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, flex: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151' }}>
+                        {step.title}
+                      </Typography>
+                      {step.amount && (
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#4b5563' }}>
+                          {step.amount}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                      {step.date}
+                    </Typography>
+                    
+                    {step.breakdown && (
+                      <Box sx={{ 
+                        mt: 1.5, 
+                        p: 1.5, 
+                        background: '#f9fafb', 
+                        borderRadius: '6px', 
+                        border: '1px solid #e5e7eb',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 0.75
+                      }}>
+                        {step.breakdown.map((item: any, idx: number) => (
+                          <Box 
+                            key={idx} 
+                            sx={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between',
+                              pt: item.isTotal ? 1 : 0,
+                              mt: item.isTotal ? 0.5 : 0,
+                              borderTop: item.isTotal ? '1px dashed #d1d5db' : 'none'
+                            }}
+                          >
+                            <Typography variant="caption" sx={{ color: item.isTotal ? '#374151' : '#6b7280', fontWeight: item.isTotal ? 600 : 400 }}>
+                              {item.label}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: item.isTotal ? '#111827' : '#4b5563', fontWeight: item.isTotal ? 600 : 500 }}>
+                              {item.amount}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
                 </Box>
-              </>
-            )}
+              );
+            })}
           </Box>
         </Box>
       </Box>
@@ -1801,7 +1655,7 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   'Event Type': { apiParam: 'event_type', type: 'enum' },
   'Order Date': { apiParam: 'order_date', type: 'date' }, // → order_date_from/to
   'Settlement Date': { apiParam: 'settlement_date', type: 'date' },
-  'Order Value': { apiParam: 'order_value', type: 'number' },
+  'Expected Payout': { apiParam: 'order_value', type: 'number' },
   'Settlement Value': { apiParam: 'settlement_value', type: 'number' },
   'Difference': { apiParam: 'diff', type: 'number' },
 
@@ -1814,7 +1668,7 @@ const COLUMN_TO_SORT_BY_MAP: Record<string, string> = {
   'Order Date': 'order_date',
   'Invoice Date': 'invoice_date',
   'Settlement Date': 'settlement_date',
-  'Order Value': 'order_value',
+  'Expected Payout': 'order_value',
   'Settlement Value': 'settlement_value',
   'Difference': 'diff',
 };
@@ -2135,7 +1989,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   };
 
   // Get current columns based on which API is being used
-  const getCurrentColumns = () => {
+  const getCurrentColumns = (): string[] => {
+    const filterColumnsForActiveTab = (cols: string[]) => {
+      if (activeTab === 0) {
+        return cols.filter((title: string) => title !== 'Difference');
+      }
+      return cols;
+    };
     // Sales Report tab (index 4) - fixed columns
     if (activeTab === 4) {
       const salesColumns = salesReportData?.columns || [];
@@ -2156,7 +2016,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         .filter(Boolean) as typeof salesColumns;
       const remaining = salesColumns.filter(col => !priorityKeys.includes(col.key as typeof priorityKeys[number]));
 
-      return [...prioritized, ...remaining].map(col => col.title);
+      return filterColumnsForActiveTab([...prioritized, ...remaining].map(col => col.title));
     }
 
     // Use quad API data if available (can be null when filtering)
@@ -2180,15 +2040,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       if (!currentData) {
         return [];
       }
-      return currentData.columns?.map(col => col.title) || [];
+      return filterColumnsForActiveTab(currentData.columns?.map(col => col.title) || []);
     }
 
     // Fallback to legacy single API data
     if (useNewAPI && totalTransactionsData) {
       // Handle null columns case - only return actual API columns, not breakup fields
-      return totalTransactionsData.columns?.map(col => col.title) || [];
+      return filterColumnsForActiveTab(totalTransactionsData.columns?.map(col => col.title) || []);
     }
-    return visibleColumns;
+    return filterColumnsForActiveTab(visibleColumns);
   };
 
 
@@ -2301,7 +2161,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     } else {
       // Fallback to hardcoded metadata for backward compatibility
       meta['Order ID'] = { type: 'string' };
-      meta['Order Value'] = { type: 'number' };
+      meta['Expected Payout'] = { type: 'number' };
       meta['Settlement Value'] = { type: 'number' };
       meta['Settlement Date'] = { type: 'date' };
       meta['Difference'] = { type: 'number' };
@@ -2822,7 +2682,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         .join('&');
 
 
-      const response = await api.transactions.getTotalTransactions(queryParams as any);
+      const response = await mockTransactionsApi.getTotalTransactions(queryParams as any);
 
       if (response.success && response.data) {
         // Store total transactions data for column metadata (enum values, etc.)
@@ -2953,7 +2813,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         .join('&');
 
 
-      const response = await api.transactions.getTotalTransactions(queryParams as any);
+      const response = await mockTransactionsApi.getTotalTransactions(queryParams as any);
 
       if (response.success && response.data) {
         // Store total transactions data for column metadata (enum values, etc.)
@@ -3256,7 +3116,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const queryParams = buildQueryParams(1, remark, filters, dateRangeFilter);
       queryParams.limit = 1; // Only need metadata, not actual data
 
-      const response = await api.transactions.getTotalTransactions(queryParams as any);
+      const response = await mockTransactionsApi.getTotalTransactions(queryParams as any);
       let count = 0;
 
       // Try to get count from metadata first
@@ -3290,7 +3150,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const queryParams = buildQueryParams(1, remark);
       queryParams.limit = 1; // Only need metadata, not actual data
 
-      const response = await api.transactions.getTotalTransactions(queryParams as any);
+      const response = await mockTransactionsApi.getTotalTransactions(queryParams as any);
       let count = 0;
 
       // Try to get count from metadata first
@@ -3510,27 +3370,27 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       // Make only the active tab's API call if only switching tabs (to optimize network usage)
       const matchedCall = (isTabSwitchOnly && activeTab !== 0)
         ? Promise.resolve({ success: true, data: matchedData, skipped: true })
-        : api.transactions.getTotalTransactions(matchedParams);
+        : mockTransactionsApi.getTotalTransactions(matchedParams);
 
       const mismatchedLessReceivedCall = (isTabSwitchOnly && (activeTab !== 1 || mismatchedSubTab !== 'less_received'))
         ? Promise.resolve({ success: true, data: mismatchedLessReceivedData, skipped: true })
-        : api.transactions.getTotalTransactions(mismatchedLessReceivedParams);
+        : mockTransactionsApi.getTotalTransactions(mismatchedLessReceivedParams);
 
       const mismatchedMoreReceivedCall = (isTabSwitchOnly && (activeTab !== 1 || mismatchedSubTab !== 'more_received'))
         ? Promise.resolve({ success: true, data: mismatchedMoreReceivedData, skipped: true })
-        : api.transactions.getTotalTransactions(mismatchedMoreReceivedParams);
+        : mockTransactionsApi.getTotalTransactions(mismatchedMoreReceivedParams);
 
       const unsettledCall = (isTabSwitchOnly && activeTab !== 2)
         ? Promise.resolve({ success: true, data: unsettledData, skipped: true })
-        : api.transactions.getTotalTransactions(unsettledParams);
+        : mockTransactionsApi.getTotalTransactions(unsettledParams);
 
       const allCall = (isTabSwitchOnly && activeTab !== 3)
         ? Promise.resolve({ success: true, data: allData, skipped: true })
-        : api.transactions.getTotalTransactions(allParams);
+        : mockTransactionsApi.getTotalTransactions(allParams);
 
       const salesReportCall = (isTabSwitchOnly)
         ? Promise.resolve({ success: true, data: { pagination: { total_count: salesReportTotalCount } }, skipped: true })
-        : api.transactions.getSalesTransactions(salesReportParams);
+        : mockTransactionsApi.getSalesTransactions(salesReportParams);
 
       const apiCalls = [
         matchedCall,
@@ -3763,7 +3623,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         params.search = searchToUse.trim();
       }
 
-      const response = await api.transactions.getSalesTransactions(params);
+      const response = await mockTransactionsApi.getSalesTransactions(params);
 
       if (response.success && response.data) {
         const responseData = response.data;
@@ -4142,7 +4002,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Allow opening modal if breakups has data OR if metadata exists (even with empty breakups)
     // This allows D2C transactions with empty breakups but shipping_courier to show the modal
     // We always have metadata for transactions, so this ensures the modal can open for all transactions
-    if (hasBreakups || metadata) {
+    if (true) {
       // Store the full row so we can access order_value, settlement_value, and diff
       setSelectedBreakups(row);
       setBreakupsOrderId(orderId);
@@ -4465,7 +4325,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const getVisibleColumns = () => {
     const base = [
       "Order ID",
-      "Order Value",
+      "Expected Payout",
       "Settlement Value",
       "Invoice Date",
       "Settlement Date",
@@ -6425,7 +6285,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       // Default reason to the remark for now
                                       displayValue = (row as any)['Remark'] || value || '-';
                                     } else if (typeof value === 'number') {
-                                      if (column === 'Order Value' || column === 'Settlement Value' || column === 'Difference') {
+                                      if (column === 'Expected Payout' || column === 'Settlement Value' || column === 'Difference') {
                                         displayValue = formatCurrency(value);
                                       } else {
                                         displayValue = value.toLocaleString(getCurrencyLocale());
@@ -6491,8 +6351,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                                     break;
                                                   case 'less_payment_received':
                                                     displayText = 'Less Payment Received';
-                                                    backgroundColor = '#fef3c7';
-                                                    textColor = '#d97706';
+                                                    backgroundColor = '#fee2e2';
+                                                    textColor = '#dc2626';
                                                     break;
                                                   case 'more_payment_received':
                                                     displayText = 'More Payment Received';
