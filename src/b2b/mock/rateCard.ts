@@ -1,4 +1,4 @@
-// Blinkit rate card for SuperYou — authorised contracted lines plus the flagged
+// Blinkit rate card for Nexbit Gear — authorised contracted lines plus the flagged
 // "Storage Fee v2" charge that has no signed basis (FL-001 / dispute D-1043).
 import type { RateCardLine } from './types';
 import { disputes } from './receivables';

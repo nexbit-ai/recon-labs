@@ -11,7 +11,7 @@ export const askNexQA: AskNexQA[] = [
   },
   {
     id: 'AN-2',
-    question: "What's our true net realisation on SuperYou Pro?",
+    question: "What's our true net realisation on our Pro peripherals?",
     answer:
       "68.4% blended vs the 74% list assumption. Amazon drags it to 64% via weight-band fees; Blinkit sits at 66% after 'Storage Fee v2'. Clearing both lifts blended realisation to ~71%.",
   },
@@ -19,7 +19,7 @@ export const askNexQA: AskNexQA[] = [
     id: 'AN-3',
     question: 'Which channel leaks the most?',
     answer:
-      'Amazon — ₹14.2L this quarter, 37% of total leakage, almost entirely FBA weight-band and fee misclassification on the 1kg powders.',
+      'Amazon — ₹14.2L this quarter, 37% of total leakage, almost entirely FBA weight-band and fee misclassification on the 1kg keyboards.',
   },
   {
     id: 'AN-4',

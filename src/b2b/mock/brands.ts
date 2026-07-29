@@ -1,9 +1,9 @@
-// Workspace, connected channels, fiscal period, and SuperYou's SKU catalogue.
+// Workspace, connected channels, fiscal period, and Nexbit Gear's SKU catalogue.
 import type { Channel, Sku } from './types';
 
 export const workspace = {
-  brand: 'Blue Tribe Foods',
-  category: 'FMCG · Plant-based Meats & Snacking',
+  brand: 'Nexbit Gear',
+  category: 'Consumer Electronics · Tech Accessories & Peripherals',
   channelsConnectedLabel: 'FXT · 5 channels connected',
 } as const;
 
@@ -25,12 +25,12 @@ export const channels: Channel[] = [
 // stable internal codes (referenced by secondaryDiscounts); product & label are
 // shown as neutral SKU-N handles rather than real product names.
 export const skus: Sku[] = [
-  { id: 'BTF-NUG', product: 'Plant-based Chicken Nuggets', variant: '', label: 'Plant-based Chicken Nuggets' },
-  { id: 'BTF-KEE', product: 'Vegan Keema', variant: '', label: 'Vegan Keema' },
-  { id: 'BTF-SAU', product: 'Plant-based Sausages', variant: '', label: 'Plant-based Sausages' },
-  { id: 'BTF-KEB', product: 'Plant-based Kebabs', variant: '', label: 'Plant-based Kebabs' },
-  { id: 'KLW-PUF', product: 'Supergrain Puffs', variant: '', label: 'Supergrain Puffs' },
-  { id: 'KLW-SPR', product: 'Sprout Sticks', variant: '', label: 'Sprout Sticks' },
+  { id: 'TECH-KBD', product: 'Mechanical Keyboard', variant: '', label: 'Mechanical Keyboard' },
+  { id: 'TECH-MOU', product: 'Wireless Mouse', variant: '', label: 'Wireless Mouse' },
+  { id: 'TECH-SPK', product: 'Bluetooth Speakers', variant: '', label: 'Bluetooth Speakers' },
+  { id: 'TECH-CHR', product: 'Ergonomic Chair', variant: '', label: 'Ergonomic Chair' },
+  { id: 'TECH-ARM', product: 'Dual Monitor Arm', variant: '', label: 'Dual Monitor Arm' },
+  { id: 'TECH-HUB', product: 'USB-C Docking Station', variant: '', label: 'USB-C Docking Station' },
 ];
 
 export const skuById = (id: string): Sku | undefined => skus.find((s) => s.id === id);
