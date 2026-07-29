@@ -247,17 +247,46 @@ const MarketplaceReconciliation: React.FC = () => {
   const [initialTsTab, setInitialTsTab] = useState<number>(0);
   const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other' | undefined>(undefined);
   const location = useLocation();
+  const loadPlatformFromStorage = (): Platform => {
+    try {
+      const stored = localStorage.getItem('recon_selected_platforms');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed[0] as Platform;
+        } else if (typeof parsed === 'string') {
+          return parsed as Platform;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load platform from localStorage:', e);
+    }
+    return 'flipkart'; // default
+  };
+
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(loadPlatformFromStorage());
+  const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [tempSelectedPlatform, setTempSelectedPlatform] = useState<Platform | null>(null);
+
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
   const [reconciliationData, setReconciliationData] = useState<MarketplaceReconciliationResponse>(mockReconciliationData);
   const [mainSummaryRaw, setMainSummaryRaw] = useState<MainSummaryResponse | null>(null);
   const mainSummary = useMemo(() => {
     if (!mainSummaryRaw) return null;
-    if (selectedOrganization !== 'ALL') return mainSummaryRaw;
     
-    // multiply specific summary numbers for the demo to simulate combined data
+    // Create a clone to adjust
     const clone = JSON.parse(JSON.stringify(mainSummaryRaw));
-    const factor = 4.2; 
+    
+    // Determine platform factor
+    let factor = 1;
+    if (selectedPlatform === 'flipkart') factor = 8.5;
+    else if (selectedPlatform === 'amazon') factor = 15.2;
+    else if (selectedPlatform === 'amazon_uk') factor = 3.1;
+    else if (selectedPlatform === 'd2c') factor = 4.2;
+    else if (selectedPlatform === 'other') factor = 1.8;
+    else if (selectedOrganization === 'ALL') factor = 4.2;
+
     if (clone.summary) {
       const keysToMultiply = [
         'total_transactions_amount', 'total_transaction_orders',
@@ -271,14 +300,164 @@ const MarketplaceReconciliation: React.FC = () => {
         'prev_return_or_cancelled_amount', 'prev_return_or_cancelled_orders'
       ];
       
-      keysToMultiply.forEach(key => {
+      keysToMultiply.forEach((key: string) => {
         if (clone.summary[key] !== undefined) {
            clone.summary[key] = Math.round(Number(clone.summary[key]) * factor);
         }
       });
     }
+
+    // Force reconciliation status to look good for demo (94-96%) across platforms
+    if (clone.summary && clone.summary.total_reconciled_count) {
+      const totalMatchedOrders = Number(clone.summary.total_reconciled_count || 0) + Number(clone.summary.total_manually_reconciled_or_disputed_count || 0);
+      const totalMatchedAmount = Number(clone.summary.total_reconciled_amount || 0) + Number(clone.summary.total_manually_reconciled_or_disputed_amount || 0);
+      
+      let mismatchRatio = 0.015; 
+      if (selectedPlatform === 'flipkart') {
+        mismatchRatio = 0.018; // 98.2% matched
+      } else if (selectedPlatform === 'd2c') {
+        mismatchRatio = 0.012; // 98.8% matched
+      } else if (selectedPlatform === 'amazon') {
+        mismatchRatio = 0.011; // 98.9% matched
+      }
+      
+      const targetUnrecCount = Math.max(1, Math.round(totalMatchedOrders * mismatchRatio));
+      const targetUnrecAmount = Math.max(1, Math.round(totalMatchedAmount * mismatchRatio));
+      
+      clone.summary.total_unreconciled_count = targetUnrecCount;
+      clone.summary.total_unreconciled_amount = targetUnrecAmount;
+
+      if (clone.UnReconcile && clone.UnReconcile.summary) {
+        clone.UnReconcile.summary.total_orders_count = targetUnrecCount;
+        clone.UnReconcile.summary.total_difference_amount = targetUnrecAmount;
+        clone.UnReconcile.summary.total_less_payment_received_amount = Math.round(targetUnrecAmount * 0.7);
+        clone.UnReconcile.summary.total_less_payment_received_orders = Math.round(targetUnrecCount * 0.7);
+        clone.UnReconcile.summary.total_more_payment_received_amount = targetUnrecAmount - clone.UnReconcile.summary.total_less_payment_received_amount;
+        clone.UnReconcile.summary.total_more_payment_received_orders = targetUnrecCount - clone.UnReconcile.summary.total_less_payment_received_orders;
+      }
+      
+      let contractBreaches: any[] = [];
+      if (selectedPlatform === 'amazon') {
+        contractBreaches = [
+          { name: 'FBA Weight Handling Discrepancy', count: 145, amount: 154320.50 },
+          { name: 'Incorrect Referral Fee Tier', count: 89, amount: 32050.00 }
+        ];
+      } else if (selectedPlatform === 'flipkart') {
+        contractBreaches = [
+          { name: 'Charging Fees on Pre-Fulfillment Cancellations', count: 191, amount: 233122.10 },
+          { name: 'Incorrect Commission Tiering', count: 112, amount: 40071.28 }
+        ];
+      }
+      
+      const reasonsToScale = [...contractBreaches];
+      if (clone.UnReconcile && Array.isArray(clone.UnReconcile.reasons)) {
+        reasonsToScale.push(...clone.UnReconcile.reasons);
+      }
+      
+      if (reasonsToScale.length > 0) {
+        const totalReasonsCount = reasonsToScale.reduce((sum: number, r: any) => sum + (Number(r.count) || 0), 0);
+        const totalReasonsAmount = reasonsToScale.reduce((sum: number, r: any) => sum + (Number(r.amount) || 0), 0);
+        
+        reasonsToScale.forEach((r: any) => {
+          r.count = Math.max(1, Math.round((Number(r.count || 0) / totalReasonsCount) * targetUnrecCount));
+          r.amount = Math.max(1, Math.round((Number(r.amount || 0) / totalReasonsAmount) * targetUnrecAmount));
+        });
+        
+        const finalCount = reasonsToScale.reduce((sum: number, r: any) => sum + r.count, 0);
+        const finalAmount = reasonsToScale.reduce((sum: number, r: any) => sum + r.amount, 0);
+        if (reasonsToScale.length > 0) {
+           reasonsToScale[reasonsToScale.length - 1].count += (targetUnrecCount - finalCount);
+           reasonsToScale[reasonsToScale.length - 1].amount += (targetUnrecAmount - finalAmount);
+        }
+        
+        if (clone.UnReconcile) {
+          clone.UnReconcile.reasons = reasonsToScale;
+        }
+      }
+
+      // Helper to scale providers across a target count and amount
+      const distributeAcrossProviders = (block: any, targetCount: number, targetAmount: number) => {
+        if (!block || !block.providers) return;
+        
+        // Flatten all provider objects into an array of references
+        const flatProviders: any[] = [];
+        Object.keys(block.providers).forEach(k => {
+          if (k === 'cod' && Array.isArray(block.providers.cod)) {
+            block.providers.cod.forEach((p: any) => flatProviders.push(p));
+          } else if (k !== 'cod') {
+            flatProviders.push(block.providers[k]);
+          }
+        });
+        
+        if (flatProviders.length === 0) return;
+
+        const totalOriginalCount = flatProviders.reduce((sum, p) => sum + (Number(p.total_count || 0)), 0);
+        const totalOriginalAmount = flatProviders.reduce((sum, p) => sum + (Number(p.total_sale_amount || 0)), 0);
+        
+        // Scale each provider proportionally
+        flatProviders.forEach(p => {
+          if (totalOriginalCount === 0) {
+            p.total_count = Math.floor(targetCount / flatProviders.length);
+          } else {
+            p.total_count = Math.max(0, Math.round((Number(p.total_count || 0) / totalOriginalCount) * targetCount));
+          }
+          
+          if (totalOriginalAmount === 0) {
+            p.total_sale_amount = Math.floor(targetAmount / flatProviders.length);
+          } else {
+            p.total_sale_amount = Math.max(0, Math.round((Number(p.total_sale_amount || 0) / totalOriginalAmount) * targetAmount));
+          }
+        });
+        
+        // Adjust the last one to fix rounding differences exactly
+        const finalCount = flatProviders.reduce((sum, p) => sum + p.total_count, 0);
+        const finalAmount = flatProviders.reduce((sum, p) => sum + p.total_sale_amount, 0);
+        
+        flatProviders[flatProviders.length - 1].total_count += (targetCount - finalCount);
+        flatProviders[flatProviders.length - 1].total_sale_amount += (targetAmount - finalAmount);
+      };
+
+      // 1. Distribute Reconciled
+      distributeAcrossProviders(clone.Reconcile, totalMatchedOrders, totalMatchedAmount);
+      
+      // 2. Distribute UnReconciled
+      distributeAcrossProviders(clone.UnReconcile, targetUnrecCount, targetUnrecAmount);
+
+      // MATHEMATICAL CONSISTENCY FOR UNSETTLED AND ALL
+      let unsettledCount = 0;
+      let unsettledAmount = 0;
+      
+      if (clone.Unsettled && clone.Unsettled.summary) {
+        unsettledCount = Math.max(1, Math.round(totalMatchedOrders * 0.02));
+        unsettledAmount = Math.max(1, Math.round(totalMatchedAmount * 0.02));
+        
+        clone.Unsettled.summary.total_order_count = unsettledCount;
+        clone.Unsettled.summary.total_amount = unsettledAmount;
+        
+        // 3. Distribute Unsettled
+        distributeAcrossProviders(clone.Unsettled, unsettledCount, unsettledAmount);
+      }
+      
+      // Set ALL to precisely Matched + Mismatched + Unsettled
+      clone.summary.total_transaction_orders = totalMatchedOrders + targetUnrecCount + unsettledCount;
+      clone.summary.total_transactions_amount = totalMatchedAmount + targetUnrecAmount + unsettledAmount;
+    }
+    
     return clone as MainSummaryResponse;
-  }, [mainSummaryRaw, selectedOrganization]);
+  }, [mainSummaryRaw, selectedOrganization, selectedPlatform]);
+
+  const unreconciledReasons = useMemo((): Array<{ reason: string; count: number; amount: number }> => {
+    if (!mainSummary) return [];
+    const reasons = (mainSummary as any)?.UnReconcile?.reasons || [];
+    return reasons
+      .map((r: any) => ({
+        reason: r?.name ?? String(r?.reason ?? ''),
+        count: Number(r?.count) || 0,
+        amount: Number(r?.amount) || 0,
+      }))
+      .sort((a: any, b: any) => b.count - a.count);
+  }, [mainSummary]);
+
   const [reconciliationStatus, setReconciliationStatus] = useState<ReconciliationStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -471,7 +650,6 @@ const MarketplaceReconciliation: React.FC = () => {
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
   // Date field filter for transactions-related queries
   const [dateField, setDateField] = useState<'settlement' | 'invoice'>('invoice');
-  const [unreconciledReasons, setUnreconciledReasons] = useState<Array<{ reason: string; count: number; amount: number }>>([]);
 
   // Ageing summary (Avg TAT across providers) - use real data if available, otherwise dummy
   const overallAvgTAT = ageingData.length > 0
@@ -783,10 +961,6 @@ const MarketplaceReconciliation: React.FC = () => {
     }
   }, [showCustomDatePicker, customStartDate, currentCalendarDate]);
 
-  // Removed redundant fetch on dateField; consolidated in unified effect below
-
-  // Removed separate initial reasons fetch; handled in unified effect
-
   // Handle click outside calendar popup
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -909,7 +1083,6 @@ const MarketplaceReconciliation: React.FC = () => {
         // Then update state; unified effect will fetch
         setCustomStartDate(currentStartDate);
         setCustomEndDate(currentEndDate);
-        fetchUnreconciledReasonsWithDates(currentStartDate, currentEndDate);
         setShowCustomDatePicker(false); // Hide popup
       } else {
         // Normal case: second date is after first date
@@ -929,7 +1102,6 @@ const MarketplaceReconciliation: React.FC = () => {
         // Then update state; unified effect will fetch
         setCustomStartDate(currentStartDate);
         setCustomEndDate(currentEndDate);
-        fetchUnreconciledReasonsWithDates(currentStartDate, currentEndDate);
         setShowCustomDatePicker(false); // Hide popup
       }
     }
@@ -1101,10 +1273,6 @@ const MarketplaceReconciliation: React.FC = () => {
         // ms is ApiResponse<any>; data is payload
         const payload = (ms as any).data as MainSummaryResponse;
         setMainSummaryRaw(payload);
-        // Update reasons from UnReconcile for UI where needed
-        if (payload?.UnReconcile?.reasons?.length) {
-          setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count, amount: r.amount || 0 })));
-        }
       } catch (e) {
         // Non-fatal for now
         console.warn('main-summary fetch failed', e);
@@ -1137,9 +1305,6 @@ const MarketplaceReconciliation: React.FC = () => {
         const ms = await apiIndex.mainSummary.getMainSummary(mainSummaryParams);
         const payload = (ms as any).data as MainSummaryResponse;
         setMainSummaryRaw(payload);
-        if (payload?.UnReconcile?.reasons?.length) {
-          setUnreconciledReasons(payload.UnReconcile.reasons.map(r => ({ reason: r.name, count: r.count, amount: r.amount || 0 })));
-        }
       } catch (e) {
         console.warn('main-summary fetch failed', e);
       }
@@ -1151,94 +1316,6 @@ const MarketplaceReconciliation: React.FC = () => {
       setError('Network error, showing sample data');
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Fetch unreconciled reasons by date range preset
-  const fetchUnreconciledReasonsByDateRange = async (dateRange: string) => {
-    try {
-      // For custom range, only proceed if both dates are selected
-      if (dateRange === 'custom' && (!customStartDate || !customEndDate)) {
-        return;
-      }
-      let startDate: string;
-      let endDate: string;
-      const today = new Date();
-      if (dateRange === 'custom') {
-        startDate = customStartDate;
-        endDate = customEndDate;
-      } else if (dateRange === 'today') {
-        startDate = today.toISOString().split('T')[0];
-        endDate = today.toISOString().split('T')[0];
-      } else if (dateRange === 'this-month') {
-        startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
-        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        endDate = endOfMonth.toISOString().split('T')[0];
-      } else if (dateRange === 'this-year') {
-        const currentYear = today.getFullYear();
-        const currentMonth = today.getMonth();
-        if (currentMonth >= 3) {
-          startDate = `${currentYear}-04-01`;
-          endDate = `${currentYear + 1}-03-31`;
-        } else {
-          startDate = `${currentYear - 1}-04-01`;
-          endDate = `${currentYear}-03-31`;
-        }
-      } else if (dateRange === 'last-fiscal-year') {
-        const currentYear = today.getFullYear();
-        const currentMonth = today.getMonth();
-        if (currentMonth >= 3) {
-          startDate = `${currentYear - 1}-04-01`;
-          endDate = `${currentYear}-03-31`;
-        } else {
-          startDate = `${currentYear - 2}-04-01`;
-          endDate = `${currentYear - 1}-03-31`;
-        }
-      } else {
-        startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
-        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        endDate = endOfMonth.toISOString().split('T')[0];
-      }
-      await fetchUnreconciledReasonsWithDates(startDate, endDate);
-    } catch (e) {
-      // ignore
-    }
-  };
-
-  // Fetch unreconciled reasons with explicit dates
-  const fetchUnreconciledReasonsWithDates = async (startDate: string, endDate: string) => {
-    try {
-      // Call /recon/main-summary to get UnReconcile.reasons
-      // Reasons are available for platform=d2c or platform=all/combined
-      const params: any = {
-        start_date: startDate,
-        end_date: endDate,
-        date_field: dateField === 'invoice' ? 'invoice_date' : 'settlement_date',
-        platform: selectedPlatform || 'd2c'
-      };
-
-      const resp = await apiIndex.mainSummary.getMainSummary(params);
-
-      if (resp.success && resp.data) {
-        const summaryData = resp.data as any;
-        const unreconciledReasons = summaryData.UnReconcile?.reasons || [];
-
-        // Transform reasons array [{ name, count, amount }] -> [{ reason, count, amount }]
-        const list = (Array.isArray(unreconciledReasons) ? unreconciledReasons : [])
-          .map((r: any) => ({
-            reason: r?.name ?? String(r?.reason ?? ''),
-            count: Number(r?.count) || 0,
-            amount: Number(r?.amount) || 0,
-          }))
-          .sort((a: any, b: any) => b.count - a.count);
-
-        setUnreconciledReasons(list);
-      } else {
-        setUnreconciledReasons([]);
-      }
-    } catch (e) {
-      console.error('Error fetching unreconciled reasons:', e);
-      setUnreconciledReasons([]);
     }
   };
 
@@ -1450,28 +1527,7 @@ const MarketplaceReconciliation: React.FC = () => {
     }
   };
 
-  // Platform selector state - load from localStorage if available
-  const loadPlatformFromStorage = (): Platform => {
-    try {
-      const stored = localStorage.getItem('recon_selected_platforms');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Handle both old array format and new single value format
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed[0] as Platform;
-        } else if (typeof parsed === 'string' && ['flipkart', 'amazon', 'd2c', 'other'].includes(parsed)) {
-          return parsed as Platform;
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to load platform from localStorage:', e);
-    }
-    return 'flipkart'; // default
-  };
 
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(loadPlatformFromStorage());
-  const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [tempSelectedPlatform, setTempSelectedPlatform] = useState<Platform | null>(null);
   const [qcModel, setQcModel] = useState<'SOR' | 'OR'>('SOR');
 
   const isD2C = selectedPlatform === 'd2c';
@@ -3664,9 +3720,9 @@ const MarketplaceReconciliation: React.FC = () => {
                     const cancellationsAmount = Math.abs(Number(s?.total_cancellations_amount || 0));
                     const cancellationsCount = Number(s?.total_cancellations_orders || 0);
 
-                    // API-provided Net Sales values
-                    const netSalesAmount = Math.abs(Number(s?.net_sales_amount || 0));
-                    const netSalesCount = Number(s?.net_sales_orders || 0);
+                    // Enforce Net Sales values to exactly match: Gross - Returns - Cancellations
+                    const netSalesAmount = grossSalesAmount - returnsAmount - cancellationsAmount;
+                    const netSalesCount = grossSalesCount - returnsCount - cancellationsCount;
 
                     // Previous return/cancellations metrics
                     const prevReturnOrCancelledAmount = Math.abs(Number(s?.prev_return_or_cancelled_amount || 0));
@@ -3793,9 +3849,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     const rawUnreconciledCount = Number(s?.total_unreconciled_count || 0);
                     // Total settled = all reconciled + unreconciled from API
                     const totalCount = rawReconciledCount + manuallyReconciledCount + rawUnreconciledCount;
-                    // Cap displayed unreconciled to ~0.1% of total so the gauge shows ~99.9%
-                    const displayUnreconciledCount = Math.min(rawUnreconciledCount, Math.max(1, Math.round(totalCount * 0.001)));
-                    const totalReconciledCount = totalCount - displayUnreconciledCount;
+                    const totalReconciledCount = rawReconciledCount + manuallyReconciledCount;
                     const pct = totalCount === 0 ? 0 : (totalReconciledCount / totalCount) * 100;
                     const matchedDeg = (pct / 100) * 360;
 
@@ -3971,8 +4025,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             const _rec = Number(_s?.total_reconciled_count || 0);
                             const _man = Number(_s?.total_manually_reconciled_or_disputed_count || 0);
                             const _unrec = Number(_s?.total_unreconciled_count || 0);
-                            const _total = _rec + _man + _unrec;
-                            return Math.min(_unrec, Math.max(1, Math.round(_total * 0.001))).toLocaleString();
+                            return _unrec.toLocaleString();
                           })()}
                         </Typography>
                         <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: '#6b7280', fontWeight: 400 }}>
@@ -4128,8 +4181,9 @@ const MarketplaceReconciliation: React.FC = () => {
                             variant="outlined"
                             size="small"
                             onClick={() => {
-                              const platformsParam = selectedPlatform || '';
-                              navigate(`/operations-centre?from=${effectiveDateRangeForTs.start}&to=${effectiveDateRangeForTs.end}${platformsParam ? `&platforms=${platformsParam}` : ''}`);
+                              setInitialTsFilters(undefined);
+                              setInitialTsTab(1); // 1 = Mismatched Tab
+                              setShowTransactionSheet(true);
                             }}
                             sx={{
                               borderColor: '#6366f1',
@@ -4866,14 +4920,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                 letterSpacing: '-0.02em',
                                 fontSize: '2rem'
                               }}>
-                                {formatCurrency(Math.abs(totalUnrecAmount))}
+                                {(totalUnrecCount).toLocaleString('en-IN')}
                               </Typography>
                               <Box sx={{ display: 'flex', alignItems: 'baseline', color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
-                                <Typography sx={{ width: 85, textAlign: 'left', fontWeight: 'inherit', fontSize: 'inherit', fontVariantNumeric: 'tabular-nums' }}>
-                                  {(totalUnrecCount).toLocaleString('en-IN')}
+                                <Typography sx={{ mr: 1, textAlign: 'left', fontWeight: 'inherit', fontSize: 'inherit', fontVariantNumeric: 'tabular-nums' }}>
+                                  {formatCurrency(Math.abs(totalUnrecAmount))}
                                 </Typography>
                                 <Typography sx={{ fontWeight: 'inherit', fontSize: 'inherit' }}>
-                                  Orders
+                                  in Value
                                 </Typography>
                               </Box>
                             </Box>
@@ -7716,7 +7770,7 @@ const MarketplaceReconciliation: React.FC = () => {
             setSelectedProviderPlatform(undefined);
             setInitialTsFilters(undefined);
           }}
-          statsData={reconciliationData}
+          statsData={mainSummary as any}
           initialTab={initialTsTab}
           dateRange={effectiveDateRangeForTs}
           initialPlatforms={

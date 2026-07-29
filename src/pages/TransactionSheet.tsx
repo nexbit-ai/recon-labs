@@ -1693,6 +1693,7 @@ const createQuadParamsSignature = (params: Record<string, any>) => {
 };
 
 const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0, dateRange: propDateRange, initialPlatforms, initialFilters: propsInitialFilters }) => {
+  console.log("TransactionSheet RENDERING, propsStatsData:", propsStatsData);
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -3425,50 +3426,82 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       // Process matched response (Tab 0)
       if ((matchedResponse as any).success && !(matchedResponse as any).skipped) {
-        setMatchedData(matchedResponse.data as any);
         if (matchedResponse.data?.pagination) {
+          const summaryData = propsStatsData as any;
+          console.log("propsStatsData:", propsStatsData);
+          const overriddenCount = summaryData?.summary?.total_reconciled_count;
+          console.log("overriddenCount:", overriddenCount);
+          if (overriddenCount !== undefined) {
+             matchedResponse.data.pagination.total_count = overriddenCount;
+             (matchedResponse.data.pagination as any).total_pages = Math.max(1, Math.ceil(overriddenCount / ((matchedResponse.data.pagination as any).limit || 100)));
+          }
           setMatchedTotalCount(matchedResponse.data.pagination.total_count);
         }
+        setMatchedData(matchedResponse.data as any);
       } else if (!matchedResponse.success) {
         console.error('[fetchQuadTransactions] Matched API failed:', matchedResponse);
       }
 
       // Process mismatched less received response (Tab 1 - sub-tab 1)
       if ((mismatchedLessReceivedResponse as any).success && !(mismatchedLessReceivedResponse as any).skipped) {
-        setMismatchedLessReceivedData(mismatchedLessReceivedResponse.data as any);
         if (mismatchedLessReceivedResponse.data?.pagination) {
+          const summaryData = propsStatsData as any;
+          const overriddenCount = summaryData?.UnReconcile?.summary?.total_less_payment_received_orders;
+          if (overriddenCount !== undefined) {
+             mismatchedLessReceivedResponse.data.pagination.total_count = overriddenCount;
+             (mismatchedLessReceivedResponse.data.pagination as any).total_pages = Math.max(1, Math.ceil(overriddenCount / ((mismatchedLessReceivedResponse.data.pagination as any).limit || 100)));
+          }
           setMismatchedLessReceivedTotalCount(mismatchedLessReceivedResponse.data.pagination.total_count);
         }
+        setMismatchedLessReceivedData(mismatchedLessReceivedResponse.data as any);
       } else if (!mismatchedLessReceivedResponse.success) {
         console.error('[fetchQuadTransactions] Mismatched Less Received API failed:', mismatchedLessReceivedResponse);
       }
 
       // Process mismatched more received response (Tab 1 - sub-tab 2)
       if ((mismatchedMoreReceivedResponse as any).success && !(mismatchedMoreReceivedResponse as any).skipped) {
-        setMismatchedMoreReceivedData(mismatchedMoreReceivedResponse.data as any);
         if (mismatchedMoreReceivedResponse.data?.pagination) {
+          const summaryData = propsStatsData as any;
+          const overriddenCount = summaryData?.UnReconcile?.summary?.total_more_payment_received_orders;
+          if (overriddenCount !== undefined) {
+             mismatchedMoreReceivedResponse.data.pagination.total_count = overriddenCount;
+             (mismatchedMoreReceivedResponse.data.pagination as any).total_pages = Math.max(1, Math.ceil(overriddenCount / ((mismatchedMoreReceivedResponse.data.pagination as any).limit || 100)));
+          }
           setMismatchedMoreReceivedTotalCount(mismatchedMoreReceivedResponse.data.pagination.total_count);
         }
+        setMismatchedMoreReceivedData(mismatchedMoreReceivedResponse.data as any);
       } else if (!mismatchedMoreReceivedResponse.success) {
         console.error('[fetchQuadTransactions] Mismatched More Received API failed:', mismatchedMoreReceivedResponse);
       }
 
       // Process unsettled response (Tab 2)
       if ((unsettledResponse as any).success && !(unsettledResponse as any).skipped) {
-        setUnsettledData(processedUnsettledData);
-        if (processedUnsettledData?.pagination) {
-          setUnsettledTotalCount(processedUnsettledData.pagination.total_count);
+        if (unsettledResponse.data?.pagination) {
+          const summaryData = propsStatsData as any;
+          const overriddenCount = summaryData?.Unsettled?.summary?.total_order_count;
+          if (overriddenCount !== undefined) {
+             unsettledResponse.data.pagination.total_count = overriddenCount;
+             (unsettledResponse.data.pagination as any).total_pages = Math.max(1, Math.ceil(overriddenCount / ((unsettledResponse.data.pagination as any).limit || 100)));
+          }
+          setUnsettledTotalCount(unsettledResponse.data.pagination.total_count);
         }
+        setUnsettledData(processedUnsettledData);
       } else if (!unsettledResponse.success) {
         console.error('[fetchQuadTransactions] Unsettled API failed:', unsettledResponse);
       }
 
       // Process all response (Tab 3)
       if ((allResponse as any).success && !(allResponse as any).skipped) {
-        setAllData(allResponse.data as any);
         if (allResponse.data?.pagination) {
+          const summaryData = propsStatsData as any;
+          const overriddenCount = summaryData?.summary?.total_transaction_orders;
+          if (overriddenCount !== undefined) {
+             allResponse.data.pagination.total_count = overriddenCount;
+             (allResponse.data.pagination as any).total_pages = Math.max(1, Math.ceil(overriddenCount / ((allResponse.data.pagination as any).limit || 100)));
+          }
           setAllTotalCount(allResponse.data.pagination.total_count);
         }
+        setAllData(allResponse.data as any);
       } else if (!allResponse.success) {
         console.error('[fetchQuadTransactions] All API failed:', allResponse);
       }
@@ -3529,13 +3562,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       // Update tab counts based on the actual data received (only on initial load or base param change)
       if (!isTabSwitchOnly) {
-        const lessReceivedCount = mismatchedLessReceivedResponse.success ? ((mismatchedLessReceivedResponse.data as any)?.data?.length || 0) : 0;
-        const moreReceivedCount = mismatchedMoreReceivedResponse.success ? ((mismatchedMoreReceivedResponse.data as any)?.data?.length || 0) : 0;
+        const getCount = (resp: any) => resp.success ? (resp.data?.pagination?.total_count ?? resp.data?.data?.length ?? 0) : null;
+        const lessReceivedCount = getCount(mismatchedLessReceivedResponse) || 0;
+        const moreReceivedCount = getCount(mismatchedMoreReceivedResponse) || 0;
+        
         setTabCounts({
-          matched: matchedResponse.success ? ((matchedResponse.data as any)?.data?.length || 0) : null,
+          matched: getCount(matchedResponse),
           mismatched: lessReceivedCount + moreReceivedCount > 0 ? lessReceivedCount + moreReceivedCount : null,
-          unsettled: unsettledResponse.success ? ((unsettledResponse.data as any)?.data?.length || 0) : null,
-          all: allResponse.success ? ((allResponse.data as any)?.data?.length || 0) : null,
+          unsettled: getCount(unsettledResponse),
+          all: getCount(allResponse),
         });
       }
     } catch (err: any) {

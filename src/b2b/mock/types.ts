@@ -65,7 +65,8 @@ export interface ReconLineItem {
   channel: ChannelName;
   skuId: string;
   skuLabel: string;
-  ref: string; // GRN / settlement reference
+  grn: string;
+  invoice: string;
   expected: number;
   paid: number;
   variance: number; // gap = expected - paid (positive = underpaid)
