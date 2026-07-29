@@ -18,6 +18,7 @@ import {
   ExpandMoreOutlined,
   AddOutlined,
   LocalOfferOutlined,
+  SyncOutlined,
 } from '@mui/icons-material';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
@@ -398,8 +399,17 @@ const Contracts: React.FC = () => {
   const [expandedChannel, setExpandedChannel] = React.useState<ChannelName | null>('Blinkit');
   const [discounts, setDiscounts] = React.useState<SecondaryDiscount[]>(seedDiscounts);
   const [addChannel, setAddChannel] = React.useState<ChannelName | null>(null);
+  const [isSyncing, setIsSyncing] = React.useState(false);
 
   const discountsFor = (channel: ChannelName) => discounts.filter((d) => d.channel === channel);
+
+  const handleSync = () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    setTimeout(() => {
+      setIsSyncing(false);
+    }, 2000);
+  };
 
   const handleAdd = (discount: SecondaryDiscount) => {
     setDiscounts((prev) => [discount, ...prev]);
@@ -413,12 +423,54 @@ const Contracts: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
     >
-      <PageTitle>Contracts</PageTitle>
-      <Typography sx={{ mt: `-${space.md}px`, mb: `${space.xl}px`, fontSize: type.body.fontSize, color: colors.grey700, maxWidth: 760 }}>
-        One contract per channel. Each defines the rate card <b style={{ color: colors.ink }}>and</b> the secondary
-        discounts running on it — together they set the “expected amount to receive” that reconciliation checks every
-        settlement against. Open a channel to view or configure its contract.
-      </Typography>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: `${space.lg}px`,
+          flexWrap: 'wrap',
+          mb: `${space.xl}px`,
+        }}
+      >
+        <Box>
+          <PageTitle>Contracts</PageTitle>
+          <Typography sx={{ mt: `-${space.md}px`, fontSize: type.body.fontSize, color: colors.grey700, maxWidth: 760 }}>
+            One contract per channel. Each defines the rate card <b style={{ color: colors.ink }}>and</b> the secondary
+            discounts running on it — together they set the “expected amount to receive” that reconciliation checks every
+            settlement against. Open a channel to view or configure its contract.
+          </Typography>
+        </Box>
+        <Button
+          onClick={handleSync}
+          disabled={isSyncing}
+          startIcon={
+            <SyncOutlined
+              sx={{
+                fontSize: 18,
+                animation: isSyncing && !reduce ? 'b2bspin 1s linear infinite' : 'none',
+                '@keyframes b2bspin': { to: { transform: 'rotate(360deg)' } },
+              }}
+            />
+          }
+          sx={{
+            bgcolor: colors.accent,
+            color: colors.paper,
+            fontSize: 13,
+            fontWeight: 600,
+            px: `${space.xl}px`,
+            py: `${space.md}px`,
+            '&:hover': { bgcolor: colors.accentHover },
+            '&.Mui-disabled': {
+              bgcolor: colors.accent,
+              color: colors.paper,
+              opacity: 0.7,
+            }
+          }}
+        >
+          {isSyncing ? 'Syncing...' : 'Sync'}
+        </Button>
+      </Box>
 
       <Box sx={cardSx}>
         {channelContracts.map((contract, i) => (
