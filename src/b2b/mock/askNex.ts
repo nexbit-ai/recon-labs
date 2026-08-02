@@ -19,7 +19,7 @@ export const askNexQA: AskNexQA[] = [
     id: 'AN-3',
     question: 'Which channel leaks the most?',
     answer:
-      'Amazon — ₹14.2L this quarter, 37% of total leakage, almost entirely FBA weight-band and fee misclassification on the 1kg keyboards.',
+      'Amazon — ₹14.2L this quarter, 37% of total leakage, almost entirely FBA weight-band and fee misclassification on the keyboards.',
   },
   {
     id: 'AN-4',
