@@ -8,14 +8,14 @@ import type { Dispute, DisputePipeline } from './types';
 // that the Overview reads (windowDaysRemaining <= 10 sum to ₹1,40,000, max 9).
 export const disputes: Dispute[] = [
   // ── High-value named claims (shown in the Disputes table) ──
-  { id: 'D-1041', channel: 'Instamart', reason: 'Short-paid vs GRN (Thaw rejection)', amount: 85_200, status: 'Filed', windowDaysRemaining: 18, highValue: true },
-  { id: 'D-1042', channel: 'Blinkit', reason: 'Spoilage incorrectly charged to brand', amount: 1_12_400, status: 'Drafted', windowDaysRemaining: 73, highValue: true },
+  { id: 'D-1041', channel: 'Instamart', reason: 'Short-paid vs GRN (QC rejection)', amount: 85_200, status: 'Filed', windowDaysRemaining: 18, highValue: true },
+  { id: 'D-1042', channel: 'Blinkit', reason: 'Transit damage incorrectly charged to brand', amount: 1_12_400, status: 'Drafted', windowDaysRemaining: 73, highValue: true },
   { id: 'D-1043', channel: 'Zepto', reason: 'Visibility fee deducted twice', amount: 41_200, status: 'Drafted', windowDaysRemaining: 11, urgent: true, highValue: true },
   { id: 'D-1044', channel: 'Offline Stores', reason: 'Promotional Endcap mismatch', amount: 18_500, status: 'In review', windowDaysRemaining: 22, highValue: true },
-  { id: 'D-1045', channel: 'Amazon', reason: 'FBA dry-ice surcharge error', amount: 32_000, status: 'Recovered', windowDaysRemaining: 0, highValue: true },
+  { id: 'D-1045', channel: 'Amazon', reason: 'FBA oversized surcharge error', amount: 32_000, status: 'Recovered', windowDaysRemaining: 0, highValue: true },
 
   // ── Other active claims expiring within ~10 days (Σ = ₹1,40,000 = ₹1.4L, max 9) ──
-  { id: 'D-1051', channel: 'Blinkit', reason: 'Cold chain penalty disputed', amount: 55_000, status: 'Drafted', windowDaysRemaining: 5, urgent: true },
+  { id: 'D-1051', channel: 'Blinkit', reason: 'Late fulfillment penalty disputed', amount: 55_000, status: 'Drafted', windowDaysRemaining: 5, urgent: true },
   { id: 'D-1052', channel: 'Zepto', reason: 'Weight discrepancy on GRN', amount: 45_000, status: 'Filed', windowDaysRemaining: 9 },
   { id: 'D-1053', channel: 'Instamart', reason: 'Promo funding not credited', amount: 40_000, status: 'In review', windowDaysRemaining: 8 },
 
