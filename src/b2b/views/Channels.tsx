@@ -128,7 +128,7 @@ const Channels: React.FC = () => {
 
       {/* Quiet narrative caption */}
       <Typography sx={{ mt: `${space.lg}px`, fontSize: type.body.fontSize, color: colors.grey700, maxWidth: 720 }}>
-        Amazon settles the most but realises the least — the 1kg keyboards keep landing in the wrong FBA weight
+        Amazon settles the most but realises the least — the keyboards keep landing in the wrong FBA weight
         band. That single fix is worth ~₹8.6L.
       </Typography>
     </Box>
