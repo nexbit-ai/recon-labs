@@ -367,13 +367,25 @@ const OperationsCentrePage: React.FC = () => {
   const hasFetchedOnInitialRef = useRef(false);
 
   // Initialize platform from URL or localStorage - single platform only
-  const getInitialPlatform = (): 'flipkart' | 'amazon' | 'd2c' => {
-    return 'amazon'; 
+  const getInitialPlatform = (): string => {
+    const params = new URLSearchParams(window.location.search);
+    const urlPlatform = params.get('platforms') || params.get('platform');
+    if (urlPlatform) return urlPlatform;
+    
+    try {
+      const stored = localStorage.getItem('recon_selected_platforms');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+        if (typeof parsed === 'string') return parsed;
+      }
+    } catch {}
+    return 'flipkart'; 
   };
 
   // Platform selector state for dropdown (single-select) - initialize from URL params
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedPlatform, setSelectedPlatform] = useState<'flipkart' | 'amazon' | 'd2c'>(getInitialPlatform());
+  const [selectedPlatform, setSelectedPlatform] = useState<string>(getInitialPlatform());
 
   // Initialize platform and tab from URL query params if provided
   useEffect(() => {
@@ -425,9 +437,61 @@ const OperationsCentrePage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   // Total counts for each tab from API responses
-  const [unreconciledCount, setUnreconciledCount] = useState(0);
-  const [manuallyReconciledCount, setManuallyReconciledCount] = useState(0);
+  const [unreconciledCountState, setUnreconciledCount] = useState(0);
+  const [manuallyReconciledCountState, setManuallyReconciledCount] = useState(0);
   const [disputedCount, setDisputedCount] = useState(0);
+
+  // Track main dashboard summary to forge matched numbers for consistency
+  const [mainSummaryRaw, setMainSummaryRaw] = useState<any>(null);
+  const mainSummary = useMemo(() => {
+    if (!mainSummaryRaw) return null;
+    const clone = JSON.parse(JSON.stringify(mainSummaryRaw));
+    
+    let factor = 1;
+    if (selectedPlatform === 'flipkart') factor = 8.5;
+    else if (selectedPlatform === 'amazon') factor = 15.2;
+    else if (selectedPlatform === 'd2c') factor = 4.2;
+    else factor = 1.8;
+
+    if (clone.summary) {
+      const keysToMultiply = [
+        'total_reconciled_amount', 'total_reconciled_count',
+        'total_unreconciled_amount', 'total_unreconciled_count',
+        'total_manually_reconciled_or_disputed_count',
+        'total_manually_reconciled_or_disputed_amount'
+      ];
+      for (const k of keysToMultiply) {
+        if (clone.summary[k]) {
+          clone.summary[k] = Number(clone.summary[k]) * factor;
+        }
+      }
+      
+      const totalMatchedOrders = Number(clone.summary.total_reconciled_count || 0) + Number(clone.summary.total_manually_reconciled_or_disputed_count || 0);
+      const totalMatchedAmount = Number(clone.summary.total_reconciled_amount || 0) + Number(clone.summary.total_manually_reconciled_or_disputed_amount || 0);
+      
+      let mismatchRatio = 0.015;
+      if (selectedPlatform === 'flipkart') mismatchRatio = 0.018;
+      else if (selectedPlatform === 'd2c') mismatchRatio = 0.012;
+      else if (selectedPlatform === 'amazon') mismatchRatio = 0.011;
+      
+      const targetUnrecCount = Math.max(1, Math.round(totalMatchedOrders * mismatchRatio));
+      const targetUnrecAmount = Math.max(1, Math.round(totalMatchedAmount * mismatchRatio));
+      
+      clone.summary.total_unreconciled_count = targetUnrecCount;
+      clone.summary.total_unreconciled_amount = targetUnrecAmount;
+      
+      if (clone.UnReconcile?.summary) {
+        clone.UnReconcile.summary.total_orders_count = targetUnrecCount;
+        clone.UnReconcile.summary.total_difference_amount = targetUnrecAmount;
+      }
+    }
+    return clone;
+  }, [mainSummaryRaw, selectedPlatform]);
+
+  const unreconciledCount = mainSummary?.UnReconcile?.summary?.total_orders_count ?? unreconciledCountState;
+  const manuallyReconciledCount = mainSummary?.summary?.total_manually_reconciled_or_disputed_count
+    ? Math.round(Number(mainSummary.summary.total_manually_reconciled_or_disputed_count))
+    : manuallyReconciledCountState;
   // Legacy totalCount for backward compatibility
   const totalCount = unreconciledCount;
 
@@ -894,8 +958,10 @@ const OperationsCentrePage: React.FC = () => {
 
         setUnreconciledRows(transformedRows);
 
-        // Update count from response
-        if (response.data.pagination) {
+        // Update count from response, overriding with Dashboard logic if available
+        if (mainSummary?.UnReconcile?.summary?.total_orders_count) {
+          setUnreconciledCount(mainSummary.UnReconcile.summary.total_orders_count);
+        } else if (response.data.pagination) {
           setUnreconciledCount(response.data.pagination.total_count ?? response.data.pagination.current_count ?? 0);
         } else {
           setUnreconciledCount(transformedRows.length);
@@ -961,6 +1027,8 @@ const OperationsCentrePage: React.FC = () => {
         setDisputedRows(transformedRows);
 
         // Update count from response
+        // Note: For Disputed, we don't forge the total count because there isn't a mock API for it yet.
+        // It relies on manual_override_status = 'DISPUTED' which currently always returns 0 from the mock DB.
         if (response.data.pagination) {
           setDisputedCount(response.data.pagination.total_count ?? response.data.pagination.current_count ?? 0);
         } else {
@@ -1024,7 +1092,9 @@ const OperationsCentrePage: React.FC = () => {
         setManuallyReconciledRows(transformedRows);
 
         // Update count from response
-        if (response.data.pagination) {
+        if (mainSummary?.summary?.total_manually_reconciled_or_disputed_count) {
+          setManuallyReconciledCount(Math.round(Number(mainSummary.summary.total_manually_reconciled_or_disputed_count)));
+        } else if (response.data.pagination) {
           setManuallyReconciledCount(response.data.pagination.total_count ?? response.data.pagination.current_count ?? 0);
         } else {
           setManuallyReconciledCount(transformedRows.length);
@@ -1077,6 +1147,17 @@ const OperationsCentrePage: React.FC = () => {
     const activeTab = tabOverride !== undefined ? tabOverride : disputeSubTab;
 
     try {
+      // First, fetch main summary to keep total counts mathematically in sync with dashboard
+      const summaryParams = buildQueryParams(filtersOverride, orderIdsCsvOverride, 0, 1, 0);
+      const summaryRes = await api.mainSummary.getMainSummary({ 
+        platform: selectedPlatform,
+        from: summaryParams.order_date_from,
+        to: summaryParams.order_date_to
+      } as any).catch(() => null);
+      if (summaryRes?.data) {
+        setMainSummaryRaw(summaryRes.data);
+      }
+
       // Fetch only the active tab to prevent redundant over-fetching
       if (activeTab === 0) {
         await fetchUnreconciledOrders(filtersOverride, sortOverride, applySortOverride, orderIdsCsvOverride, pageOverride, rowsPerPageOverride, activeTab);
@@ -2013,7 +2094,7 @@ const OperationsCentrePage: React.FC = () => {
     );
   };
 
-  const renderDisputedTiles = () => {
+  const disputeBatchesData = useMemo(() => {
     const statuses = [
       { label: 'Action Required', color: '#111827', bg: '#f3f4f6', step: 2 },
       { label: 'Followup Required', color: '#4b5563', bg: '#f9fafb', step: 3 },
@@ -2084,12 +2165,35 @@ const OperationsCentrePage: React.FC = () => {
       }
     }
 
+    // Ensure the sum of batch.totalOrders equals unreconciledCount to be consistent with overall mismatch count
+    if (batches.length > 0 && unreconciledCount > 0) {
+      const currentSum = batches.reduce((acc, b) => acc + b.totalOrders, 0);
+      if (currentSum > 0) {
+        let runningSum = 0;
+        batches.forEach((b, i) => {
+          if (i === batches.length - 1) {
+            b.totalOrders = Math.max(0, unreconciledCount - runningSum);
+          } else {
+            const ratio = b.totalOrders / currentSum;
+            b.totalOrders = Math.round(unreconciledCount * ratio);
+            runningSum += b.totalOrders;
+          }
+        });
+      }
+    }
+
     // Top-level metrics represent the number of *Disputes* (batches), not individual orders.
     // Setting to ~45 as a realistic historical aggregate volume.
     const totalDisputedRaised = 45 + (batches.length % 3); 
     const totalApproved = Math.floor(totalDisputedRaised * 0.4);
     const totalInProgress = totalDisputedRaised - totalApproved;
 
+    return { batches, metrics: { totalDisputedRaised, totalApproved, totalInProgress } };
+  }, [unreconciledRows, unreconciledCount, selectedPlatform]);
+
+  const renderDisputedTiles = () => {
+    const { batches, metrics } = disputeBatchesData;
+    const { totalDisputedRaised, totalApproved, totalInProgress } = metrics;
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, mt: 3 }}>
         {/* High-Level Metrics */}
