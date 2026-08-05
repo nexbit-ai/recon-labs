@@ -70,8 +70,8 @@ class TokenManager {
    * Get legacy organization ID (for backward compatibility)
    */
   getOrgId(): string | null {
-    // Always use the hardcoded organization ID from config
-    return API_CONFIG.ORG_ID;
+    // Return stored orgId from session, or local storage, fallback to config
+    return this.orgId || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID;
   }
 
   /**

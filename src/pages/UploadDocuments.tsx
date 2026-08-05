@@ -248,7 +248,7 @@ const UploadDocuments: React.FC = () => {
         const customSessionData = {
           member_id: session.member_id,
           member_session_id: session.member_session_id,
-          organization_id: API_CONFIG.ORG_ID,
+          organization_id: session.organization_id || API_CONFIG.ORG_ID,
           organization_slug: session.organization_slug,
           roles: session.roles,
         };
@@ -257,7 +257,7 @@ const UploadDocuments: React.FC = () => {
       
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': API_CONFIG.ORG_ID,
+        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
       };
       
       if (customToken) {
@@ -319,7 +319,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: API_CONFIG.ORG_ID, // Use hardcoded org_id instead of Stytch's
+            organization_id: session.organization_id || API_CONFIG.ORG_ID, // Prefer Stytch's org_id
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -335,7 +335,7 @@ const UploadDocuments: React.FC = () => {
       // Build headers with API key and custom JWT token
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': API_CONFIG.ORG_ID,
+        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
       };
       
       // Add custom JWT token
@@ -415,7 +415,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: API_CONFIG.ORG_ID,
+            organization_id: session.organization_id || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -427,7 +427,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': API_CONFIG.ORG_ID,
+        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
       };
 
       if (customToken) {
@@ -504,7 +504,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: API_CONFIG.ORG_ID,
+            organization_id: session.organization_id || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -516,7 +516,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': API_CONFIG.ORG_ID,
+        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
       };
       if (customToken) {
         headers['Authorization'] = `Bearer ${customToken}`;
@@ -581,7 +581,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: API_CONFIG.ORG_ID,
+            organization_id: session.organization_id || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -593,7 +593,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': API_CONFIG.ORG_ID,
+        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
       };
       if (customToken) {
         headers['Authorization'] = `Bearer ${customToken}`;
@@ -738,7 +738,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: API_CONFIG.ORG_ID,
+            organization_id: session.organization_id || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -750,7 +750,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': API_CONFIG.ORG_ID,
+        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
       };
       if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
 
@@ -822,7 +822,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: API_CONFIG.ORG_ID,
+            organization_id: session.organization_id || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -833,7 +833,7 @@ const UploadDocuments: React.FC = () => {
       }
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': API_CONFIG.ORG_ID,
+        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
       };
       if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
       const response = await fetch(`${API_CONFIG.BASE_URL}/v1/recon/upload`, {
@@ -893,7 +893,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: API_CONFIG.ORG_ID,
+            organization_id: session.organization_id || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -905,7 +905,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': API_CONFIG.ORG_ID,
+        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
       };
       if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
 
@@ -964,7 +964,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: API_CONFIG.ORG_ID,
+            organization_id: session.organization_id || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -976,7 +976,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': API_CONFIG.ORG_ID,
+        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
       };
       if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
 
@@ -1032,7 +1032,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: API_CONFIG.ORG_ID,
+            organization_id: session.organization_id || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -1044,7 +1044,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': API_CONFIG.ORG_ID,
+        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
       };
       if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
 

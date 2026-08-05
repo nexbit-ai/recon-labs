@@ -56,7 +56,7 @@ import {
   Info as InfoIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
-import { api } from '../services/api';
+import { api, apiService } from '../services/api';
 import ColumnFilterControls from '../components/ColumnFilterControls';
 import TransactionSheet from './TransactionSheet';
 // Type definitions for transaction data based on API response
@@ -1252,6 +1252,7 @@ const OperationsCentrePage: React.FC = () => {
   }, []);
 
   // Fetch only the active tab data whenever filters or other inputs change
+  
   const fetchAllTabsData = async (
     filtersOverride?: Record<string, any>,
     sortOverride?: { key: string; direction: 'asc' | 'desc' } | null,
@@ -1277,6 +1278,7 @@ const OperationsCentrePage: React.FC = () => {
       }
       if (activeTab === 2 || activeTab === -1) {
         promises.push(fetchClaimBatchesData());
+        // Removed fetchFeeInvoiceSummary
       }
       await Promise.all(promises);
     } catch (err) {
@@ -2375,7 +2377,8 @@ const OperationsCentrePage: React.FC = () => {
             }}
           >
             <Tab value={2} label="Home" />
-            <Tab value={1} label={`Dispute Required (${getDisputedCount()})`} />
+            <Tab value={0} label={`Action Required (${getUnreconciledTotalCount()})`} />
+            <Tab value={1} label={`Already Disputed (${getDisputedCount()})`} />
           </Tabs>
 
           {/* Controls */}
@@ -2515,12 +2518,44 @@ const OperationsCentrePage: React.FC = () => {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {/* Metrics Cards */}
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+
+            {/* Invoice vs Settlement Recon */}
+
+            {/* Claims Eligible */}
             <Card sx={{ width: 260, borderRadius: 1, background: '#ffffff', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
               <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.875rem' }}>Claims Raised</Typography>
-                  <Box sx={{ px: 1.5, py: 0.5, borderRadius: 1, background: '#f3f4f6', color: '#374151', fontWeight: 600, fontSize: '0.875rem' }}>
-                    {filteredBatches.filter(b => b.status !== 'ELIGIBLE').length}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.875rem' }}>Claims Eligible</Typography>
+                    <Box sx={{ px: 1.5, py: 0.5, borderRadius: 1, background: '#f3f4f6', color: '#374151', fontWeight: 600, fontSize: '0.875rem' }}>
+                      {filteredBatches.filter(b => b.status === 'ELIGIBLE').reduce((sum, b) => sum + (Number(b.total_orders) || 0), 0)}
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.8125rem' }}>Value</Typography>
+                    <Typography sx={{ color: '#111827', fontWeight: 700, fontSize: '1rem' }}>
+                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(filteredBatches.filter(b => b.status === 'ELIGIBLE').reduce((sum, b) => sum + (Number(b.total_gap) || 0), 0))}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Claims Raised */}
+            <Card sx={{ width: 260, borderRadius: 1, background: '#ffffff', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+              <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.875rem' }}>Claims Raised</Typography>
+                    <Box sx={{ px: 1.5, py: 0.5, borderRadius: 1, background: '#f3f4f6', color: '#374151', fontWeight: 600, fontSize: '0.875rem' }}>
+                      {filteredBatches.filter(b => b.status !== 'ELIGIBLE').reduce((sum, b) => sum + (Number(b.total_orders) || 0), 0)}
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.8125rem' }}>Value</Typography>
+                    <Typography sx={{ color: '#111827', fontWeight: 700, fontSize: '1rem' }}>
+                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(filteredBatches.filter(b => b.status !== 'ELIGIBLE').reduce((sum, b) => sum + (Number(b.total_gap) || 0), 0))}
+                    </Typography>
                   </Box>
                 </Box>
               </CardContent>
@@ -2532,7 +2567,7 @@ const OperationsCentrePage: React.FC = () => {
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.875rem' }}>Claims Approved</Typography>
                     <Box sx={{ px: 1.5, py: 0.5, borderRadius: 1, background: '#f3f4f6', color: '#374151', fontWeight: 600, fontSize: '0.875rem' }}>
-                      {filteredBatches.filter(b => ['APPROVED', 'REIMBURSED', 'SUCCESS'].includes(b.status)).length}
+                      {filteredBatches.filter(b => ['APPROVED', 'REIMBURSED', 'SUCCESS'].includes(b.status)).reduce((sum, b) => sum + (Number(b.total_orders) || 0), 0)}
                     </Box>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2630,7 +2665,7 @@ const OperationsCentrePage: React.FC = () => {
                         variant="outlined" 
                         sx={{ textTransform: 'none', fontWeight: 600, py: 0.75, fontSize: '0.8125rem', borderColor: '#e5e7eb', color: '#374151', '&:hover': { background: '#f9fafb' } }}
                         onClick={() => {
-                          setDisputeSubTab(1); // Jump to Dispute Required tab
+                          setDisputeSubTab(0); // Jump to Dispute Required tab
                         }}
                       >
                         View Orders
@@ -3236,7 +3271,7 @@ const OperationsCentrePage: React.FC = () => {
                         <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
                             <Chip
-                              label='Dispute Required'
+                              label='Action Required'
                               size="small"
                               sx={{
                                 background: '#fee2e2',

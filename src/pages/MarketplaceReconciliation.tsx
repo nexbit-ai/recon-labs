@@ -196,6 +196,8 @@ import {
   CalendarToday as CalendarTodayIcon,
   ArrowRight,
   Download as DownloadIcon,
+  Close as CloseIcon,
+  DescriptionOutlined as DescriptionOutlinedIcon,
 } from '@mui/icons-material';
 import TransactionSheet from './TransactionSheet';
 import { apiService } from '../services/api/apiService';
@@ -213,6 +215,29 @@ const MarketplaceReconciliation: React.FC = () => {
   const { setMemberName } = useUser();
   const { hasValidCredentials, isInitialized } = useOrganization();
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
+  const [feeInvoiceSummary, setFeeInvoiceSummary] = useState<{
+    total_invoiced: number;
+    total_invoiced_ex_gst: number;
+    total_invoice_gst: number;
+    total_deducted: number;
+    difference: number;
+    categories: Array<{
+      category: string;
+      invoice_ex_gst: number;
+      settlement_amount: number;
+      difference: number;
+    }>;
+    total_marketplace_fees: number;
+    total_fba_storage_fees: number;
+    total_lightning_deal_fees: number;
+    total_subscription_fees: number;
+    total_inbound_transportation_fees: number;
+    total_advertising_fees: number;
+    total_fba_removal_fees: number;
+    total_other_fees: number;
+  } | null>(null);
+  const [feeInvoicesList, setFeeInvoicesList] = useState<any[]>([]);
+  const [showInvoicesDialog, setShowInvoicesDialog] = useState(false);
   const [initialTsFilters, setInitialTsFilters] = useState<{ [key: string]: any } | undefined>(undefined);
   const [initialTsTab, setInitialTsTab] = useState<number>(0);
   const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other' | undefined>(undefined);
@@ -415,17 +440,22 @@ const MarketplaceReconciliation: React.FC = () => {
   // Ageing summary (Avg TAT across providers) - use real data if available, otherwise dummy
   const overallAvgTAT = ageingData.length > 0
     ? (ageingData.reduce((sum, p) => sum + p.averageDaysToSettle, 0) / ageingData.length).toFixed(1)
-    : (PROVIDER_AGEING_DATA.reduce((sum, p) => sum + p.averageDaysToSettle, 0) / PROVIDER_AGEING_DATA.length).toFixed(1);
+    : usingMockData 
+      ? (PROVIDER_AGEING_DATA.reduce((sum, p) => sum + p.averageDaysToSettle, 0) / PROVIDER_AGEING_DATA.length).toFixed(1)
+      : "0.0";
 
   // Generate chart data from ageing data (convert counts to percentages for display)
   const generateAgeingChartData = () => {
     if (ageingData.length === 0) {
-      // Fallback to dummy data
-      return PROVIDER_AGEING_DATA.map((p) => {
-        const row: any = { provider: p.provider, avgTat: p.averageDaysToSettle };
-        AGE_BUCKETS.forEach((b) => { row[b] = p.distribution[b]; });
-        return row;
-      });
+      if (usingMockData) {
+        // Fallback to dummy data
+        return PROVIDER_AGEING_DATA.map((p) => {
+          const row: any = { provider: p.provider, avgTat: p.averageDaysToSettle };
+          AGE_BUCKETS.forEach((b) => { row[b] = p.distribution[b]; });
+          return row;
+        });
+      }
+      return [];
     }
 
     return ageingData.map((item) => {
@@ -1184,6 +1214,50 @@ const MarketplaceReconciliation: React.FC = () => {
   };
 
   // Fetch ageing analysis data
+  const fetchFeeInvoiceSummary = async () => {
+    // For custom range, wait until both dates are selected
+    if (selectedDateRange === 'custom' && (!customStartDate || !customEndDate)) {
+      return;
+    }
+    
+    let startDate: string;
+    let endDate: string;
+    const today = new Date();
+
+    if (selectedDateRange === 'custom') {
+      startDate = customStartDate;
+      endDate = customEndDate;
+    } else if (selectedDateRange === 'this-month') {
+      startDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), 1)).toISOString().split('T')[0];
+      endDate = new Date(Date.UTC(today.getFullYear(), today.getMonth() + 1, 0)).toISOString().split('T')[0];
+    } else { // last-month
+      startDate = new Date(Date.UTC(today.getFullYear(), today.getMonth() - 1, 1)).toISOString().split('T')[0];
+      endDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), 0)).toISOString().split('T')[0];
+    }
+
+    try {
+      const [summaryRes, listRes] = await Promise.all([
+        apiService.get('/recon/fee-invoices-summary', {
+          start_date: startDate,
+          end_date: endDate
+        }),
+        apiService.get('/recon/fee-invoices', {
+          start_date: startDate,
+          end_date: endDate
+        }).catch(() => ({ data: [] }))
+      ]);
+      
+      if (summaryRes.data) {
+        setFeeInvoiceSummary(summaryRes.data);
+      }
+      if (listRes.data) {
+        setFeeInvoicesList(listRes.data);
+      }
+    } catch (err) {
+      console.error('Error fetching fee invoice summary:', err);
+    }
+  };
+
   const fetchAgeingAnalysis = async () => {
     // For custom range, wait until both dates are selected
     if (selectedDateRange === 'custom' && (!customStartDate || !customEndDate)) {
@@ -2000,6 +2074,9 @@ const MarketplaceReconciliation: React.FC = () => {
     // Fetch ageing analysis data (only when both dates are set for custom)
     if (selectedDateRange !== 'custom' || (customStartDate && customEndDate)) {
       fetchAgeingAnalysis();
+      if (selectedPlatform === 'amazon') {
+        fetchFeeInvoiceSummary();
+      }
     }
     // Fetch month on month growth data when platform is selected
     if (selectedPlatform && (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || selectedPlatform === 'other')) {
@@ -4213,99 +4290,101 @@ const MarketplaceReconciliation: React.FC = () => {
                                   </Box>
                                 </Box>
 
-                                <Grid container spacing={2} sx={{ mt: 1 }}>
-                                  <Grid item xs={12} md={6}>
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1f2937' }}>Pending Payment by Providers</Typography>
-                                      {pendingPaymentProviders.map((provider, idx) => (
-                                        <Box key={`up-${provider.key}-${idx}`}>
-                                          <Box
-                                            sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, px: 2, borderRadius: 1.5, background: '#f9fafb', border: '1px solid #f1f3f4', cursor: provider.key === 'cod' ? 'pointer' : 'default', transition: 'background 0.2s', '&:hover': { background: provider.key === 'cod' ? '#f3f4f6' : '#f9fafb' } }}
-                                            onClick={() => {
-                                              if (provider.key === 'cod') {
-                                                setIsCodExpanded((v) => !v);
-                                              }
-                                            }}
-                                            role={provider.key === 'cod' ? 'button' : undefined}
-                                            aria-expanded={provider.key === 'cod' ? isCodExpanded : undefined}
-                                          >
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                              <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: provider.color }} />
-                                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{provider.name}</Typography>
-                                                {provider.key === 'cod' && (
-                                                  <ExpandMoreIcon
-                                                    sx={{
-                                                      fontSize: 20,
-                                                      color: '#6b7280',
-                                                      transition: 'transform 0.2s',
-                                                      transform: isCodExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
-                                                    }}
-                                                  />
-                                                )}
-                                              </Box>
-                                              <Chip label={provider.type === 'cod' ? 'COD' : 'Payment'} size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: provider.type === 'cod' ? '#d1fae5' : '#dbeafe', color: provider.type === 'cod' ? '#065f46' : '#1e40af' }} />
-                                            </Box>
-                                            <Box sx={{ textAlign: 'right' }}>
-                                              <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(provider.amount)}</Typography>
-                                              <Typography variant="caption" sx={{ color: '#6b7280' }}>{provider.count.toLocaleString('en-IN')} orders</Typography>
-                                            </Box>
-                                          </Box>
-                                          {/* No provider buttons in unsettled section */}
-                                          {/* Expandable list of COD partners for unsettled pending payment */}
-                                          {provider.key === 'cod' && (
-                                            <MuiCollapse in={isCodExpanded} timeout="auto" unmountOnExit>
-                                              <Box sx={{ mt: 1, ml: { xs: 0, md: 4 } }}>
-                                                <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1 }}>
-                                                  Logistics partners with pending payment
-                                                </Typography>
-                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                                  {cod.map((lp) => (
-                                                    <Box key={lp.code}>
-                                                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, px: 2, borderRadius: 1.5, background: '#ffffff', border: '1px solid #e5e7eb' }}>
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                          <DeliveryIcon fontSize="small" sx={{ color: '#059669' }} />
-                                                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{lp.displayName}</Typography>
-                                                          <Chip label="Logistics" size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: '#ecfeff', color: '#164e63' }} />
-                                                        </Box>
-                                                        <Box sx={{ textAlign: 'right' }}>
-                                                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(Number(lp.totalSaleAmount || 0))}</Typography>
-                                                          <Typography variant="caption" sx={{ color: '#6b7280' }}>{Number(lp.totalCount || 0).toLocaleString('en-IN')} orders</Typography>
-                                                        </Box>
-                                                      </Box>
-                                                      {/* No provider buttons in unsettled COD sub-list */}
-                                                    </Box>
-                                                  ))}
+                                {selectedPlatform === 'd2c' && (
+                                  <Grid container spacing={2} sx={{ mt: 1 }}>
+                                    <Grid item xs={12} md={6}>
+                                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1f2937' }}>Pending Payment by Providers</Typography>
+                                        {pendingPaymentProviders.map((provider, idx) => (
+                                          <Box key={`up-${provider.key}-${idx}`}>
+                                            <Box
+                                              sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, px: 2, borderRadius: 1.5, background: '#f9fafb', border: '1px solid #f1f3f4', cursor: provider.key === 'cod' ? 'pointer' : 'default', transition: 'background 0.2s', '&:hover': { background: provider.key === 'cod' ? '#f3f4f6' : '#f9fafb' } }}
+                                              onClick={() => {
+                                                if (provider.key === 'cod') {
+                                                  setIsCodExpanded((v) => !v);
+                                                }
+                                              }}
+                                              role={provider.key === 'cod' ? 'button' : undefined}
+                                              aria-expanded={provider.key === 'cod' ? isCodExpanded : undefined}
+                                            >
+                                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: provider.color }} />
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{provider.name}</Typography>
+                                                  {provider.key === 'cod' && (
+                                                    <ExpandMoreIcon
+                                                      sx={{
+                                                        fontSize: 20,
+                                                        color: '#6b7280',
+                                                        transition: 'transform 0.2s',
+                                                        transform: isCodExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+                                                      }}
+                                                    />
+                                                  )}
                                                 </Box>
+                                                <Chip label={provider.type === 'cod' ? 'COD' : 'Payment'} size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: provider.type === 'cod' ? '#d1fae5' : '#dbeafe', color: provider.type === 'cod' ? '#065f46' : '#1e40af' }} />
                                               </Box>
-                                            </MuiCollapse>
-                                          )}
-                                        </Box>
-                                      ))}
-                                    </Box>
-                                  </Grid>
-                                  <Grid item xs={12} md={6}>
-                                    <Box sx={{ p: 2, border: '1px solid #f1f3f4', borderRadius: 2, background: '#fff', height: '100%' }}>
-                                      <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1 }}>Provider Breakdown (Pending Payment)</Typography>
-                                      <Box sx={{ width: '100%', height: 200 }}>
-                                        <ResponsiveContainer>
-                                          <PieChart>
-                                            <Pie data={pendingPaymentPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={70} paddingAngle={2}>
-                                              {(() => {
-                                                const PIE_COLORS = ['#2563eb', '#1e40af', '#0ea5e9', '#38bdf8', '#10b981', '#6366f1', '#f59e0b', '#14b8a6', '#ef4444', '#9333ea', '#c2410c', '#059669', '#0f766e', '#84cc16', '#64748b'];
-                                                return pendingPaymentPieData.map((_, i) => (
-                                                  <Cell key={`upp-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                                                ));
-                                              })()}
-                                            </Pie>
-                                            <RechartsTooltip formatter={(value) => formatCurrency(Number(value))} />
-                                          </PieChart>
-                                        </ResponsiveContainer>
+                                              <Box sx={{ textAlign: 'right' }}>
+                                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(provider.amount)}</Typography>
+                                                <Typography variant="caption" sx={{ color: '#6b7280' }}>{provider.count.toLocaleString('en-IN')} orders</Typography>
+                                              </Box>
+                                            </Box>
+                                            {/* No provider buttons in unsettled section */}
+                                            {/* Expandable list of COD partners for unsettled pending payment */}
+                                            {provider.key === 'cod' && (
+                                              <MuiCollapse in={isCodExpanded} timeout="auto" unmountOnExit>
+                                                <Box sx={{ mt: 1, ml: { xs: 0, md: 4 } }}>
+                                                  <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1 }}>
+                                                    Logistics partners with pending payment
+                                                  </Typography>
+                                                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                    {cod.map((lp) => (
+                                                      <Box key={lp.code}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, px: 2, borderRadius: 1.5, background: '#ffffff', border: '1px solid #e5e7eb' }}>
+                                                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                            <DeliveryIcon fontSize="small" sx={{ color: '#059669' }} />
+                                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827' }}>{lp.displayName}</Typography>
+                                                            <Chip label="Logistics" size="small" sx={{ height: 18, fontSize: '0.7rem', bgcolor: '#ecfeff', color: '#164e63' }} />
+                                                          </Box>
+                                                          <Box sx={{ textAlign: 'right' }}>
+                                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#1f2937' }}>{formatCurrency(Number(lp.totalSaleAmount || 0))}</Typography>
+                                                            <Typography variant="caption" sx={{ color: '#6b7280' }}>{Number(lp.totalCount || 0).toLocaleString('en-IN')} orders</Typography>
+                                                          </Box>
+                                                        </Box>
+                                                        {/* No provider buttons in unsettled COD sub-list */}
+                                                      </Box>
+                                                    ))}
+                                                  </Box>
+                                                </Box>
+                                              </MuiCollapse>
+                                            )}
+                                          </Box>
+                                        ))}
                                       </Box>
-                                      {/* legend removed as per request */}
-                                    </Box>
+                                    </Grid>
+                                    <Grid item xs={12} md={6}>
+                                      <Box sx={{ p: 2, border: '1px solid #f1f3f4', borderRadius: 2, background: '#fff', height: '100%' }}>
+                                        <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 700, mb: 1 }}>Provider Breakdown (Pending Payment)</Typography>
+                                        <Box sx={{ width: '100%', height: 200 }}>
+                                          <ResponsiveContainer>
+                                            <PieChart>
+                                              <Pie data={pendingPaymentPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={70} paddingAngle={2}>
+                                                {(() => {
+                                                  const PIE_COLORS = ['#2563eb', '#1e40af', '#0ea5e9', '#38bdf8', '#10b981', '#6366f1', '#f59e0b', '#14b8a6', '#ef4444', '#9333ea', '#c2410c', '#059669', '#0f766e', '#84cc16', '#64748b'];
+                                                  return pendingPaymentPieData.map((_, i) => (
+                                                    <Cell key={`upp-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                                                  ));
+                                                })()}
+                                              </Pie>
+                                              <RechartsTooltip formatter={(value) => formatCurrency(Number(value))} />
+                                            </PieChart>
+                                          </ResponsiveContainer>
+                                        </Box>
+                                        {/* legend removed as per request */}
+                                      </Box>
+                                    </Grid>
                                   </Grid>
-                                </Grid>
+                                )}
                               </>
                             );
                           })()}
@@ -5388,6 +5467,8 @@ const MarketplaceReconciliation: React.FC = () => {
           );
         })()}
 
+
+
         {/* Payment Ageing Analysis (replaces Sales Dashboard) */}
         <Paper sx={{
           p: 3,
@@ -6332,8 +6413,211 @@ const MarketplaceReconciliation: React.FC = () => {
               </Grid>
             </Grid>
           </CardContent>
-        </Card>
         */}
+        {selectedPlatform === 'amazon' && feeInvoiceSummary && (
+          <Paper sx={{
+            p: 3,
+            mb: 6,
+            background: '#ffffff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '16px',
+            boxShadow: 'none'
+          }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {/* Card Header */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="h3" sx={{ color: '#1f2937', fontWeight: 600 }}>Invoice vs Actual Fees</Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setShowInvoicesDialog(true)}
+                  sx={{
+                    borderRadius: '8px', textTransform: 'none', borderColor: '#e5e7eb',
+                    color: '#4b5563', py: 0.25, px: 1.5,
+                    '&:hover': { backgroundColor: '#f9fafb', borderColor: '#d1d5db' }
+                  }}
+                >
+                  Show Invoices
+                </Button>
+              </Box>
+
+              {/* Invoice Header Row */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1.5, borderBottom: '1px solid #f3f4f6' }}>
+                <Box>
+                  <Typography sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.85rem', mb: 0.25 }}>B2B Invoices Total (with GST)</Typography>
+                  <Typography sx={{ color: '#111827', fontWeight: 700, fontSize: '1.25rem' }}>
+                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(feeInvoiceSummary.total_invoiced)}
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: 'right' }}>
+                  <Typography sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.85rem', mb: 0.25 }}>Fees Ex-GST</Typography>
+                  <Typography sx={{ color: '#374151', fontWeight: 600, fontSize: '1rem' }}>
+                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(feeInvoiceSummary.total_invoiced_ex_gst)}
+                  </Typography>
+                  <Typography sx={{ color: '#9ca3af', fontSize: '0.78rem' }}>
+                    GST: {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(feeInvoiceSummary.total_invoice_gst)}
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Category Comparison Table */}
+              {feeInvoiceSummary.categories && feeInvoiceSummary.categories.length > 0 && (
+                <Box sx={{ mt: 0.5 }}>
+                  <Typography sx={{ color: '#4b5563', fontWeight: 600, fontSize: '0.85rem', mb: 1.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Category Breakdown
+                  </Typography>
+
+                  {/* Table Header */}
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 1, mb: 1, px: 1 }}>
+                    <Typography sx={{ color: '#9ca3af', fontSize: '0.75rem', fontWeight: 600 }}>Category</Typography>
+                    <Typography sx={{ color: '#9ca3af', fontSize: '0.75rem', fontWeight: 600, textAlign: 'right', minWidth: 110 }}>Invoice</Typography>
+                    <Typography sx={{ color: '#9ca3af', fontSize: '0.75rem', fontWeight: 600, textAlign: 'right', minWidth: 110 }}>Settlement</Typography>
+                    <Typography sx={{ color: '#9ca3af', fontSize: '0.75rem', fontWeight: 600, textAlign: 'right', minWidth: 100 }}>Diff</Typography>
+                  </Box>
+
+                  {/* Table Rows */}
+                  {feeInvoiceSummary.categories.map((row, idx) => (
+                    <Box key={idx} sx={{
+                      display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 1, py: 1, px: 1,
+                      borderRadius: '8px',
+                      backgroundColor: idx % 2 === 0 ? '#f9fafb' : '#ffffff',
+                      alignItems: 'center'
+                    }}>
+                      <Typography sx={{ color: '#374151', fontSize: '0.875rem', fontWeight: 500 }}>{row.category}</Typography>
+                      <Typography sx={{ color: '#111827', fontSize: '0.875rem', fontWeight: 500, textAlign: 'right', minWidth: 110 }}>
+                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(row.invoice_ex_gst)}
+                      </Typography>
+                      <Typography sx={{ color: '#111827', fontSize: '0.875rem', fontWeight: 500, textAlign: 'right', minWidth: 110 }}>
+                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(row.settlement_amount)}
+                      </Typography>
+                      <Typography sx={{
+                        fontSize: '0.875rem', fontWeight: 600, textAlign: 'right', minWidth: 100,
+                        color: Math.abs(row.difference) < 100 ? '#166534' : row.difference > 0 ? '#92400e' : '#991b1b'
+                      }}>
+                        {row.difference >= 0 ? '+' : ''}{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(row.difference)}
+                      </Typography>
+                    </Box>
+                  ))}
+
+                  {/* Totals Row */}
+                  <Box sx={{
+                    display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 1, py: 1.5, px: 1, mt: 0.5,
+                    borderTop: '2px solid #e5e7eb', alignItems: 'center'
+                  }}>
+                    <Typography sx={{ color: '#111827', fontSize: '0.9rem', fontWeight: 700 }}>Total</Typography>
+                    <Typography sx={{ color: '#111827', fontSize: '0.9rem', fontWeight: 700, textAlign: 'right', minWidth: 110 }}>
+                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(feeInvoiceSummary.total_invoiced_ex_gst)}
+                    </Typography>
+                    <Typography sx={{ color: '#111827', fontSize: '0.9rem', fontWeight: 700, textAlign: 'right', minWidth: 110 }}>
+                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(feeInvoiceSummary.total_deducted)}
+                    </Typography>
+                    <Typography sx={{
+                      fontSize: '0.9rem', fontWeight: 700, textAlign: 'right', minWidth: 100,
+                      color: Math.abs(feeInvoiceSummary.difference) < 500 ? '#166534' : feeInvoiceSummary.difference > 0 ? '#92400e' : '#991b1b'
+                    }}>
+                      {feeInvoiceSummary.difference >= 0 ? '+' : ''}{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(feeInvoiceSummary.difference)}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          </Paper>
+        )}
+
+      {/* Invoices List Dialog */}
+      <Dialog 
+        open={showInvoicesDialog} 
+        onClose={() => setShowInvoicesDialog(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: '16px' }
+        }}
+      >
+        <DialogTitle sx={{ 
+          borderBottom: '1px solid #e5e7eb', 
+          pb: 2, 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center' 
+        }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f2937' }}>
+            Ingested Fee Invoices
+          </Typography>
+          <IconButton onClick={() => setShowInvoicesDialog(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          <TableContainer>
+            <Table sx={{ minWidth: 650 }}>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f9fafb' }}>
+                  <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2 }}>Invoice Number</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2 }}>Type</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2 }}>Date</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2 }}>File Name</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2, textAlign: 'right' }}>Amount</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {feeInvoicesList && feeInvoicesList.length > 0 ? (
+                  feeInvoicesList.map((invoice, index) => (
+                    <TableRow 
+                      key={index}
+                      sx={{ 
+                        '&:last-child td, &:last-child th': { border: 0 },
+                        '&:hover': { backgroundColor: '#f9fafb' }
+                      }}
+                    >
+                      <TableCell sx={{ color: '#111827', fontWeight: 500 }}>
+                        {invoice.invoice_number || 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ 
+                          display: 'inline-block',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: '16px',
+                          fontSize: '0.75rem',
+                          fontWeight: 500,
+                          backgroundColor: invoice.type === 'Invoice' ? '#ecfdf5' : '#fff1f2',
+                          color: invoice.type === 'Invoice' ? '#059669' : '#e11d48'
+                        }}>
+                          {invoice.type || 'Unknown'}
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ color: '#4b5563' }}>
+                        {invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString('en-IN', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        }) : 'N/A'}
+                      </TableCell>
+                      <TableCell sx={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                        {invoice.file_name || 'N/A'}
+                      </TableCell>
+                      <TableCell sx={{ color: '#111827', fontWeight: 600, textAlign: 'right' }}>
+                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(invoice.total_amount || 0)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} sx={{ textAlign: 'center', py: 6, color: '#6b7280' }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                        <DescriptionOutlinedIcon sx={{ fontSize: 48, color: '#d1d5db' }} />
+                        <Typography variant="body1" sx={{ fontWeight: 500 }}>No invoices found</Typography>
+                        <Typography variant="body2" sx={{ color: '#9ca3af' }}>Try adjusting your date range.</Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+      </Dialog>
       </Box>
 
       {/* Sync modal removed; animation shown on the button icon itself */}

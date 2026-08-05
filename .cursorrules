@@ -1,0 +1,3 @@
+# Repository Rules
+
+1. **Clean Code Protocol**: Once a task is completed, you MUST delete any leftover scratch scripts, temporary SQL files, .patch files, .log files, or any other temporary garbage created during the development process. This is production code and we do not want garbage left in the repository.

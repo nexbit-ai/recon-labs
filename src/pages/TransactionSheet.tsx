@@ -3174,6 +3174,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const handleAmazonBusinessModeToggle = (nextMode: 'B2C' | 'B2B') => {
     if (!nextMode || nextMode === amazonBusinessMode) return;
     setAmazonBusinessMode(nextMode);
+    // Reset to first page and fetch new data with the updated business mode
+    setCurrentPage(1);
+    fetchSalesTransactions(
+      dateRange, 
+      selectedPlatform, 
+      { page: 1, limit: rowsPerPage, force: true }, 
+      salesReportSortConfig, 
+      salesReportSearch || null,
+      nextMode
+    );
   };
 
   // Handle mismatched sub-tab toggle (Less Received / More Received)
