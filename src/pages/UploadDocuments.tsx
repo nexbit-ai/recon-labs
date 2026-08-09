@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, Typography, Paper, Grid, Breadcrumbs, Link, Chip, Button, Alert, CircularProgress, Drawer, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, MenuItem, Card, CardContent } from '@mui/material';
+import { Box, Typography, Paper, Grid, Breadcrumbs, Link, Chip, Button, Alert, CircularProgress, Drawer, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, MenuItem, Card, CardContent, Select } from '@mui/material';
 import { 
   CalendarToday as CalendarIcon,
   CheckCircle as CheckCircleIcon,
@@ -16,6 +16,7 @@ import { API_CONFIG } from '../services/api/config';
 import { tokenManager } from '../services/api/tokenManager';
 import JWTService from '../services/auth/jwtService';
 import { useStytchMemberSession } from '@stytch/react/b2b';
+import { useOrganization } from '../hooks/useOrganization';
 import { useReconciliationStatus } from '../hooks/useReconciliationStatus';
 import { ReconciliationStatus, UploadListResponse as APIUploadListResponse } from '../services/api/types';
 
@@ -35,6 +36,7 @@ interface UploadedDocument {
   upload_date: string;
   inactive?: boolean;
   sync_status?: string;
+  sub_platform?: string;
 }
 
 interface UploadListResponse {
@@ -126,11 +128,20 @@ const UploadDocuments: React.FC = () => {
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [rightPanelVendor, setRightPanelVendor] = useState<'amazon' | 'flipkart' | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [pendingUpload, setPendingUpload] = useState<{ vendorId: string; kind: string } | null>(null);
+  const [pendingUpload, setPendingUpload] = useState<{ vendorId: string; kind: string; noFileYet?: boolean } | null>(null);
   const [pendingFileInputId, setPendingFileInputId] = useState<string | null>(null);
   const [hoveredYear, setHoveredYear] = useState<number | null>(null);
   const [hoveredMonth, setHoveredMonth] = useState<{ year: number; month: number } | null>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { organizationId } = useOrganization();
+  const allowedSubPlatformOrgs = ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'];
+  const hasFlipkartSubPlatforms = organizationId ? allowedSubPlatformOrgs.includes(organizationId) : false;
+
+  const [flipkartSubPlatform, setFlipkartSubPlatform] = useState<string>('Main Account');
+  const flipkartSubPlatforms = hasFlipkartSubPlatforms 
+    ? ['bengaluru', 'Guwahati', 'Hyderabad', 'Kolkata', 'Main Account'] 
+    : [''];
 
   useEffect(() => {
     return () => {
@@ -248,7 +259,7 @@ const UploadDocuments: React.FC = () => {
         const customSessionData = {
           member_id: session.member_id,
           member_session_id: session.member_session_id,
-          organization_id: session.organization_id || API_CONFIG.ORG_ID,
+          organization_id: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
           organization_slug: session.organization_slug,
           roles: session.roles,
         };
@@ -257,7 +268,7 @@ const UploadDocuments: React.FC = () => {
       
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
+        'x-org-id': session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
       };
       
       if (customToken) {
@@ -319,7 +330,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: session.organization_id || API_CONFIG.ORG_ID, // Prefer Stytch's org_id
+            organization_id: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID, // Prefer Stytch's org_id
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -335,7 +346,7 @@ const UploadDocuments: React.FC = () => {
       // Build headers with API key and custom JWT token
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
+        'x-org-id': session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
       };
       
       // Add custom JWT token
@@ -415,7 +426,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: session.organization_id || API_CONFIG.ORG_ID,
+            organization_id: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -427,7 +438,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
+        'x-org-id': session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
       };
 
       if (customToken) {
@@ -504,7 +515,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: session.organization_id || API_CONFIG.ORG_ID,
+            organization_id: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -516,7 +527,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
+        'x-org-id': session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
       };
       if (customToken) {
         headers['Authorization'] = `Bearer ${customToken}`;
@@ -581,7 +592,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: session.organization_id || API_CONFIG.ORG_ID,
+            organization_id: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -593,7 +604,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
+        'x-org-id': session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
       };
       if (customToken) {
         headers['Authorization'] = `Bearer ${customToken}`;
@@ -646,22 +657,8 @@ const UploadDocuments: React.FC = () => {
       e.stopPropagation();
       setPendingFileInputId(fileInputId);
       
-      // Determine if there's a pending file selected in local state
-      let hasPendingFile = false;
-      if (vendorId === 'unicommerce') {
-        hasPendingFile = !!unicommerceFile;
-      } else if (vendorId === 'amazon' || vendorId === 'flipkart' || vendorId === 'amazon_uk') {
-        hasPendingFile = !!(marketplaceFiles as any)[vendorId]?.[kind];
-      } else {
-        hasPendingFile = !!(d2cFiles as any)[vendorId]?.[kind];
-      }
-
-      if (hasPendingFile) {
-        setPendingUpload({ vendorId, kind });
-      } else {
-        // Just open file selector after confirmation (no pending upload)
-        setPendingUpload(null);
-      }
+      // Since the button is clicked before the file picker opens, any file in state is stale
+      setPendingUpload({ vendorId, kind, noFileYet: true });
       setConfirmDialogOpen(true);
       return false;
     }
@@ -693,10 +690,16 @@ const UploadDocuments: React.FC = () => {
     setConfirmDialogOpen(false);
     
     // If there's a pending upload (file already selected), proceed with upload
-    if (pendingUpload) {
-      performMarketplaceUpload(pendingUpload.vendorId as any, pendingUpload.kind as any);
-      setPendingUpload(null);
+    if (pendingUpload && !pendingUpload.noFileYet) {
+      if (pendingUpload.vendorId === 'cred') {
+        handleD2cUpload(pendingUpload.vendorId as any, pendingUpload.kind as any);
+      } else if (pendingUpload.vendorId === 'unicommerce') {
+        handleUnicommerceUpload();
+      } else {
+        performMarketplaceUpload(pendingUpload.vendorId as any, pendingUpload.kind as any);
+      }
     }
+    setPendingUpload(null);
     
     // Trigger file input if pending (user wants to choose a new file)
     if (pendingFileInputId) {
@@ -716,11 +719,11 @@ const UploadDocuments: React.FC = () => {
     setPendingFileInputId(null);
   };
 
-  const performMarketplaceUpload = async (vendorId: 'amazon' | 'flipkart' | 'amazon_uk', kind: 'sales' | 'sales_b2b' | 'settlement', selectedFile?: File) => {
+  const performMarketplaceUpload = async (vendorId: 'amazon' | 'flipkart' | 'amazon_uk', kind: 'sales' | 'sales_b2b' | 'settlement', selectedFile?: File, subPlatform?: string) => {
     const file = selectedFile || marketplaceFiles[vendorId]?.[kind];
     if (!file || selectedYear === null || selectedMonth === null) return;
 
-    const key = `${vendorId}_${kind}`;
+    const key = subPlatform ? `${vendorId}_${subPlatform}_${kind}` : `${vendorId}_${kind}`;
     setUploadingVendor(key);
     setUploadStatus(null);
 
@@ -732,13 +735,17 @@ const UploadDocuments: React.FC = () => {
       formData.append('year', selectedYear.toString());
       formData.append('report_type', getReportType(vendorId, kind));
 
+      if (vendorId === 'flipkart' && subPlatform) {
+        formData.append('sub_platform', subPlatform);
+      }
+
       let customToken: string | null = null;
       if (session) {
         try {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: session.organization_id || API_CONFIG.ORG_ID,
+            organization_id: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -750,7 +757,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
+        'x-org-id': session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
       };
       if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
 
@@ -761,6 +768,9 @@ const UploadDocuments: React.FC = () => {
       });
 
       if (!response.ok) {
+        // Clear the file from state so the user can select a new one
+        setMarketplaceFile(vendorId, kind, null);
+        
         const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
         if (response.status === 400) {
           const vendorName = vendorId === 'amazon' ? 'Amazon' : vendorId === 'flipkart' ? 'Flipkart' : vendorId;
@@ -822,7 +832,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: session.organization_id || API_CONFIG.ORG_ID,
+            organization_id: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -833,7 +843,7 @@ const UploadDocuments: React.FC = () => {
       }
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
+        'x-org-id': session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
       };
       if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
       const response = await fetch(`${API_CONFIG.BASE_URL}/v1/recon/upload`, {
@@ -893,7 +903,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: session.organization_id || API_CONFIG.ORG_ID,
+            organization_id: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -905,7 +915,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
+        'x-org-id': session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
       };
       if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
 
@@ -964,7 +974,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: session.organization_id || API_CONFIG.ORG_ID,
+            organization_id: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -976,7 +986,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
+        'x-org-id': session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
       };
       if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
 
@@ -1032,7 +1042,7 @@ const UploadDocuments: React.FC = () => {
           const customSessionData = {
             member_id: session.member_id,
             member_session_id: session.member_session_id,
-            organization_id: session.organization_id || API_CONFIG.ORG_ID,
+            organization_id: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
             organization_slug: session.organization_slug,
             roles: session.roles,
           };
@@ -1044,7 +1054,7 @@ const UploadDocuments: React.FC = () => {
 
       const headers: Record<string, string> = {
         'x-api-key': API_CONFIG.API_KEY,
-        'x-org-id': session ? session.organization_id : API_CONFIG.ORG_ID,
+        'x-org-id': session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
       };
       if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
 
@@ -1080,13 +1090,20 @@ const UploadDocuments: React.FC = () => {
 
   const findUploadForVendor = (
     vendorId: string,
-    kind?: 'sales' | 'sales_b2b' | 'settlement'
+    kind?: 'sales' | 'sales_b2b' | 'settlement',
+    subPlatform?: string
   ): UploadedDocument | undefined => {
     const key = kind ? `${vendorId}_${kind}` : vendorId;
     const expected = getReportType(vendorId, kind);
     const matching = uploadedDocuments.filter((doc) => {
       const rt = doc.report_type.toLowerCase();
-      return rt === key.toLowerCase() || rt === expected.toLowerCase();
+      const typeMatches = rt === key.toLowerCase() || rt === expected.toLowerCase();
+      
+      // If it's Flipkart for the Prestige org, also match on sub_platform
+      if (typeMatches && vendorId === 'flipkart') {
+        return doc.sub_platform === (subPlatform || flipkartSubPlatform);
+      }
+      return typeMatches;
     });
 
     if (!matching.length) return undefined;
@@ -1115,13 +1132,13 @@ const UploadDocuments: React.FC = () => {
   };
 
   // Check if a vendor already has an uploaded document
-  const isVendorUploaded = (vendorId: string, kind?: 'sales' | 'sales_b2b' | 'settlement'): boolean => {
-    return !!findUploadForVendor(vendorId, kind);
+  const isVendorUploaded = (vendorId: string, kind?: 'sales' | 'sales_b2b' | 'settlement', subPlatform?: string): boolean => {
+    return !!findUploadForVendor(vendorId, kind, subPlatform);
   };
 
   // Get uploaded document for a vendor
-  const getUploadedDocument = (vendorId: string, kind?: 'sales' | 'sales_b2b' | 'settlement'): UploadedDocument | undefined => {
-    return findUploadForVendor(vendorId, kind);
+  const getUploadedDocument = (vendorId: string, kind?: 'sales' | 'sales_b2b' | 'settlement', subPlatform?: string): UploadedDocument | undefined => {
+    return findUploadForVendor(vendorId, kind, subPlatform);
   };
 
   const getUploadProcessingStatus = (doc?: UploadedDocument): UploadProcessingStatus => {
@@ -1179,6 +1196,275 @@ const UploadDocuments: React.FC = () => {
   const drawerSalesB2BStatus = getUploadProcessingStatus(drawerSalesB2BDoc);
   const drawerSettlementDoc = rightPanelVendor ? getUploadedDocument(rightPanelVendor, 'settlement') : undefined;
   const drawerSettlementStatus = getUploadProcessingStatus(drawerSettlementDoc);
+
+  
+  const renderFlipkartBlock = (sp?: string) => {
+    const spSuffix = sp ? `_${sp}` : '';
+    const spParam = sp || undefined;
+
+    const fSalesDoc = getUploadedDocument('flipkart', 'sales', spParam);
+    const fSalesStatus = getUploadProcessingStatus(fSalesDoc);
+    const fSettlementDoc = getUploadedDocument('flipkart', 'settlement', spParam);
+    const fSettlementStatus = getUploadProcessingStatus(fSettlementDoc);
+    const upVendorSales = sp ? `flipkart_${sp}_sales` : 'flipkart_sales';
+    const upVendorSettlement = sp ? `flipkart_${sp}_settlement` : 'flipkart_settlement';
+
+    return (
+      <Box sx={{ mb: sp ? 4 : 0 }}>
+        {sp && (
+          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2, textAlign: 'center', color: '#374151' }}>
+            {sp}
+          </Typography>
+        )}
+        <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 0, position: 'relative', maxWidth: 800, mx: 'auto' }}>
+          {/* Step 1: Sales File */}
+          <Paper 
+            elevation={0}
+            sx={{ 
+              flex: '0 0 auto',
+              width: 220,
+              p: 2,
+              border: fSalesStatus === 'processing'
+                ? '2px solid #16a34a'
+                : fSalesStatus === 'pending'
+                  ? '2px solid #f59e0b'
+                  : '2px solid #e5e7eb',
+              borderRadius: '12px',
+              background: fSalesStatus === 'processing'
+                ? '#f0fdf4'
+                : fSalesStatus === 'pending'
+                  ? '#fffbeb'
+                  : '#ffffff',
+              position: 'relative',
+              zIndex: 2
+            }}
+          >
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ 
+                width: 32, 
+                height: 32, 
+                borderRadius: '50%', 
+                background: fSalesStatus === 'processing'
+                  ? '#16a34a'
+                  : fSalesStatus === 'pending'
+                    ? '#f59e0b'
+                    : '#f3f4f6',
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                border: fSalesStatus !== 'none' ? 'none' : '2px solid #d1d5db'
+              }}>
+                {fSalesStatus === 'processing' ? (
+                  <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                ) : fSalesStatus === 'pending' ? (
+                  <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
+                ) : (
+                  <></>
+                )}
+              </Box>
+              
+              <Typography variant="body2" fontWeight={600} color="#111111" textAlign="center">
+                Sales File
+              </Typography>
+              
+              {fSalesDoc && fSalesStatus !== 'none' && (
+                <Typography
+                  variant="caption"
+                  color={fSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
+                  sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                >
+                  {fSalesDoc.filename} • {fSalesStatus === 'processing' ? 'Processed' : 'Pending'}
+                </Typography>
+              )}
+              
+              <input
+                accept={getAcceptForVendor('flipkart')}
+                style={{ display: 'none' }}
+                id={`flipkart-sales-upload${spSuffix}`}
+                type="file"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0] || null;
+                  if (file) {
+                    if (!validateFileType(file, 'flipkart', 'Flipkart sales')) {
+                      e.target.value = '';
+                      return;
+                    }
+                    // For UI simplicity, just overwrite 'flipkart.sales' in state 
+                    // as it's only shown momentarily during upload
+                    setMarketplaceFile('flipkart', 'sales', file);
+                    await performMarketplaceUpload('flipkart', 'sales', file, spParam);
+                  }
+                  e.target.value = '';
+                }}
+                disabled={!!uploadingVendor}
+              />
+              <Button
+                variant={isVendorUploaded('flipkart', 'sales', spParam) ? "outlined" : "contained"}
+                size="small"
+                startIcon={<CloudUploadIcon />}
+                disabled={!!uploadingVendor || uploadingVendor === upVendorSales}
+                endIcon={uploadingVendor === upVendorSales ? <CircularProgress size={14} /> : null}
+                onClick={(e) => {
+                  handleFileInputClick(e, `flipkart-sales-upload${spSuffix}`, 'flipkart', 'sales');
+                }}
+                sx={{ 
+                  minWidth: 120,
+                  fontSize: '0.75rem',
+                  py: 0.75,
+                  ...(isVendorUploaded('flipkart', 'sales', spParam) && {
+                    borderColor: fSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                    color: fSalesStatus === 'pending' ? '#b45309' : '#16a34a'
+                  })
+                }}
+              >
+                {uploadingVendor === upVendorSales ? 'Uploading...' : isVendorUploaded('flipkart', 'sales', spParam) ? 'Re-upload' : 'Upload'}
+              </Button>
+            </Box>
+          </Paper>
+
+          {/* Connector Line */}
+          <Box sx={{ 
+            width: 80,
+            height: '3px',
+            background: fSalesStatus === 'processing'
+              ? 'linear-gradient(to right, #16a34a, #16a34a)'
+              : fSalesStatus === 'pending'
+                ? 'linear-gradient(to right, #f59e0b, #f59e0b)'
+                : 'linear-gradient(to right, #d1d5db, #d1d5db)',
+            position: 'relative',
+            zIndex: 3
+          }}>
+            {fSalesStatus !== 'none' && (
+              <Box sx={{
+                position: 'absolute',
+                right: -8,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: 16,
+                height: 16,
+                borderRadius: '50%',
+                background: fSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 4
+              }}>
+                <ArrowForwardIcon sx={{ fontSize: 12, color: '#ffffff' }} />
+              </Box>
+            )}
+          </Box>
+
+          {/* Step 2: Settlement File */}
+          <Paper 
+            elevation={0}
+            sx={{ 
+              flex: '0 0 auto',
+              width: 220,
+              p: 2,
+              border: fSettlementStatus === 'processing'
+                ? '2px solid #16a34a'
+                : fSettlementStatus === 'pending'
+                  ? '2px solid #f59e0b'
+                  : '2px solid #e5e7eb',
+              borderRadius: '12px',
+              background: fSettlementStatus === 'processing'
+                ? '#f0fdf4'
+                : fSettlementStatus === 'pending'
+                  ? '#fffbeb'
+                  : '#ffffff',
+              position: 'relative',
+              zIndex: 2,
+              opacity: 1
+            }}
+          >
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ 
+                width: 32, 
+                height: 32, 
+                borderRadius: '50%', 
+                background: fSettlementStatus === 'processing'
+                  ? '#16a34a'
+                  : fSettlementStatus === 'pending'
+                    ? '#f59e0b'
+                    : '#f3f4f6',
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                border: fSettlementStatus !== 'none'
+                  ? 'none'
+                  : '2px solid #d1d5db',
+                position: 'relative'
+              }}>
+                {fSettlementStatus === 'processing' ? (
+                  <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                ) : fSettlementStatus === 'pending' ? (
+                  <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
+                ) : (
+                  <></>
+                )}
+              </Box>
+              
+              <Typography variant="body2" fontWeight={600} color="#111111" textAlign="center">
+                Settlement File
+              </Typography>
+              
+              {fSettlementDoc && fSettlementStatus !== 'none' && (
+                <Typography
+                  variant="caption"
+                  color={fSettlementStatus === 'processing' ? '#16a34a' : '#b45309'}
+                  sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                >
+                  {fSettlementDoc.filename} • {fSettlementStatus === 'processing' ? 'Processed' : 'Pending'}
+                </Typography>
+              )}
+              
+              <input
+                accept={getAcceptForVendor('flipkart')}
+                style={{ display: 'none' }}
+                id={`flipkart-settlement-upload${spSuffix}`}
+                type="file"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0] || null;
+                  if (file) {
+                    if (!validateFileType(file, 'flipkart', 'Flipkart settlement')) {
+                      e.target.value = '';
+                      return;
+                    }
+                    setMarketplaceFile('flipkart', 'settlement', file);
+                    await performMarketplaceUpload('flipkart', 'settlement', file, spParam);
+                  }
+                  e.target.value = '';
+                }}
+                disabled={!!uploadingVendor}
+              />
+              <Button
+                variant={isVendorUploaded('flipkart', 'settlement', spParam) ? "outlined" : "contained"}
+                size="small"
+                startIcon={<CloudUploadIcon />}
+                disabled={!!uploadingVendor || uploadingVendor === upVendorSettlement}
+                endIcon={uploadingVendor === upVendorSettlement ? <CircularProgress size={14} /> : null}
+                onClick={(e) => {
+                  handleFileInputClick(e, `flipkart-settlement-upload${spSuffix}`, 'flipkart', 'settlement');
+                }}
+                sx={{ 
+                  minWidth: 120,
+                  fontSize: '0.75rem',
+                  py: 0.75,
+                  ...(isVendorUploaded('flipkart', 'settlement', spParam) && {
+                    borderColor: fSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                    color: fSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
+                  })
+                }}
+              >
+                {uploadingVendor === upVendorSettlement ? 'Uploading...' : isVendorUploaded('flipkart', 'settlement', spParam) ? 'Re-upload' : 'Upload'}
+              </Button>
+            </Box>
+          </Paper>
+        </Box>
+      </Box>
+    );
+  };
+
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
@@ -1521,285 +1807,193 @@ const UploadDocuments: React.FC = () => {
               </Alert>
             )}
             <Grid container spacing={4}>
-              {/* Flipkart */}
+              {/* Flipkart - single outer boundary containing all sub-platforms */}
               <Grid item xs={12}>
                 <Paper elevation={0} sx={{ p: 3, border: '2px solid #e5e7eb', borderRadius: '12px' }}>
-                  <Typography variant="h6" fontWeight={700} color="#111111" mb={4}>
+                  {/* Header */}
+                  <Typography variant="h6" fontWeight={700} color="#111111" mb={3}>
                     Flipkart
                   </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 0, position: 'relative', maxWidth: 800, mx: 'auto' }}>
-                    {/* Step 1: Sales File */}
-                    <Paper 
-                      elevation={0}
-                      sx={{ 
-                        flex: '0 0 auto',
-                        width: 220,
-                        p: 2,
-                        border: flipkartSalesStatus === 'processing'
-                          ? '2px solid #16a34a'
-                          : flipkartSalesStatus === 'pending'
-                            ? '2px solid #f59e0b'
-                            : '2px solid #e5e7eb',
-                        borderRadius: '12px',
-                        background: flipkartSalesStatus === 'processing'
-                          ? '#f0fdf4'
-                          : flipkartSalesStatus === 'pending'
-                            ? '#fffbeb'
-                            : '#ffffff',
-                        position: 'relative',
-                        zIndex: 2
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                        {/* Step Number Circle */}
-                        <Box sx={{ 
-                          width: 32, 
-                          height: 32, 
-                          borderRadius: '50%', 
-                          background: flipkartSalesStatus === 'processing'
-                            ? '#16a34a'
-                            : flipkartSalesStatus === 'pending'
-                              ? '#f59e0b'
-                              : '#f3f4f6',
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          border: flipkartSalesStatus !== 'none' ? 'none' : '2px solid #d1d5db'
-                        }}>
-                          {flipkartSalesStatus === 'processing' ? (
-                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
-                          ) : flipkartSalesStatus === 'pending' ? (
-                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
-                          ) : (
-                            <></>
+
+                  {/* Sub-platform rows */}
+                  <Grid container spacing={2}>
+                    {flipkartSubPlatforms.map((sp) => {
+                      const flipkartSalesDoc = getUploadedDocument('flipkart', 'sales', sp);
+                      const flipkartSalesStatus = getUploadProcessingStatus(flipkartSalesDoc);
+                      const flipkartSettlementDoc = getUploadedDocument('flipkart', 'settlement', sp);
+                      const flipkartSettlementStatus = getUploadProcessingStatus(flipkartSettlementDoc);
+                      const salesId = `flipkart-sales-upload-${sp}`;
+                      const settlementId = `flipkart-settlement-upload-${sp}`;
+
+                      return (
+                        <Grid item xs={6} key={sp}>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            height: '100%',
+                            alignItems: 'center',
+                            gap: 2,
+                            p: 1.5,
+                            borderRadius: '10px',
+                            border: '1.5px solid #f1f5f9',
+                            background: '#fafafa',
+                          }}
+                        >
+                          {/* Sub-platform label */}
+                          {hasFlipkartSubPlatforms && (
+                            <Typography
+                              variant="body2"
+                              fontWeight={600}
+                              color="#374151"
+                              sx={{ minWidth: 110, fontSize: '0.8rem' }}
+                            >
+                              {sp === 'Main Account' ? 'Main Account' : sp.charAt(0).toUpperCase() + sp.slice(1)}
+                            </Typography>
                           )}
-                        </Box>
-                        
-                        {/* Step Title */}
-                        <Typography variant="body2" fontWeight={600} color="#111111" textAlign="center">
-                          Sales File
-                        </Typography>
-                        
-                        {/* Uploaded File Info */}
-                        {flipkartSalesDoc && flipkartSalesStatus !== 'none' && (
-                          <Typography
-                            variant="caption"
-                            color={flipkartSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
-                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
-                          >
-                            {flipkartSalesDoc.filename} • {flipkartSalesStatus === 'processing' ? 'Processed' : 'Pending'}
-                          </Typography>
-                        )}
-                        
-                        {/* File Input */}
-                        <input
-                          accept={getAcceptForVendor('flipkart')}
-                          style={{ display: 'none' }}
-                          id="flipkart-sales-upload"
-                          type="file"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0] || null;
-                            if (file) {
-                              if (!validateFileType(file, 'flipkart', 'Flipkart sales')) {
-                                e.target.value = '';
-                                return;
-                              }
-                              setMarketplaceFile('flipkart', 'sales', file);
-                              await performMarketplaceUpload('flipkart', 'sales', file);
-                            }
-                            e.target.value = '';
-                          }}
-                          disabled={!!uploadingVendor}
-                        />
-                        <Button
-                          variant={isVendorUploaded('flipkart', 'sales') ? "outlined" : "contained"}
-                          size="small"
-                          startIcon={<CloudUploadIcon />}
-                          disabled={!!uploadingVendor || uploadingVendor === 'flipkart_sales'}
-                          endIcon={uploadingVendor === 'flipkart_sales' ? <CircularProgress size={14} /> : null}
-                          onClick={(e) => {
-                            handleFileInputClick(e, 'flipkart-sales-upload', 'flipkart', 'sales');
-                          }}
-                          sx={{ 
-                            minWidth: 120,
-                            fontSize: '0.75rem',
-                            py: 0.75,
-                            ...(isVendorUploaded('flipkart', 'sales') && {
-                              borderColor: flipkartSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                              color: flipkartSalesStatus === 'pending' ? '#b45309' : '#16a34a'
-                            })
-                          }}
-                        >
-                          {uploadingVendor === 'flipkart_sales' ? 'Uploading...' : isVendorUploaded('flipkart', 'sales') ? 'Re-upload' : 'Upload'}
-                        </Button>
-                        {marketplaceFiles.flipkart?.sales && !isVendorUploaded('flipkart', 'sales') && (
-                          <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
-                            {marketplaceFiles.flipkart.sales.name}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Paper>
 
-                    {/* Connector Line */}
-                    <Box sx={{ 
-                      width: 80,
-                      height: '3px',
-                      background: flipkartSalesStatus === 'processing'
-                        ? 'linear-gradient(to right, #16a34a, #16a34a)'
-                        : flipkartSalesStatus === 'pending'
-                          ? 'linear-gradient(to right, #f59e0b, #f59e0b)'
-                          : 'linear-gradient(to right, #d1d5db, #d1d5db)',
-                      position: 'relative',
-                      zIndex: 3
-                    }}>
-                      {flipkartSalesStatus !== 'none' && (
-                        <Box sx={{
-                          position: 'absolute',
-                          right: -8,
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          width: 16,
-                          height: 16,
-                          borderRadius: '50%',
-                          background: flipkartSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          zIndex: 4
-                        }}>
-                          <ArrowForwardIcon sx={{ fontSize: 12, color: '#ffffff' }} />
-                        </Box>
-                      )}
-                    </Box>
-
-                    {/* Step 2: Settlement File */}
-                    <Paper 
-                      elevation={0}
-                      sx={{ 
-                        flex: '0 0 auto',
-                        width: 220,
-                        p: 2,
-                        border: flipkartSettlementStatus === 'processing'
-                          ? '2px solid #16a34a'
-                          : flipkartSettlementStatus === 'pending'
-                            ? '2px solid #f59e0b'
-                          : (!isVendorUploaded('flipkart', 'sales') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
-                        borderRadius: '12px',
-                        background: flipkartSettlementStatus === 'processing'
-                          ? '#f0fdf4'
-                          : flipkartSettlementStatus === 'pending'
-                            ? '#fffbeb'
-                          : (!isVendorUploaded('flipkart', 'sales') ? '#f9fafb' : '#ffffff'),
-                        position: 'relative',
-                        zIndex: 2,
-                        opacity: isVendorUploaded('flipkart', 'sales') ? 1 : 0.6
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                        {/* Step Number Circle */}
-                        <Box sx={{ 
-                          width: 32, 
-                          height: 32, 
-                          borderRadius: '50%', 
-                          background: flipkartSettlementStatus === 'processing'
-                            ? '#16a34a'
-                            : flipkartSettlementStatus === 'pending'
-                              ? '#f59e0b'
-                            : (!isVendorUploaded('flipkart', 'sales') ? '#f3f4f6' : '#f3f4f6'),
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          border: flipkartSettlementStatus !== 'none'
-                            ? 'none'
-                            : (!isVendorUploaded('flipkart', 'sales') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
-                          position: 'relative'
-                        }}>
-                          {flipkartSettlementStatus === 'processing' ? (
-                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
-                          ) : flipkartSettlementStatus === 'pending' ? (
-                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
-                          ) : !isVendorUploaded('flipkart', 'sales') ? (
-                            <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
-                          ) : (
-                            <></>
-                    )}
-                  </Box>
-                        
-                        {/* Step Title */}
-                        <Typography variant="body2" fontWeight={600} color={isVendorUploaded('flipkart', 'sales') ? '#111111' : '#9ca3af'} textAlign="center">
-                          Settlement File
-                        </Typography>
-                        
-                        {/* Uploaded File Info */}
-                        {flipkartSettlementDoc && flipkartSettlementStatus !== 'none' && (
-                          <Typography
-                            variant="caption"
-                            color={flipkartSettlementStatus === 'processing' ? '#16a34a' : '#b45309'}
-                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          {/* Sales card */}
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              flex: '0 0 auto',
+                              width: 160,
+                              p: 1.5,
+                              border: flipkartSalesStatus === 'processing'
+                                ? '1.5px solid #16a34a'
+                                : flipkartSalesStatus === 'pending'
+                                  ? '1.5px solid #f59e0b'
+                                  : '1.5px solid #e5e7eb',
+                              borderRadius: '10px',
+                              background: flipkartSalesStatus === 'processing'
+                                ? '#f0fdf4'
+                                : flipkartSalesStatus === 'pending'
+                                  ? '#fffbeb'
+                                  : '#ffffff',
+                            }}
                           >
-                            {flipkartSettlementDoc.filename} •{' '}
-                            {flipkartSettlementStatus === 'processing' ? 'Processed' : 'Pending'}
-                          </Typography>
-                        )}
-                        
-                        {/* File Input */}
-                        <input
-                          accept={getAcceptForVendor('flipkart')}
-                          style={{ display: 'none' }}
-                          id="flipkart-settlement-upload"
-                          type="file"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0] || null;
-                            if (file) {
-                              if (!validateFileType(file, 'flipkart', 'Flipkart settlement')) {
-                                e.target.value = '';
-                                return;
-                              }
-                              setMarketplaceFile('flipkart', 'settlement', file);
-                              await performMarketplaceUpload('flipkart', 'settlement', file);
-                            }
-                            e.target.value = '';
-                          }}
-                          disabled={!!uploadingVendor || !isVendorUploaded('flipkart', 'sales')}
-                        />
-                        <Button
-                          variant={isVendorUploaded('flipkart', 'settlement') ? "outlined" : "contained"}
-                          size="small"
-                          startIcon={<CloudUploadIcon />}
-                          disabled={!!uploadingVendor || uploadingVendor === 'flipkart_settlement' || !isVendorUploaded('flipkart', 'sales')}
-                          endIcon={uploadingVendor === 'flipkart_settlement' ? <CircularProgress size={14} /> : null}
-                          onClick={(e) => {
-                            handleFileInputClick(e, 'flipkart-settlement-upload', 'flipkart', 'settlement');
-                          }}
-                          sx={{ 
-                            minWidth: 120,
-                            fontSize: '0.75rem',
-                            py: 0.75,
-                            ...(!isVendorUploaded('flipkart', 'sales') && {
-                              background: '#f3f4f6',
-                              color: '#9ca3af',
-                              cursor: 'not-allowed',
-                              border: 'none',
-                              '&:hover': {
-                                background: '#f3f4f6',
-                              }
-                            }),
-                            ...(isVendorUploaded('flipkart', 'settlement') && {
-                              borderColor: flipkartSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                              color: flipkartSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
-                            })
-                          }}
-                        >
-                          {uploadingVendor === 'flipkart_settlement' ? 'Uploading...' : isVendorUploaded('flipkart', 'settlement') ? 'Re-upload' : 'Upload'}
-                        </Button>
-                        {marketplaceFiles.flipkart?.settlement && !isVendorUploaded('flipkart', 'settlement') && (
-                          <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
-                            {marketplaceFiles.flipkart.settlement.name}
-                      </Typography>
-                    )}
-                  </Box>
-                    </Paper>
-                  </Box>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{
+                                width: 24, height: 24, borderRadius: '50%',
+                                background: flipkartSalesStatus === 'processing' ? '#16a34a' : flipkartSalesStatus === 'pending' ? '#f59e0b' : '#f3f4f6',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                border: flipkartSalesStatus !== 'none' ? 'none' : '1.5px solid #d1d5db'
+                              }}>
+                                {flipkartSalesStatus === 'processing' ? <CheckCircleIcon sx={{ fontSize: 14, color: '#fff' }} /> : flipkartSalesStatus === 'pending' ? <ScheduleIcon sx={{ fontSize: 13, color: '#fff' }} /> : null}
+                              </Box>
+                              <Typography variant="caption" fontWeight={600} color="#111111">Sales File</Typography>
+                              {flipkartSalesDoc && flipkartSalesStatus !== 'none' && (
+                                <Typography variant="caption" color={flipkartSalesStatus === 'processing' ? '#16a34a' : '#b45309'} sx={{ textAlign: 'center', fontSize: '9px', display: 'block' }}>
+                                  {flipkartSalesDoc.filename.slice(0, 16)}… • {flipkartSalesStatus === 'processing' ? 'Done' : 'Pending'}
+                                </Typography>
+                              )}
+                              <input accept={getAcceptForVendor('flipkart')} style={{ display: 'none' }} id={salesId} type="file"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0] || null;
+                                  if (file) {
+                                    if (!validateFileType(file, 'flipkart', 'Flipkart sales')) { e.target.value = ''; return; }
+                                    setMarketplaceFile('flipkart', 'sales', file);
+                                    await performMarketplaceUpload('flipkart', 'sales', file, sp);
+                                  }
+                                  e.target.value = '';
+                                }}
+                                disabled={!!uploadingVendor}
+                              />
+                              <Button
+                                variant={isVendorUploaded('flipkart', 'sales', sp) ? 'outlined' : 'contained'}
+                                size="small"
+                                startIcon={<CloudUploadIcon sx={{ fontSize: '0.8rem !important' }} />}
+                                disabled={!!uploadingVendor}
+                                endIcon={(uploadingVendor === `flipkart_${sp}_sales` || uploadingVendor === `flipkart_sales`) ? <CircularProgress size={10} /> : null}
+                                onClick={(e) => handleFileInputClick(e, salesId, 'flipkart', 'sales')}
+                                sx={{
+                                  fontSize: '0.68rem', py: 0.4, px: 1, minWidth: 80,
+                                  ...(isVendorUploaded('flipkart', 'sales', sp) && {
+                                    borderColor: flipkartSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                                    color: flipkartSalesStatus === 'pending' ? '#b45309' : '#16a34a'
+                                  })
+                                }}
+                              >
+                                {(uploadingVendor === `flipkart_${sp}_sales` || uploadingVendor === `flipkart_sales`) ? '...' : isVendorUploaded('flipkart', 'sales', sp) ? 'Re-upload' : 'Upload'}
+                              </Button>
+                            </Box>
+                          </Paper>
+
+                          {/* Connector arrow */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', color: flipkartSalesStatus === 'processing' ? '#16a34a' : '#d1d5db' }}>
+                            <ArrowForwardIcon sx={{ fontSize: 16 }} />
+                          </Box>
+
+                          {/* Settlement card */}
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              flex: '0 0 auto',
+                              width: 160,
+                              p: 1.5,
+                              border: flipkartSettlementStatus === 'processing'
+                                ? '1.5px solid #16a34a'
+                                : flipkartSettlementStatus === 'pending'
+                                  ? '1.5px solid #f59e0b'
+                                  : '1.5px solid #e5e7eb',
+                              borderRadius: '10px',
+                              background: flipkartSettlementStatus === 'processing'
+                                ? '#f0fdf4'
+                                : flipkartSettlementStatus === 'pending'
+                                  ? '#fffbeb'
+                                  : '#ffffff',
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{
+                                width: 24, height: 24, borderRadius: '50%',
+                                background: flipkartSettlementStatus === 'processing' ? '#16a34a' : flipkartSettlementStatus === 'pending' ? '#f59e0b' : '#f3f4f6',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                border: flipkartSettlementStatus !== 'none' ? 'none' : '1.5px solid #d1d5db'
+                              }}>
+                                {flipkartSettlementStatus === 'processing' ? <CheckCircleIcon sx={{ fontSize: 14, color: '#fff' }} /> : flipkartSettlementStatus === 'pending' ? <ScheduleIcon sx={{ fontSize: 13, color: '#fff' }} /> : null}
+                              </Box>
+                              <Typography variant="caption" fontWeight={600} color="#111111">Settlement File</Typography>
+                              {flipkartSettlementDoc && flipkartSettlementStatus !== 'none' && (
+                                <Typography variant="caption" color={flipkartSettlementStatus === 'processing' ? '#16a34a' : '#b45309'} sx={{ textAlign: 'center', fontSize: '9px', display: 'block' }}>
+                                  {flipkartSettlementDoc.filename.slice(0, 16)}… • {flipkartSettlementStatus === 'processing' ? 'Done' : 'Pending'}
+                                </Typography>
+                              )}
+                              <input accept={getAcceptForVendor('flipkart')} style={{ display: 'none' }} id={settlementId} type="file"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0] || null;
+                                  if (file) {
+                                    if (!validateFileType(file, 'flipkart', 'Flipkart settlement')) { e.target.value = ''; return; }
+                                    setMarketplaceFile('flipkart', 'settlement', file);
+                                    await performMarketplaceUpload('flipkart', 'settlement', file, sp);
+                                  }
+                                  e.target.value = '';
+                                }}
+                                disabled={!!uploadingVendor}
+                              />
+                              <Button
+                                variant={isVendorUploaded('flipkart', 'settlement', sp) ? 'outlined' : 'contained'}
+                                size="small"
+                                startIcon={<CloudUploadIcon sx={{ fontSize: '0.8rem !important' }} />}
+                                disabled={!!uploadingVendor}
+                                endIcon={(uploadingVendor === `flipkart_${sp}_settlement` || uploadingVendor === `flipkart_settlement`) ? <CircularProgress size={10} /> : null}
+                                onClick={(e) => handleFileInputClick(e, settlementId, 'flipkart', 'settlement')}
+                                sx={{
+                                  fontSize: '0.68rem', py: 0.4, px: 1, minWidth: 80,
+                                  ...(isVendorUploaded('flipkart', 'settlement', sp) && {
+                                    borderColor: flipkartSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                                    color: flipkartSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
+                                  })
+                                }}
+                              >
+                                {(uploadingVendor === `flipkart_${sp}_settlement` || uploadingVendor === `flipkart_settlement`) ? '...' : isVendorUploaded('flipkart', 'settlement', sp) ? 'Re-upload' : 'Upload'}
+                              </Button>
+                            </Box>
+                          </Paper>
+                        </Box>
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
                 </Paper>
               </Grid>
 

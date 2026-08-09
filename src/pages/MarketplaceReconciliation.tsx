@@ -213,7 +213,9 @@ import { useReconciliationStatus, formatReconciliationTimestamp } from '../hooks
 
 const MarketplaceReconciliation: React.FC = () => {
   const { setMemberName } = useUser();
-  const { hasValidCredentials, isInitialized } = useOrganization();
+  const { hasValidCredentials, isInitialized, organizationId } = useOrganization();
+  const allowedSubPlatformOrgs = ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'];
+  const hasFlipkartSubPlatforms = organizationId ? allowedSubPlatformOrgs.includes(organizationId) : false;
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
   const [feeInvoiceSummary, setFeeInvoiceSummary] = useState<{
     total_invoiced: number;
@@ -5294,7 +5296,7 @@ const MarketplaceReconciliation: React.FC = () => {
         </Card>
 
         {/* Sub-Platform Breakdown */}
-        {mainSummary?.subPlatformBreakdown && mainSummary.subPlatformBreakdown.length > 0 && (
+        {hasFlipkartSubPlatforms && mainSummary?.subPlatformBreakdown && mainSummary.subPlatformBreakdown.length > 0 && (
           <Card sx={{
             background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
             borderRadius: '16px',

@@ -141,6 +141,13 @@ export interface MainSummaryResponse {
       amount: number;
     }>;
   };
+  subPlatformBreakdown?: Array<{
+    sub_platform: string;
+    order_count: number;
+    total_sales_amount: number;
+    total_settlement_amount: number;
+    total_commission: number;
+  }>;
 }
 
 export interface MarketplaceReconciliationResponse {
