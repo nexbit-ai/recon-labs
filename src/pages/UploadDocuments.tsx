@@ -136,7 +136,7 @@ const UploadDocuments: React.FC = () => {
 
   const { organizationId } = useOrganization();
   const allowedSubPlatformOrgs = ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'];
-  const hasFlipkartSubPlatforms = organizationId ? allowedSubPlatformOrgs.includes(organizationId) : false;
+  const hasFlipkartSubPlatforms = organizationId ? allowedSubPlatformOrgs.some(id => organizationId.includes(id)) : false;
 
   const [flipkartSubPlatform, setFlipkartSubPlatform] = useState<string>('Main Account');
   const flipkartSubPlatforms = hasFlipkartSubPlatforms 
