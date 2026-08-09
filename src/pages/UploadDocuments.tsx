@@ -63,6 +63,7 @@ const vendors: Vendor[] = [
   // D2C payment gateway partner - uses report_type "cashfree"
   { id: 'cashfree', name: 'Cashfree' },
   { id: 'cashfree_payments', name: 'Cashfree Payments' },
+  { id: 'razorpay', name: 'Razorpay' },
   // D2C logistics partner - uses report_type "zippee-loginext" and "zippee-blaze"
   { id: 'zippee-loginext', name: 'Zippee Loginext' },
   { id: 'zippee-blaze', name: 'Zippee Blaze' },
@@ -112,6 +113,7 @@ const UploadDocuments: React.FC = () => {
   const [lastMileStatusFile, setLastMileStatusFile] = useState<File | null>(null);
   // Unicommerce Sales file
   const [unicommerceFile, setUnicommerceFile] = useState<File | null>(null);
+  const [magentoFile, setMagentoFile] = useState<File | null>(null);
   // Delhivery logistics recon CSV
   const [delhiveryLogisticReconFile, setDelhiveryLogisticReconFile] = useState<File | null>(null);
   // Shadowfax logistics recon CSV
@@ -1088,6 +1090,71 @@ const UploadDocuments: React.FC = () => {
     }
   };
 
+  const handleMagentoUpload = async (fileOverride?: File | null) => {
+    const file = fileOverride || magentoFile;
+    if (!file || selectedMonth === null || selectedYear === null) return;
+
+    setUploadingVendor('magento_sales');
+    setUploadStatus(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('description', `Magento sales file for ${months[selectedMonth]} ${selectedYear}`);
+      formData.append('month', months[selectedMonth]);
+      formData.append('year', selectedYear.toString());
+      formData.append('report_type', 'magento_sales');
+
+      let customToken: string | null = null;
+      if (session) {
+        try {
+          const customSessionData = {
+            member_id: session.member_id,
+            member_session_id: session.member_session_id,
+            organization_id: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
+            organization_slug: session.organization_slug,
+            roles: session.roles,
+          };
+          customToken = await JWTService.generateToken(customSessionData);
+        } catch (error) {
+          console.error('❌ Failed to generate custom token:', error);
+        }
+      }
+
+      const headers: Record<string, string> = {
+        'x-api-key': API_CONFIG.API_KEY,
+        'x-org-id': session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
+      };
+      if (customToken) headers['Authorization'] = `Bearer ${customToken}`;
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/v1/recon/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
+        if (response.status === 400) {
+          throw new Error('Please upload the correct file for Magento');
+        }
+        throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
+      }
+
+      setUploadStatus({ type: 'success', message: `Successfully uploaded Magento sales file` });
+      setMagentoFile(null);
+      
+      // refresh list
+      if (selectedYear !== null && selectedMonth !== null) {
+        await fetchUploadedDocuments(selectedYear, selectedMonth);
+      }
+    } catch (error) {
+      console.error('❌ Upload error:', error);
+      setUploadStatus({ type: 'error', message: error instanceof Error ? error.message : 'Failed to upload file. Please try again.' });
+    } finally {
+      setUploadingVendor(null);
+    }
+  };
+
   const findUploadForVendor = (
     vendorId: string,
     kind?: 'sales' | 'sales_b2b' | 'settlement',
@@ -1178,6 +1245,9 @@ const UploadDocuments: React.FC = () => {
 
   const unicommerceDoc = getUploadedDocument('unicommerce');
   const unicommerceStatus = getUploadProcessingStatus(unicommerceDoc);
+  
+  const magentoDoc = getUploadedDocument('magento_sales');
+  const magentoStatus = getUploadProcessingStatus(magentoDoc);
   const lastmileDoc = getUploadedDocument('lastmile');
   const lastmileStatus = getUploadProcessingStatus(lastmileDoc);
 
@@ -3671,6 +3741,123 @@ const UploadDocuments: React.FC = () => {
                     </Button>
             </Box>
                 </Paper>
+
+              {/* Step 1b: Magento Sales File (Conditional) */}
+              {hasFlipkartSubPlatforms && (
+                <>
+                {/* Connector Line between Unicommerce and Magento */}
+                <Box sx={{ 
+                  width: 40,
+                  height: '3px',
+                  background: unicommerceStatus === 'processing'
+                    ? 'linear-gradient(to right, #16a34a, #16a34a)'
+                    : unicommerceStatus === 'pending'
+                      ? 'linear-gradient(to right, #f59e0b, #f59e0b)'
+                      : 'linear-gradient(to right, #d1d5db, #d1d5db)',
+                  position: 'relative',
+                  zIndex: 3,
+                  alignSelf: 'center'
+                }} />
+                
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    flex: '0 0 auto',
+                    width: 200,
+                    p: 2,
+                    border: magentoStatus === 'processing'
+                      ? '2px solid #16a34a'
+                      : magentoStatus === 'pending'
+                        ? '2px solid #f59e0b'
+                        : '2px solid #e5e7eb',
+                    borderRadius: '12px',
+                    background: magentoStatus === 'processing'
+                      ? '#f0fdf4'
+                      : magentoStatus === 'pending'
+                        ? '#fffbeb'
+                        : '#ffffff',
+                    position: 'relative',
+                    zIndex: 2
+                  }}
+                >
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                    <Box sx={{ 
+                      width: 32, 
+                      height: 32, 
+                      borderRadius: '50%', 
+                      background: magentoStatus === 'processing'
+                        ? '#16a34a'
+                        : magentoStatus === 'pending'
+                          ? '#f59e0b'
+                          : '#f3f4f6',
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      border: magentoStatus !== 'none' ? 'none' : '2px solid #d1d5db'
+                    }}>
+                        {magentoStatus === 'processing' ? (
+                        <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                        ) : magentoStatus === 'pending' ? (
+                        <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
+                        ) : (
+                          <></>
+                          )}
+                    </Box>
+                    
+                    <Typography variant="body2" fontWeight={600} color="#111111" textAlign="center">
+                      Magento Sales
+                    </Typography>
+                    
+                    {magentoDoc && magentoStatus !== 'none' && (
+                      <Typography
+                        variant="caption"
+                        color={magentoStatus === 'processing' ? '#16a34a' : '#b45309'}
+                        sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                      >
+                        {magentoDoc.filename} • {magentoStatus === 'processing' ? 'Processed' : 'Pending'}
+                      </Typography>
+                    )}
+                    
+                    <input
+                      accept=".csv,.xlsx,.xls,.gz"
+                      style={{ display: 'none' }}
+                      id="d2c-magento-sales-upload"
+                      type="file"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0] || null;
+                        if (file) {
+                          setMagentoFile(file);
+                          handleMagentoUpload(file);
+                        }
+                        e.target.value = '';
+                      }}
+                      disabled={uploadingVendor === 'magento_sales'}
+                    />
+                    <Button
+                      variant={isVendorUploaded('magento_sales') ? 'outlined' : 'contained'}
+                      size="small"
+                      startIcon={<CloudUploadIcon />}
+                      disabled={uploadingVendor === 'magento_sales'}
+                      endIcon={uploadingVendor === 'magento_sales' ? <CircularProgress size={14} /> : null}
+                      onClick={(e) => {
+                        handleFileInputClick(e, 'd2c-magento-sales-upload', 'magento_sales' as any, 'sales' as any);
+                      }}
+                      sx={{ 
+                        minWidth: 120,
+                        fontSize: '0.75rem',
+                        py: 0.75,
+                        ...(isVendorUploaded('magento_sales') && {
+                          borderColor: magentoStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                          color: magentoStatus === 'pending' ? '#b45309' : '#16a34a'
+                        })
+                      }}
+                    >
+                      {uploadingVendor === 'magento_sales' ? 'Uploading...' : isVendorUploaded('magento_sales') ? 'Re-upload' : 'Upload'}
+                    </Button>
+                  </Box>
+                </Paper>
+                </>
+              )}
 
               {/* Connector Line between Sales and Settlement */}
               <Box sx={{ 

@@ -41,7 +41,7 @@ export const useOrganization = () => {
   }, [session, isInitialized]);
 
   return {
-    organizationId: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
+    organizationId: session?.organization_id || tokenManager.getOrgId(),
     isInitialized,
     authMethod: tokenManager.getAuthMethod(),
     hasValidCredentials: tokenManager.getAuthStatus().hasValidCredentials
