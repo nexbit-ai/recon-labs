@@ -2378,7 +2378,6 @@ const OperationsCentrePage: React.FC = () => {
           >
             <Tab value={2} label="Home" />
             <Tab value={0} label={`Action Required (${getUnreconciledTotalCount()})`} />
-            <Tab value={1} label={`Already Disputed (${getDisputedCount()})`} />
           </Tabs>
 
           {/* Controls */}

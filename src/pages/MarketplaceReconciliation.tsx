@@ -3572,6 +3572,8 @@ const MarketplaceReconciliation: React.FC = () => {
               </CardContent>
             </Card>
           </Grid>
+
+
           {/* Comprehensive Unreconciled Section */}
           <Grid item xs={12} md={12}>
             <Card sx={{
@@ -5290,6 +5292,61 @@ const MarketplaceReconciliation: React.FC = () => {
             })()}
           </CardContent>
         </Card>
+
+        {/* Sub-Platform Breakdown */}
+        {mainSummary?.subPlatformBreakdown && mainSummary.subPlatformBreakdown.length > 0 && (
+          <Card sx={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+            borderRadius: '16px',
+            border: '1px solid #f1f3f4',
+            boxShadow: 'none',
+            mb: 6,
+          }}>
+            <CardContent sx={{ p: 4 }}>
+              <Typography variant="h3" sx={{ fontWeight: 600, color: '#1f2937', mb: 3 }}>
+                Sub-Platform Breakdown
+              </Typography>
+              <Grid container spacing={3}>
+                {mainSummary.subPlatformBreakdown.map((sp, idx) => (
+                  <Grid item xs={12} sm={6} md={4} key={idx}>
+                    <Box sx={{
+                      p: 2,
+                      borderRadius: '12px',
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: '#ffffff'
+                    }}>
+                      <Typography sx={{ fontWeight: 600, color: '#374151', mb: 1 }}>
+                        {sp.sub_platform}
+                      </Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography sx={{ color: '#6b7280', fontSize: '0.875rem' }}>Orders</Typography>
+                        <Typography sx={{ fontWeight: 500 }}>{sp.order_count.toLocaleString('en-IN')}</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography sx={{ color: '#6b7280', fontSize: '0.875rem' }}>Sales Amount</Typography>
+                        <Typography sx={{ fontWeight: 600, color: '#111827' }}>
+                          {getCurrencySymbol()}{Math.round(sp.total_sales_amount).toLocaleString(getCurrencyLocale())}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography sx={{ color: '#6b7280', fontSize: '0.875rem' }}>Settlement Amount</Typography>
+                        <Typography sx={{ fontWeight: 600, color: '#111827' }}>
+                          {getCurrencySymbol()}{Math.round(sp.total_settlement_amount || 0).toLocaleString(getCurrencyLocale())}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography sx={{ color: '#6b7280', fontSize: '0.875rem' }}>Commission</Typography>
+                        <Typography sx={{ fontWeight: 600, color: '#111827' }}>
+                          {getCurrencySymbol()}{Math.round(sp.total_commission || 0).toLocaleString(getCurrencyLocale())}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Party Composition Section - Only for D2C */}
         {selectedPlatform === 'd2c' && (() => {
