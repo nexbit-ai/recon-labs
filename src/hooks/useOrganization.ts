@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useStytchMemberSession } from '@stytch/react/b2b';
 import { tokenManager } from '../services/api/tokenManager';
+import { API_CONFIG } from '../services/api/config';
 
 export const useOrganization = () => {
   const { session, isInitialized } = useStytchMemberSession();
@@ -40,7 +41,7 @@ export const useOrganization = () => {
   }, [session, isInitialized]);
 
   return {
-    organizationId: session?.organization_id,
+    organizationId: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
     isInitialized,
     authMethod: tokenManager.getAuthMethod(),
     hasValidCredentials: tokenManager.getAuthStatus().hasValidCredentials
