@@ -70,8 +70,22 @@ class TokenManager {
    * Get legacy organization ID (for backward compatibility)
    */
   getOrgId(): string | null {
-    // Return stored orgId from session, or local storage, fallback to config
-    return this.orgId || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID;
+    // First priority: in-memory orgId set during setJWTCredentials
+    if (this.orgId) return this.orgId;
+
+    // Second priority: decode the JWT token to get organization_id (most reliable)
+    const jwtToken = this.jwtToken || localStorage.getItem('jwt_token');
+    if (jwtToken) {
+      const decoded = JWTService.decodeToken(jwtToken);
+      if (decoded?.organization_id) return decoded.organization_id;
+    }
+
+    // Third priority: localStorage organization_id key
+    const lsOrgId = localStorage.getItem('organization_id');
+    if (lsOrgId) return lsOrgId;
+
+    // Last resort: config (may be wrong org, avoid if possible)
+    return API_CONFIG.ORG_ID;
   }
 
   /**
