@@ -1948,7 +1948,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [salesReportSortConfig, setSalesReportSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   // Sales Report search state
   const [salesReportSearch, setSalesReportSearch] = useState<string>('');
-  const [showSalesReportSearch, setShowSalesReportSearch] = useState(false);
+  const [showSalesReportSearch, setShowSalesReportSearch] = useState<string | null>(null);
   // Amazon Sales Report business mode (B2C default)
   const [amazonBusinessMode, setAmazonBusinessMode] = useState<'B2C' | 'B2B'>('B2C');
   const [exportDrawerOpen, setExportDrawerOpen] = useState(false);
@@ -2435,7 +2435,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   const handleSalesReportSearchClear = () => {
     setSalesReportSearch('');
-    setShowSalesReportSearch(false);
+    setShowSalesReportSearch(null);
     // Trigger API call without search
     setPage(0);
     setCurrentPage(1);
@@ -4272,7 +4272,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Clear Sales Report search when switching away from Sales Report tab
     if (newValue !== 4) {
       setSalesReportSearch('');
-      setShowSalesReportSearch(false);
+      setShowSalesReportSearch(null);
     }
 
     // Sales Report tab (index 4) - fetch data when clicked
@@ -5409,12 +5409,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         onClick={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
-                                          setShowSalesReportSearch(!showSalesReportSearch);
+                                          setShowSalesReportSearch(showSalesReportSearch === column ? null : column);
                                         }}
                                         sx={{
                                           ml: 0.5,
-                                          color: showSalesReportSearch ? '#1f2937' : '#6b7280',
-                                          background: showSalesReportSearch ? '#e5e7eb' : 'transparent',
+                                          color: showSalesReportSearch === column ? '#1f2937' : '#6b7280',
+                                          background: showSalesReportSearch === column ? '#e5e7eb' : 'transparent',
                                           '&:hover': { background: '#f3f4f6' },
                                         }}
                                         aria-label="Toggle search"
@@ -5472,23 +5472,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               <Box
                                 sx={{
                                   position: 'absolute',
-                                  top: 'calc(100% + 4px)',
+                                  top: 0,
                                   left: 0,
+                                  right: 0,
+                                  bottom: 0,
                                   zIndex: 20,
-                                  background: '#ffffff',
-                                  borderRadius: '8px',
-                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                  padding: '4px',
-                                  border: '1px solid #e5e7eb',
+                                  background: '#f3f4f6',
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: 0.5,
-                                  width: 'calc(100% - 16px)',
-                                  animation: 'slideDown 0.2s ease-out forwards',
-                                  '@keyframes slideDown': {
-                                    '0%': { transform: 'translateY(-10px)', opacity: 0 },
-                                    '100%': { transform: 'translateY(0)', opacity: 1 }
-                                  }
+                                  justifyContent: 'center',
+                                  padding: '0 4px'
                                 }}
                               >
                                 <TextField
@@ -5516,6 +5509,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         )}
                                         <IconButton
                                           size="small"
+                                          onClick={() => { setShowOrderIdSearch(false); handleOrderIdSearchClear(); }}
+                                          sx={{ p: 0.5, mr: 0.25 }}
+                                        >
+                                          <CloseIcon sx={{ fontSize: '1rem', color: '#111827' }} />
+                                        </IconButton>
+                                        <IconButton
+                                          size="small"
                                           onClick={handleOrderIdSearchClick}
                                           disabled={(loading || quadApiLoading) && !isSorting}
                                           sx={{ p: 0.5 }}
@@ -5537,29 +5537,22 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               </Box>
                             )}
                             {/* Sales Report Search Bar - Floating Popover */}
-                            {activeTab === 4 && showSalesReportSearch &&
+                            {activeTab === 4 && showSalesReportSearch === column &&
                               (['Order ID', 'Order Item ID', 'HSN', 'Marketplace SKU Code'].includes(column) || 
                                ['order_id', 'order_item_id', 'hsn', 'marketplace_sku_code'].includes(salesReportData?.columns?.find(col => col.title === column)?.key || '')) && (
                                 <Box
                                   sx={{
                                     position: 'absolute',
-                                    top: 'calc(100% + 4px)',
+                                    top: 0,
                                     left: 0,
+                                    right: 0,
+                                    bottom: 0,
                                     zIndex: 20,
-                                    background: '#ffffff',
-                                    borderRadius: '8px',
-                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                    padding: '4px',
-                                    border: '1px solid #e5e7eb',
+                                    background: '#f3f4f6',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: 0.5,
-                                    width: 'calc(100% - 16px)',
-                                    animation: 'slideDown 0.2s ease-out forwards'
-                                    , '@keyframes slideDown': {
-                                      '0%': { transform: 'translateY(-10px)', opacity: 0 },
-                                      '100%': { transform: 'translateY(0)', opacity: 1 }
-                                    }
+                                    justifyContent: 'center',
+                                    padding: '0 4px'
                                   }}
                                 >
                                   <TextField
@@ -5585,6 +5578,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                               <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
                                             </IconButton>
                                           )}
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => { setShowSalesReportSearch(null); handleSalesReportSearchClear(); }}
+                                            sx={{ p: 0.5, mr: 0.25 }}
+                                          >
+                                            <CloseIcon sx={{ fontSize: '1rem', color: '#111827' }} />
+                                          </IconButton>
                                           <IconButton
                                             size="small"
                                             onClick={handleSalesReportSearchClick}
@@ -5700,12 +5700,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         onClick={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
-                                          setShowSalesReportSearch(!showSalesReportSearch);
+                                          setShowSalesReportSearch(showSalesReportSearch === column ? null : column);
                                         }}
                                         sx={{
                                           ml: 0.5,
-                                          color: showSalesReportSearch ? '#1f2937' : '#6b7280',
-                                          background: showSalesReportSearch ? '#e5e7eb' : 'transparent',
+                                          color: showSalesReportSearch === column ? '#1f2937' : '#6b7280',
+                                          background: showSalesReportSearch === column ? '#e5e7eb' : 'transparent',
                                           '&:hover': { background: '#f3f4f6' },
                                         }}
                                         aria-label="Toggle search"
@@ -5763,23 +5763,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               <Box
                                 sx={{
                                   position: 'absolute',
-                                  top: 'calc(100% + 4px)',
+                                  top: 0,
                                   left: 0,
+                                  right: 0,
+                                  bottom: 0,
                                   zIndex: 20,
-                                  background: '#ffffff',
-                                  borderRadius: '8px',
-                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                  padding: '4px',
-                                  border: '1px solid #e5e7eb',
+                                  background: '#f3f4f6',
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: 0.5,
-                                  width: 'calc(100% - 16px)',
-                                  animation: 'slideDown 0.2s ease-out forwards',
-                                  '@keyframes slideDown': {
-                                    '0%': { transform: 'translateY(-10px)', opacity: 0 },
-                                    '100%': { transform: 'translateY(0)', opacity: 1 }
-                                  }
+                                  justifyContent: 'center',
+                                  padding: '0 4px'
                                 }}
                               >
                                 <TextField
@@ -5807,6 +5800,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         )}
                                         <IconButton
                                           size="small"
+                                          onClick={() => { setShowOrderIdSearch(false); handleOrderIdSearchClear(); }}
+                                          sx={{ p: 0.5, mr: 0.25 }}
+                                        >
+                                          <CloseIcon sx={{ fontSize: '1rem', color: '#111827' }} />
+                                        </IconButton>
+                                        <IconButton
+                                          size="small"
                                           onClick={handleOrderIdSearchClick}
                                           disabled={(loading || quadApiLoading) && !isSorting}
                                           sx={{ p: 0.5 }}
@@ -5828,29 +5828,22 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               </Box>
                             )}
                             {/* Sales Report Search Bar - Floating Popover */}
-                            {activeTab === 4 && showSalesReportSearch &&
+                            {activeTab === 4 && showSalesReportSearch === column &&
                               (['Order ID', 'Order Item ID', 'HSN', 'Marketplace SKU Code'].includes(column) || 
                                ['order_id', 'order_item_id', 'hsn', 'marketplace_sku_code'].includes(salesReportData?.columns?.find(col => col.title === column)?.key || '')) && (
                                 <Box
                                   sx={{
                                     position: 'absolute',
-                                    top: 'calc(100% + 4px)',
+                                    top: 0,
                                     left: 0,
+                                    right: 0,
+                                    bottom: 0,
                                     zIndex: 20,
-                                    background: '#ffffff',
-                                    borderRadius: '8px',
-                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                    padding: '4px',
-                                    border: '1px solid #e5e7eb',
+                                    background: '#f3f4f6',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: 0.5,
-                                    width: 'calc(100% - 16px)',
-                                    animation: 'slideDown 0.2s ease-out forwards'
-                                    , '@keyframes slideDown': {
-                                      '0%': { transform: 'translateY(-10px)', opacity: 0 },
-                                      '100%': { transform: 'translateY(0)', opacity: 1 }
-                                    }
+                                    justifyContent: 'center',
+                                    padding: '0 4px'
                                   }}
                                 >
                                   <TextField
@@ -5876,6 +5869,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                               <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
                                             </IconButton>
                                           )}
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => { setShowSalesReportSearch(null); handleSalesReportSearchClear(); }}
+                                            sx={{ p: 0.5, mr: 0.25 }}
+                                          >
+                                            <CloseIcon sx={{ fontSize: '1rem', color: '#111827' }} />
+                                          </IconButton>
                                           <IconButton
                                             size="small"
                                             onClick={handleSalesReportSearchClick}
@@ -6006,12 +6006,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         onClick={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
-                                          setShowSalesReportSearch(!showSalesReportSearch);
+                                          setShowSalesReportSearch(showSalesReportSearch === column ? null : column);
                                         }}
                                         sx={{
                                           ml: 0.5,
-                                          color: showSalesReportSearch ? '#1f2937' : '#6b7280',
-                                          background: showSalesReportSearch ? '#e5e7eb' : 'transparent',
+                                          color: showSalesReportSearch === column ? '#1f2937' : '#6b7280',
+                                          background: showSalesReportSearch === column ? '#e5e7eb' : 'transparent',
                                           '&:hover': { background: '#f3f4f6' },
                                         }}
                                         aria-label="Toggle search"
@@ -6069,23 +6069,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               <Box
                                 sx={{
                                   position: 'absolute',
-                                  top: 'calc(100% + 4px)',
+                                  top: 0,
                                   left: 0,
+                                  right: 0,
+                                  bottom: 0,
                                   zIndex: 20,
-                                  background: '#ffffff',
-                                  borderRadius: '8px',
-                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                  padding: '4px',
-                                  border: '1px solid #e5e7eb',
+                                  background: '#f3f4f6',
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: 0.5,
-                                  width: 'calc(100% - 16px)',
-                                  animation: 'slideDown 0.2s ease-out forwards',
-                                  '@keyframes slideDown': {
-                                    '0%': { transform: 'translateY(-10px)', opacity: 0 },
-                                    '100%': { transform: 'translateY(0)', opacity: 1 }
-                                  }
+                                  justifyContent: 'center',
+                                  padding: '0 4px'
                                 }}
                               >
                                 <TextField
@@ -6113,6 +6106,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         )}
                                         <IconButton
                                           size="small"
+                                          onClick={() => { setShowOrderIdSearch(false); handleOrderIdSearchClear(); }}
+                                          sx={{ p: 0.5, mr: 0.25 }}
+                                        >
+                                          <CloseIcon sx={{ fontSize: '1rem', color: '#111827' }} />
+                                        </IconButton>
+                                        <IconButton
+                                          size="small"
                                           onClick={handleOrderIdSearchClick}
                                           disabled={(loading || quadApiLoading) && !isSorting}
                                           sx={{ p: 0.5 }}
@@ -6134,29 +6134,22 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               </Box>
                             )}
                             {/* Sales Report Search Bar - Floating Popover */}
-                            {activeTab === 4 && showSalesReportSearch &&
+                            {activeTab === 4 && showSalesReportSearch === column &&
                               (['Order ID', 'Order Item ID', 'HSN', 'Marketplace SKU Code'].includes(column) || 
                                ['order_id', 'order_item_id', 'hsn', 'marketplace_sku_code'].includes(salesReportData?.columns?.find(col => col.title === column)?.key || '')) && (
                                 <Box
                                   sx={{
                                     position: 'absolute',
-                                    top: 'calc(100% + 4px)',
+                                    top: 0,
                                     left: 0,
+                                    right: 0,
+                                    bottom: 0,
                                     zIndex: 20,
-                                    background: '#ffffff',
-                                    borderRadius: '8px',
-                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                    padding: '4px',
-                                    border: '1px solid #e5e7eb',
+                                    background: '#f3f4f6',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: 0.5,
-                                    width: 'calc(100% - 16px)',
-                                    animation: 'slideDown 0.2s ease-out forwards'
-                                    , '@keyframes slideDown': {
-                                      '0%': { transform: 'translateY(-10px)', opacity: 0 },
-                                      '100%': { transform: 'translateY(0)', opacity: 1 }
-                                    }
+                                    justifyContent: 'center',
+                                    padding: '0 4px'
                                   }}
                                 >
                                   <TextField
@@ -6182,6 +6175,13 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                               <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
                                             </IconButton>
                                           )}
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => { setShowSalesReportSearch(null); handleSalesReportSearchClear(); }}
+                                            sx={{ p: 0.5, mr: 0.25 }}
+                                          >
+                                            <CloseIcon sx={{ fontSize: '1rem', color: '#111827' }} />
+                                          </IconButton>
                                           <IconButton
                                             size="small"
                                             onClick={handleSalesReportSearchClick}
