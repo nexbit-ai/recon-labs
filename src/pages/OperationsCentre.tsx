@@ -1529,6 +1529,19 @@ const OperationsCentrePage: React.FC = () => {
     setSelectedBatchForClaim(null);
   };
 
+  // Flipkart Dispute UI
+  const [flipkartDisputeDialogOpen, setFlipkartDisputeDialogOpen] = useState(false);
+
+  const openFlipkartDisputeDialog = (batch: any) => {
+    setSelectedBatchForClaim(batch);
+    setFlipkartDisputeDialogOpen(true);
+  };
+
+  const closeFlipkartDisputeDialog = () => {
+    setFlipkartDisputeDialogOpen(false);
+    setSelectedBatchForClaim(null);
+  };
+
   // Track Claim UI
   const [trackClaimDialogOpen, setTrackClaimDialogOpen] = useState(false);
   const [selectedBatchForTracking, setSelectedBatchForTracking] = useState<any>(null);
@@ -2689,6 +2702,19 @@ const OperationsCentrePage: React.FC = () => {
                       >
                         Track Status
                       </Button>
+                    ) : selectedPlatform === 'flipkart' ? (
+                      <Button 
+                        fullWidth 
+                        variant="contained" 
+                        sx={{ 
+                          background: '#7A5DBF', 
+                          color: 'white', 
+                          textTransform: 'none', fontWeight: 600, py: 0.75, fontSize: '0.8125rem', boxShadow: 'none', '&:hover': { background: '#624a9e', boxShadow: 'none' } 
+                        }}
+                        onClick={() => openFlipkartDisputeDialog(batch)}
+                      >
+                        Raise Dispute
+                      </Button>
                     ) : (
                       <Button 
                         fullWidth 
@@ -3567,6 +3593,38 @@ const OperationsCentrePage: React.FC = () => {
           <Button variant="contained" onClick={handleMarkBatchFiledSubmit} disabled={!claimTicketInput} sx={{ background: '#7A5DBF', color: 'white', '&:hover': { background: '#624a9e' } }}>
             Confirm File
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Flipkart Dispute Dialog */}
+      <Dialog open={flipkartDisputeDialogOpen} onClose={closeFlipkartDisputeDialog} PaperProps={{ sx: { borderRadius: 2, minWidth: 400 } }}>
+        <DialogTitle sx={{ pb: 1, fontWeight: 700 }}>Raise Dispute</DialogTitle>
+        <DialogContent sx={{ pb: 1 }}>
+          <Typography variant="body2" sx={{ color: '#4b5563', mb: 3 }}>
+            Choose how you would like to proceed with raising a dispute for this batch.
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Button variant="outlined" sx={{ justifyContent: 'flex-start', py: 1.5, px: 2, textTransform: 'none', color: '#111827', borderColor: '#e5e7eb', borderRadius: 2, '&:hover': { background: '#f9fafb' } }}>
+              <Box sx={{ textAlign: 'left' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Setup Email Flow</Typography>
+                <Typography variant="caption" sx={{ color: '#6b7280' }}>Automatically send emails to Flipkart support</Typography>
+              </Box>
+            </Button>
+            <Button variant="outlined" sx={{ justifyContent: 'flex-start', py: 1.5, px: 2, textTransform: 'none', color: '#111827', borderColor: '#e5e7eb', borderRadius: 2, '&:hover': { background: '#f9fafb' } }}>
+              <Box sx={{ textAlign: 'left' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Setup Flipkart Credentials</Typography>
+                <Typography variant="caption" sx={{ color: '#6b7280' }}>Automate dispute filing directly via API</Typography>
+              </Box>
+            </Button>
+            <Box sx={{ mt: 1, p: 1.5, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 2 }}>
+              <Typography variant="body2" sx={{ color: '#166534', fontWeight: 500, fontSize: '0.8125rem' }}>
+                💡 Note: Disputes are raised automatically every 7 days window.
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2 }}>
+          <Button variant="text" onClick={closeFlipkartDisputeDialog} sx={{ color: '#111827' }}>Cancel</Button>
         </DialogActions>
       </Dialog>
 
