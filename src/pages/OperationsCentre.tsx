@@ -59,6 +59,7 @@ import {
 import { api, apiService } from '../services/api';
 import ColumnFilterControls from '../components/ColumnFilterControls';
 import TransactionSheet from './TransactionSheet';
+import { useStytchMemberSession } from '@stytch/react/b2b';
 // Type definitions for transaction data based on API response
 interface TransactionRow {
   "Order ID": string;
@@ -304,6 +305,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
 };
 
 const OperationsCentrePage: React.FC = () => {
+  const { session } = useStytchMemberSession();
   const [disputeSubTab, setDisputeSubTab] = useState<number>(2); // 0: unreconciled, 1: manually reconciled, 2: disputed
 
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
@@ -368,6 +370,18 @@ const OperationsCentrePage: React.FC = () => {
   // Platform selector state for dropdown (single-select) - initialize from URL params
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<'flipkart' | 'amazon' | 'amazon_uk' | 'd2c'>(getInitialPlatform());
+
+  // Override default platform for 'prestige' organization
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const isPrestige = session?.organization_slug === 'prestige' || 
+                       session?.organization_id === '3d718fbf-4e12-4be6-a79e-b66e492bd063' || // staging
+                       session?.organization_id === 'e948288b-26ba-4cff-afb2-9ff145026b96';    // production
+    
+    if (!params.get('platforms') && isPrestige) {
+      setSelectedPlatform('flipkart');
+    }
+  }, [session?.organization_slug, session?.organization_id]);
 
   // Initialize platform and tab from URL query params if provided
   useEffect(() => {

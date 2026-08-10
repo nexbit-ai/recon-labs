@@ -5561,6 +5561,10 @@ const MarketplaceReconciliation: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                 <CircularProgress />
               </Box>
+            ) : ageingData.length === 0 ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <Typography sx={{ color: '#6b7280' }}>No data available for Payment Ageing</Typography>
+              </Box>
             ) : ageingData.length === 1 ? (
               // Single-vendor minimalist greyscale layout
               <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
