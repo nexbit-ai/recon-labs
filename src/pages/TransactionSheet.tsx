@@ -5402,9 +5402,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     {getSalesReportSortIcon(column)}
                                   </IconButton>
                                   {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
-                                  {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
-                                    (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
-                                    (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                  {(['Order ID', 'Order Item ID', 'HSN', 'Marketplace SKU Code'].includes(column) || 
+                                    ['order_id', 'order_item_id', 'hsn', 'marketplace_sku_code'].includes(salesReportData?.columns?.find(col => col.title === column)?.key || '')) && (
                                       <IconButton
                                         size="small"
                                         onClick={(e) => {
@@ -5539,9 +5538,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             )}
                             {/* Sales Report Search Bar - Floating Popover */}
                             {activeTab === 4 && showSalesReportSearch &&
-                              ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
-                                (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
-                                (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                              (['Order ID', 'Order Item ID', 'HSN', 'Marketplace SKU Code'].includes(column) || 
+                               ['order_id', 'order_item_id', 'hsn', 'marketplace_sku_code'].includes(salesReportData?.columns?.find(col => col.title === column)?.key || '')) && (
                                 <Box
                                   sx={{
                                     position: 'absolute',
@@ -5695,9 +5693,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     {getSalesReportSortIcon(column)}
                                   </IconButton>
                                   {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
-                                  {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
-                                    (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
-                                    (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                  {(['Order ID', 'Order Item ID', 'HSN', 'Marketplace SKU Code'].includes(column) || 
+                                    ['order_id', 'order_item_id', 'hsn', 'marketplace_sku_code'].includes(salesReportData?.columns?.find(col => col.title === column)?.key || '')) && (
                                       <IconButton
                                         size="small"
                                         onClick={(e) => {
@@ -5832,9 +5829,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             )}
                             {/* Sales Report Search Bar - Floating Popover */}
                             {activeTab === 4 && showSalesReportSearch &&
-                              ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
-                                (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
-                                (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                              (['Order ID', 'Order Item ID', 'HSN', 'Marketplace SKU Code'].includes(column) || 
+                               ['order_id', 'order_item_id', 'hsn', 'marketplace_sku_code'].includes(salesReportData?.columns?.find(col => col.title === column)?.key || '')) && (
                                 <Box
                                   sx={{
                                     position: 'absolute',
@@ -6003,9 +5999,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     {getSalesReportSortIcon(column)}
                                   </IconButton>
                                   {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
-                                  {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
-                                    (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
-                                    (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                                  {(['Order ID', 'Order Item ID', 'HSN', 'Marketplace SKU Code'].includes(column) || 
+                                    ['order_id', 'order_item_id', 'hsn', 'marketplace_sku_code'].includes(salesReportData?.columns?.find(col => col.title === column)?.key || '')) && (
                                       <IconButton
                                         size="small"
                                         onClick={(e) => {
@@ -6140,9 +6135,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             )}
                             {/* Sales Report Search Bar - Floating Popover */}
                             {activeTab === 4 && showSalesReportSearch &&
-                              ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
-                                (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
-                                (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
+                              (['Order ID', 'Order Item ID', 'HSN', 'Marketplace SKU Code'].includes(column) || 
+                               ['order_id', 'order_item_id', 'hsn', 'marketplace_sku_code'].includes(salesReportData?.columns?.find(col => col.title === column)?.key || '')) && (
                                 <Box
                                   sx={{
                                     position: 'absolute',
