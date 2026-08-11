@@ -229,8 +229,6 @@ const B2BShell: React.FC = () => {
         <Box sx={{ flex: 1, overflowY: 'auto' }}>
           <Box
             sx={{
-              maxWidth: shell.canvasMaxWidth,
-              mx: 'auto',
               px: `${shell.canvasPaddingX}px`,
               pt: `${shell.canvasPaddingTop}px`,
               pb: `${space.xxxl}px`,

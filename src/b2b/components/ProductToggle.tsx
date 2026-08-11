@@ -1,6 +1,6 @@
-// Top-level B2C / B2B segmented toggle. The single shared surface between the
-// two products. Square, monochrome, active side = ink fill. Route-based:
-// B2C -> existing app at '/', B2B -> '/b2b'. Default is B2C.
+// Top-level B2C / B2B / Payable segmented toggle. Single shared surface across
+// all three products. Square, monochrome, active side = ink fill. Route-based:
+// B2C -> '/', B2B -> '/b2b', Payable -> '/b2b/payable/overview'.
 //
 // Colours come from the shared b2b tokens (plain constants — no theme/runtime
 // dependency), so it renders identically inside the B2C app.
@@ -13,7 +13,8 @@ import { Pressable } from './primitives';
 const ProductToggle: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isB2B = location.pathname.startsWith('/b2b');
+  const isPayable = location.pathname.startsWith('/b2b/payable');
+  const isB2B = location.pathname.startsWith('/b2b') && !isPayable;
 
   const segment = (label: string, active: boolean, onClick: () => void) => (
     <Pressable
@@ -50,9 +51,11 @@ const ProductToggle: React.FC = () => {
         bgcolor: colors.paper,
       }}
     >
-      {segment('B2C', !isB2B, () => navigate('/'))}
+      {segment('B2C', !isB2B && !isPayable, () => navigate('/'))}
       <Box sx={{ width: '1px', bgcolor: colors.grey200 }} />
       {segment('B2B', isB2B, () => navigate('/b2b'))}
+      <Box sx={{ width: '1px', bgcolor: colors.grey200 }} />
+      {segment('Payable', isPayable, () => navigate('/b2b/payable/overview'))}
     </Box>
   );
 };
