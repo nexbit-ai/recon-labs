@@ -3596,187 +3596,114 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         count_only: 'true',
       };
 
-      // Make only the active tab's API call if only switching tabs (to optimize network usage)
-      const matchedCall = (isTabSwitchOnly && activeTab !== 0)
-        ? Promise.resolve({ success: true, data: matchedData, skipped: true })
-        : api.transactions.getTotalTransactions(matchedParams);
+      // 1. Determine active call parameters
+      let activePromise: Promise<any> | null = null;
+      let activeCallName = '';
 
-      const mismatchedLessReceivedCall = (isTabSwitchOnly && (activeTab !== 1 || mismatchedSubTab !== 'less_received'))
-        ? Promise.resolve({ success: true, data: mismatchedLessReceivedData, skipped: true })
-        : api.transactions.getTotalTransactions(mismatchedLessReceivedParams);
-
-      const mismatchedMoreReceivedCall = (isTabSwitchOnly && (activeTab !== 1 || mismatchedSubTab !== 'more_received'))
-        ? Promise.resolve({ success: true, data: mismatchedMoreReceivedData, skipped: true })
-        : api.transactions.getTotalTransactions(mismatchedMoreReceivedParams);
-
-      const unsettledCall = (isTabSwitchOnly && activeTab !== 2)
-        ? Promise.resolve({ success: true, data: unsettledData, skipped: true })
-        : api.transactions.getTotalTransactions(unsettledParams);
-
-      const allCall = (isTabSwitchOnly && activeTab !== 3)
-        ? Promise.resolve({ success: true, data: allData, skipped: true })
-        : api.transactions.getTotalTransactions(allParams);
-
-      const salesReportCall = (isTabSwitchOnly)
-        ? Promise.resolve({ success: true, data: { pagination: { total_count: salesReportTotalCount } }, skipped: true })
-        : api.transactions.getSalesTransactions(salesReportParams);
-
-      const apiCalls = [
-        matchedCall,
-        mismatchedLessReceivedCall,
-        mismatchedMoreReceivedCall,
-        unsettledCall,
-        allCall,
-        salesReportCall,
-      ];
-
-      const [
-        matchedResponse,
-        mismatchedLessReceivedResponse,
-        mismatchedMoreReceivedResponse,
-        unsettledResponse,
-        allResponse,
-        salesReportResponse,
-      ] = await Promise.all(apiCalls);
-
-      // Enhance all D2C tab responses with Shipping Courier column/value
-      const processedMatchedData = (matchedResponse as any).success && !(matchedResponse as any).skipped
-        ? addCourierProviderColumn(matchedResponse.data as TotalTransactionsResponse, platformToUse)
-        : matchedData;
-      const processedMismatchedLessData = (mismatchedLessReceivedResponse as any).success && !(mismatchedLessReceivedResponse as any).skipped
-        ? addCourierProviderColumn(mismatchedLessReceivedResponse.data as TotalTransactionsResponse, platformToUse)
-        : mismatchedLessReceivedData;
-      const processedMismatchedMoreData = (mismatchedMoreReceivedResponse as any).success && !(mismatchedMoreReceivedResponse as any).skipped
-        ? addCourierProviderColumn(mismatchedMoreReceivedResponse.data as TotalTransactionsResponse, platformToUse)
-        : mismatchedMoreReceivedData;
-      const processedUnsettledData = (unsettledResponse as any).success && !(unsettledResponse as any).skipped
-        ? addCourierProviderColumn(unsettledResponse.data as TotalTransactionsResponse, platformToUse)
-        : unsettledData;
-      const processedAllData = (allResponse as any).success && !(allResponse as any).skipped
-        ? addCourierProviderColumn(allResponse.data as TotalTransactionsResponse, platformToUse)
-        : allData;
-
-      // Use the first successful response that contains column metadata to populate filters
-      const responseWithColumns = [matchedResponse, mismatchedLessReceivedResponse, mismatchedMoreReceivedResponse, unsettledResponse, allResponse].find(
-        (res) => (res as any).success && !(res as any).skipped && (res.data as TotalTransactionsResponse | undefined)?.columns
-      );
-      if (responseWithColumns?.data) {
-        setTotalTransactionsData(responseWithColumns.data as TotalTransactionsResponse);
+      if (activeTab === 0) {
+        activeCallName = 'matched';
+        activePromise = api.transactions.getTotalTransactions(matchedParams);
+      } else if (activeTab === 1 && mismatchedSubTab === 'less_received') {
+        activeCallName = 'mismatchedLess';
+        activePromise = api.transactions.getTotalTransactions(mismatchedLessReceivedParams);
+      } else if (activeTab === 1 && mismatchedSubTab === 'more_received') {
+        activeCallName = 'mismatchedMore';
+        activePromise = api.transactions.getTotalTransactions(mismatchedMoreReceivedParams);
+      } else if (activeTab === 2) {
+        activeCallName = 'unsettled';
+        activePromise = api.transactions.getTotalTransactions(unsettledParams);
+      } else if (activeTab === 3) {
+        activeCallName = 'all';
+        activePromise = api.transactions.getTotalTransactions(allParams);
       }
 
-      // Process matched response (Tab 0)
-      if ((matchedResponse as any).success && !(matchedResponse as any).skipped) {
-        setMatchedData(processedMatchedData as any);
-        if (processedMatchedData?.pagination) {
-          setMatchedTotalCount(processedMatchedData.pagination.total_count);
-        }
-      } else if (!matchedResponse.success) {
-        console.error('[fetchQuadTransactions] Matched API failed:', matchedResponse);
-      }
+      // For activeTab === 4 (Sales Report), the actual data is fetched by fetchSalesTransactions,
+      // so activePromise is null here. We only fetch the count_only endpoints in background.
 
-      // Process mismatched less received response (Tab 1 - sub-tab 1)
-      if ((mismatchedLessReceivedResponse as any).success && !(mismatchedLessReceivedResponse as any).skipped) {
-        setMismatchedLessReceivedData(processedMismatchedLessData as any);
-        if (processedMismatchedLessData?.pagination) {
-          setMismatchedLessReceivedTotalCount(processedMismatchedLessData.pagination.total_count);
-        }
-      } else if (!mismatchedLessReceivedResponse.success) {
-        console.error('[fetchQuadTransactions] Mismatched Less Received API failed:', mismatchedLessReceivedResponse);
-      }
+      // 2. Await only the active tab data to unblock UI
+      if (activePromise) {
+        const activeResponse = await activePromise;
+        if (activeResponse && activeResponse.success) {
+          const processedData = addCourierProviderColumn(activeResponse.data as TotalTransactionsResponse, platformToUse);
 
-      // Process mismatched more received response (Tab 1 - sub-tab 2)
-      if ((mismatchedMoreReceivedResponse as any).success && !(mismatchedMoreReceivedResponse as any).skipped) {
-        setMismatchedMoreReceivedData(processedMismatchedMoreData as any);
-        if (processedMismatchedMoreData?.pagination) {
-          setMismatchedMoreReceivedTotalCount(processedMismatchedMoreData.pagination.total_count);
-        }
-      } else if (!mismatchedMoreReceivedResponse.success) {
-        console.error('[fetchQuadTransactions] Mismatched More Received API failed:', mismatchedMoreReceivedResponse);
-      }
+          if (processedData?.columns) {
+            setTotalTransactionsData(processedData as TotalTransactionsResponse);
+          }
 
-      // Process unsettled response (Tab 2)
-      if ((unsettledResponse as any).success && !(unsettledResponse as any).skipped) {
-        setUnsettledData(processedUnsettledData);
-        if (processedUnsettledData?.pagination) {
-          setUnsettledTotalCount(processedUnsettledData.pagination.total_count);
-        }
-      } else if (!unsettledResponse.success) {
-        console.error('[fetchQuadTransactions] Unsettled API failed:', unsettledResponse);
-      }
+          const pagination = processedData?.pagination || (activeResponse.data as any)?.pagination;
+          if (pagination) {
+            setTotalCount((pagination.total_count ?? 0) as number);
+          }
 
-      // Process all response (Tab 3)
-      if ((allResponse as any).success && !(allResponse as any).skipped) {
-        setAllData(processedAllData as any);
-        if (processedAllData?.pagination) {
-          setAllTotalCount(processedAllData.pagination.total_count);
+          if (activeCallName === 'matched') {
+            setMatchedData(processedData as any);
+            if (pagination) setMatchedTotalCount(pagination.total_count);
+          } else if (activeCallName === 'mismatchedLess') {
+            setMismatchedLessReceivedData(processedData as any);
+            if (pagination) setMismatchedLessReceivedTotalCount(pagination.total_count);
+          } else if (activeCallName === 'mismatchedMore') {
+            setMismatchedMoreReceivedData(processedData as any);
+            if (pagination) setMismatchedMoreReceivedTotalCount(pagination.total_count);
+          } else if (activeCallName === 'unsettled') {
+            setUnsettledData(processedData);
+            if (pagination) setUnsettledTotalCount(pagination.total_count);
+          } else if (activeCallName === 'all') {
+            setAllData(processedData as any);
+            if (pagination) setAllTotalCount(pagination.total_count);
+          }
+        } else {
+          console.error(`[fetchQuadTransactions] Active API failed (${activeCallName}):`, activeResponse);
         }
-      } else if (!allResponse.success) {
-        console.error('[fetchQuadTransactions] All API failed:', allResponse);
-      }
-
-      // Process sales report response
-      if ((salesReportResponse as any).success && !(salesReportResponse as any).skipped) {
-        // Cast to any to avoid strict TS property checks
-        const responseData = salesReportResponse.data as any;
-        let totalCountVal = 0;
-        // Resolve total count from possible response shapes
-        if (responseData?.pagination?.total_count != null) {
-          totalCountVal = responseData.pagination.total_count;
-        } else if (typeof responseData?.count === 'number') {
-          totalCountVal = responseData.count;
-        } else if (Array.isArray(responseData?.transactions)) {
-          totalCountVal = responseData.transactions.length;
-        } else if (Array.isArray(responseData?.data)) {
-          totalCountVal = responseData.data.length;
-        }
-        setSalesReportTotalCount(totalCountVal);
-      } else if (!salesReportResponse.success) {
-        console.error('[fetchQuadTransactions] Sales Report count API failed:', salesReportResponse);
-      }
-
-      // Update totalCount based on current active tab
-      if (activeTab === 0 && matchedResponse.success && (matchedResponse.data?.pagination || matchedData?.pagination)) {
-        const pag = matchedResponse.data?.pagination || matchedData?.pagination;
-        if (pag) setTotalCount((pag.total_count ?? 0) as number);
-      } else if (activeTab === 1) {
-        // For mismatched tab, use the appropriate sub-tab data
-        if (mismatchedSubTab === 'less_received' && mismatchedLessReceivedResponse.success && (mismatchedLessReceivedResponse.data?.pagination || mismatchedLessReceivedData?.pagination)) {
-          const pag = mismatchedLessReceivedResponse.data?.pagination || mismatchedLessReceivedData?.pagination;
-          if (pag) setTotalCount((pag.total_count ?? 0) as number);
-        } else if (mismatchedSubTab === 'more_received' && mismatchedMoreReceivedResponse.success && (mismatchedMoreReceivedResponse.data?.pagination || mismatchedMoreReceivedData?.pagination)) {
-          const pag = mismatchedMoreReceivedResponse.data?.pagination || mismatchedMoreReceivedData?.pagination;
-          if (pag) setTotalCount((pag.total_count ?? 0) as number);
-        }
-      } else if (activeTab === 2 && unsettledResponse.success && (processedUnsettledData?.pagination || unsettledData?.pagination)) {
-        const unsettledPagination = processedUnsettledData?.pagination || unsettledData?.pagination;
-        if (unsettledPagination) {
-          setTotalCount((unsettledPagination.total_count ?? 0) as number);
-        }
-      } else if (activeTab === 3 && allResponse.success && (allResponse.data?.pagination || allData?.pagination)) {
-        const pag = allResponse.data?.pagination || allData?.pagination;
-        if (pag) setTotalCount((pag.total_count ?? 0) as number);
       }
 
       setCurrentPage(pageNumber);
 
-      const allSucceeded = matchedResponse.success && mismatchedLessReceivedResponse.success && mismatchedMoreReceivedResponse.success && unsettledResponse.success && allResponse.success && salesReportResponse.success;
-      if (allSucceeded) {
-        lastQuadParamsRef.current = paramsSignature;
-        lastBaseParamsSignatureRef.current = baseParamsSignature;
-      } else {
-        lastQuadParamsRef.current = null;
-        lastBaseParamsSignatureRef.current = null;
-      }
+      // Unblock UI for active tab immediately
+      setQuadApiLoading(false);
+      setPaginationLoading(false);
 
-      // Update tab counts based on the actual data received (only on initial load or base param change)
+      lastQuadParamsRef.current = paramsSignature;
+      lastBaseParamsSignatureRef.current = baseParamsSignature;
+      isFetchingRef.current = false;
+
+      // 3. Fetch background counts asynchronously
       if (!isTabSwitchOnly) {
-        const lessReceivedCount = mismatchedLessReceivedResponse.success ? ((mismatchedLessReceivedResponse.data as any)?.data?.length || 0) : 0;
-        const moreReceivedCount = mismatchedMoreReceivedResponse.success ? ((mismatchedMoreReceivedResponse.data as any)?.data?.length || 0) : 0;
-        setTabCounts({
-          matched: matchedResponse.success ? ((matchedResponse.data as any)?.data?.length || 0) : null,
-          mismatched: lessReceivedCount + moreReceivedCount > 0 ? lessReceivedCount + moreReceivedCount : null,
-          unsettled: unsettledResponse.success ? ((unsettledResponse.data as any)?.data?.length || 0) : null,
-          all: allResponse.success ? ((allResponse.data as any)?.data?.length || 0) : null,
+        const bgCalls: Promise<{name: string, res: any}>[] = [];
+        const currentSignature = paramsSignature;
+
+        if (activeCallName !== 'matched') bgCalls.push(api.transactions.getTotalTransactions(matchedParams).then(res => ({ name: 'matched', res })));
+        if (activeCallName !== 'mismatchedLess') bgCalls.push(api.transactions.getTotalTransactions(mismatchedLessReceivedParams).then(res => ({ name: 'mismatchedLess', res })));
+        if (activeCallName !== 'mismatchedMore') bgCalls.push(api.transactions.getTotalTransactions(mismatchedMoreReceivedParams).then(res => ({ name: 'mismatchedMore', res })));
+        if (activeCallName !== 'unsettled') bgCalls.push(api.transactions.getTotalTransactions(unsettledParams).then(res => ({ name: 'unsettled', res })));
+        if (activeCallName !== 'all') bgCalls.push(api.transactions.getTotalTransactions(allParams).then(res => ({ name: 'all', res })));
+        bgCalls.push(api.transactions.getSalesTransactions(salesReportParams).then(res => ({ name: 'salesReport', res })));
+
+        bgCalls.forEach(call => {
+          call.then(({ name, res }) => {
+            // Check for race condition: if signature changed, a newer request is in flight
+            if (lastQuadParamsRef.current !== currentSignature) return;
+
+            if (res && (res as any).success) {
+              const data = (res as any).data as any;
+              let totalCountVal = 0;
+              if (data?.pagination?.total_count != null) {
+                totalCountVal = data.pagination.total_count;
+              } else if (typeof data?.count === 'number') {
+                totalCountVal = data.count;
+              } else if (Array.isArray(data?.transactions)) {
+                totalCountVal = data.transactions.length;
+              } else if (Array.isArray(data?.data)) {
+                totalCountVal = data.data.length;
+              }
+
+              if (name === 'matched') setMatchedTotalCount(totalCountVal);
+              else if (name === 'mismatchedLess') setMismatchedLessReceivedTotalCount(totalCountVal);
+              else if (name === 'mismatchedMore') setMismatchedMoreReceivedTotalCount(totalCountVal);
+              else if (name === 'unsettled') setUnsettledTotalCount(totalCountVal);
+              else if (name === 'all') setAllTotalCount(totalCountVal);
+              else if (name === 'salesReport') setSalesReportTotalCount(totalCountVal);
+            }
+          }).catch(err => console.error('[fetchQuadTransactions] Background fetch error:', err));
         });
       }
     } catch (err: any) {
@@ -3784,7 +3711,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       setError(err?.message || 'Failed to fetch transactions');
       lastQuadParamsRef.current = null;
       lastBaseParamsSignatureRef.current = null;
-    } finally {
       setQuadApiLoading(false);
       setPaginationLoading(false);
       isFetchingRef.current = false;
