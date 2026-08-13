@@ -2533,6 +2533,29 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Create mapping from normalized values to original values for shipping_courier
   const shippingCourierMapping = useMemo(() => {
     const mapping: Record<string, string[]> = {};
+    
+    // First, process any values sent by the backend in columns metadata (complete list)
+    if (useNewAPI && totalTransactionsData?.columns) {
+      const shippingCourierColumn = totalTransactionsData.columns.find(
+        col => col.key === 'shipping_courier' && col.type === 'enum'
+      );
+      if (shippingCourierColumn?.values) {
+        shippingCourierColumn.values.forEach(originalValue => {
+          if (originalValue && originalValue.trim() && originalValue !== 'NA') {
+            const originalValueTrimmed = originalValue.trim();
+            const normalizedValue = normalizeShippingCourier(originalValueTrimmed);
+            if (!mapping[normalizedValue]) {
+              mapping[normalizedValue] = [];
+            }
+            if (!mapping[normalizedValue].includes(originalValueTrimmed)) {
+              mapping[normalizedValue].push(originalValueTrimmed);
+            }
+          }
+        });
+      }
+    }
+
+    // Then, fallback/supplement with values from currently loaded data sources
     const dataSources = [matchedData, mismatchedLessReceivedData, mismatchedMoreReceivedData, unsettledData, allData];
     
     dataSources.forEach(dataset => {
@@ -2558,7 +2581,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       });
     });
     return mapping;
-  }, [matchedData, mismatchedLessReceivedData, mismatchedMoreReceivedData, unsettledData, allData]);
+  }, [totalTransactionsData, useNewAPI, matchedData, mismatchedLessReceivedData, mismatchedMoreReceivedData, unsettledData, allData]);
 
   // Add derived Shipping Courier column for D2C data (all tabs)
   const addCourierProviderColumn = (response: TotalTransactionsResponse | null, platform: Platform): TotalTransactionsResponse | null => {
