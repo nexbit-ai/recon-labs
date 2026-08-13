@@ -3668,21 +3668,27 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       // 3. Fetch background counts asynchronously
       if (!isTabSwitchOnly) {
-        const bgCalls: Promise<{name: string, res: any}>[] = [];
         const currentSignature = paramsSignature;
 
-        if (activeCallName !== 'matched') bgCalls.push(api.transactions.getTotalTransactions(matchedParams).then(res => ({ name: 'matched', res })));
-        if (activeCallName !== 'mismatchedLess') bgCalls.push(api.transactions.getTotalTransactions(mismatchedLessReceivedParams).then(res => ({ name: 'mismatchedLess', res })));
-        if (activeCallName !== 'mismatchedMore') bgCalls.push(api.transactions.getTotalTransactions(mismatchedMoreReceivedParams).then(res => ({ name: 'mismatchedMore', res })));
-        if (activeCallName !== 'unsettled') bgCalls.push(api.transactions.getTotalTransactions(unsettledParams).then(res => ({ name: 'unsettled', res })));
-        if (activeCallName !== 'all') bgCalls.push(api.transactions.getTotalTransactions(allParams).then(res => ({ name: 'all', res })));
-        bgCalls.push(api.transactions.getSalesTransactions(salesReportParams).then(res => ({ name: 'salesReport', res })));
-
-        bgCalls.forEach(call => {
-          call.then(({ name, res }) => {
-            // Check for race condition: if signature changed, a newer request is in flight
+        // Fetch the summary for all tabs in one API call
+        api.transactions.getTotalTransactionsSummary(baseParams)
+          .then(res => {
             if (lastQuadParamsRef.current !== currentSignature) return;
+            if (res && res.success && res.data) {
+              const summary = res.data;
+              setMatchedTotalCount(summary.matched || 0);
+              setMismatchedLessReceivedTotalCount(summary.mismatched_less || 0);
+              setMismatchedMoreReceivedTotalCount(summary.mismatched_more || 0);
+              setUnsettledTotalCount(summary.unsettled || 0);
+              setAllTotalCount(summary.all || 0);
+            }
+          })
+          .catch(err => console.error('[fetchQuadTransactions] Background summary fetch error:', err));
 
+        // Fetch sales report count separately as it uses different tables
+        api.transactions.getSalesTransactions(salesReportParams)
+          .then(res => {
+            if (lastQuadParamsRef.current !== currentSignature) return;
             if (res && (res as any).success) {
               const data = (res as any).data as any;
               let totalCountVal = 0;
@@ -3695,16 +3701,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
               } else if (Array.isArray(data?.data)) {
                 totalCountVal = data.data.length;
               }
-
-              if (name === 'matched') setMatchedTotalCount(totalCountVal);
-              else if (name === 'mismatchedLess') setMismatchedLessReceivedTotalCount(totalCountVal);
-              else if (name === 'mismatchedMore') setMismatchedMoreReceivedTotalCount(totalCountVal);
-              else if (name === 'unsettled') setUnsettledTotalCount(totalCountVal);
-              else if (name === 'all') setAllTotalCount(totalCountVal);
-              else if (name === 'salesReport') setSalesReportTotalCount(totalCountVal);
+              setSalesReportTotalCount(totalCountVal);
             }
-          }).catch(err => console.error('[fetchQuadTransactions] Background fetch error:', err));
-        });
+          })
+          .catch(err => console.error('[fetchQuadTransactions] Background sales report fetch error:', err));
       }
     } catch (err: any) {
       console.error('[fetchQuadTransactions] Error:', err);

@@ -54,6 +54,7 @@ export const API_CONFIG = {
     
     // Transactions
     TOTAL_TRANSACTIONS: '/recon/total-transactions',
+    TOTAL_TRANSACTIONS_SUMMARY: '/recon/total-transactions/summary',
     D2C_TRANSACTIONS: '/recon/total-transactions',
     SALES_TRANSACTIONS: '/recon/sales-transactions',
     EXPORT_TRANSACTIONS: '/recon/export',
