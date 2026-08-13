@@ -1808,6 +1808,7 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   // D2C-specific CSV filters (with _in suffix support)
   'Settlement Provider': { apiParam: 'settlement_provider', type: 'enum', supportedPlatforms: ['d2c'] },
   'Payment Mode': { apiParam: 'payment_mode', type: 'enum', supportedPlatforms: ['d2c'] },
+  'Shipping Courier': { apiParam: 'shipping_courier_in', type: 'enum', supportedPlatforms: ['d2c'] },
 };
 
 // Mapping of sortable UI columns to backend sort_by values
@@ -2480,6 +2481,38 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       .join(' ');
   };
 
+  // Helper to group similar shipping couriers
+  const normalizeShippingCourier = (courier: string): string => {
+    if (!courier || typeof courier !== 'string') return courier;
+    const lower = courier.toLowerCase();
+    if (lower.includes('amazon') || lower.includes('ats')) {
+      return 'Amazon';
+    }
+    if (lower.includes('ecom') || lower.includes('ecom express')) {
+      return 'Ecom Express';
+    }
+    if (lower.includes('bluedart') || lower.includes('blue dart')) {
+      return 'Blue Dart';
+    }
+    if (lower.includes('xpressbees')) {
+      return 'Xpressbees';
+    }
+    if (lower.includes('delhivery')) {
+      return 'Delhivery';
+    }
+    if (lower.includes('shadowfax')) {
+      return 'Shadowfax';
+    }
+    if (lower.includes('ekart')) {
+      return 'Ekart';
+    }
+    // Default: Capitalize first letters
+    return courier
+      .split(/[\s_]+/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   // Create mapping from cleaned values to original values for settlement_provider
   const settlementProviderMapping = useMemo(() => {
     const mapping: Record<string, string> = {};
@@ -2497,21 +2530,51 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     return mapping;
   }, [totalTransactionsData, useNewAPI]);
 
-  // Add derived Courier Provider column for D2C unsettled data
+  // Create mapping from normalized values to original values for shipping_courier
+  const shippingCourierMapping = useMemo(() => {
+    const mapping: Record<string, string[]> = {};
+    const dataSources = [matchedData, mismatchedLessReceivedData, mismatchedMoreReceivedData, unsettledData, allData];
+    
+    dataSources.forEach(dataset => {
+      (dataset?.data || []).forEach(row => {
+        const metadata = (row as any)?.metadata || {};
+        const breakups = (row as any)?.breakups || metadata?.breakups || {};
+        const originalCourier = 
+          (metadata as any)?.shipping_courier ||
+          (breakups as any)?.shipping_courier ||
+          (row as any)?.shipping_courier;
+          
+        if (originalCourier && typeof originalCourier === 'string' && originalCourier.trim() && originalCourier !== 'NA') {
+          const originalValue = originalCourier.trim();
+          const normalizedValue = normalizeShippingCourier(originalValue);
+          
+          if (!mapping[normalizedValue]) {
+            mapping[normalizedValue] = [];
+          }
+          if (!mapping[normalizedValue].includes(originalValue)) {
+            mapping[normalizedValue].push(originalValue);
+          }
+        }
+      });
+    });
+    return mapping;
+  }, [matchedData, mismatchedLessReceivedData, mismatchedMoreReceivedData, unsettledData, allData]);
+
+  // Add derived Shipping Courier column for D2C data (all tabs)
   const addCourierProviderColumn = (response: TotalTransactionsResponse | null, platform: Platform): TotalTransactionsResponse | null => {
     if (!response || platform !== 'd2c') {
       return response;
     }
 
-    const courierColumn = { key: 'courier_provider', title: 'Courier Provider', type: 'string' as const };
+    const courierColumn = { key: 'shipping_courier', title: 'Shipping Courier', type: 'string' as const };
     const platformColumn = (response.columns || []).find(col => col.title === 'Platform') || null;
 
-    // Remove any existing Courier Provider / Platform to re-order cleanly
+    // Remove any existing Shipping Courier / Platform to re-order cleanly
     const baseColumns = (response.columns || []).filter(
-      col => col.title !== courierColumn.title && col.title !== 'Platform'
+      col => col.title !== courierColumn.title && col.title !== 'Courier Provider' && col.title !== 'Platform'
     );
 
-    // Ensure Courier Provider is second last and Platform is last (when Platform exists)
+    // Ensure Shipping Courier is second last and Platform is last (when Platform exists)
     let enhancedColumns = baseColumns;
     if (platformColumn) {
       enhancedColumns = [...baseColumns, courierColumn, platformColumn];
@@ -2530,7 +2593,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       const eventSubtype = (row as any)?.event_subtype || '';
       const courierValue =
         shippingCourier && String(shippingCourier).trim().length > 0
-          ? String(shippingCourier)
+          ? normalizeShippingCourier(String(shippingCourier).trim())
           : eventSubtype
             ? `NA (${eventSubtype})`
             : 'NA';
@@ -2572,6 +2635,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
       // Fallback: return empty array if no values found
       return [];
+    }
+
+    // For Shipping Courier, get grouped/distinct values from current tab data
+    if (columnName === 'Shipping Courier') {
+      return Object.keys(shippingCourierMapping).sort();
     }
 
     // For other columns, try to get values from data
@@ -3403,6 +3471,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 // Convert Event Type values to lowercase before sending to API
                 const lowerCaseValues = filterValue.map(val => String(val).toLowerCase());
                 baseParams[baseParam] = lowerCaseValues.join(',');
+              } else if (columnKey === 'Shipping Courier') {
+                const originalValues: string[] = [];
+                filterValue.forEach((normalizedValue: any) => {
+                  const mappedOriginals = shippingCourierMapping[normalizedValue];
+                  if (mappedOriginals && mappedOriginals.length > 0) {
+                    originalValues.push(...mappedOriginals);
+                  } else {
+                    originalValues.push(String(normalizedValue));
+                  }
+                });
+                if (originalValues.length > 0) {
+                  baseParams[baseParam] = originalValues.join(',');
+                }
               } else {
                 baseParams[baseParam] = filterValue.join(',');
               }
@@ -3535,10 +3616,22 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         salesReportResponse,
       ] = await Promise.all(apiCalls);
 
-      // Enhance unsettled response for D2C with courier provider column/value
+      // Enhance all D2C tab responses with Shipping Courier column/value
+      const processedMatchedData = (matchedResponse as any).success && !(matchedResponse as any).skipped
+        ? addCourierProviderColumn(matchedResponse.data as TotalTransactionsResponse, platformToUse)
+        : matchedData;
+      const processedMismatchedLessData = (mismatchedLessReceivedResponse as any).success && !(mismatchedLessReceivedResponse as any).skipped
+        ? addCourierProviderColumn(mismatchedLessReceivedResponse.data as TotalTransactionsResponse, platformToUse)
+        : mismatchedLessReceivedData;
+      const processedMismatchedMoreData = (mismatchedMoreReceivedResponse as any).success && !(mismatchedMoreReceivedResponse as any).skipped
+        ? addCourierProviderColumn(mismatchedMoreReceivedResponse.data as TotalTransactionsResponse, platformToUse)
+        : mismatchedMoreReceivedData;
       const processedUnsettledData = (unsettledResponse as any).success && !(unsettledResponse as any).skipped
         ? addCourierProviderColumn(unsettledResponse.data as TotalTransactionsResponse, platformToUse)
         : unsettledData;
+      const processedAllData = (allResponse as any).success && !(allResponse as any).skipped
+        ? addCourierProviderColumn(allResponse.data as TotalTransactionsResponse, platformToUse)
+        : allData;
 
       // Use the first successful response that contains column metadata to populate filters
       const responseWithColumns = [matchedResponse, mismatchedLessReceivedResponse, mismatchedMoreReceivedResponse, unsettledResponse, allResponse].find(
@@ -3550,9 +3643,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       // Process matched response (Tab 0)
       if ((matchedResponse as any).success && !(matchedResponse as any).skipped) {
-        setMatchedData(matchedResponse.data as any);
-        if (matchedResponse.data?.pagination) {
-          setMatchedTotalCount(matchedResponse.data.pagination.total_count);
+        setMatchedData(processedMatchedData as any);
+        if (processedMatchedData?.pagination) {
+          setMatchedTotalCount(processedMatchedData.pagination.total_count);
         }
       } else if (!matchedResponse.success) {
         console.error('[fetchQuadTransactions] Matched API failed:', matchedResponse);
@@ -3560,9 +3653,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       // Process mismatched less received response (Tab 1 - sub-tab 1)
       if ((mismatchedLessReceivedResponse as any).success && !(mismatchedLessReceivedResponse as any).skipped) {
-        setMismatchedLessReceivedData(mismatchedLessReceivedResponse.data as any);
-        if (mismatchedLessReceivedResponse.data?.pagination) {
-          setMismatchedLessReceivedTotalCount(mismatchedLessReceivedResponse.data.pagination.total_count);
+        setMismatchedLessReceivedData(processedMismatchedLessData as any);
+        if (processedMismatchedLessData?.pagination) {
+          setMismatchedLessReceivedTotalCount(processedMismatchedLessData.pagination.total_count);
         }
       } else if (!mismatchedLessReceivedResponse.success) {
         console.error('[fetchQuadTransactions] Mismatched Less Received API failed:', mismatchedLessReceivedResponse);
@@ -3570,9 +3663,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       // Process mismatched more received response (Tab 1 - sub-tab 2)
       if ((mismatchedMoreReceivedResponse as any).success && !(mismatchedMoreReceivedResponse as any).skipped) {
-        setMismatchedMoreReceivedData(mismatchedMoreReceivedResponse.data as any);
-        if (mismatchedMoreReceivedResponse.data?.pagination) {
-          setMismatchedMoreReceivedTotalCount(mismatchedMoreReceivedResponse.data.pagination.total_count);
+        setMismatchedMoreReceivedData(processedMismatchedMoreData as any);
+        if (processedMismatchedMoreData?.pagination) {
+          setMismatchedMoreReceivedTotalCount(processedMismatchedMoreData.pagination.total_count);
         }
       } else if (!mismatchedMoreReceivedResponse.success) {
         console.error('[fetchQuadTransactions] Mismatched More Received API failed:', mismatchedMoreReceivedResponse);
@@ -3590,9 +3683,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       // Process all response (Tab 3)
       if ((allResponse as any).success && !(allResponse as any).skipped) {
-        setAllData(allResponse.data as any);
-        if (allResponse.data?.pagination) {
-          setAllTotalCount(allResponse.data.pagination.total_count);
+        setAllData(processedAllData as any);
+        if (processedAllData?.pagination) {
+          setAllTotalCount(processedAllData.pagination.total_count);
         }
       } else if (!allResponse.success) {
         console.error('[fetchQuadTransactions] All API failed:', allResponse);
@@ -3892,6 +3985,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   // Convert Event Type values to lowercase before sending to API
                   const lowerCaseValues = filterValue.map(val => String(val).toLowerCase());
                   params[baseParam] = lowerCaseValues.join(',');
+                } else if (columnKey === 'Shipping Courier') {
+                  const originalValues: string[] = [];
+                  filterValue.forEach((normalizedValue: any) => {
+                    const mappedOriginals = shippingCourierMapping[normalizedValue];
+                    if (mappedOriginals && mappedOriginals.length > 0) {
+                      originalValues.push(...mappedOriginals);
+                    } else {
+                      originalValues.push(String(normalizedValue));
+                    }
+                  });
+                  if (originalValues.length > 0) {
+                    params[baseParam] = originalValues.join(',');
+                  }
                 } else {
                   // Use the mapped API param which already includes _in suffix if needed
                   params[baseParam] = filterValue.join(',');
