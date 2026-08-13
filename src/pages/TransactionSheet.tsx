@@ -2119,6 +2119,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Get current columns based on which API is being used
   const getCurrentColumns = () => {
+    const isSpecificOrg = ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'].includes(API_CONFIG.ORG_ID);
+    let cols: string[] = [];
+
     // Sales Report tab (index 4) - fixed columns
     if (activeTab === 4) {
       const salesColumns = salesReportData?.columns || [];
@@ -2139,11 +2142,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         .filter(Boolean) as typeof salesColumns;
       const remaining = salesColumns.filter(col => !priorityKeys.includes(col.key as typeof priorityKeys[number]));
 
-      return [...prioritized, ...remaining].map(col => col.title);
+      cols = [...prioritized, ...remaining].map(col => col.title);
     }
 
     // Use quad API data if available (can be null when filtering)
-    if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
+    else if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
       let currentData: TotalTransactionsResponse | null = null;
       if (activeTab === 0) {
         currentData = matchedData;
@@ -2163,15 +2166,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       if (!currentData) {
         return [];
       }
-      return currentData.columns?.map(col => col.title) || [];
+      cols = currentData.columns?.map(col => col.title) || [];
     }
 
     // Fallback to legacy single API data
-    if (useNewAPI && totalTransactionsData) {
+    else if (useNewAPI && totalTransactionsData) {
       // Handle null columns case - only return actual API columns, not breakup fields
-      return totalTransactionsData.columns?.map(col => col.title) || [];
+      cols = totalTransactionsData.columns?.map(col => col.title) || [];
+    } else {
+      cols = visibleColumns;
     }
-    return visibleColumns;
+
+    if (!isSpecificOrg) {
+      cols = cols.filter(title => title !== 'Sub-Platform');
+    }
+    return cols;
   };
 
 
@@ -3595,6 +3604,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         page: 1,
         count_only: 'true',
       };
+
+      if (platformToUse === 'amazon') {
+        salesReportParams.business_mode = amazonBusinessMode || 'B2C';
+      }
 
       // 1. Determine active call parameters
       let activePromise: Promise<any> | null = null;
