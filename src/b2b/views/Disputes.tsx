@@ -3,10 +3,10 @@
 // Monochrome + one accent (#7A5DBF).
 import React from 'react';
 import { Box, Typography, Button, CircularProgress } from '@mui/material';
-import { CheckOutlined, NotificationsActiveOutlined } from '@mui/icons-material';
+import { CheckOutlined, NotificationsActiveOutlined, ExpandMoreOutlined } from '@mui/icons-material';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
-import { cardSx, ChannelTag, ColumnLabel, PageTitle, SectionTitle } from '../components/primitives';
+import { cardSx, ChannelTag, ColumnLabel, PageTitle, SectionTitle, Pressable } from '../components/primitives';
 import { formatRupees } from '../lib/format';
 import {
   headlineByKey,
@@ -19,7 +19,7 @@ import {
   type NudgeStatus,
 } from '../mock';
 
-const GRID = '116px 130px minmax(160px, 1fr) 132px 168px 112px';
+const GRID = '116px 130px minmax(160px, 1fr) 132px 168px 112px 36px';
 const INK_SUB = 'rgba(255, 255, 255, 0.66)';
 const FILE_DELAY_MS = 1700;
 
@@ -83,10 +83,58 @@ const NudgeStatusChip: React.FC<{ status: NudgeStatus }> = ({ status }) => {
   );
 };
 
+const signed = (n: number): string => (n < 0 ? `−${formatRupees(Math.abs(n))}` : formatRupees(n));
+
+const DisputeRowDetail: React.FC<{ dispute: Dispute }> = ({ dispute }) => {
+  if (!dispute.lineItems || dispute.lineItems.length === 0) {
+    return (
+      <Box sx={{ p: `${space.xl}px`, bgcolor: colors.grey100, borderTop: hairline }}>
+        <Typography sx={{ fontSize: 13, color: colors.grey500 }}>No line item details available for this dispute.</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ p: `${space.xl}px`, bgcolor: colors.grey100, borderTop: hairline, display: 'flex', flexDirection: 'column', gap: `${space.lg}px` }}>
+      <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>Line Items</Typography>
+      {dispute.lineItems.map(line => (
+        <Box key={line.id} sx={{ bgcolor: colors.paper, border: hairline, p: `${space.lg}px` }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: `${space.md}px` }}>
+            <Box>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>{line.skuLabel}</Typography>
+              <Typography sx={{ fontSize: 12, color: colors.grey500 }}>PO: {line.poNumber} · INV: {line.invoiceNumber}</Typography>
+            </Box>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography sx={{ fontSize: 13, color: colors.grey700 }}>Variance</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.accent, ...tabularNums }}>{signed(-line.variance)}</Typography>
+            </Box>
+          </Box>
+          <Box sx={{ borderTop: hairline, pt: `${space.md}px` }}>
+            {line.varianceBreakdown.map((part, i) => (
+               <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', mb: '4px' }}>
+                 <Typography sx={{ fontSize: 12, color: colors.grey700 }}>{part.label}</Typography>
+                 <Typography sx={{ fontSize: 12, color: colors.ink, ...tabularNums }}>{signed(part.amount)}</Typography>
+               </Box>
+            ))}
+          </Box>
+          {line.nextAction && (
+             <Box sx={{ mt: `${space.md}px`, p: `${space.sm}px`, bgcolor: colors.accentWash, border: `1px solid ${colors.accent}` }}>
+               <Typography sx={{ fontSize: 12, color: colors.ink }}><b>Action:</b> {line.nextAction}</Typography>
+             </Box>
+          )}
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
 const Disputes: React.FC = () => {
   const reduce = useReducedMotion();
   const [phase, setPhase] = React.useState<Phase>('idle');
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  const [expandedNudgeId, setExpandedNudgeId] = React.useState<string | null>(null);
+  const [expandedDisputeId, setExpandedDisputeId] = React.useState<string | null>(null);
 
   React.useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
@@ -255,53 +303,104 @@ const Disputes: React.FC = () => {
           <SectionTitle>Follow-up automation</SectionTitle>
         </Box>
         <Box sx={{ ...cardSx }}>
-          {followUpNudges.map((nudge, idx) => (
-            <Box
-              key={nudge.id}
-              sx={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: `${space.lg}px`,
-                px: `${space.xl}px`,
-                py: `${space.lg}px`,
-                borderBottom: idx < followUpNudges.length - 1 ? hairline : 'none',
-                transition: 'background-color 0.12s ease',
-                '&:hover': { bgcolor: colors.grey100 },
-              }}
-            >
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.md}px`, mb: `${space.xs}px` }}>
-                  <ChannelTag name={nudge.channel} />
-                  <Box
-                    component="span"
-                    sx={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      border: hairline,
-                      px: `${space.sm}px`,
-                      py: '2px',
-                      fontSize: 11,
-                      fontWeight: 500,
-                      letterSpacing: '0.04em',
-                      textTransform: 'uppercase',
-                      color: colors.grey700,
-                    }}
-                  >
-                    {nudge.nudgeType}
+          {followUpNudges.map((nudge, idx) => {
+            const isExpanded = expandedNudgeId === nudge.id;
+            return (
+              <Box key={nudge.id} sx={{ borderBottom: idx < followUpNudges.length - 1 ? hairline : 'none' }}>
+                <Pressable
+                  onClick={() => setExpandedNudgeId(isExpanded ? null : nudge.id)}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: `${space.lg}px`,
+                    px: `${space.xl}px`,
+                    py: `${space.lg}px`,
+                    bgcolor: isExpanded ? colors.grey100 : 'transparent',
+                    transition: 'background-color 0.12s ease',
+                    '&:hover': { bgcolor: colors.grey100 },
+                    cursor: nudge.history && nudge.history.length > 0 ? 'pointer' : 'default',
+                  }}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.md}px`, mb: `${space.xs}px` }}>
+                      <ChannelTag name={nudge.channel} />
+                      <Box
+                        component="span"
+                        sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          border: hairline,
+                          px: `${space.sm}px`,
+                          py: '2px',
+                          fontSize: 11,
+                          fontWeight: 500,
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase',
+                          color: colors.grey700,
+                        }}
+                      >
+                        {nudge.nudgeType}
+                      </Box>
+                    </Box>
+                    <Typography sx={{ fontSize: type.body.fontSize, color: colors.ink, lineHeight: '20px' }}>
+                      {nudge.message}
+                    </Typography>
+                    <Typography sx={{ fontSize: 13, color: colors.grey500, mt: '2px', ...tabularNums }}>
+                      {nudge.relatedRef} · {nudge.daysSinceIssue} days since issue · {nudge.date}
+                    </Typography>
                   </Box>
-                </Box>
-                <Typography sx={{ fontSize: type.body.fontSize, color: colors.ink, lineHeight: '20px' }}>
-                  {nudge.message}
-                </Typography>
-                <Typography sx={{ fontSize: 13, color: colors.grey500, mt: '2px', ...tabularNums }}>
-                  {nudge.relatedRef} · {nudge.daysSinceIssue} days since issue · {nudge.date}
-                </Typography>
+                  <Box sx={{ flexShrink: 0, textAlign: 'right', display: 'flex', alignItems: 'center', gap: `${space.md}px` }}>
+                    <NudgeStatusChip status={nudge.status} />
+                    {nudge.history && nudge.history.length > 0 && (
+                      <ExpandMoreOutlined
+                        sx={{
+                          fontSize: 20,
+                          color: colors.grey500,
+                          transition: reduce ? 'none' : 'transform 0.18s ease',
+                          transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                        }}
+                      />
+                    )}
+                  </Box>
+                </Pressable>
+                
+                <AnimatePresence initial={false}>
+                  {isExpanded && nudge.history && nudge.history.length > 0 && (
+                    <Box
+                      component={motion.div}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: 'easeInOut' }}
+                      sx={{ overflow: 'hidden' }}
+                    >
+                      <Box sx={{ px: `${space.xl}px`, pb: `${space.lg}px`, pt: 0, bgcolor: colors.grey100 }}>
+                        <Typography sx={{ fontSize: 12, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase', mb: `${space.sm}px` }}>
+                          Timeline
+                        </Typography>
+                        <Box sx={{ pl: `${space.sm}px`, borderLeft: `2px solid ${colors.grey200}`, ml: '8px' }}>
+                          {nudge.history.map((h, i) => (
+                            <Box key={i} sx={{ display: 'flex', alignItems: 'flex-start', gap: `${space.sm}px`, mb: i === nudge.history!.length - 1 ? 0 : `${space.sm}px`, position: 'relative' }}>
+                              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: colors.grey500, position: 'absolute', left: -12, top: 6 }} />
+                              <Box sx={{ width: 80, flexShrink: 0 }}>
+                                <Typography sx={{ fontSize: 12, color: colors.grey500, ...tabularNums }}>{h.date}</Typography>
+                              </Box>
+                              <Box sx={{ flex: 1 }}>
+                                <Typography sx={{ fontSize: 13, color: colors.ink }}>{h.action}</Typography>
+                              </Box>
+                              <Box sx={{ width: 70, textAlign: 'right' }}>
+                                <Typography sx={{ fontSize: 11, color: colors.grey500, textTransform: 'uppercase', fontWeight: 600 }}>{h.status}</Typography>
+                              </Box>
+                            </Box>
+                          ))}
+                        </Box>
+                      </Box>
+                    </Box>
+                  )}
+                </AnimatePresence>
               </Box>
-              <Box sx={{ flexShrink: 0, textAlign: 'right' }}>
-                <NudgeStatusChip status={nudge.status} />
-              </Box>
-            </Box>
-          ))}
+            );
+          })}
         </Box>
       </Box>
 
@@ -332,63 +431,90 @@ const Disputes: React.FC = () => {
             const status = displayStatus(d);
             const resolved = status === 'Resolved';
             const urgency: 'Urgent' | 'On track' | 'Closed' = resolved ? 'Closed' : d.urgent ? 'Urgent' : 'On track';
+            const isExpanded = expandedDisputeId === d.id;
+            
             return (
-              <Box
-                key={d.id}
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: GRID,
-                  alignItems: 'center',
-                  gap: `${space.lg}px`,
-                  px: `${space.xl}px`,
-                  minHeight: 56,
-                  py: `${space.md}px`,
-                  borderBottom: idx < rows.length - 1 ? hairline : 'none',
-                  transition: 'background-color 0.12s ease',
-                  '&:hover': { bgcolor: colors.grey100 },
-                }}
-              >
-                <Typography sx={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', fontSize: 12.5, color: colors.grey700, ...tabularNums }}>
-                  {d.id}
-                </Typography>
-                <ChannelTag name={d.channel} />
-                <Typography
-                  sx={{ fontSize: type.body.fontSize, color: colors.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                >
-                  {d.reason}
-                </Typography>
-                <Typography
+              <Box key={d.id} sx={{ borderBottom: idx < rows.length - 1 ? hairline : 'none' }}>
+                <Pressable
+                  onClick={() => setExpandedDisputeId(isExpanded ? null : d.id)}
                   sx={{
-                    textAlign: 'right',
-                    fontSize: type.body.fontSize,
-                    fontWeight: 600,
-                    color: resolved ? colors.accent : colors.ink,
-                    ...tabularNums,
+                    display: 'grid',
+                    gridTemplateColumns: GRID,
+                    alignItems: 'center',
+                    gap: `${space.lg}px`,
+                    px: `${space.xl}px`,
+                    minHeight: 56,
+                    py: `${space.md}px`,
+                    bgcolor: isExpanded ? colors.grey100 : 'transparent',
+                    transition: 'background-color 0.12s ease',
+                    '&:hover': { bgcolor: colors.grey100 },
                   }}
                 >
-                  {formatRupees(d.amount)}
-                </Typography>
-                {/* Status with days remaining */}
-                {resolved ? (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.xs}px` }}>
-                    <CheckOutlined sx={{ fontSize: 16, color: colors.accent }} />
-                    <Typography sx={{ fontSize: type.body.fontSize, color: colors.ink }}>Resolved</Typography>
-                  </Box>
-                ) : (
+                  <Typography sx={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', fontSize: 12.5, color: colors.grey700, ...tabularNums }}>
+                    {d.id}
+                  </Typography>
+                  <ChannelTag name={d.channel} />
+                  <Typography
+                    sx={{ fontSize: type.body.fontSize, color: colors.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
+                    {d.reason}
+                  </Typography>
                   <Typography
                     sx={{
+                      textAlign: 'right',
                       fontSize: type.body.fontSize,
-                      color: colors.ink,
-                      fontWeight: d.urgent ? 600 : 400,
+                      fontWeight: 600,
+                      color: resolved ? colors.accent : colors.ink,
                       ...tabularNums,
                     }}
                   >
-                    {status} · {d.windowDaysRemaining}d
+                    {formatRupees(d.amount)}
                   </Typography>
-                )}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <UrgencyLabel kind={urgency} />
-                </Box>
+                  {/* Status with days remaining */}
+                  {resolved ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.xs}px` }}>
+                      <CheckOutlined sx={{ fontSize: 16, color: colors.accent }} />
+                      <Typography sx={{ fontSize: type.body.fontSize, color: colors.ink }}>Resolved</Typography>
+                    </Box>
+                  ) : (
+                    <Typography
+                      sx={{
+                        fontSize: type.body.fontSize,
+                        color: colors.ink,
+                        fontWeight: d.urgent ? 600 : 400,
+                        ...tabularNums,
+                      }}
+                    >
+                      {status} · {d.windowDaysRemaining}d
+                    </Typography>
+                  )}
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: `${space.sm}px`, alignItems: 'center' }}>
+                    <UrgencyLabel kind={urgency} />
+                  </Box>
+                  <ExpandMoreOutlined
+                    sx={{
+                      fontSize: 20,
+                      color: colors.grey500,
+                      justifySelf: 'end',
+                      transition: reduce ? 'none' : 'transform 0.18s ease',
+                      transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                    }}
+                  />
+                </Pressable>
+                
+                <AnimatePresence initial={false}>
+                  {isExpanded && (
+                    <motion.div
+                      initial={reduce ? false : { height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={reduce ? undefined : { height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: 'easeOut' }}
+                      style={{ overflow: 'hidden' }}
+                    >
+                      <DisputeRowDetail dispute={d} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </Box>
             );
           })}
