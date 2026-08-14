@@ -1,4 +1,4 @@
-// AP Demo Data — hardcoded for sales demo at /b2b/payable/*
+// AP Demo Data - hardcoded for sales demo at /b2b/payable/*
 // Covers all test cases: perfect match, qty mismatch, HSN mismatch, GST mismatch,
 // freight unmapped, short GRN + credit note.
 
@@ -91,7 +91,7 @@ export const POS: PurchaseOrder[] = [
     lineItems: [
       { hsn: '25231000', description: 'Portland Cement (50kg Bag)', qty: 2000, unit: 'BAG', rate: 380, gstRate: 28 },
     ],
-    freightTerms: false, // freight not in PO — triggers exception on INV-7825
+    freightTerms: false, // freight not in PO - triggers exception on INV-7825
     totalValue: 760000,
     status: 'Open',
   },
@@ -475,7 +475,7 @@ export const CREDIT_NOTES: CreditNote[] = [
     vendor: 'V002',
     date: '2024-06-25',
     amount: 76000,
-    reason: 'Short GRN — 200 bags of Portland Cement not delivered (PO-2024-002)',
+    reason: 'Short GRN - 200 bags of Portland Cement not delivered (PO-2024-002)',
     status: 'Pending',
   },
   {
@@ -484,7 +484,7 @@ export const CREDIT_NOTES: CreditNote[] = [
     vendor: 'V001',
     date: '2024-06-20',
     amount: 24000,
-    reason: 'Qty overbilling — 20 extra Brake Assembly units invoiced vs GRN',
+    reason: 'Qty overbilling - 20 extra Brake Assembly units invoiced vs GRN',
     status: 'Applied',
   },
 ];
@@ -552,7 +552,7 @@ export const EXCEPTIONS: APException[] = [
     id: 'EXC-001',
     invoice: 'INV-7826',
     type: 'OCR uncertainty',
-    issue: 'Invoice total unreadable — scan quality below threshold',
+    issue: 'Invoice total unreadable - scan quality below threshold',
     whyFlagged: 'OCR confidence 41% on total amount field. Extracted ₹7,93,600 but digit "9" uncertain.',
     suggestedAction: 'Request vendor to re-send invoice as a searchable PDF or rescan at 300 DPI.',
     confidence: 41,
@@ -567,7 +567,7 @@ export const EXCEPTIONS: APException[] = [
     type: 'HSN/SAC mismatch',
     issue: 'HSN 25231090 on invoice ≠ HSN 25231000 on PO',
     whyFlagged:
-      'Vendor used 8-digit sub-classification (25231090 — Other Portland Cement) vs PO 6-digit (25231000 — Generic). GST rate remains 28% but ITC claim may be flagged during GSTR-2B reconciliation.',
+      'Vendor used 8-digit sub-classification (25231090 - Other Portland Cement) vs PO 6-digit (25231000 - Generic). GST rate remains 28% but ITC claim may be flagged during GSTR-2B reconciliation.',
     suggestedAction:
       'Accept if vendor confirms same material. Request revised invoice with correct HSN if mismatch is substantive.',
     confidence: 88,
@@ -582,7 +582,7 @@ export const EXCEPTIONS: APException[] = [
     type: 'GST mismatch',
     issue: 'GST charged @ 28% vs applicable 18% for SAC 99836931',
     whyFlagged:
-      'AI verified SAC 99836931 (IT/BPO services) is taxable at 18% under HSN master. Vendor applied 28% — overstated tax by ₹18,000. ITC will not match GSTR-2B, causing reconciliation failure.',
+      'AI verified SAC 99836931 (IT/BPO services) is taxable at 18% under HSN master. Vendor applied 28% - overstated tax by ₹18,000. ITC will not match GSTR-2B, causing reconciliation failure.',
     suggestedAction: 'Block payment. Request a revised invoice @ 18% GST or obtain a credit note for ₹18,000.',
     confidence: 97,
     reviewer: 'AP team',
@@ -626,7 +626,7 @@ export const EXCEPTIONS: APException[] = [
     type: 'Missing vendor code',
     issue: 'Freight line item has no SAC/HSN code and no vendor item mapping',
     whyFlagged:
-      'Freight is classified as a service (SAC 996511 — Road transport) but vendor did not include SAC. Cannot post to correct GL. Vendor item code not in master data.',
+      'Freight is classified as a service (SAC 996511 - Road transport) but vendor did not include SAC. Cannot post to correct GL. Vendor item code not in master data.',
     suggestedAction:
       'Send back to vendor to include SAC 996511 on freight line. Map to GL account 6-4020 (Freight inward).',
     confidence: 83,

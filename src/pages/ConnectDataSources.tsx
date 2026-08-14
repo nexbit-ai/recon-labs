@@ -74,7 +74,7 @@ interface UploadResponse {
 const dataSources: DataSource[] = [
   { id: 'shopify', name: 'Shopify', logo: 'https://cdn.worldvectorlogo.com/logos/shopify.svg' },
   { id: 'amazon', name: 'Amazon', logo: 'https://cdn.worldvectorlogo.com/logos/logo-amazon.svg',  isConnected: true},
-  { id: 'flipkart', name: 'Flipkart', logo: 'https://cdn.worldvectorlogo.com/logos/flipkart.svg', isConnected: true },
+  { id: 'myntra', name: 'Myntra', logo: 'https://cdn.worldvectorlogo.com/logos/myntra.svg', isConnected: true },
   { id: 'myntra', name: 'Myntra', logo: 'https://cdn.worldvectorlogo.com/logos/myntra-1.svg' },
   { id: 'nykaa', name: 'Nykaa', logo: 'https://cdn.worldvectorlogo.com/logos/nykaa-1.svg' },
   { id: 'zoho', name: 'Zoho', logo: 'https://cdn.worldvectorlogo.com/logos/zoho-1.svg',  isConnected: true},
@@ -98,14 +98,14 @@ const ConnectDataSources: React.FC = () => {
   const [reportType, setReportType] = useState<'all' | 'Sales' | 'Settlement' | 'System'>('all');
   const [reportQuery, setReportQuery] = useState('');
 
-  // Per-vendor marketplace uploads state (Amazon, Flipkart)
+  // Per-vendor marketplace uploads state (Amazon, Myntra)
   const [marketplaceFiles, setMarketplaceFiles] = useState<Record<string, { sales: File | null; sales_b2b?: File | null; settlement: File | null }>>({
     amazon: { sales: null, sales_b2b: null, settlement: null },
-    flipkart: { sales: null, settlement: null },
+    myntra: { sales: null, settlement: null },
   });
   const [marketplaceStatus, setMarketplaceStatus] = useState<Record<string, { state: 'idle' | 'uploading' | 'success' | 'error'; message: string }>>({
     amazon: { state: 'idle', message: '' },
-    flipkart: { state: 'idle', message: '' },
+    myntra: { state: 'idle', message: '' },
   });
 
   const toggleSelect = (id: string) => {
@@ -160,14 +160,14 @@ const ConnectDataSources: React.FC = () => {
     }
   };
 
-  const setMarketplaceFile = (vendorId: 'amazon' | 'flipkart', kind: 'sales' | 'sales_b2b' | 'settlement', file: File | null) => {
+  const setMarketplaceFile = (vendorId: 'amazon' | 'myntra', kind: 'sales' | 'sales_b2b' | 'settlement', file: File | null) => {
     setMarketplaceFiles((prev) => ({
       ...prev,
       [vendorId]: { ...prev[vendorId], [kind]: file },
     }));
   };
 
-  const uploadMarketplaceReports = async (vendorId: 'amazon' | 'flipkart') => {
+  const uploadMarketplaceReports = async (vendorId: 'amazon' | 'myntra') => {
     const files = marketplaceFiles[vendorId];
     if (vendorId === 'amazon') {
       // Amazon requires B2C sales, B2B sales, and settlement
@@ -179,7 +179,7 @@ const ConnectDataSources: React.FC = () => {
         return;
       }
     } else {
-      // Flipkart requires sales and settlement
+      // Myntra requires sales and settlement
       if (!files?.sales || !files?.settlement) {
         setMarketplaceStatus((prev) => ({
           ...prev,
@@ -427,7 +427,7 @@ const ConnectDataSources: React.FC = () => {
           </Grid>
         </Paper>
 
-        {/* Marketplace Uploads: Amazon & Flipkart */}
+        {/* Marketplace Uploads: Amazon & Myntra */}
         <Paper 
           elevation={0} 
           sx={{ 
@@ -442,11 +442,11 @@ const ConnectDataSources: React.FC = () => {
             <Typography variant="h6" fontWeight={700} color="#1e293b">
               Marketplace Uploads
             </Typography>
-            <Chip label="Amazon & Flipkart" size="small" sx={{ ml: 1 }} />
+            <Chip label="Amazon & Myntra" size="small" sx={{ ml: 1 }} />
           </Box>
 
           <Grid container spacing={3}>
-            {(['amazon', 'flipkart'] as const).map((vendorId) => {
+            {(['amazon', 'myntra'] as const).map((vendorId) => {
               const vendor = dataSources.find((d) => d.id === vendorId);
               const files = marketplaceFiles[vendorId];
               const status = marketplaceStatus[vendorId];
@@ -780,12 +780,12 @@ const ConnectDataSources: React.FC = () => {
           </Paper>
         )}
       </Box>
-      {/* Flipkart Reports dialog - enterprise styled */}
+      {/* Myntra Reports dialog - enterprise styled */}
       <Dialog open={reportsOpen} onClose={() => setReportsOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <img src="https://cdn.worldvectorlogo.com/logos/flipkart.svg" alt="Flipkart" style={{ width: 24, height: 24 }} />
-            <Typography variant="h6" fontWeight={700}>Flipkart — Past fetched reports</Typography>
+            <img src="https://cdn.worldvectorlogo.com/logos/myntra.svg" alt="Myntra" style={{ width: 24, height: 24 }} />
+            <Typography variant="h6" fontWeight={700}>Myntra - Past fetched reports</Typography>
           </Box>
           <Box>
             <Tooltip title="Refresh"><IconButton size="small"><RefreshIcon /></IconButton></Tooltip>

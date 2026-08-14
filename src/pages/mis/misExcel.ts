@@ -5,7 +5,7 @@
 // One private buildWorkbook(meta, tables) produces the shared branded format
 // (Tata 1mg header block + audit footer) for all 5 reports, so they look
 // identical. Download is triggered by writing xlsx.writeBuffer() to a Blob and
-// clicking a temporary object-URL anchor — no file-saver dependency.
+// clicking a temporary object-URL anchor - no file-saver dependency.
 import ExcelJS from 'exceljs';
 import { misData } from './misData';
 
@@ -18,7 +18,7 @@ const MONEY_FMT = '[>=10000000]"₹"#\\,##\\,##\\,##0;[>=100000]"₹"#\\,##\\,##
 // Percent stored as points (e.g. 82.0), displayed "82.0%"; negatives red in parens.
 const PCT_FMT = '0.0"%";[Red](0.0"%")';
 
-// ── Palette (ARGB) — mirrors the on-screen tokens ────────────────────────────
+// ── Palette (ARGB) - mirrors the on-screen tokens ────────────────────────────
 const INK = 'FF111111';
 const GREY700 = 'FF6B7280';
 const MUTED = 'FF9CA3AF';
@@ -59,7 +59,7 @@ async function buildWorkbook(meta: Meta, tables: Table[]): Promise<void> {
     `${r.reconciledMatchedPct}% reconciled · ${r.inDisputePct}% in dispute`;
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Nexbit — AI-Powered MIS';
+  wb.creator = 'Nexbit - AI-Powered MIS';
   wb.created = new Date();
   const ws = wb.addWorksheet('Report', { views: [{ state: 'frozen', ySplit: 3 }] });
 
@@ -76,7 +76,7 @@ async function buildWorkbook(meta: Meta, tables: Table[]): Promise<void> {
   ws.getCell(2, 1).font = { bold: true, size: 12, color: { argb: INK } };
 
   ws.mergeCells(3, 1, 3, span);
-  ws.getCell(3, 1).value = `Period: ${period}   ·   Generated: ${today}   ·   Prepared via Nexbit — AI-Powered MIS`;
+  ws.getCell(3, 1).value = `Period: ${period}   ·   Generated: ${today}   ·   Prepared via Nexbit - AI-Powered MIS`;
   ws.getCell(3, 1).font = { size: 9, italic: true, color: { argb: MUTED } };
 
   // Column widths = max needed per index across all tables.
@@ -175,7 +175,7 @@ function buildReport(id: AnswerReportId): { meta: Meta; tables: Table[] } {
     case 'net-revenue': {
       const keys = ['gmv', 'discounts', 'returnsRto', 'netRevenue'];
       return {
-        meta: { title: `Net Revenue — ${period}`, filename: fileName('NetRevenue') },
+        meta: { title: `Net Revenue - ${period}`, filename: fileName('NetRevenue') },
         tables: [
           {
             columns: [
@@ -195,7 +195,7 @@ function buildReport(id: AnswerReportId): { meta: Meta; tables: Table[] } {
     case 'losing-channel': {
       const sorted = [...channels].sort((a, b) => b.cm1Pct - a.cm1Pct);
       return {
-        meta: { title: `Channel Profitability — ${period}`, filename: fileName('ChannelProfitability') },
+        meta: { title: `Channel Profitability - ${period}`, filename: fileName('ChannelProfitability') },
         tables: [
           {
             columns: [
@@ -205,7 +205,7 @@ function buildReport(id: AnswerReportId): { meta: Meta; tables: Table[] } {
               { header: 'Status', kind: 'text', width: 16 },
             ],
             rows: sorted.map((c) => ({
-              cells: [c.channel, c.gmv, c.cm1Pct, c.cm1Pct < 0 ? 'Loss-making' : HEALTH_LABEL[c.health] ?? '—'],
+              cells: [c.channel, c.gmv, c.cm1Pct, c.cm1Pct < 0 ? 'Loss-making' : HEALTH_LABEL[c.health] ?? '-'],
             })),
           },
         ],
@@ -222,7 +222,7 @@ function buildReport(id: AnswerReportId): { meta: Meta; tables: Table[] } {
       ];
       const tables: Table[] = [
         {
-          title: 'Below cost — kill list',
+          title: 'Below cost - kill list',
           columns: cols,
           rows: killed.map((s) => ({ cells: [s.sku, s.channel, s.marginPct] })),
         },
@@ -234,13 +234,13 @@ function buildReport(id: AnswerReportId): { meta: Meta; tables: Table[] } {
           rows: winners.map((s) => ({ cells: [s.sku, s.channel, s.marginPct] })),
         });
       }
-      return { meta: { title: `SKUs Below Cost — ${period}`, filename: fileName('SKUsBelowCost') }, tables };
+      return { meta: { title: `SKUs Below Cost - ${period}`, filename: fileName('SKUsBelowCost') }, tables };
     }
 
     case 'disputes': {
       const r = misData.reconciliation;
       return {
-        meta: { title: `Reconciliation & Disputes — ${period}`, filename: fileName('Reconciliation') },
+        meta: { title: `Reconciliation & Disputes - ${period}`, filename: fileName('Reconciliation') },
         tables: [
           {
             columns: [
@@ -264,7 +264,7 @@ function buildReport(id: AnswerReportId): { meta: Meta; tables: Table[] } {
 
     case 'ebitda': {
       return {
-        meta: { title: `P&L Waterfall — ${period}`, filename: fileName('PnL') },
+        meta: { title: `P&L Waterfall - ${period}`, filename: fileName('PnL') },
         tables: [
           {
             columns: [

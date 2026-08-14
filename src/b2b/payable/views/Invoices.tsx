@@ -1,4 +1,4 @@
-// Invoices — 3-way match screen.
+// Invoices - 3-way match screen.
 // Shows invoice list -> click to open 3-way match detail view.
 import React, { useState } from 'react';
 import { Box, Typography, Button } from '@mui/material';
@@ -136,8 +136,8 @@ const Invoices: React.FC = () => {
 
     return {
       description: invLi.description,
-      poQty: poLi ? `${poLi.qty} ${poLi.unit}` : '—',
-      grnQty: grnLi ? `${grnLi.receivedQty} ${grnLi.unit}` : '—',
+      poQty: poLi ? `${poLi.qty} ${poLi.unit}` : '-',
+      grnQty: grnLi ? `${grnLi.receivedQty} ${grnLi.unit}` : '-',
       invQty: `${invLi.qty} ${invLi.unit}`,
       rate: `₹${invLi.rate.toLocaleString('en-IN')}`,
       amount: `₹${invLi.amount.toLocaleString('en-IN')}`,
@@ -189,8 +189,8 @@ const Invoices: React.FC = () => {
           </Box>
           <Box>
             <Typography sx={{ ...type.label, color: colors.grey500, mb: `${space.xs}px` }}>Documents</Typography>
-            <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.ink }}>PO: {po?.id || '—'}</Typography>
-            <Typography sx={{ fontSize: 12, color: colors.grey700 }}>GRN: {grn?.id || '—'}</Typography>
+            <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.ink }}>PO: {po?.id || '-'}</Typography>
+            <Typography sx={{ fontSize: 12, color: colors.grey700 }}>GRN: {grn?.id || '-'}</Typography>
           </Box>
           <Box>
             <Typography sx={{ ...type.label, color: colors.grey500, mb: `${space.xs}px` }}>Invoice total</Typography>
@@ -217,7 +217,7 @@ const Invoices: React.FC = () => {
               Found related contract for this invoice
             </Typography>
             <Typography sx={{ fontSize: 13, color: colors.grey700 }}>
-              Master Services Agreement — <Box component="a" href="/b2b/payable/contracts" sx={{ color: colors.accent, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>CT-2024-{vendor?.id.replace('V', '')} (View contract)</Box>
+              Master Services Agreement - <Box component="a" href="/b2b/payable/contracts" sx={{ color: colors.accent, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>CT-2024-{vendor?.id.replace('V', '')} (View contract)</Box>
             </Typography>
           </Box>
         </Box>
@@ -288,10 +288,10 @@ const Invoices: React.FC = () => {
             }}
           >
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.accent }}>Freight (unapproved line item)</Typography>
-            <Typography sx={{ fontSize: 13, color: colors.grey500 }}>—</Typography>
-            <Typography sx={{ fontSize: 13, color: colors.grey500 }}>—</Typography>
-            <Typography sx={{ fontSize: 13, color: colors.grey500 }}>—</Typography>
-            <Typography sx={{ fontSize: 13, color: colors.grey500, textAlign: 'right' }}>—</Typography>
+            <Typography sx={{ fontSize: 13, color: colors.grey500 }}>-</Typography>
+            <Typography sx={{ fontSize: 13, color: colors.grey500 }}>-</Typography>
+            <Typography sx={{ fontSize: 13, color: colors.grey500 }}>-</Typography>
+            <Typography sx={{ fontSize: 13, color: colors.grey500, textAlign: 'right' }}>-</Typography>
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.accent, textAlign: 'right', ...tabularNums }}>{formatINR(inv.freightCharge)}</Typography>
           </Box>
         )}
@@ -302,7 +302,7 @@ const Invoices: React.FC = () => {
         <Box sx={{ border: `1px solid ${colors.accent}`, bgcolor: colors.accentWash, p: `${space.xl}px`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: `${space.lg}px`, flexWrap: 'wrap' }}>
           <Box>
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>This invoice has active exceptions</Typography>
-            <Typography sx={{ fontSize: 13, color: colors.grey700, mt: '2px' }}>{inv.exceptionIds.length} exception{inv.exceptionIds.length > 1 ? 's' : ''} flagged by AI — review before payment. {inv.notes}</Typography>
+            <Typography sx={{ fontSize: 13, color: colors.grey700, mt: '2px' }}>{inv.exceptionIds.length} exception{inv.exceptionIds.length > 1 ? 's' : ''} flagged by AI - review before payment. {inv.notes}</Typography>
           </Box>
           <Button href="/b2b/payable/exceptions" sx={{ bgcolor: colors.accent, color: colors.paper, fontSize: 13, fontWeight: 600, px: `${space.xl}px`, py: `${space.md}px`, flexShrink: 0, '&:hover': { bgcolor: colors.accentHover } }}>
             <OpenInNewOutlined sx={{ fontSize: 14, mr: '6px' }} />

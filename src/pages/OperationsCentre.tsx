@@ -380,7 +380,7 @@ const OperationsCentrePage: React.FC = () => {
         if (typeof parsed === 'string') return parsed;
       }
     } catch {}
-    return 'flipkart'; 
+    return 'myntra'; 
   };
 
   // Platform selector state for dropdown (single-select) - initialize from URL params
@@ -448,7 +448,7 @@ const OperationsCentrePage: React.FC = () => {
     const clone = JSON.parse(JSON.stringify(mainSummaryRaw));
     
     let factor = 1;
-    if (selectedPlatform === 'flipkart') factor = 8.5;
+    if (selectedPlatform === 'myntra') factor = 8.5;
     else if (selectedPlatform === 'amazon') factor = 15.2;
     else if (selectedPlatform === 'd2c') factor = 4.2;
     else factor = 1.8;
@@ -470,7 +470,7 @@ const OperationsCentrePage: React.FC = () => {
       const totalMatchedAmount = Number(clone.summary.total_reconciled_amount || 0) + Number(clone.summary.total_manually_reconciled_or_disputed_amount || 0);
       
       let mismatchRatio = 0.015;
-      if (selectedPlatform === 'flipkart') mismatchRatio = 0.018;
+      if (selectedPlatform === 'myntra') mismatchRatio = 0.018;
       else if (selectedPlatform === 'd2c') mismatchRatio = 0.012;
       else if (selectedPlatform === 'amazon') mismatchRatio = 0.011;
       
@@ -528,7 +528,7 @@ const OperationsCentrePage: React.FC = () => {
   const COLUMN_TO_API_PARAM_MAP: Record<string, {
     apiParam: string;
     type: 'string' | 'number' | 'date' | 'enum';
-    supportedPlatforms?: ('flipkart' | 'amazon' | 'd2c' | 'all')[];
+    supportedPlatforms?: ('myntra' | 'amazon' | 'd2c' | 'all')[];
     usesInSuffix?: boolean; // For CSV filters like status_in
   }> = {
     // Common filters (both platforms)
@@ -2544,7 +2544,7 @@ const OperationsCentrePage: React.FC = () => {
                   minWidth: 'auto', minHeight: 36, px: 1.5, fontSize: '0.7875rem', '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107,114,128,0.04)' }
                 }}
               >
-                {selectedPlatform === 'flipkart' ? 'Flipkart' : selectedPlatform === 'amazon' ? 'Amazon' : 'D2C'}
+                {selectedPlatform === 'myntra' ? 'Myntra' : selectedPlatform === 'amazon' ? 'Amazon' : 'D2C'}
               </Button>
               <Menu
                 anchorEl={platformMenuAnchorEl}
@@ -2567,13 +2567,13 @@ const OperationsCentrePage: React.FC = () => {
                   <RadioGroup
                     value={selectedPlatform}
                     onChange={(e) => {
-                      const newPlatform = e.target.value as 'flipkart' | 'amazon' | 'd2c';
+                      const newPlatform = e.target.value as 'myntra' | 'amazon' | 'd2c';
                       setSelectedPlatform(newPlatform);
                       setPlatformMenuAnchorEl(null);
                       // Data fetch will be triggered by useEffect watching selectedPlatform
                     }}
                   >
-                    {(['flipkart', 'amazon', 'd2c'] as const).map((p) => (
+                    {(['myntra', 'amazon', 'd2c'] as const).map((p) => (
                       <MenuItem
                         key={p}
                         onClick={() => {
@@ -2586,7 +2586,7 @@ const OperationsCentrePage: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Radio size="small" checked={selectedPlatform === p} value={p} />
                           <Box>
-                            <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p === 'flipkart' ? 'Flipkart' : p === 'amazon' ? 'Amazon' : 'D2C'}</Typography>
+                            <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p === 'myntra' ? 'Myntra' : p === 'amazon' ? 'Amazon' : 'D2C'}</Typography>
                             <Typography variant="caption" sx={{ color: '#6b7280' }}>{p === 'd2c' ? 'Website / D2C' : 'E-commerce marketplace'}</Typography>
                           </Box>
                         </Box>
@@ -3270,7 +3270,7 @@ const OperationsCentrePage: React.FC = () => {
 
       {/* Minimal Raise Dispute Dialog */}
       <Dialog open={raiseDialogOpen} onClose={closeRaiseDispute} PaperProps={{ sx: { borderRadius: 1, minWidth: 420 } }}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Raise dispute to Flipkart</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Raise dispute to Myntra</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ color: '#374151', mb: 2 }}>Total orders: {selectedRaiseGroup?.count || 0}</Typography>
           <TextField

@@ -1,50 +1,34 @@
-// B2B Channels — per-channel settlement performance. All figures from the mock
-// barrel (src/b2b/mock). Monochrome + one accent (#7A5DBF): accent appears ONLY
-// on the recoverable column and the net-realisation bar fill. Channels are
-// uppercase text labels — never colour-coded. Net-realisation bars are NOT
-// colour-graded by value (single accent fill on a grey track); the % + weight
-// carry the meaning. Square corners, hairline borders, tabular figures.
+// B2B Channels - Cosmix channel list with click-through to channel drilldown.
+// Shows channel name, model, receivable, received, outstanding, issues.
 import React from 'react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Box, Typography } from '@mui/material';
+import { ArrowForwardOutlined } from '@mui/icons-material';
 import { motion, useReducedMotion } from 'framer-motion';
 import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
-import { cardSx, ChannelTag, ColumnLabel, PageTitle } from '../components/primitives';
-import { formatCompactINR, formatPercent } from '../lib/format';
-import { channelPerformance, headlineByKey } from '../mock';
+import { cardSx, ChannelTag, ColumnLabel, PageTitle, Pressable } from '../components/primitives';
+import { formatRupees, formatINRShort, formatPercent } from '../lib/format';
+import { channelPerformance, type ChannelPerformance } from '../mock';
 
-const GRID = '110px 130px minmax(200px, 1fr) 120px 130px';
-
-// Thin square net-realisation bar: accent fill on a grey track. No value-grading.
-const RealisationBar: React.FC<{ pct: number; emphasise?: boolean }> = ({ pct, emphasise }) => (
-  <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.md}px` }}>
-    <Box sx={{ flex: 1, height: 6, bgcolor: colors.grey100 }}>
-      <Box sx={{ height: '100%', width: `${pct}%`, bgcolor: colors.accent }} />
-    </Box>
-    <Typography sx={{ width: 44, textAlign: 'right', fontSize: type.body.fontSize, fontWeight: emphasise ? 600 : 500, color: colors.ink, ...tabularNums }}>
-      {formatPercent(pct)}
-    </Typography>
-  </Box>
-);
-
-const Cell: React.FC<{ children: React.ReactNode; align?: 'left' | 'right'; sx?: object }> = ({
-  children,
-  align = 'left',
-  sx,
-}) => (
-  <Typography sx={{ fontSize: type.body.fontSize, color: colors.ink, textAlign: align, ...tabularNums, ...sx }}>
-    {children}
-  </Typography>
-);
+const GRID = '160px minmax(100px, 1fr) 116px 116px 116px 80px 36px';
 
 const Channels: React.FC = () => {
   const reduce = useReducedMotion();
-  const rows = channelPerformance;
-  const minNet = Math.min(...rows.map((c) => c.netRealisationPct)); // worst realiser → emphasised
+  const navigate = useNavigate();
+  const { platformFilter } = useOutletContext<{ platformFilter: string }>();
 
-  const settledTotal = headlineByKey('settled');
-  const leakageTotal = headlineByKey('leakage');
-  const recoverableTotal = headlineByKey('recoverable');
-  const blendedNet = headlineByKey('netRealisation').value;
+  const filterKey = platformFilter.toLowerCase().replace(/\s+/g, '').replace('–', '');
+  const rows: ChannelPerformance[] = filterKey === 'all'
+    ? channelPerformance
+    : channelPerformance.filter((c) => {
+        const channelKey = c.channel.toLowerCase().replace(/\s+/g, '').replace('–', '');
+        return channelKey.includes(filterKey) || filterKey.includes(channelKey);
+      });
+
+  const handleClick = (channel: string) => {
+    const key = channel.toLowerCase().replace(/\s+/g, '').replace('–', '');
+    navigate(`/b2b/channels/${key}`);
+  };
 
   return (
     <Box
@@ -53,84 +37,95 @@ const Channels: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
     >
-      <PageTitle>Channels</PageTitle>
+      <PageTitle>Channel Overview</PageTitle>
 
       <Box sx={{ ...cardSx, overflowX: 'auto' }}>
-       <Box sx={{ minWidth: 760 }}>
-        {/* Header */}
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: GRID,
-            alignItems: 'center',
-            gap: `${space.lg}px`,
-            px: `${space.xl}px`,
-            py: `${space.md}px`,
-            bgcolor: colors.grey100,
-            borderBottom: hairline,
-          }}
-        >
-          <ColumnLabel>Channel</ColumnLabel>
-          <ColumnLabel align="right">Settled · Q1</ColumnLabel>
-          <ColumnLabel>Net realisation</ColumnLabel>
-          <ColumnLabel align="right">Leakage</ColumnLabel>
-          <ColumnLabel align="right">Recoverable</ColumnLabel>
-        </Box>
-
-        {/* Channel rows */}
-        {rows.map((c) => (
+        <Box sx={{ minWidth: 800 }}>
+          {/* Header */}
           <Box
-            key={c.channel}
             sx={{
               display: 'grid',
               gridTemplateColumns: GRID,
               alignItems: 'center',
               gap: `${space.lg}px`,
               px: `${space.xl}px`,
-              minHeight: 52,
+              py: `${space.md}px`,
+              bgcolor: colors.grey100,
               borderBottom: hairline,
-              transition: 'background-color 0.12s ease',
-              '&:hover': { bgcolor: colors.grey100 },
             }}
           >
-            <ChannelTag name={c.channel} />
-            <Cell align="right">{formatCompactINR(c.settled)}</Cell>
-            <RealisationBar pct={c.netRealisationPct} emphasise={c.netRealisationPct === minNet} />
-            <Cell align="right">{formatCompactINR(c.leakage)}</Cell>
-            <Cell align="right" sx={{ color: colors.accent, fontWeight: 600 }}>
-              {formatCompactINR(c.recoverable)}
-            </Cell>
+            <ColumnLabel>Channel</ColumnLabel>
+            <ColumnLabel>Model</ColumnLabel>
+            <ColumnLabel align="right">Receivable</ColumnLabel>
+            <ColumnLabel align="right">Received</ColumnLabel>
+            <ColumnLabel align="right">Outstanding</ColumnLabel>
+            <ColumnLabel align="right">Net %</ColumnLabel>
+            <ColumnLabel />
           </Box>
-        ))}
 
-        {/* All-channels summary — heavier separator, bold */}
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: GRID,
-            alignItems: 'center',
-            gap: `${space.lg}px`,
-            px: `${space.xl}px`,
-            minHeight: 56,
-            borderTop: `2px solid ${colors.grey200}`,
-          }}
-        >
-          <Box component="span" sx={{ ...type.label, color: colors.ink, fontWeight: 600 }}>
-            All channels
-          </Box>
-          <Cell align="right" sx={{ fontWeight: 600 }}>{settledTotal.display}</Cell>
-          <RealisationBar pct={blendedNet} emphasise />
-          <Cell align="right" sx={{ fontWeight: 600 }}>{leakageTotal.display}</Cell>
-          <Cell align="right" sx={{ color: colors.accent, fontWeight: 600 }}>{recoverableTotal.display}</Cell>
+          {/* Rows */}
+          {rows.map((channel, idx) => {
+            const receivable = channel.settled + channel.leakage;
+            const outstanding = channel.leakage;
+            return (
+              <Pressable
+                key={channel.channel}
+                ariaLabel={`View ${channel.channel} details`}
+                onClick={() => handleClick(channel.channel)}
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: GRID,
+                  alignItems: 'center',
+                  gap: `${space.lg}px`,
+                  px: `${space.xl}px`,
+                  minHeight: 60,
+                  borderBottom: idx < rows.length - 1 ? hairline : 'none',
+                  transition: 'background-color 0.12s ease',
+                  '&:hover': { bgcolor: colors.grey100 },
+                }}
+              >
+                <ChannelTag name={channel.channel} />
+                <Typography sx={{ fontSize: 13, color: colors.grey700 }}>
+                  {channel.channel === 'Blinkit' || channel.channel === 'Zepto'
+                    ? 'Quick-commerce (SOR)'
+                    : channel.channel === 'Reliance'
+                    ? 'Modern Trade'
+                    : 'Direct Supply'}
+                </Typography>
+                <Typography sx={{ textAlign: 'right', fontSize: type.body.fontSize, color: colors.ink, ...tabularNums }}>
+                  {formatINRShort(receivable)}
+                </Typography>
+                <Typography sx={{ textAlign: 'right', fontSize: type.body.fontSize, color: colors.ink, ...tabularNums }}>
+                  {formatINRShort(channel.settled)}
+                </Typography>
+                <Typography
+                  sx={{
+                    textAlign: 'right',
+                    fontSize: type.body.fontSize,
+                    fontWeight: 600,
+                    color: outstanding > 0 ? colors.accent : colors.grey500,
+                    ...tabularNums,
+                  }}
+                >
+                  {formatINRShort(outstanding)}
+                </Typography>
+                <Typography sx={{ textAlign: 'right', fontSize: type.body.fontSize, color: colors.ink, ...tabularNums }}>
+                  {formatPercent(channel.netRealisationPct)}
+                </Typography>
+                <ArrowForwardOutlined sx={{ fontSize: 18, color: colors.grey500, justifySelf: 'end' }} />
+              </Pressable>
+            );
+          })}
+
+          {rows.length === 0 && (
+            <Box sx={{ p: `${space.xl}px` }}>
+              <Typography sx={{ fontSize: type.body.fontSize, color: colors.grey500 }}>
+                No channels match the current filter.
+              </Typography>
+            </Box>
+          )}
         </Box>
-       </Box>
       </Box>
-
-      {/* Quiet narrative caption */}
-      <Typography sx={{ mt: `${space.lg}px`, fontSize: type.body.fontSize, color: colors.grey700, maxWidth: 720 }}>
-        Amazon settles the most but realises the least — the keyboards keep landing in the wrong FBA weight
-        band. That single fix is worth ~₹8.6L.
-      </Typography>
     </Box>
   );
 };

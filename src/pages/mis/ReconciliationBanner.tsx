@@ -1,4 +1,4 @@
-// Reconciliation-completeness banner — the trust anchor of the MIS page.
+// Reconciliation-completeness banner - the trust anchor of the MIS page.
 // Reads entirely from misData.reconciliation. Full-width card: a headline
 // completeness figure, a single segmented progress bar (matched / in dispute /
 // pending) with a legend, and three compact money stats. Money via

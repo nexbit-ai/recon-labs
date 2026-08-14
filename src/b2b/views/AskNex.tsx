@@ -1,4 +1,4 @@
-// B2B Ask Nex — a calm, conversational Q&A over settlements. All pairs come from
+// B2B Ask Nex - a calm, conversational Q&A over settlements. All pairs come from
 // the mock barrel (src/b2b/mock). Monochrome + one accent (#7A5DBF): accent is
 // used ONLY on the input glyph, the Nex avatar, and the "Ask something else"
 // link. Square corners, hairline borders, tabular figures. The assistant is

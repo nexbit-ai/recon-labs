@@ -1,4 +1,4 @@
-// Upload settlement modal — frontend-only. Runs a staged 4-step "analysis"
+// Upload settlement modal - frontend-only. Runs a staged 4-step "analysis"
 // then shows a findings summary. No file picker, no API; all local state.
 // Monochrome + one accent (#7A5DBF): accent on the header tile, the step checks,
 // and the primary action. Square corners, hairline borders, no shadow.

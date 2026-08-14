@@ -1,7 +1,7 @@
-// "Ask your data" — a SCRIPTED, deterministic assistant for the MIS page.
+// "Ask your data" - a SCRIPTED, deterministic assistant for the MIS page.
 // NOT an LLM: a fixed set of 5 pre-authored Q&A entries whose answers are
 // computed from misData, so they can never contradict the numbers rendered
-// elsewhere on the page. No API, no dynamic text generation — only misData
+// elsewhere on the page. No API, no dynamic text generation - only misData
 // values filled into pre-written templates. Free-typed input is matched to an
 // entry by simple case-insensitive keyword scoring; no match → graceful
 // fallback that re-surfaces the chips. Drill-down links smooth-scroll to the
@@ -60,7 +60,7 @@ function buildEntries(): QAEntry[] {
     pnl.find((l) => l.key === k) ?? { key: k, label: k, amount: 0, pctOfGmv: 0, kind: 'flow' as const };
   const gmv = line('gmv').amount;
 
-  // 2 — worst channel (guarded against an empty channel list)
+  // 2 - worst channel (guarded against an empty channel list)
   const negatives = channels.filter((c) => c.cm1Pct < 0).sort((a, b) => a.cm1Pct - b.cm1Pct);
   const worst = negatives[0] ?? [...channels].sort((a, b) => a.cm1Pct - b.cm1Pct)[0];
   const gmvRank = worst
@@ -68,12 +68,12 @@ function buildEntries(): QAEntry[] {
     : 0;
   const otherNeg = negatives.slice(1).map((c) => `${c.channel} (${formatPercent(c.cm1Pct)})`);
 
-  // 3 — kill list
+  // 3 - kill list
   const killed = skus.filter((s) => s.isKillList).sort((a, b) => a.marginPct - b.marginPct);
   const killChannels = [...new Set(killed.map((s) => s.channel))];
   const allQuickCommerce = killChannels.length > 0 && killChannels.every((c) => QUICK_COMMERCE.has(c));
 
-  // 5 — EBITDA drains
+  // 5 - EBITDA drains
   const eb = line('ebitda');
   const per100 = gmv ? (eb.amount / gmv) * 100 : 0;
   const topDrains = pnl
@@ -89,7 +89,7 @@ function buildEntries(): QAEntry[] {
       answer: {
         headline: formatINRShort(line('netRevenue').amount),
         tone: 'ink',
-        sentence: `That's ${formatPercent(line('netRevenue').pctOfGmv)} of your ${formatINRShort(gmv)} GMV — the gap is discounts (${formatINRShort(line('discounts').amount)}) and returns & RTO (${formatINRShort(line('returnsRto').amount)}).`,
+        sentence: `That's ${formatPercent(line('netRevenue').pctOfGmv)} of your ${formatINRShort(gmv)} GMV - the gap is discounts (${formatINRShort(line('discounts').amount)}) and returns & RTO (${formatINRShort(line('returnsRto').amount)}).`,
         drill: { label: '↳ from Profit & Loss', region: 'mis-pnl' },
       },
     },
@@ -368,7 +368,7 @@ const AskYourData: React.FC = () => {
 
         {errored && (
           <Typography sx={{ mt: `${space.sm}px`, fontSize: 13, color: colors.grey700 }}>
-            Couldn't generate file — try again
+            Couldn't generate file - try again
           </Typography>
         )}
 
@@ -430,7 +430,7 @@ const AskYourData: React.FC = () => {
         <Box sx={{ border: hairline, borderRadius: `${radii.panel}px`, p: `${space.lg}px` }}>
           {NexTag}
           <Typography sx={{ ...type.body, color: colors.ink }}>
-            I can answer that from your reconciled data — try one of these:
+            I can answer that from your reconciled data - try one of these:
           </Typography>
         </Box>
       );

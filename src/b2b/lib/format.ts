@@ -19,7 +19,7 @@ export function formatCompactINR(value: number): string {
 /**
  * Two-decimal Indian short currency for the MIS page, e.g.
  * 11644000 -> "₹1.16 Cr", 680000 -> "₹6.80 L", -213000 -> "-₹2.13 L".
- * Distinct from formatCompactINR (1 decimal, no space) — the MIS spec calls for
+ * Distinct from formatCompactINR (1 decimal, no space) - the MIS spec calls for
  * two decimals and a space before the Cr / L unit.
  */
 export function formatINRShort(value: number): string {

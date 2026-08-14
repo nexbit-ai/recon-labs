@@ -31,11 +31,11 @@ export const mockReconciliationData: MarketplaceReconciliationResponse = {
     totalUnreconciled: {
       amount: "100000",
       number: 30,
-      lessPaymentReceivedFromFlipkart: {
+      lessPaymentReceivedFromMyntra: {
         amount: "50000",
         number: 15
       },
-      excessPaymentReceivedFromFlipkart: {
+      excessPaymentReceivedFromMyntra: {
         amount: "30000",
         number: 10
       }
@@ -101,12 +101,12 @@ export const isValidReconciliationData = (data: any): data is MarketplaceReconci
     data.summaryData.totalUnreconciled &&
     typeof data.summaryData.totalUnreconciled.amount === 'string' &&
     typeof data.summaryData.totalUnreconciled.number === 'number' &&
-    data.summaryData.totalUnreconciled.lessPaymentReceivedFromFlipkart &&
-    typeof data.summaryData.totalUnreconciled.lessPaymentReceivedFromFlipkart.amount === 'string' &&
-    typeof data.summaryData.totalUnreconciled.lessPaymentReceivedFromFlipkart.number === 'number' &&
-    data.summaryData.totalUnreconciled.excessPaymentReceivedFromFlipkart &&
-    typeof data.summaryData.totalUnreconciled.excessPaymentReceivedFromFlipkart.amount === 'string' &&
-    typeof data.summaryData.totalUnreconciled.excessPaymentReceivedFromFlipkart.number === 'number' &&
+    data.summaryData.totalUnreconciled.lessPaymentReceivedFromMyntra &&
+    typeof data.summaryData.totalUnreconciled.lessPaymentReceivedFromMyntra.amount === 'string' &&
+    typeof data.summaryData.totalUnreconciled.lessPaymentReceivedFromMyntra.number === 'number' &&
+    data.summaryData.totalUnreconciled.excessPaymentReceivedFromMyntra &&
+    typeof data.summaryData.totalUnreconciled.excessPaymentReceivedFromMyntra.amount === 'string' &&
+    typeof data.summaryData.totalUnreconciled.excessPaymentReceivedFromMyntra.number === 'number' &&
     data.summaryData.totalReconciled &&
     typeof data.summaryData.totalReconciled.amount === 'string' &&
     typeof data.summaryData.totalReconciled.number === 'number' &&

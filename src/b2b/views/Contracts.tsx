@@ -1,7 +1,7 @@
-// B2B Contracts — every channel's contract in one place. The page is an
+// B2B Contracts - every channel's contract in one place. The page is an
 // accordion of channels; opening one unrolls its full contract: the signed rate
 // card AND its secondary-discount register. Secondary discounts are the time-
-// and-SKU-scoped promos the brand co-funds — declaring them here is what lets
+// and-SKU-scoped promos the brand co-funds - declaring them here is what lets
 // recon lower the "expected amount to receive" for that window, so a legitimate
 // promo deduction reconciles instead of flagging as variance.
 //
@@ -95,7 +95,7 @@ const RateCard: React.FC<{ lines: RateCardLine[] }> = ({ lines }) => (
             <Typography sx={{ fontSize: type.body.fontSize, fontWeight: line.authorised ? 400 : 600, color: colors.ink }}>
               {line.label}
             </Typography>
-            {line.note && <Typography sx={{ fontSize: 13, color: colors.grey700 }}>— {line.note}</Typography>}
+            {line.note && <Typography sx={{ fontSize: 13, color: colors.grey700 }}>- {line.note}</Typography>}
           </Box>
         </Box>
         <Typography
@@ -193,7 +193,7 @@ const DiscountRow: React.FC<{
                   </Box>
                   <Typography sx={{ fontSize: 13, color: colors.grey700, lineHeight: '19px' }}>
                     Nex expects full price, sees a {formatRupees(impact.brandFunded)} deduction on the settlement, and
-                    flags it as <b style={{ color: colors.ink }}>unexplained variance</b> — a false leakage alert.
+                    flags it as <b style={{ color: colors.ink }}>unexplained variance</b> - a false leakage alert.
                   </Typography>
                 </Box>
 
@@ -205,7 +205,7 @@ const DiscountRow: React.FC<{
                   </Box>
                   <Typography sx={{ fontSize: 13, color: colors.grey700, lineHeight: '19px' }}>
                     Expected receivable drops by <b style={{ color: colors.ink }}>{formatRupees(impact.brandFunded)}</b> for
-                    this window &amp; SKU set — the deduction matches expectation and{' '}
+                    this window &amp; SKU set - the deduction matches expectation and{' '}
                     <b style={{ color: colors.ink }}>reconciles clean</b>.
                   </Typography>
                 </Box>
@@ -315,7 +315,7 @@ const ChannelPanel: React.FC<{
                 <RateCard lines={contract.rateCard} />
               </Box>
 
-              {/* Breach strip — Blinkit's unauthorised "Storage Fee v2" */}
+              {/* Breach strip - Blinkit's unauthorised "Storage Fee v2" */}
               {hasBreach && contract.channel === 'Blinkit' && (
                 <Box sx={{ border: hairline, p: `${space.lg}px`, display: 'flex', alignItems: 'flex-start', gap: `${space.md}px`, flexWrap: 'wrap' }}>
                   <ErrorOutlineOutlined sx={{ fontSize: 18, color: colors.ink, flexShrink: 0, mt: '1px' }} />
@@ -360,7 +360,7 @@ const ChannelPanel: React.FC<{
                 {discounts.length === 0 ? (
                   <Box sx={{ border: hairline, px: `${space.lg}px`, py: `${space.xl}px`, textAlign: 'center' }}>
                     <Typography sx={{ fontSize: type.body.fontSize, color: colors.grey500 }}>
-                      No discounts configured — deductions on promo SKUs will flag as variance until you add them.
+                      No discounts configured - deductions on promo SKUs will flag as variance until you add them.
                     </Typography>
                   </Box>
                 ) : (
@@ -437,7 +437,7 @@ const Contracts: React.FC = () => {
           <PageTitle>Contracts</PageTitle>
           <Typography sx={{ mt: `-${space.md}px`, fontSize: type.body.fontSize, color: colors.grey700, maxWidth: 760 }}>
             One contract per channel. Each defines the rate card <b style={{ color: colors.ink }}>and</b> the secondary
-            discounts running on it — together they set the “expected amount to receive” that reconciliation checks every
+            discounts running on it - together they set the “expected amount to receive” that reconciliation checks every
             settlement against. Open a channel to view or configure its contract.
           </Typography>
         </Box>

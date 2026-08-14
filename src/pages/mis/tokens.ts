@@ -1,7 +1,7 @@
 // Design tokens for the AI-Powered MIS page, retuned to the B2C (recon-labs)
 // look: rounded cards with a soft shadow on a light canvas, Inter type. Derived
 // from the B2B token set but with radii + card treatment swapped to match the
-// main app. Self-contained — the MIS feature imports everything from here so a
+// main app. Self-contained - the MIS feature imports everything from here so a
 // single edit restyles every region.
 
 // ── COLOUR (monochrome + one accent, on the B2C neutral ramp) ───────────────
@@ -10,10 +10,10 @@ export const colors = {
   paper: '#FFFFFF',
   grey700: '#6B7280',
   grey500: '#9CA3AF',
-  grey200: '#E5E7EB', // hairline — internal dividers / rules
+  grey200: '#E5E7EB', // hairline - internal dividers / rules
   grey100: '#F5F5F5', // subtle fills
   canvas: '#F8FAFC', // page background (matches Logistics / other B2C pages)
-  accent: '#7A5DBF', // AI accent — the one non-neutral hue on the page
+  accent: '#7A5DBF', // AI accent - the one non-neutral hue on the page
   accentHover: '#6A4FB0',
   accentWash: 'rgba(122, 93, 191, 0.08)',
   inkHover: '#000000',
@@ -26,7 +26,7 @@ export const hairline = `1px solid ${colors.grey200}`;
 export const cardBorder = `1.5px solid ${colors.grey200}`;
 export const cardShadow = '0 2px 12px 0 rgba(16,30,54,0.04)';
 
-// ── RADII (the defining B2C restyle — square → rounded) ─────────────────────
+// ── RADII (the defining B2C restyle - square → rounded) ─────────────────────
 export const radii = {
   card: 16, // outer cards / regions
   panel: 12, // inner panels, answer cards, highlighted rows

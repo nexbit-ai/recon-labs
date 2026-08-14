@@ -11,7 +11,7 @@ import { workspace, fiscalPeriod } from '../mock';
 import ProductToggle from '../components/ProductToggle';
 import UploadSettlementModal from '../components/UploadSettlementModal';
 import { Pressable } from '../components/primitives';
-// @ts-ignore — same Nexbit logo used across the B2C UI
+// @ts-ignore - same Nexbit logo used across the B2C UI
 import logo from '../../assets/logo_fresh.jpg';
 
 const NavItem: React.FC<{ section: SectionDef; active: boolean; onClick: () => void }> = ({
@@ -216,8 +216,8 @@ const B2BShell: React.FC = () => {
                   <option value="all">All Channels</option>
                   <option value="blinkit">Blinkit</option>
                   <option value="zepto">Zepto</option>
-                  <option value="entitya">Entity A</option>
-                  <option value="entityb">Entity B</option>
+                  <option value="reliance">Reliance</option>
+                  <option value="cafes">Cafes – Bangalore</option>
                 </select>
               </Box>
               <Pill>{fiscalPeriod.pill}</Pill>

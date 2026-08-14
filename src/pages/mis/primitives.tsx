@@ -1,6 +1,6 @@
 // Shared UI primitives for the B2C AI-Powered MIS page. Mirrors the B2B
 // primitives but with the rounded, soft-shadowed card surface of the main app.
-// Style only — no behaviour.
+// Style only - no behaviour.
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material';
@@ -26,7 +26,7 @@ export const SectionTitle: React.FC<{ children: React.ReactNode; sx?: Sx }> = ({
   <Typography sx={{ ...type.sectionTitle, color: colors.ink, ...sx }}>{children}</Typography>
 );
 
-// Uppercase channel name label — never a coloured dot.
+// Uppercase channel name label - never a coloured dot.
 export const ChannelTag: React.FC<{ name: string }> = ({ name }) => (
   <Box component="span" sx={{ ...type.label, color: colors.grey500 }}>
     {name}

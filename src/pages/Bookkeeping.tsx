@@ -39,7 +39,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface Settlement {
   id: string;
   period: string;
-  provider: 'Shopify' | 'Amazon' | 'Flipkart' | 'Myntra' | 'Website' | 'Other';
+  provider: 'Shopify' | 'Amazon' | 'Myntra' | 'Myntra' | 'Website' | 'Other';
   grossAmount: number;
   deductions: number; 
   taxWithheld: number;
@@ -80,14 +80,14 @@ const Bookkeeping: React.FC = () => {
   const [reportsAnchorEl, setReportsAnchorEl] = useState<null | HTMLElement>(null);
 
   const mockSettlements: Settlement[] = [
-    { id: 'SET-FK-25-01', period: 'Jan 15 - Jan 21, 2025', provider: 'Flipkart', grossAmount: 845000, deductions: 126750, taxWithheld: 16900, netSettlement: 701350, status: 'synced', zohoId: 'ZOHO-1022', paymentDate: '2025-01-22' },
+    { id: 'SET-FK-25-01', period: 'Jan 15 - Jan 21, 2025', provider: 'Myntra', grossAmount: 845000, deductions: 126750, taxWithheld: 16900, netSettlement: 701350, status: 'synced', zohoId: 'ZOHO-1022', paymentDate: '2025-01-22' },
     { id: 'SET-AMZ-25-01', period: 'Jan 14 - Jan 20, 2025', provider: 'Amazon', grossAmount: 1240000, deductions: 248000, taxWithheld: 24800, netSettlement: 967200, status: 'synced', zohoId: 'ZOHO-1023', paymentDate: '2025-01-21' },
     { id: 'SET-SH-25-01', period: 'Jan 10 - Jan 17, 2025', provider: 'Shopify', grossAmount: 450000, deductions: 13500, taxWithheld: 9000, netSettlement: 427500, status: 'pending', zohoId: null, paymentDate: '2025-01-18' },
-    { id: 'SET-FK-25-02', period: 'Jan 08 - Jan 14, 2025', provider: 'Flipkart', grossAmount: 670000, deductions: 100500, taxWithheld: 13400, netSettlement: 556100, status: 'synced', zohoId: 'ZOHO-1018', paymentDate: '2025-01-15' },
+    { id: 'SET-FK-25-02', period: 'Jan 08 - Jan 14, 2025', provider: 'Myntra', grossAmount: 670000, deductions: 100500, taxWithheld: 13400, netSettlement: 556100, status: 'synced', zohoId: 'ZOHO-1018', paymentDate: '2025-01-15' },
     { id: 'SET-AMZ-25-02', period: 'Jan 07 - Jan 13, 2025', provider: 'Amazon', grossAmount: 1100000, deductions: 220000, taxWithheld: 22000, netSettlement: 858000, status: 'synced', zohoId: 'ZOHO-1017', paymentDate: '2025-01-14' },
     { id: 'SET-MYN-25-01', period: 'Jan 01 - Jan 10, 2025', provider: 'Myntra', grossAmount: 520000, deductions: 78000, taxWithheld: 10400, netSettlement: 431600, status: 'error', zohoId: null, paymentDate: '2025-01-12' },
     { id: 'SET-SH-25-02', period: 'Jan 01 - Jan 09, 2025', provider: 'Shopify', grossAmount: 380000, deductions: 11400, taxWithheld: 7600, netSettlement: 361000, status: 'synced', zohoId: 'ZOHO-1011', paymentDate: '2025-01-10' },
-    { id: 'SET-FK-25-03', period: 'Jan 01 - Jan 07, 2025', provider: 'Flipkart', grossAmount: 920000, deductions: 138000, taxWithheld: 18400, netSettlement: 763600, status: 'synced', zohoId: 'ZOHO-1008', paymentDate: '2025-01-08' },
+    { id: 'SET-FK-25-03', period: 'Jan 01 - Jan 07, 2025', provider: 'Myntra', grossAmount: 920000, deductions: 138000, taxWithheld: 18400, netSettlement: 763600, status: 'synced', zohoId: 'ZOHO-1008', paymentDate: '2025-01-08' },
     { id: 'SET-AMZ-25-03', period: 'Dec 24 - Dec 31, 2024', provider: 'Amazon', grossAmount: 1450000, deductions: 290000, taxWithheld: 29000, netSettlement: 1131000, status: 'synced', zohoId: 'ZOHO-0988', paymentDate: '2025-01-01' },
     { id: 'SET-MYN-25-02', period: 'Dec 20 - Dec 31, 2024', provider: 'Myntra', grossAmount: 410000, deductions: 61500, taxWithheld: 8200, netSettlement: 340300, status: 'synced', zohoId: 'ZOHO-0985', paymentDate: '2025-01-01' }
   ];
@@ -280,7 +280,7 @@ const Bookkeeping: React.FC = () => {
             <Grid item xs={12}><TextField fullWidth label="Period" size="small" /></Grid>
             <Grid item xs={12}>
               <FormControl fullWidth size="small"><InputLabel>Provider</InputLabel>
-                <Select label="Provider"><MenuItem value="Shopify">Shopify</MenuItem><MenuItem value="Amazon">Amazon</MenuItem><MenuItem value="Flipkart">Flipkart</MenuItem></Select>
+                <Select label="Provider"><MenuItem value="Shopify">Shopify</MenuItem><MenuItem value="Amazon">Amazon</MenuItem><MenuItem value="Myntra">Myntra</MenuItem></Select>
               </FormControl>
             </Grid>
             <Grid item xs={6}><TextField fullWidth label="Gross" type="number" size="small" /></Grid>

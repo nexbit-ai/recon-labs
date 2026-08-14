@@ -1,4 +1,4 @@
-// AP Ingest — document intake screen.
+// AP Ingest - document intake screen.
 // Mirrors /b2b/upload exactly: drag-and-drop zone + email forwarding card,
 // today's processing counts, recently received feed.
 // AP-specific doc types: PO, GRN, Invoice, Credit Note, Ledger.
@@ -68,7 +68,7 @@ const RECEIVED_FILES: ReceivedFile[] = [
     confidence: 97,
     amount: '₹2,30,400',
     status: 'Exception',
-    note: 'GST rate mismatch detected — 28% vs 18% applicable',
+    note: 'GST rate mismatch detected - 28% vs 18% applicable',
     supplier: 'Infosys BPO Services',
     tags: ['INV-7824', 'PO-2024-003'],
   },
@@ -80,7 +80,7 @@ const RECEIVED_FILES: ReceivedFile[] = [
     confidence: 62,
     amount: '₹6,84,000',
     status: 'Needs review',
-    note: 'Scan quality low — short GRN qty partially unreadable',
+    note: 'Scan quality low - short GRN qty partially unreadable',
     supplier: 'Shree Cements Ltd',
     tags: ['GRN-002', 'PO-2024-002'],
   },
@@ -472,7 +472,7 @@ const APIngest: React.FC = () => {
                   flexShrink: 0,
                   ...type.body,
                   fontWeight: 600,
-                  color: file.amount === '—' ? colors.grey500 : colors.ink,
+                  color: file.amount === '-' ? colors.grey500 : colors.ink,
                   ...tabularNums,
                 }}
               >

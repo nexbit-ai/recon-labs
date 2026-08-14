@@ -1,4 +1,4 @@
-// Suppliers — Vendor master and transaction history.
+// Suppliers - Vendor master and transaction history.
 import React, { useState } from 'react';
 import { Box, Typography, Button, Tabs, Tab } from '@mui/material';
 import { motion, useReducedMotion } from 'framer-motion';

@@ -1,4 +1,4 @@
-// Generic section placeholder — renders only the page title. Kept as the router
+// Generic section placeholder - renders only the page title. Kept as the router
 // fallback; all six sections now have real views.
 import React from 'react';
 import { Box, Typography } from '@mui/material';

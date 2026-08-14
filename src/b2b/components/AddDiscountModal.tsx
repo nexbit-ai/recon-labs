@@ -1,4 +1,4 @@
-// Add-secondary-discount modal — frontend-only. A real working form: pick SKUs,
+// Add-secondary-discount modal - frontend-only. A real working form: pick SKUs,
 // discount type + value, brand-funded split, and date window, then it builds a
 // SecondaryDiscount and hands it back to the Contracts view (local state). No
 // API. Monochrome + one accent (#7A5DBF): accent on the header tile, selected
@@ -362,7 +362,7 @@ const AddDiscountModal: React.FC<Props> = ({ open, channel, onClose, onAdd }) =>
                   {formatRupees(impact.brandFunded)}
                 </Typography>
                 <Typography sx={{ fontSize: 13, color: colors.grey700, mt: `${space.xs}px` }}>
-                  brand-funded slice of a {formatRupees(impact.gross)} markdown — so this deduction reconciles
+                  brand-funded slice of a {formatRupees(impact.gross)} markdown - so this deduction reconciles
                   instead of flagging as variance.
                 </Typography>
               </Box>

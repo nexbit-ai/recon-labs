@@ -1,46 +1,50 @@
 // Canonical headline numbers, per-channel performance, flagged leakage, and
-// reconciliation line items. Every figure here cross-foots — see assertions at
-// the bottom of mock/index.ts. Amounts in whole rupees unless noted.
+// reconciliation line items for the Cosmix demo. Every figure here cross-foots.
+// Scenario: ₹1 Crore expected from B2B channels on 10 August, ₹90L received.
+// Amounts in whole rupees unless noted.
 import type {
   HeadlineMetric,
   ChannelPerformance,
   FlaggedIssue,
   ReconLineItem,
+  ReconPurchaseOrder,
+  ReconStatus,
+  ThreeWayMatch,
 } from './types';
 
 // ── HEADLINE METRICS (the single source of truth for all later views) ───────
+// Core scenario: Expected ₹1.00 Cr, Received ₹90.00L, Gap ₹10.00L
 export const headline: HeadlineMetric[] = [
-  { key: 'settled', label: 'Settled this quarter', value: 2_90_00_000, display: '₹2.90 Cr', unit: 'inr' },
-  { key: 'leakage', label: 'Leakage detected (Q1)', value: 10_60_000, display: '₹10.6L', unit: 'inr' },
-  // Receivable = what all 5 portals owed you this quarter = settled + leakage.
-  // Received = the settled portion; the gap is the leakage.
-  { key: 'receivable', label: 'Receivable this quarter', value: 3_00_60_000, display: '₹3.01 Cr', unit: 'inr' },
-  { key: 'recoverable', label: 'Recoverable now', value: 6_20_000, display: '₹6.20L', unit: 'inr' },
-  { key: 'expiring', label: 'Recoverable expiring within ~10 days', value: 1_40_000, display: '₹1.40L', unit: 'inr' },
-  { key: 'recoveredYtd', label: 'Recovered YTD', value: 7_80_000, display: '₹7.80L', unit: 'inr' },
-  { key: 'netRealisation', label: 'True net realisation', value: 76.4, display: '76.4%', unit: 'percent' },
+  { key: 'receivable', label: 'Total Receivables Due', value: 1_00_00_000, display: '₹1.00 Cr', unit: 'inr' },
+  { key: 'settled', label: 'Total Received', value: 90_00_000, display: '₹90.00L', unit: 'inr' },
+  { key: 'leakage', label: 'Shortfall / Gap', value: 10_00_000, display: '₹10.00L', unit: 'inr' },
+  { key: 'recoverable', label: 'Recoverable now', value: 6_80_000, display: '₹6.80L', unit: 'inr' },
+  { key: 'expiring', label: 'Recoverable expiring within ~10 days', value: 1_50_000, display: '₹1.50L', unit: 'inr' },
+  { key: 'recoveredYtd', label: 'Recovered YTD', value: 8_40_000, display: '₹8.40L', unit: 'inr' },
+  { key: 'netRealisation', label: 'True net realisation', value: 78.2, display: '78.2%', unit: 'percent' },
+  { key: 'underDispute', label: 'Under dispute', value: 3_20_000, display: '₹3.20L', unit: 'inr' },
 ];
 
 // Reference for views: the assumption brand planned against, vs reality.
-export const netRealisationAssumptionPct = 80;
+export const netRealisationAssumptionPct = 82;
 
-// Claims won that make up Recovered YTD (₹7.80L), shown as a caption.
-export const recoveredYtdClaimsWon = 82;
+// Claims won that make up Recovered YTD (₹8.40L), shown as a caption.
+export const recoveredYtdClaimsWon = 94;
 
 // Total open issues detected this quarter; the feed surfaces the top few by value.
-export const flaggedIssuesTotal = 24;
+export const flaggedIssuesTotal = 18;
 
 export const headlineByKey = (key: string): HeadlineMetric =>
   headline.find((m) => m.key === key)!;
 
 // ── PER-CHANNEL PERFORMANCE (sums to the headline totals) ───────────────────
-// settled Σ = ₹2.90 Cr · leakage Σ = ₹10.6L · recoverable Σ = ₹6.20L
+// settled Σ = ₹90.00L · leakage Σ = ₹10.00L · recoverable Σ = ₹6.80L
+// receivable per channel = settled + leakage → Σ = ₹1.00 Cr
 export const channelPerformance: ChannelPerformance[] = [
-  { channel: 'Blinkit', settled: 95_00_000, leakage: 3_50_000, netRealisationPct: 74, recoverable: 2_20_000 },
-  { channel: 'Zepto', settled: 85_00_000, leakage: 3_00_000, netRealisationPct: 75, recoverable: 2_00_000 },
-  { channel: 'Instamart', settled: 75_00_000, leakage: 2_50_000, netRealisationPct: 77, recoverable: 1_20_000 },
-  { channel: 'Amazon', settled: 25_00_000, leakage: 1_00_000, netRealisationPct: 72, recoverable: 50_000 },
-  { channel: 'Offline Stores', settled: 10_00_000, leakage: 60_000, netRealisationPct: 84, recoverable: 30_000 },
+  { channel: 'Blinkit',            settled: 32_00_000, leakage: 3_80_000, netRealisationPct: 76.5, recoverable: 2_40_000 },
+  { channel: 'Zepto',              settled: 28_00_000, leakage: 3_20_000, netRealisationPct: 77.8, recoverable: 2_10_000 },
+  { channel: 'Reliance',           settled: 18_00_000, leakage: 1_80_000, netRealisationPct: 80.1, recoverable: 1_30_000 },
+  { channel: 'Cafes – Bangalore',  settled: 12_00_000, leakage: 1_20_000, netRealisationPct: 79.6, recoverable: 1_00_000 },
 ];
 
 // ── RECEIVED vs RECEIVABLE, per portal ──────────────────────────────────────
@@ -55,52 +59,77 @@ export const totalReceivable = channelPerformance.reduce((t, c) => t + c.settled
 export const totalReceived = channelPerformance.reduce((t, c) => t + c.settled, 0);
 export const pctReceivedOverall = (totalReceived / totalReceivable) * 100;
 
-// ── FLAGGED ISSUES (the five canonical exceptions) ──────────────────────────
+// ── FLAGGED ISSUES (the canonical exceptions - Cosmix-specific) ─────────────
 export const flaggedIssues: FlaggedIssue[] = [
   {
     id: 'OR-001',
     channel: 'Blinkit',
-    title: 'PO-2026-BL-940',
-    detail: 'Invoice INV-8822 generated for 2,400 units of Mechanical Keyboard. Payment overdue by 4 days.',
-    amount: 3_12_400,
-    type: 'Overdue',
+    title: 'PO-BLK-2026-0847',
+    detail: 'GRN accepted for 500 units of Plant Protein but 42 units deducted via Debit Note DN-0847 for damages not reported at warehouse. ₹7,560 deducted.',
+    amount: 1_52_000,
+    type: 'Debit note – damages',
     confidence: 'High',
+    poNumber: 'PO-BLK-2026-0847',
   },
   {
     id: 'OR-002',
-    channel: 'Instamart',
-    title: 'PO-2026-IM-112',
-    detail: 'GRN accepted for Wireless Mouse. Settlement window open until Jun 28.',
-    amount: 1_85_200,
-    type: 'Pending',
+    channel: 'Zepto',
+    title: 'PO-ZEP-2026-0391',
+    detail: 'Visibility fee (₹18,400) deducted twice in settlement STL-ZEP-0391 for the same campaign period. Duplicate charge confirmed against rate card.',
+    amount: 1_84_000,
+    type: 'Visibility fee duplicate',
     confidence: 'High',
+    poNumber: 'PO-ZEP-2026-0391',
   },
   {
     id: 'OR-003',
-    channel: 'Zepto',
-    title: 'PO-2026-ZP-445',
-    detail: 'Partial payment received for Dual Monitor Arm. Short by ₹41,200 pending reconciliation.',
-    amount: 41_200,
-    type: 'Partial Pay',
+    channel: 'Reliance',
+    title: 'PO-REL-2026-0112',
+    detail: 'Invoice INV-REL-0112 for ₹2.4L submitted on 28 Jul. Payment due 10 Aug per 45-day credit terms. Settlement not received.',
+    amount: 2_40_000,
+    type: 'Settlement pending',
     confidence: 'High',
+    poNumber: 'PO-REL-2026-0112',
   },
   {
     id: 'OR-004',
-    channel: 'Amazon',
-    title: 'PO-2026-AMZ-092',
-    detail: 'FBA inventory received. Awaiting payout cycle on Jul 1.',
-    amount: 1_32_000,
-    type: 'Pending',
-    confidence: 'High',
+    channel: 'Cafes – Bangalore',
+    title: 'Cafe batch - 8 accounts',
+    detail: '8 cafe accounts have overdue invoices totalling ₹1.2L. Oldest overdue: Third Wave Coffee (32 days). Inconsistent email confirmations.',
+    amount: 1_20_000,
+    type: 'Overdue',
+    confidence: 'Med',
+    poNumber: 'ORD-TWC-2026-Jul',
   },
   {
     id: 'OR-005',
-    channel: 'Offline Stores',
-    title: 'PO-2026-OS-554',
-    detail: 'Croma Retail PO fulfilled. 45-day credit term active.',
-    amount: 2_18_500,
-    type: 'In Term',
+    channel: 'Blinkit',
+    title: 'PO-BLK-2026-0923',
+    detail: 'GRN pending for 120 units of Collagen Boost dispatched on 3 Aug. Warehouse has not confirmed acceptance. Invoice INV-BLK-0923 on hold.',
+    amount: 96_000,
+    type: 'Pending GRN',
     confidence: 'High',
+    poNumber: 'PO-BLK-2026-0923',
+  },
+  {
+    id: 'OR-006',
+    channel: 'Zepto',
+    title: 'PO-ZEP-2026-0445',
+    detail: 'Short payment of ₹41,200 on settlement STL-ZEP-0445. 38 units of Energy Blend deducted as returns but RTO claim already processed.',
+    amount: 41_200,
+    type: 'Short payment',
+    confidence: 'High',
+    poNumber: 'PO-ZEP-2026-0445',
+  },
+  {
+    id: 'OR-007',
+    channel: 'Reliance',
+    title: 'PO-REL-2026-0087',
+    detail: 'Invoice INV-REL-0087 for Immunity Mix not found in Reliance portal. PO exists, GRN accepted. Invoice needs to be re-uploaded.',
+    amount: 68_000,
+    type: 'Invoice missing',
+    confidence: 'High',
+    poNumber: 'PO-REL-2026-0087',
   },
 ];
 
@@ -112,324 +141,518 @@ export interface MarketingSpend {
 }
 
 export const marketingSpends: Record<string, MarketingSpend> = {
-  all: { performanceAds: 1250000, tradePromos: 840000, roas: 4.2 },
-  blinkit: { performanceAds: 450000, tradePromos: 320000, roas: 3.8 },
-  zepto: { performanceAds: 380000, tradePromos: 250000, roas: 4.5 },
-  instamart: { performanceAds: 320000, tradePromos: 210000, roas: 4.1 },
-  amazon: { performanceAds: 100000, tradePromos: 60000, roas: 5.2 },
-  entitya: { performanceAds: 250000, tradePromos: 150000, roas: 3.9 },
-  entityb: { performanceAds: 120000, tradePromos: 80000, roas: 4.8 },
-  offlinestores: { performanceAds: 0, tradePromos: 50000, roas: 0 }, // offline stores mostly just trade promos
+  all:                { performanceAds: 980000, tradePromos: 620000, roas: 3.8 },
+  blinkit:            { performanceAds: 380000, tradePromos: 240000, roas: 3.5 },
+  zepto:              { performanceAds: 320000, tradePromos: 200000, roas: 4.1 },
+  reliance:           { performanceAds: 180000, tradePromos: 120000, roas: 3.9 },
+  'cafes–bangalore':  { performanceAds: 100000, tradePromos: 60000, roas: 4.2 },
 };
 
+// ── UPCOMING EXPECTED PAYOUTS ───────────────────────────────────────────────
+export interface UpcomingPayout {
+  channel: string;
+  date: string;
+  amount: number;
+  status: 'Expected' | 'Overdue' | 'Partial';
+}
+
+export const upcomingPayouts: UpcomingPayout[] = [
+  { channel: 'Zepto', date: '12 Aug 2026', amount: 4_20_000, status: 'Expected' },
+  { channel: 'Blinkit', date: '14 Aug 2026', amount: 5_60_000, status: 'Expected' },
+  { channel: 'Reliance', date: '15 Aug 2026', amount: 2_40_000, status: 'Overdue' },
+  { channel: 'Cafes – Bangalore', date: '16 Aug 2026', amount: 1_80_000, status: 'Partial' },
+];
+
 // ── RECONCILIATION LINE ITEMS ───────────────────────────────────────────────
+// Each line item has full 3-way matching (PO ↔ GRN ↔ Invoice) and operationally
+// detailed variance breakdowns. SKUs are Cosmix products. Issue types are
+// Cosmix-specific (pending GRN, debit note damages, visibility fee duplicate, etc.)
+
+const mkThreeWay = (
+  po: { ref: string; status: 'Matched' | 'Pending' | 'Missing' | 'Disputed'; amount: number },
+  grn: { ref: string; status: 'Matched' | 'Pending' | 'Missing' | 'Disputed'; amount: number; unitsAccepted: number; unitsOrdered: number },
+  inv: { ref: string; status: 'Matched' | 'Pending' | 'Missing' | 'Disputed'; amount: number },
+): ThreeWayMatch => ({ po, grn, invoice: inv });
+
 export const reconLineItems: ReconLineItem[] = [
+  // ── Blinkit: Debit note for damages (flagged) ──
   {
-    id: 'RC-2291',
-    channel: 'Instamart',
-    skuId: 'TECH-MOU',
-    skuLabel: 'TECH-MOU · Wireless Mouse',
-    ref: 'GRN-IM-2291',
-    expected: 5_46_000,
-    paid: 2_60_800,
-    variance: 2_85_200,
-    status: 'Unpaid',
-    matchNote:
-      'Composite-key match (SKU + GRN qty + cycle). Goods accepted on the GRN but no settlement line was raised — flagged as unpaid.',
-    varianceBreakdown: [
-      { label: 'Quantity variance', amount: -2_72_800, why: '1,240 units accepted on GRN, never settled (likely QC rejection)' },
-      { label: 'Deduction variance', amount: -9_600, why: 'Handling deduction applied to units that were never paid' },
-      { label: 'Tax / TCS variance', amount: -2_800, why: 'TCS not credited on the unsettled invoice value' },
-    ],
-  },
-  {
-    id: 'RC-8841',
-    channel: 'Amazon',
-    skuId: 'TECH-SPK',
-    skuLabel: 'TECH-SPK · Bluetooth Speakers',
-    ref: 'STL-AMZ-8841',
-    expected: 7_18_000,
-    paid: 5_76_000,
-    variance: 1_42_000,
-    status: 'Over-deducted',
-    matchNote:
-      'Exact reference match on STL-AMZ-8841. FBA fee reconciled to weight band — billed band (2kg) ≠ catalog weight (1kg).',
-    varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'All 980 units reconciled — no quantity gap' },
-      { label: 'Deduction variance', amount: -1_35_200, why: '980 units billed at the 2kg FBA band vs contracted 1kg band' },
-      { label: 'Tax / TCS variance', amount: -6_800, why: 'GST charged on the excess weight-band fee' },
-    ],
-  },
-  {
-    id: 'RC-7732',
+    id: 'RC-0847',
     channel: 'Blinkit',
-    skuId: 'TECH-KBD',
-    skuLabel: 'TECH-KBD · Mechanical Keyboard',
-    ref: 'STL-BLK-7732',
-    expected: 4_12_000,
-    paid: 3_28_600,
-    variance: 83_400,
+    skuId: 'COS-PRO',
+    skuLabel: 'COS-PRO · Plant Protein - 250g',
+    poNumber: 'PO-BLK-2026-0847',
+    invoiceNumber: 'INV-BLK-0847',
+    grn: 'GRN-BLK-0847',
+    grnStatus: 'Accepted',
+    salePeriod: '1–7 Aug 2026',
+    expectedPayoutDate: '10 Aug 2026',
+    expected: 4_50_000,
+    paid: 2_98_000,
+    variance: 1_52_000,
     status: 'Over-deducted',
-    matchNote:
-      "Exact reference match on STL-BLK-7732. An extra deduction line — 'Storage Fee v2' — has no counterpart in the signed rate card.",
+    issueType: 'Debit note – damages',
+    matchNote: 'Exact reference match on STL-BLK-0847. Debit note DN-0847 deducted ₹7,560 for damages not reported in GRN acceptance.',
     varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Units reconciled exactly against the cycle' },
-      { label: 'Deduction variance', amount: -78_200, why: "'Transit Damage Fee' applied to 38 SKUs with no rate-card basis" },
-      { label: 'Tax / TCS variance', amount: -5_200, why: 'GST charged on the unauthorised storage fee' },
+      { label: 'Debit note – transit damages', amount: -1_42_400, why: 'DN-0847 raised for 42 units of Plant Protein at ₹180/unit. Damage report absent from GRN; brand disputes claim' },
+      { label: 'Shelf placement fee', amount: -6_800, why: 'Dark store placement fee at 1.5% vs contracted 1.0% - ₹6,800 excess on ₹4.5L GMV' },
+      { label: 'TCS variance', amount: -2_800, why: 'TCS calculated on gross before debit note adjustment' },
     ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'PO-BLK-2026-0847', status: 'Matched', amount: 4_50_000 },
+      { ref: 'GRN-BLK-0847', status: 'Matched', amount: 4_50_000, unitsAccepted: 500, unitsOrdered: 500 },
+      { ref: 'INV-BLK-0847', status: 'Matched', amount: 4_50_000 },
+    ),
+    nextAction: 'Dispute DN-0847 - request damage evidence photos from Blinkit warehouse. GRN accepted full 500 units with no damage flag.',
   },
+  // ── Zepto: Visibility fee deducted twice (flagged) ──
   {
-    id: 'RC-5519',
-    channel: 'Offline Stores',
-    skuId: 'TECH-ARM',
-    skuLabel: 'TECH-ARM · Dual Monitor Arm',
-    ref: 'STL-NB-5519',
-    expected: 3_61_500,
-    paid: 2_97_000,
-    variance: 64_500,
-    status: 'Rate variance',
-    matchNote:
-      'Exact reference match on STL-NB-5519. Margin recomputed at the contracted 18% — settlement applied 22%.',
-    varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Order quantities reconciled exactly' },
-      { label: 'Deduction variance', amount: -58_600, why: 'Margin charged at 22% vs 18% contracted' },
-      { label: 'Tax / TCS variance', amount: -5_900, why: 'GST charged on the excess margin' },
-    ],
-  },
-  {
-    id: 'RC-4410',
+    id: 'RC-0391',
     channel: 'Zepto',
-    skuId: 'TECH-HUB',
-    skuLabel: 'TECH-HUB · USB-C Docking Station',
-    ref: 'STL-ZEP-4410',
+    skuId: 'COS-COL',
+    skuLabel: 'COS-COL · Collagen Boost - 200g',
+    poNumber: 'PO-ZEP-2026-0391',
+    invoiceNumber: 'INV-ZEP-0391',
+    grn: 'GRN-ZEP-0391',
+    grnStatus: 'Accepted',
+    salePeriod: '1–7 Aug 2026',
+    expectedPayoutDate: '10 Aug 2026',
+    expected: 3_80_000,
+    paid: 1_96_000,
+    variance: 1_84_000,
+    status: 'Over-deducted',
+    issueType: 'Visibility fee duplicate',
+    matchNote: 'FIFO match across W31 cycles. Visibility fee line VIS-ZEP-0391 appears twice for the same campaign period - confirmed duplicate deduction.',
+    varianceBreakdown: [
+      { label: 'Visibility fee (duplicate)', amount: -1_72_600, why: 'Visibility / ad-recovery fee ₹18,400 deducted twice in settlement STL-ZEP-0391 for campaign "Aug Launch Push"' },
+      { label: 'Platform support fee excess', amount: -7_200, why: 'Platform support billed at 3.5% vs contracted 2% on ₹3.8L GMV' },
+      { label: 'TCS variance', amount: -4_200, why: 'TCS on the duplicate visibility fee amount' },
+    ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'PO-ZEP-2026-0391', status: 'Matched', amount: 3_80_000 },
+      { ref: 'GRN-ZEP-0391', status: 'Matched', amount: 3_80_000, unitsAccepted: 420, unitsOrdered: 420 },
+      { ref: 'INV-ZEP-0391', status: 'Matched', amount: 3_80_000 },
+    ),
+    nextAction: 'File duplicate deduction dispute with Zepto ops - attach settlement sheet showing VIS-ZEP-0391 appearing on lines 14 and 28 for identical campaign.',
+  },
+  // ── Blinkit: Pending GRN (flagged) ──
+  {
+    id: 'RC-0923',
+    channel: 'Blinkit',
+    skuId: 'COS-COL',
+    skuLabel: 'COS-COL · Collagen Boost - 200g',
+    poNumber: 'PO-BLK-2026-0923',
+    invoiceNumber: 'INV-BLK-0923',
+    grn: 'GRN-BLK-0923',
+    grnStatus: 'Pending',
+    salePeriod: '1–7 Aug 2026',
+    expectedPayoutDate: '12 Aug 2026',
+    expected: 96_000,
+    paid: 0,
+    variance: 96_000,
+    status: 'Pending GRN',
+    issueType: 'Pending GRN',
+    matchNote: 'PO and invoice exist but GRN-BLK-0923 has not been confirmed by Blinkit warehouse. Dispatched on 3 Aug - 10 days pending.',
+    varianceBreakdown: [
+      { label: 'GRN not accepted', amount: -96_000, why: '120 units of Collagen Boost dispatched 3 Aug. Blinkit warehouse has not confirmed GRN. Settlement blocked until acceptance.' },
+      { label: 'Deduction variance', amount: 0, why: 'No deductions - settlement has not been initiated' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'No settlement to reconcile' },
+    ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'PO-BLK-2026-0923', status: 'Matched', amount: 96_000 },
+      { ref: 'GRN-BLK-0923', status: 'Pending', amount: 0, unitsAccepted: 0, unitsOrdered: 120 },
+      { ref: 'INV-BLK-0923', status: 'Pending', amount: 96_000 },
+    ),
+    nextAction: 'Follow up with Blinkit dark store ops for GRN acceptance of 120 units. Dispatch proof (AWB-BLK-0923) available.',
+  },
+  // ── Zepto: Short payment / returns double-dip (flagged) ──
+  {
+    id: 'RC-0445',
+    channel: 'Zepto',
+    skuId: 'COS-ENR',
+    skuLabel: 'COS-ENR · Energy Blend - 250g',
+    poNumber: 'PO-ZEP-2026-0445',
+    invoiceNumber: 'INV-ZEP-0445',
+    grn: 'GRN-ZEP-0445',
+    grnStatus: 'Accepted',
+    salePeriod: '1–7 Aug 2026',
+    expectedPayoutDate: '10 Aug 2026',
     expected: 2_88_000,
     paid: 2_46_800,
     variance: 41_200,
-    status: 'Disputed',
-    matchNote:
-      'FIFO match across W24 cycles. The visibility-fee line appears twice for the same campaign — duplicate deduction.',
+    status: 'Short paid',
+    issueType: 'Short payment',
+    matchNote: 'FIFO match across W31 cycles. 38 units deducted as returns but RTO claim D-0931 already credited ₹36,800 for same units - double deduction.',
     varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Units reconciled — variance is fee-side only' },
-      { label: 'Deduction variance', amount: -36_800, why: 'Visibility / ad-recovery fee deducted twice in cycle W24' },
-      { label: 'Tax / TCS variance', amount: -4_400, why: 'GST charged on the duplicate visibility fee' },
+      { label: 'Returns deduction (duplicate)', amount: -36_800, why: '38 units of Energy Blend deducted as returns. RTO claim D-0931 already processed for these units - duplicate recovery.' },
+      { label: 'Deduction variance', amount: -2_200, why: 'Handling charge on returned units already reversed in prior claim' },
+      { label: 'TCS variance', amount: -2_200, why: 'TCS on the duplicate returns deduction' },
     ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'PO-ZEP-2026-0445', status: 'Matched', amount: 2_88_000 },
+      { ref: 'GRN-ZEP-0445', status: 'Matched', amount: 2_88_000, unitsAccepted: 320, unitsOrdered: 320 },
+      { ref: 'INV-ZEP-0445', status: 'Disputed', amount: 2_88_000 },
+    ),
+    nextAction: 'Raise dispute - attach prior RTO claim D-0931 settlement confirmation showing the 38 units already credited.',
   },
+  // ── Reliance: Settlement pending - overdue (flagged) ──
   {
-    id: 'RC-9920',
-    channel: 'Amazon',
-    skuId: 'TECH-CHR',
-    skuLabel: 'TECH-CHR · Ergonomic Chair',
-    ref: 'STL-AMZ-9920',
-    expected: 6_04_000,
-    paid: 6_04_000,
-    variance: 0,
-    status: 'Matched',
-    matchNote: 'Exact reference match — GRN ↔ settlement ID, amount within ±₹1 tolerance.',
+    id: 'RC-0112',
+    channel: 'Reliance',
+    skuId: 'COS-IMM',
+    skuLabel: 'COS-IMM · Immunity Mix - 150g',
+    poNumber: 'PO-REL-2026-0112',
+    invoiceNumber: 'INV-REL-0112',
+    grn: 'GRN-REL-0112',
+    grnStatus: 'Accepted',
+    salePeriod: '15–31 Jul 2026',
+    expectedPayoutDate: '10 Aug 2026',
+    expected: 2_40_000,
+    paid: 0,
+    variance: 2_40_000,
+    status: 'Short paid',
+    issueType: 'Settlement pending',
+    matchNote: 'PO, GRN, and invoice all match. 45-day credit term expired 10 Aug. Settlement not received from Reliance - overdue.',
     varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
-      { label: 'Deduction variance', amount: 0, why: 'All deductions reconcile to the rate card' },
-      { label: 'Tax / TCS variance', amount: 0, why: 'GST and TCS credited as expected' },
+      { label: 'Settlement not received', amount: -2_40_000, why: 'Full invoice amount ₹2,40,000 pending. 45-day credit term (from 28 Jun invoice) expired on 10 Aug. No payment initiated by Reliance.' },
+      { label: 'Deduction variance', amount: 0, why: 'No settlement initiated - no deductions to reconcile' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'No settlement to reconcile' },
     ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'PO-REL-2026-0112', status: 'Matched', amount: 2_40_000 },
+      { ref: 'GRN-REL-0112', status: 'Matched', amount: 2_40_000, unitsAccepted: 400, unitsOrdered: 400 },
+      { ref: 'INV-REL-0112', status: 'Matched', amount: 2_40_000 },
+    ),
+    nextAction: 'Escalate to Reliance finance - 45-day credit term expired. Send payment reminder with invoice copy and GRN confirmation.',
   },
+  // ── Reliance: Invoice missing (flagged) ──
   {
-    id: 'RC-3301',
-    channel: 'Offline Stores',
-    skuId: 'TECH-SPK',
-    skuLabel: 'TECH-SPK · Bluetooth Speakers',
-    ref: 'STL-NB-3301',
-    expected: 3_92_000,
-    paid: 3_92_000,
-    variance: 0,
-    status: 'Matched',
-    matchNote: 'Exact reference match — settlement ID resolved on first pass, amount within ±₹1 tolerance.',
+    id: 'RC-0087',
+    channel: 'Reliance',
+    skuId: 'COS-IMM',
+    skuLabel: 'COS-IMM · Immunity Mix - 150g',
+    poNumber: 'PO-REL-2026-0087',
+    invoiceNumber: 'INV-REL-0087',
+    grn: 'GRN-REL-0087',
+    grnStatus: 'Accepted',
+    salePeriod: '1–15 Jul 2026',
+    expectedPayoutDate: '14 Aug 2026',
+    expected: 68_000,
+    paid: 0,
+    variance: 68_000,
+    status: 'Missing invoice',
+    issueType: 'Invoice missing',
+    matchNote: 'PO and GRN exist but invoice INV-REL-0087 not found in Reliance portal. Cannot initiate settlement without invoice on file.',
     varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
-      { label: 'Deduction variance', amount: 0, why: 'Margin charged at the contracted 18%' },
-      { label: 'Tax / TCS variance', amount: 0, why: 'GST and TCS credited as expected' },
+      { label: 'Invoice not on portal', amount: -68_000, why: 'Invoice INV-REL-0087 for 113 units of Immunity Mix not uploaded to Reliance Vendor Portal. GRN accepted. Payment blocked.' },
+      { label: 'Deduction variance', amount: 0, why: 'No settlement - invoice missing' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'No settlement to reconcile' },
     ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'PO-REL-2026-0087', status: 'Matched', amount: 68_000 },
+      { ref: 'GRN-REL-0087', status: 'Matched', amount: 68_000, unitsAccepted: 113, unitsOrdered: 113 },
+      { ref: 'INV-REL-0087', status: 'Missing', amount: 0 },
+    ),
+    nextAction: 'Re-upload invoice INV-REL-0087 to Reliance Vendor Portal. Attach GRN-REL-0087 confirmation as supporting document.',
   },
+  // ── Cafes – Bangalore: Overdue batch (flagged) ──
   {
-    id: 'RC-1180',
+    id: 'RC-CAF-001',
+    channel: 'Cafes – Bangalore',
+    skuId: 'COS-PRO',
+    skuLabel: 'COS-PRO · Plant Protein - 250g',
+    poNumber: 'ORD-TWC-2026-Jul',
+    invoiceNumber: 'INV-CAF-0034',
+    grn: 'DEL-CAF-0034',
+    grnStatus: 'Accepted',
+    salePeriod: '1–31 Jul 2026',
+    expectedPayoutDate: '7 Aug 2026',
+    expected: 48_000,
+    paid: 0,
+    variance: 48_000,
+    status: 'Short paid',
+    issueType: 'Overdue',
+    matchNote: 'Email-based order from Third Wave Coffee. Delivery confirmed via WhatsApp. Invoice sent via email. Payment overdue by 6 days.',
+    varianceBreakdown: [
+      { label: 'Payment overdue', amount: -48_000, why: 'Third Wave Coffee - Jul order ₹48,000 invoiced on 1 Aug, 7-day payment terms. No payment received as of 13 Aug.' },
+      { label: 'Deduction variance', amount: 0, why: 'No deductions - payment not initiated' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'No payment to reconcile' },
+    ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'ORD-TWC-2026-Jul', status: 'Matched', amount: 48_000 },
+      { ref: 'DEL-CAF-0034', status: 'Matched', amount: 48_000, unitsAccepted: 80, unitsOrdered: 80 },
+      { ref: 'INV-CAF-0034', status: 'Matched', amount: 48_000 },
+    ),
+    nextAction: 'Send 7-day payment reminder to Third Wave Coffee (finance@thirdwavecoffee.com). Attach invoice INV-CAF-0034.',
+  },
+  // ── Blinkit: Matched (clean) ──
+  {
+    id: 'RC-0810',
     channel: 'Blinkit',
-    skuId: 'TECH-KBD',
-    skuLabel: 'TECH-KBD · Mechanical Keyboard',
-    ref: 'STL-BLK-1180',
-    expected: 2_15_000,
-    paid: 2_15_000,
+    skuId: 'COS-IMM',
+    skuLabel: 'COS-IMM · Immunity Mix - 150g',
+    poNumber: 'PO-BLK-2026-0810',
+    invoiceNumber: 'INV-BLK-0810',
+    grn: 'GRN-BLK-0810',
+    grnStatus: 'Accepted',
+    salePeriod: '1–7 Aug 2026',
+    expectedPayoutDate: '10 Aug 2026',
+    expected: 3_60_000,
+    paid: 3_60_000,
     variance: 0,
     status: 'Matched',
-    matchNote: 'Composite-key match (SKU + cycle); all deduction lines reconcile to the rate card within ±₹1.',
+    matchNote: 'Exact reference match - GRN ↔ settlement ID, amount within ±₹1 tolerance. All deductions reconcile to rate card.',
     varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
-      { label: 'Deduction variance', amount: 0, why: 'Only contracted rate-card fees applied' },
+      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted (600 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'All deductions reconcile to the Blinkit rate card - commission, fulfilment, and handling fees correct' },
       { label: 'Tax / TCS variance', amount: 0, why: 'GST and TCS credited as expected' },
     ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'PO-BLK-2026-0810', status: 'Matched', amount: 3_60_000 },
+      { ref: 'GRN-BLK-0810', status: 'Matched', amount: 3_60_000, unitsAccepted: 600, unitsOrdered: 600 },
+      { ref: 'INV-BLK-0810', status: 'Matched', amount: 3_60_000 },
+    ),
   },
+  // ── Zepto: Matched (clean) ──
   {
-    id: 'RC-6627',
+    id: 'RC-0320',
     channel: 'Zepto',
-    skuId: 'TECH-ARM',
-    skuLabel: 'TECH-ARM · Dual Monitor Arm',
-    ref: 'STL-ZEP-6627',
-    expected: 4_80_000,
-    paid: 4_05_300,
-    variance: 74_700,
-    status: 'Over-deducted',
-    matchNote:
-      "Exact reference match on STL-ZEP-6627. A 'Platform Support' line was deducted at twice the contracted slab for the cycle.",
+    skuId: 'COS-SKN',
+    skuLabel: 'COS-SKN · Skin Magic - 200g',
+    poNumber: 'PO-ZEP-2026-0320',
+    invoiceNumber: 'INV-ZEP-0320',
+    grn: 'GRN-ZEP-0320',
+    grnStatus: 'Accepted',
+    salePeriod: '1–7 Aug 2026',
+    expectedPayoutDate: '10 Aug 2026',
+    expected: 2_92_000,
+    paid: 2_92_000,
+    variance: 0,
+    status: 'Matched',
+    matchNote: 'Exact reference match - settlement ID resolved on first pass, amount within ±₹1 tolerance.',
     varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Units reconciled exactly against the cycle' },
-      { label: 'Deduction variance', amount: -69_900, why: "'Platform Support' fee billed at 4% vs contracted 2%" },
-      { label: 'Tax / TCS variance', amount: -4_800, why: 'GST charged on the excess support fee' },
+      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted (365 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'All deductions reconcile to the Zepto rate card' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'GST and TCS credited as expected' },
     ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'PO-ZEP-2026-0320', status: 'Matched', amount: 2_92_000 },
+      { ref: 'GRN-ZEP-0320', status: 'Matched', amount: 2_92_000, unitsAccepted: 365, unitsOrdered: 365 },
+      { ref: 'INV-ZEP-0320', status: 'Matched', amount: 2_92_000 },
+    ),
   },
+  // ── Reliance: Matched (clean) ──
   {
-    id: 'RC-2048',
-    channel: 'Instamart',
-    skuId: 'TECH-MOU',
-    skuLabel: 'TECH-MOU · Wireless Mouse',
-    ref: 'STL-IM-2048',
-    expected: 3_36_000,
-    paid: 2_84_700,
-    variance: 51_300,
-    status: 'Rate variance',
-    matchNote:
-      'Exact reference match on STL-IM-2048. Commission recomputed at the contracted 16% — settlement applied 20%.',
+    id: 'RC-0098',
+    channel: 'Reliance',
+    skuId: 'COS-SLP',
+    skuLabel: 'COS-SLP · Sleep Easy - 100g',
+    poNumber: 'PO-REL-2026-0098',
+    invoiceNumber: 'INV-REL-0098',
+    grn: 'GRN-REL-0098',
+    grnStatus: 'Accepted',
+    salePeriod: '1–15 Jul 2026',
+    expectedPayoutDate: '10 Aug 2026',
+    expected: 1_85_000,
+    paid: 1_85_000,
+    variance: 0,
+    status: 'Matched',
+    matchNote: 'Exact reference match - Reliance vendor portal settlement reconciled. 45-day credit terms met.',
     varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Order quantities reconciled exactly' },
-      { label: 'Deduction variance', amount: -46_600, why: 'Commission charged at 20% vs 16% contracted' },
-      { label: 'Tax / TCS variance', amount: -4_700, why: 'GST charged on the excess commission' },
+      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted (370 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'Margin and listing fees at contracted rates' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'GST and TCS credited as expected' },
     ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'PO-REL-2026-0098', status: 'Matched', amount: 1_85_000 },
+      { ref: 'GRN-REL-0098', status: 'Matched', amount: 1_85_000, unitsAccepted: 370, unitsOrdered: 370 },
+      { ref: 'INV-REL-0098', status: 'Matched', amount: 1_85_000 },
+    ),
   },
+  // ── Cafes – Bangalore: Matched (clean) ──
   {
-    id: 'RC-7165',
+    id: 'RC-CAF-002',
+    channel: 'Cafes – Bangalore',
+    skuId: 'COS-ENR',
+    skuLabel: 'COS-ENR · Energy Blend - 250g',
+    poNumber: 'ORD-BT-2026-Jul',
+    invoiceNumber: 'INV-CAF-0041',
+    grn: 'DEL-CAF-0041',
+    grnStatus: 'Accepted',
+    salePeriod: '1–31 Jul 2026',
+    expectedPayoutDate: '7 Aug 2026',
+    expected: 36_000,
+    paid: 36_000,
+    variance: 0,
+    status: 'Matched',
+    matchNote: 'Email order from Blue Tokai. Payment received via NEFT on 6 Aug - 1 day early.',
+    varianceBreakdown: [
+      { label: 'Quantity variance', amount: 0, why: 'Units delivered match order (60 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'No deductions - direct supply terms' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'GST credited correctly' },
+    ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'ORD-BT-2026-Jul', status: 'Matched', amount: 36_000 },
+      { ref: 'DEL-CAF-0041', status: 'Matched', amount: 36_000, unitsAccepted: 60, unitsOrdered: 60 },
+      { ref: 'INV-CAF-0041', status: 'Matched', amount: 36_000 },
+    ),
+  },
+  // ── Blinkit: Rate variance (flagged) ──
+  {
+    id: 'RC-0876',
     channel: 'Blinkit',
-    skuId: 'TECH-CHR',
-    skuLabel: 'TECH-CHR · Ergonomic Chair',
-    ref: 'GRN-BLK-7165',
-    expected: 4_25_000,
-    paid: 1_98_400,
-    variance: 2_26_600,
-    status: 'Unpaid',
-    matchNote:
-      'Composite-key match (SKU + GRN qty + cycle). 820 units accepted on the GRN remain unsettled — partial payment only.',
-    varianceBreakdown: [
-      { label: 'Quantity variance', amount: -2_16_000, why: '820 units accepted on GRN-BLK-7165, never settled' },
-      { label: 'Deduction variance', amount: -7_800, why: 'Handling deduction applied to units that were never paid' },
-      { label: 'Tax / TCS variance', amount: -2_800, why: 'TCS not credited on the unsettled invoice value' },
-    ],
-  },
-  {
-    id: 'RC-8473',
-    channel: 'Amazon',
-    skuId: 'TECH-HUB',
-    skuLabel: 'TECH-HUB · USB-C Docking Station',
-    ref: 'STL-AMZ-8473',
-    expected: 5_52_000,
-    paid: 5_10_700,
-    variance: 41_300,
-    status: 'Disputed',
-    matchNote:
-      'FIFO match across the cycle. A returns-recovery line was charged for orders already credited under a prior RTO claim — duplicate deduction.',
-    varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Units reconciled — variance is fee-side only' },
-      { label: 'Deduction variance', amount: -37_000, why: 'Returns recovery deducted on orders already credited via RTO claim' },
-      { label: 'Tax / TCS variance', amount: -4_300, why: 'GST charged on the duplicate returns-recovery fee' },
-    ],
-  },
-  {
-    id: 'RC-3958',
-    channel: 'Blinkit',
-    skuId: 'TECH-SPK',
-    skuLabel: 'TECH-SPK · Bluetooth Speakers',
-    ref: 'STL-BLK-3958',
-    expected: 3_74_000,
-    paid: 3_15_500,
-    variance: 58_500,
+    skuId: 'COS-SKN',
+    skuLabel: 'COS-SKN · Skin Magic - 200g',
+    poNumber: 'PO-BLK-2026-0876',
+    invoiceNumber: 'INV-BLK-0876',
+    grn: 'GRN-BLK-0876',
+    grnStatus: 'Accepted',
+    salePeriod: '1–7 Aug 2026',
+    expectedPayoutDate: '10 Aug 2026',
+    expected: 2_20_000,
+    paid: 1_82_000,
+    variance: 38_000,
     status: 'Over-deducted',
-    matchNote:
-      "Exact reference match on STL-BLK-3958. A 'Dark Store Placement' charge has no counterpart in the signed rate card.",
+    issueType: 'Rate variance',
+    matchNote: 'Exact reference match on STL-BLK-0876. Commission charged at 24% vs contracted 20% - ₹8,800 excess on ₹2.2L GMV.',
     varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Units reconciled exactly against the cycle' },
-      { label: 'Deduction variance', amount: -54_100, why: "'Dark Store Placement' charge applied with no rate-card basis" },
-      { label: 'Tax / TCS variance', amount: -4_400, why: 'GST charged on the unauthorised placement charge' },
+      { label: 'Commission rate variance', amount: -34_200, why: 'Commission charged at 24% vs contracted 20% on ₹2.2L GMV. Excess = ₹8,800. Additional handling fee variance ₹25,400.' },
+      { label: 'Deduction variance', amount: -1_800, why: 'Handling fee applied at ₹6/unit vs contracted ₹4/unit on 300 units' },
+      { label: 'Tax / TCS variance', amount: -2_000, why: 'GST charged on the excess commission' },
     ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'PO-BLK-2026-0876', status: 'Matched', amount: 2_20_000 },
+      { ref: 'GRN-BLK-0876', status: 'Matched', amount: 2_20_000, unitsAccepted: 300, unitsOrdered: 300 },
+      { ref: 'INV-BLK-0876', status: 'Matched', amount: 2_20_000 },
+    ),
+    nextAction: 'File rate variance dispute - attach contract BLK-CTR-FY26 showing 20% commission clause. Excess ₹34,200 recoverable.',
   },
+  // ── Zepto: Matched (clean) ──
   {
-    id: 'RC-5006',
+    id: 'RC-0330',
     channel: 'Zepto',
-    skuId: 'TECH-MOU',
-    skuLabel: 'TECH-MOU · Wireless Mouse',
-    ref: 'STL-ZEP-5006',
-    expected: 2_68_000,
-    paid: 2_68_000,
+    skuId: 'COS-IMM',
+    skuLabel: 'COS-IMM · Immunity Mix - 150g',
+    poNumber: 'PO-ZEP-2026-0330',
+    invoiceNumber: 'INV-ZEP-0330',
+    grn: 'GRN-ZEP-0330',
+    grnStatus: 'Accepted',
+    salePeriod: '8–14 Aug 2026',
+    expectedPayoutDate: '18 Aug 2026',
+    expected: 1_25_000,
+    paid: 1_25_000,
     variance: 0,
     status: 'Matched',
-    matchNote: 'Exact reference match — settlement ID resolved on first pass, amount within ±₹1 tolerance.',
+    matchNote: 'Exact reference match - Zepto settlement reconciled successfully.',
     varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
-      { label: 'Deduction variance', amount: 0, why: 'All deductions reconcile to the rate card' },
+      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted (250 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'Platform fee at contracted 4%' },
       { label: 'Tax / TCS variance', amount: 0, why: 'GST and TCS credited as expected' },
     ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'PO-ZEP-2026-0330', status: 'Matched', amount: 1_25_000 },
+      { ref: 'GRN-ZEP-0330', status: 'Matched', amount: 1_25_000, unitsAccepted: 250, unitsOrdered: 250 },
+      { ref: 'INV-ZEP-0330', status: 'Matched', amount: 1_25_000 },
+    ),
   },
+  // ── Reliance: Matched (clean) ──
   {
-    id: 'RC-4127',
-    channel: 'Instamart',
-    skuId: 'TECH-ARM',
-    skuLabel: 'TECH-ARM · Dual Monitor Arm',
-    ref: 'STL-IM-4127',
-    expected: 3_05_000,
-    paid: 3_05_000,
+    id: 'RC-0105',
+    channel: 'Reliance',
+    skuId: 'COS-ENR',
+    skuLabel: 'COS-ENR · Energy Blend - 250g',
+    poNumber: 'PO-REL-2026-0105',
+    invoiceNumber: 'INV-REL-0105',
+    grn: 'GRN-REL-0105',
+    grnStatus: 'Accepted',
+    salePeriod: '1–15 Jul 2026',
+    expectedPayoutDate: '10 Aug 2026',
+    expected: 95_000,
+    paid: 95_000,
     variance: 0,
     status: 'Matched',
-    matchNote: 'Composite-key match (SKU + cycle); all deduction lines reconcile to the rate card within ±₹1.',
+    matchNote: 'Reference matched on portal. Margins applied correctly based on trade agreement.',
     varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
-      { label: 'Deduction variance', amount: 0, why: 'Only contracted rate-card fees applied' },
-      { label: 'Tax / TCS variance', amount: 0, why: 'GST and TCS credited as expected' },
+      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted (190 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'No rate discrepancies found' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'GST matches rate chart' },
     ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'PO-REL-2026-0105', status: 'Matched', amount: 95_000 },
+      { ref: 'GRN-REL-0105', status: 'Matched', amount: 95_000, unitsAccepted: 190, unitsOrdered: 190 },
+      { ref: 'INV-REL-0105', status: 'Matched', amount: 95_000 },
+    ),
   },
+  // ── Cafes – Bangalore: Matched (clean) ──
   {
-    id: 'RC-9314',
-    channel: 'Amazon',
-    skuId: 'TECH-KBD',
-    skuLabel: 'TECH-KBD · Mechanical Keyboard',
-    ref: 'STL-AMZ-9314',
-    expected: 4_92_000,
-    paid: 4_92_000,
+    id: 'RC-CAF-003',
+    channel: 'Cafes – Bangalore',
+    skuId: 'COS-PRO',
+    skuLabel: 'COS-PRO · Plant Protein - 250g',
+    poNumber: 'ORD-HT-2026-Aug',
+    invoiceNumber: 'INV-CAF-0050',
+    grn: 'DEL-CAF-0050',
+    grnStatus: 'Accepted',
+    salePeriod: '1–10 Aug 2026',
+    expectedPayoutDate: '15 Aug 2026',
+    expected: 54_000,
+    paid: 54_000,
     variance: 0,
     status: 'Matched',
-    matchNote: 'Exact reference match — GRN ↔ settlement ID, amount within ±₹1 tolerance.',
+    matchNote: 'Payment via UPI reference XYZ123 matched against invoice INV-CAF-0050.',
     varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
-      { label: 'Deduction variance', amount: 0, why: 'FBA fee reconciled to the correct weight band' },
-      { label: 'Tax / TCS variance', amount: 0, why: 'GST and TCS credited as expected' },
+      { label: 'Quantity variance', amount: 0, why: 'Units delivered match order (90 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'Zero deductions' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'Tax component correctly settled' },
     ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'ORD-HT-2026-Aug', status: 'Matched', amount: 54_000 },
+      { ref: 'DEL-CAF-0050', status: 'Matched', amount: 54_000, unitsAccepted: 90, unitsOrdered: 90 },
+      { ref: 'INV-CAF-0050', status: 'Matched', amount: 54_000 },
+    ),
   },
+  // ── Blinkit: Matched (clean) ──
   {
-    id: 'RC-2570',
+    id: 'RC-0880',
     channel: 'Blinkit',
-    skuId: 'TECH-HUB',
-    skuLabel: 'TECH-HUB · USB-C Docking Station',
-    ref: 'STL-BLK-2570',
-    expected: 1_88_000,
-    paid: 1_88_000,
+    skuId: 'COS-SLP',
+    skuLabel: 'COS-SLP · Sleep Easy - 100g',
+    poNumber: 'PO-BLK-2026-0880',
+    invoiceNumber: 'INV-BLK-0880',
+    grn: 'GRN-BLK-0880',
+    grnStatus: 'Accepted',
+    salePeriod: '1–7 Aug 2026',
+    expectedPayoutDate: '10 Aug 2026',
+    expected: 1_60_000,
+    paid: 1_60_000,
     variance: 0,
     status: 'Matched',
-    matchNote: 'Composite-key match (SKU + cycle); all deduction lines reconcile to the rate card within ±₹1.',
+    matchNote: 'Clean settlement. Deductions align with Blinkit commission terms.',
     varianceBreakdown: [
-      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
-      { label: 'Deduction variance', amount: 0, why: 'Only contracted rate-card fees applied' },
-      { label: 'Tax / TCS variance', amount: 0, why: 'GST and TCS credited as expected' },
+      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted (320 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'Commission charged at contracted 20%' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'GST matches invoice' },
     ],
+    threeWayMatch: mkThreeWay(
+      { ref: 'PO-BLK-2026-0880', status: 'Matched', amount: 1_60_000 },
+      { ref: 'GRN-BLK-0880', status: 'Matched', amount: 1_60_000, unitsAccepted: 320, unitsOrdered: 320 },
+      { ref: 'INV-BLK-0880', status: 'Matched', amount: 1_60_000 },
+    ),
   },
 ];
 
-import { type ReconPurchaseOrder, type ReconStatus } from './types';
-
+// ── PURCHASE ORDERS (grouped from line items) ───────────────────────────────
 export const reconPurchaseOrders: ReconPurchaseOrder[] = (() => {
-  const basePOs = (['Instamart', 'Blinkit', 'Amazon', 'Offline Stores', 'Zepto'] as const).map((channel, idx) => {
-    const items = reconLineItems.filter((li) => li.channel === channel);
+  const grouped: Record<string, ReconLineItem[]> = {};
+  for (const item of reconLineItems) {
+    if (!grouped[item.poNumber]) {
+      grouped[item.poNumber] = [];
+    }
+    grouped[item.poNumber].push(item);
+  }
+
+  return Object.entries(grouped).map(([poNumber, items]) => {
+    const channel = items[0].channel;
     const expected = items.reduce((t, li) => t + li.expected, 0);
     const paid = items.reduce((t, li) => t + li.paid, 0);
     const variance = expected - paid;
@@ -437,13 +660,13 @@ export const reconPurchaseOrders: ReconPurchaseOrder[] = (() => {
     let status: ReconStatus = 'Matched';
     if (variance > 0) {
       const errorStatuses = items.map((li) => li.status).filter((s) => s !== 'Matched');
-      status = (errorStatuses.length > 0 ? errorStatuses[0] : 'Unpaid') as ReconStatus;
+      status = (errorStatuses.length > 0 ? errorStatuses[0] : 'Short paid') as ReconStatus;
     }
 
     return {
-      id: `PO-${channel.substring(0, 3).toUpperCase()}-90${idx + 1}`,
+      id: poNumber,
       channel,
-      date: 'W24 · Jun 2024',
+      date: items[0].salePeriod,
       expected,
       paid,
       variance,
@@ -451,10 +674,4 @@ export const reconPurchaseOrders: ReconPurchaseOrder[] = (() => {
       lineItems: items,
     };
   });
-
-  return [
-    ...basePOs,
-    ...basePOs.map((po, idx) => ({ ...po, id: `PO-${po.channel.substring(0, 3).toUpperCase()}-91${idx + 1}`, date: 'W23 · Jun 2024' })),
-    ...basePOs.map((po, idx) => ({ ...po, id: `PO-${po.channel.substring(0, 3).toUpperCase()}-92${idx + 1}`, date: 'W22 · May 2024' }))
-  ];
 })();
