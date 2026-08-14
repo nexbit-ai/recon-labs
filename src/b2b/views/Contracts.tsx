@@ -11,7 +11,7 @@
 // glyph, never colour. Square corners, hairline borders, tabular figures.
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Button } from '@mui/material';
+import { Box, Typography, Button, TextField } from '@mui/material';
 import {
   CheckOutlined,
   ErrorOutlineOutlined,
@@ -19,6 +19,8 @@ import {
   AddOutlined,
   LocalOfferOutlined,
   SyncOutlined,
+  EditOutlined,
+  SaveOutlined,
 } from '@mui/icons-material';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
@@ -69,7 +71,11 @@ const StatusPill: React.FC<{ status: DiscountStatus }> = ({ status }) => {
 };
 
 // ── rate-card lines (a flagged line reads wrong via weight + glyph, not colour) ─
-const RateCard: React.FC<{ lines: RateCardLine[] }> = ({ lines }) => (
+const RateCard: React.FC<{ 
+  lines: RateCardLine[];
+  isEditing?: boolean;
+  onLineChange?: (index: number, value: string) => void;
+}> = ({ lines, isEditing, onLineChange }) => (
   <Box sx={{ border: hairline }}>
     {lines.map((line, i) => (
       <Box
@@ -98,17 +104,26 @@ const RateCard: React.FC<{ lines: RateCardLine[] }> = ({ lines }) => (
             {line.note && <Typography sx={{ fontSize: 13, color: colors.grey700 }}>- {line.note}</Typography>}
           </Box>
         </Box>
-        <Typography
-          sx={{
-            flexShrink: 0,
-            fontSize: type.body.fontSize,
-            fontWeight: line.authorised ? 400 : 600,
-            color: colors.ink,
-            ...tabularNums,
-          }}
-        >
-          {line.contracted}
-        </Typography>
+        {isEditing ? (
+          <TextField
+            size="small"
+            value={line.contracted}
+            onChange={(e) => onLineChange?.(i, e.target.value)}
+            sx={{ width: 140, input: { ...tabularNums, fontSize: type.body.fontSize, textAlign: 'right', py: '6px' } }}
+          />
+        ) : (
+          <Typography
+            sx={{
+              flexShrink: 0,
+              fontSize: type.body.fontSize,
+              fontWeight: line.authorised ? 400 : 600,
+              color: colors.ink,
+              ...tabularNums,
+            }}
+          >
+            {line.contracted}
+          </Typography>
+        )}
       </Box>
     ))}
   </Box>
@@ -242,6 +257,9 @@ const ChannelPanel: React.FC<{
 }> = ({ contract, discounts, expanded, onToggle, onAddDiscount, isLast }) => {
   const navigate = useNavigate();
   const [openDiscountId, setOpenDiscountId] = React.useState<string | null>(null);
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [rateLines, setRateLines] = React.useState(contract.rateCard);
+
   const hasBreach = contract.rateCard.some((l) => !l.authorised);
   const activeCount = discounts.filter((d) => discountStatus(d) === 'Active').length;
 
@@ -306,13 +324,31 @@ const ChannelPanel: React.FC<{
             <Box sx={{ p: `${space.xl}px`, display: 'flex', flexDirection: 'column', gap: `${space.xl}px` }}>
               {/* Rate card */}
               <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.md}px`, mb: `${space.md}px`, flexWrap: 'wrap' }}>
-                  <SectionTitle>Rate card</SectionTitle>
-                  <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: colors.accentWash, color: colors.accent, ...type.label, px: `${space.sm}px`, py: '3px' }}>
-                    {contract.source}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: `${space.md}px`, mb: `${space.md}px`, flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.md}px` }}>
+                    <SectionTitle>Rate card</SectionTitle>
+                    <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', bgcolor: colors.accentWash, color: colors.accent, ...type.label, px: `${space.sm}px`, py: '3px' }}>
+                      {contract.source}
+                    </Box>
                   </Box>
+                  <Button
+                    disableElevation
+                    startIcon={isEditing ? <SaveOutlined sx={{ fontSize: 18 }} /> : <EditOutlined sx={{ fontSize: 18 }} />}
+                    onClick={(e) => { e.stopPropagation(); setIsEditing(!isEditing); }}
+                    sx={{ borderRadius: 0, border: hairline, color: colors.ink, fontSize: 13, fontWeight: 600, px: `${space.lg}px`, py: `${space.sm}px`, '&:hover': { bgcolor: colors.grey100 } }}
+                  >
+                    {isEditing ? 'Save changes' : 'Edit contract'}
+                  </Button>
                 </Box>
-                <RateCard lines={contract.rateCard} />
+                <RateCard 
+                  lines={rateLines}
+                  isEditing={isEditing}
+                  onLineChange={(idx, val) => {
+                    const newLines = [...rateLines];
+                    newLines[idx] = { ...newLines[idx], contracted: val };
+                    setRateLines(newLines);
+                  }}
+                />
               </Box>
 
               {/* Breach strip - Blinkit's unauthorised "Storage Fee v2" */}

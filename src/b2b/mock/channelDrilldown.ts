@@ -92,7 +92,7 @@ export const channelDrilldownData: Record<string, ChannelDrilldownData> = {
     ],
   },
 
-  'cafes–bangalore': {
+  'cafes-bangalore': {
     channel: 'Cafes – Bangalore',
     model: 'Direct Supply (120+ accounts)',
     contractRef: 'CAF-BLR-FY26',
@@ -113,5 +113,12 @@ export const channelDrilldownData: Record<string, ChannelDrilldownData> = {
       { date: '16 Aug 2026', amount: 1_80_000, status: 'Partial' },
       { date: '23 Aug 2026', amount: 1_40_000, status: 'Expected' },
     ],
+    accounts: [
+      { name: 'Third Wave Coffee - Koramangala', salesInPeriod: 2_40_000, receivedAmount: 1_92_000, pendingBalance: 48_000, status: 'Overdue' },
+      { name: 'Starbucks - Indiranagar', salesInPeriod: 3_10_000, receivedAmount: 3_10_000, pendingBalance: 0, status: 'Settled' },
+      { name: 'Paper and Pie - Whitefield', salesInPeriod: 1_80_000, receivedAmount: 1_50_000, pendingBalance: 30_000, status: 'Partial' },
+      { name: 'Blue Tokai - Jayanagar', salesInPeriod: 2_20_000, receivedAmount: 2_20_000, pendingBalance: 0, status: 'Settled' },
+      { name: 'Hatti Kaapi - MG Road', salesInPeriod: 1_50_000, receivedAmount: 1_08_000, pendingBalance: 42_000, status: 'Overdue' }
+    ]
   },
 };

@@ -145,7 +145,7 @@ export const marketingSpends: Record<string, MarketingSpend> = {
   blinkit:            { performanceAds: 380000, tradePromos: 240000, roas: 3.5 },
   zepto:              { performanceAds: 320000, tradePromos: 200000, roas: 4.1 },
   reliance:           { performanceAds: 180000, tradePromos: 120000, roas: 3.9 },
-  'cafes–bangalore':  { performanceAds: 100000, tradePromos: 60000, roas: 4.2 },
+  'cafes-bangalore':  { performanceAds: 100000, tradePromos: 60000, roas: 4.2 },
 };
 
 // ── UPCOMING EXPECTED PAYOUTS ───────────────────────────────────────────────

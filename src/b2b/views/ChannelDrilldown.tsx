@@ -16,7 +16,7 @@ const ChannelDrilldown: React.FC = () => {
   const reduce = useReducedMotion();
   const navigate = useNavigate();
   const { channelId } = useParams<{ channelId: string }>();
-  const key = channelId?.toLowerCase().replace(/\s+/g, '') ?? 'zepto';
+  const key = channelId?.toLowerCase() ?? 'zepto';
 
   const data: ChannelDrilldownData | undefined = channelDrilldownData[key];
 
@@ -236,6 +236,85 @@ const ChannelDrilldown: React.FC = () => {
           ))}
         </Box>
       </Box>
+
+      {/* Sub-Accounts / Cafes List */}
+      {data.accounts && data.accounts.length > 0 && (
+        <Box sx={{ ...cardSx, mt: `${space.xl}px`, overflow: 'hidden' }}>
+          <Box sx={{ px: `${space.xl}px`, py: `${space.lg}px`, borderBottom: hairline }}>
+            <SectionTitle>Key Accounts</SectionTitle>
+          </Box>
+          <Box sx={{ overflowX: 'auto' }}>
+            <Box sx={{ minWidth: 640 }}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: '2fr 1fr 1fr 1fr 100px',
+                  alignItems: 'center',
+                  gap: `${space.lg}px`,
+                  px: `${space.xl}px`,
+                  py: `${space.md}px`,
+                  bgcolor: colors.grey100,
+                  borderBottom: hairline,
+                }}
+              >
+                <ColumnLabel>Account</ColumnLabel>
+                <ColumnLabel align="right">Sales</ColumnLabel>
+                <ColumnLabel align="right">Received</ColumnLabel>
+                <ColumnLabel align="right">Pending</ColumnLabel>
+                <ColumnLabel align="right">Status</ColumnLabel>
+              </Box>
+              {data.accounts.map((acc, i) => (
+                <Box
+                  key={acc.name}
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '2fr 1fr 1fr 1fr 100px',
+                    alignItems: 'center',
+                    gap: `${space.lg}px`,
+                    px: `${space.xl}px`,
+                    py: `${space.md}px`,
+                    borderBottom: i < data.accounts!.length - 1 ? hairline : 'none',
+                  }}
+                >
+                  <Typography sx={{ fontSize: type.body.fontSize, fontWeight: 500, color: colors.ink }}>
+                    {acc.name}
+                  </Typography>
+                  <Typography sx={{ fontSize: type.body.fontSize, color: colors.ink, textAlign: 'right', ...tabularNums }}>
+                    {formatRupees(acc.salesInPeriod)}
+                  </Typography>
+                  <Typography sx={{ fontSize: type.body.fontSize, color: colors.ink, textAlign: 'right', ...tabularNums }}>
+                    {formatRupees(acc.receivedAmount)}
+                  </Typography>
+                  <Typography sx={{ fontSize: type.body.fontSize, fontWeight: acc.pendingBalance > 0 ? 600 : 400, color: acc.pendingBalance > 0 ? colors.accent : colors.ink, textAlign: 'right', ...tabularNums }}>
+                    {formatRupees(acc.pendingBalance)}
+                  </Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Box
+                      component="span"
+                      sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: hairline,
+                        bgcolor: acc.status === 'Settled' ? colors.grey100 : acc.status === 'Overdue' ? '#FEE2E2' : colors.paper,
+                        color: acc.status === 'Settled' ? colors.grey700 : colors.ink,
+                        fontWeight: 600,
+                        fontSize: 11,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                        px: `${space.sm}px`,
+                        py: '3px',
+                      }}
+                    >
+                      {acc.status}
+                    </Box>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 };

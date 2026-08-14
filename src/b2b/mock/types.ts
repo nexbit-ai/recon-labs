@@ -279,6 +279,13 @@ export interface ChannelDrilldownData {
   deductionBreakdown: DeductionBreakdownLine[];
   issueFlags: { type: IssueType; count: number; amount: number }[];
   upcomingPayouts: { date: string; amount: number; status: 'Expected' | 'Overdue' | 'Partial' }[];
+  accounts?: {
+    name: string;
+    salesInPeriod: number;
+    receivedAmount: number;
+    pendingBalance: number;
+    status: 'Settled' | 'Overdue' | 'Partial' | 'Pending';
+  }[];
 }
 
 export interface AskNexQA {

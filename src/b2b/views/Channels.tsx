@@ -26,7 +26,7 @@ const Channels: React.FC = () => {
       });
 
   const handleClick = (channel: string) => {
-    const key = channel.toLowerCase().replace(/\s+/g, '').replace('–', '');
+    const key = channel.toLowerCase().replace(/\s*(?:–|-)\s*/g, '-').replace(/\s+/g, '-');
     navigate(`/b2b/channels/${key}`);
   };
 
