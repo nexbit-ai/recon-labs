@@ -71,7 +71,7 @@ export interface FinanceMockData {
   returns_table: SalesRow[];
 }
 
-export type Platform = 'shopify' | 'amazon' | 'myntra' | 'myntra' | 'd2c' | 'other' | 'amazon_uk' | 'nykaa' | 'blinkit' | 'zepto' | 'instamart' | 'offline' | 'offlinestore';
+export type Platform = 'shopify' | 'amazon' | 'myntra' | 'd2c' | 'other' | 'amazon_uk' | 'nykaa' | 'blinkit' | 'zepto' | 'instamart' | 'offline' | 'offlinestore';
 
 export interface PlatformData {
   [key: string]: FinanceMockData;
@@ -82,7 +82,6 @@ const PLATFORM_WEIGHTS: Record<Platform, number> = {
   shopify: 0.35,    // 35% - highest
   amazon: 0.28,     // 28% - second highest  
   myntra: 0.22,   // 22% - third
-  myntra: 0.15,     // 15% - lowest
   d2c: 0.25,        // 25% - D2C platform
   other: 0.10,      // 10% - generic "Other" / CRED
   amazon_uk: 0.20,  // 20% - Amazon UK

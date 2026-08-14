@@ -11,8 +11,8 @@ type Sx = SxProps<Theme>;
 // White, square, hairline-bordered surface - no shadow. Padding left to caller.
 export const cardSx = { bgcolor: colors.paper, border: hairline } as const;
 
-export const PageTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <Typography component="h1" sx={{ ...type.pageTitle, color: colors.ink, mb: `${space.xl}px` }}>
+export const PageTitle: React.FC<{ children: React.ReactNode; sx?: Sx }> = ({ children, sx }) => (
+  <Typography component="h1" sx={{ ...type.pageTitle, color: colors.ink, mb: `${space.xl}px`, ...sx }}>
     {children}
   </Typography>
 );

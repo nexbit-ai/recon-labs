@@ -5677,7 +5677,6 @@ const MarketplaceReconciliation: React.FC = () => {
                 'payu': palette2[1],
                 'myntra': palette2[2],
                 'amazon': palette2[3],
-                'myntra': palette2[4],
               };
 
               // Build providerData dynamically from API data

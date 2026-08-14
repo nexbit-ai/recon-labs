@@ -130,7 +130,7 @@ const ExpectedCalcPopover = ({ anchorEl, onClose, line }: { anchorEl: HTMLElemen
     <Popover
       open={Boolean(anchorEl)}
       anchorEl={anchorEl}
-      onClose={(e) => { e.stopPropagation(); onClose(); }}
+      onClose={() => { onClose(); }}
       anchorOrigin={{
         vertical: 'bottom',
         horizontal: 'center',

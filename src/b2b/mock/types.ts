@@ -1,7 +1,7 @@
 // Shared types for the B2B (Nexbit) mock-data layer - Cosmix demo.
 // Frontend-only fixtures - no backend, no fetch. All amounts in whole rupees.
 
-export type ChannelName = 'Blinkit' | 'Zepto' | 'Reliance' | 'Cafes – Bangalore';
+export type ChannelName = 'Blinkit' | 'Zepto' | 'Reliance' | 'Cafes – Bangalore' | 'Amazon' | 'Reliance Retail' | 'Third Wave Coffee' | 'Blue Tokai Coffee' | 'Subko Coffee' | 'Starbucks' | 'Hatti Kaapi';
 
 export interface Channel {
   name: ChannelName;
