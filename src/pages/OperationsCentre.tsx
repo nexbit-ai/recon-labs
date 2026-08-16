@@ -56,7 +56,7 @@ import {
   Info as InfoIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
-import { DateRangeSelector } from '../components/common/DateRangeSelector';
+import DateRangeSelector from '../components/DateRangeSelector';
 import FeeAuditsTab from './FeeAuditsTab';
 import { api, apiService, tokenManager } from '../services/api';
 import ColumnFilterControls from '../components/ColumnFilterControls';

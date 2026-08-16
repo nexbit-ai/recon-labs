@@ -359,14 +359,14 @@ const Logistics: React.FC = () => {
       setConfigLoading(false);
       setConfigError(null);
       setRateCardRows([
-        { id: 'amz_fba_0_0_5', section_name: 'National Weight Handling', zone: 'National', slab_label: '0.0 - 0.5 kg', raw_value: '74.00' },
-        { id: 'amz_fba_0_5_1', section_name: 'National Weight Handling', zone: 'National', slab_label: '0.5 - 1.0 kg', raw_value: '99.00' },
-        { id: 'amz_fba_1_0_2', section_name: 'National Weight Handling', zone: 'National', slab_label: '1.0 - 2.0 kg', raw_value: '149.00' },
-        { id: 'amz_fba_2_0_5', section_name: 'National Weight Handling', zone: 'National', slab_label: '2.0 - 5.0 kg', raw_value: '299.00' },
-        { id: 'amz_fba_5_0_12', section_name: 'National Weight Handling', zone: 'National', slab_label: '5.0 - 12.0 kg', raw_value: '450.00' },
-        { id: 'amz_fba_pnp_std', section_name: 'Pick & Pack Fee', zone: 'National', slab_label: 'Standard (≤ 5kg)', raw_value: '28.00' },
-        { id: 'amz_fba_pnp_heavy', section_name: 'Pick & Pack Fee', zone: 'National', slab_label: 'Heavy (> 5kg)', raw_value: '50.00' },
-        { id: 'amz_fba_gst', section_name: 'Taxes', zone: 'National', slab_label: 'GST %', raw_value: '18.00' },
+        { id: 'amz_fba_0_0_5', provider_name: 'amazon', service_type: 'FBA', row_label: 'National Weight Handling 0.0 - 0.5 kg', section_name: 'National Weight Handling', zone: 'National', slab_label: '0.0 - 0.5 kg', raw_value: '74.00' },
+        { id: 'amz_fba_0_5_1', provider_name: 'amazon', service_type: 'FBA', row_label: 'National Weight Handling 0.5 - 1.0 kg', section_name: 'National Weight Handling', zone: 'National', slab_label: '0.5 - 1.0 kg', raw_value: '99.00' },
+        { id: 'amz_fba_1_0_2', provider_name: 'amazon', service_type: 'FBA', row_label: 'National Weight Handling 1.0 - 2.0 kg', section_name: 'National Weight Handling', zone: 'National', slab_label: '1.0 - 2.0 kg', raw_value: '149.00' },
+        { id: 'amz_fba_2_0_5', provider_name: 'amazon', service_type: 'FBA', row_label: 'National Weight Handling 2.0 - 5.0 kg', section_name: 'National Weight Handling', zone: 'National', slab_label: '2.0 - 5.0 kg', raw_value: '299.00' },
+        { id: 'amz_fba_5_0_12', provider_name: 'amazon', service_type: 'FBA', row_label: 'National Weight Handling 5.0 - 12.0 kg', section_name: 'National Weight Handling', zone: 'National', slab_label: '5.0 - 12.0 kg', raw_value: '450.00' },
+        { id: 'amz_fba_pnp_std', provider_name: 'amazon', service_type: 'FBA', row_label: 'Pick & Pack Fee Standard (≤ 5kg)', section_name: 'Pick & Pack Fee', zone: 'National', slab_label: 'Standard (≤ 5kg)', raw_value: '28.00' },
+        { id: 'amz_fba_pnp_heavy', provider_name: 'amazon', service_type: 'FBA', row_label: 'Pick & Pack Fee Heavy (> 5kg)', section_name: 'Pick & Pack Fee', zone: 'National', slab_label: 'Heavy (> 5kg)', raw_value: '50.00' },
+        { id: 'amz_fba_gst', provider_name: 'amazon', service_type: 'FBA', row_label: 'Taxes GST %', section_name: 'Taxes', zone: 'National', slab_label: 'GST %', raw_value: '18.00' },
       ]);
       setConfigEdits({});
       setConfigServiceType('');
