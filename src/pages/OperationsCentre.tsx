@@ -56,7 +56,9 @@ import {
   Info as InfoIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
-import { api, apiService } from '../services/api';
+import { DateRangeSelector } from '../components/common/DateRangeSelector';
+import FeeAuditsTab from './FeeAuditsTab';
+import { api, apiService, tokenManager } from '../services/api';
 import ColumnFilterControls from '../components/ColumnFilterControls';
 import TransactionSheet from './TransactionSheet';
 import { useStytchMemberSession } from '@stytch/react/b2b';
@@ -448,6 +450,9 @@ const OperationsCentrePage: React.FC = () => {
   const [claimBatches, setClaimBatches] = useState<any[]>([]);
   const filteredBatches = claimBatches.filter(b => b.platform === selectedPlatform);
   const [activeClaimTag, setActiveClaimTag] = useState<string>('All');
+
+  // Fee Audit State
+  const [feeAuditData, setFeeAuditData] = useState<any>(null);
 
   // Claims UI states
   const [claimDialogOpen, setClaimDialogOpen] = useState(false);
@@ -1182,6 +1187,18 @@ const OperationsCentrePage: React.FC = () => {
     }
   };
 
+  const fetchFeeAuditData = async () => {
+    try {
+      const response = await apiService.get('/recon/amazon/fee-audit');
+      if (response && response.data) {
+        setFeeAuditData(response.data);
+      }
+    } catch (err) {
+      console.error('Error fetching fee audit data:', err);
+      setFeeAuditData(null);
+    }
+  };
+
   // Fetch manually reconciled orders from API
   const fetchManuallyReconciledOrders = async (
     filtersOverride?: Record<string, any>,
@@ -1294,6 +1311,10 @@ const OperationsCentrePage: React.FC = () => {
         promises.push(fetchClaimBatchesData());
         // Removed fetchFeeInvoiceSummary
       }
+      if (activeTab === 3 || activeTab === -1) {
+        promises.push(fetchFeeAuditData());
+      }
+
       await Promise.all(promises);
     } catch (err) {
       console.error('Error fetching tab data:', err);
@@ -2405,6 +2426,9 @@ const OperationsCentrePage: React.FC = () => {
           >
             <Tab value={2} label="Home" />
             <Tab value={0} label={`Action Required (${getUnreconciledTotalCount()})`} />
+            {tokenManager.getOrgId() === '8e969cd6-1abe-44ae-84f1-89a41dbc99b5' && (
+              <Tab value={3} label="Fee Audits" />
+            )}
           </Tabs>
 
           {/* Controls */}
@@ -2753,7 +2777,7 @@ const OperationsCentrePage: React.FC = () => {
       )}
 
       {/* Legacy Tabs Table */}
-      {disputeSubTab !== 2 && (
+      {(disputeSubTab === 0 || disputeSubTab === 1) && (
       <Card sx={{
         background: '#ffffff',
         borderRadius: '12px',
@@ -3425,6 +3449,45 @@ const OperationsCentrePage: React.FC = () => {
         </CardContent>
       </Card>
       )}
+
+      {/* Fee Audits Tab */}
+      {disputeSubTab === 3 && (
+        <FeeAuditsTab 
+          data={feeAuditData} 
+          loading={apiLoading} 
+          onDownloadCSV={() => {
+            // Trigger file download
+            const token = localStorage.getItem('token');
+            const url = `http://localhost:8080/v1/recon/amazon/fee-audit/export`;
+            
+            fetch(url, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            })
+            .then(res => res.blob())
+            .then(blob => {
+              const windowUrl = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = windowUrl;
+              a.download = `amazon_fee_audit_${new Date().toISOString().split('T')[0]}.csv`;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+            })
+            .catch(err => console.error('Error downloading CSV:', err));
+          }}
+          onViewOrders={(orderIds) => {
+            setDisputeSubTab(0);
+            setOrderIdChips(orderIds);
+            setPage(0);
+            const orderIdsCsv = orderIds.join(',');
+            fetchAllTabsData(undefined, undefined, undefined, orderIdsCsv, 0, undefined, 0);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
 
       {/* Minimal Raise Dispute Dialog */}
       <Dialog open={raiseDialogOpen} onClose={closeRaiseDispute} PaperProps={{ sx: { borderRadius: 1, minWidth: 420 } }}>
