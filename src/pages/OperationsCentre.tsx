@@ -366,7 +366,7 @@ const OperationsCentrePage: React.FC = () => {
     } catch (e) {
       console.warn('Failed to handle platforms from localStorage:', e);
     }
-    return 'amazon'; // default fallback
+    return 'flipkart'; // default fallback
   };
 
   // Platform selector state for dropdown (single-select) - initialize from URL params
@@ -819,10 +819,10 @@ const OperationsCentrePage: React.FC = () => {
     const f = filtersOverride || columnFilters;
     const currentTab = tabOverride !== undefined ? tabOverride : disputeSubTab;
 
-    // Set status for unreconciled orders (less_payment_received, more_payment_received)
+    // Set status for unreconciled orders (less_payment_received)
     // Only set default if no status filter is explicitly applied
     if (currentTab === 0 && !f['Status']) {
-      params.status_in = 'less_payment_received,more_payment_received';
+      params.status_in = 'less_payment_received';
     }
 
     // Use server-side pagination for all tabs
@@ -1070,7 +1070,7 @@ const OperationsCentrePage: React.FC = () => {
       // Add the unreconciled status filter (only if not overridden by user's Status filter)
       // buildQueryParams already handles this, but we ensure it's set if user hasn't filtered by status
       if (!params.status_in) {
-        params.status_in = 'less_payment_received,more_payment_received';
+        params.status_in = 'less_payment_received';
       }
       // Add manual_override_status filter to exclude manually reconciled and disputed orders
       // Pass as string "null" since the API service filters out actual null values
@@ -2546,7 +2546,7 @@ const OperationsCentrePage: React.FC = () => {
               <Box sx={{ p: 1, minWidth: 240 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', mb: 1 }}>Select Platform</Typography>
                 <RadioGroup value={selectedPlatform} onChange={(e) => { setSelectedPlatform(e.target.value as any); setPlatformMenuAnchorEl(null); }}>
-                  {(['flipkart', 'amazon', 'amazon_uk', 'd2c'] as const).map((p) => (
+                  {(['flipkart', 'amazon', 'amazon_uk'] as const).map((p) => (
                     <MenuItem key={p} onClick={() => { setSelectedPlatform(p); setPlatformMenuAnchorEl(null); }} sx={{ py: 1, px: 1, borderRadius: '8px' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Radio size="small" checked={selectedPlatform === p} value={p} />
@@ -3825,7 +3825,7 @@ const OperationsCentrePage: React.FC = () => {
             onApply={() => {
               applyFilters();
             }}
-            statusFilterOptions={['more_payment_received', 'less_payment_received']}
+            statusFilterOptions={['less_payment_received']}
           />
         </Box>
       </Popover>
