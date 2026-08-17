@@ -30,6 +30,7 @@ import Bookkeeping from './pages/Bookkeeping';
 import Logistics from './pages/Logistics';
 import Integrations from './pages/Integrations';
 import ShopifyCallback from './pages/ShopifyCallback';
+import AmazonCallback from './pages/AmazonCallback';
 
 // Components
 import Layout from './components/Layout';
@@ -466,6 +467,11 @@ function App() {
             <Route path="/integrations/shopify/callback" element={
               <ProtectedRoute>
                 <Layout><ShopifyCallback /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/integrations/callback" element={
+              <ProtectedRoute>
+                <Layout><AmazonCallback /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/logistics" element={

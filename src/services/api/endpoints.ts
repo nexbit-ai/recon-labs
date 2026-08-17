@@ -335,6 +335,9 @@ export const amazonAuthAPI = {
 
   start: (state?: string) =>
     apiService.get<{ authorization_url: string; state: string }>(API_CONFIG.ENDPOINTS.AMAZON_AUTH_START, { state }),
+    
+  callback: (spapi_oauth_code: string, state: string) =>
+    apiService.get<{ message: string; access_token: string }>(API_CONFIG.ENDPOINTS.AMAZON_AUTH_CALLBACK, { spapi_oauth_code, state }),
 };
 
 // Shopify Auth API
