@@ -445,7 +445,7 @@ const Integrations: React.FC = () => {
       category: 'Marketplaces',
       description: 'Automate your Amazon sales and settlement data sync directly from the Selling Partner API.',
       logo: amazonLogo,
-      status: 'Available',
+      status: amazonConnected ? 'Connected' : 'Available',
       onConnect: handleAmazonAuth,
       onConfig: () => {
         setConfigType('amazon');
@@ -793,7 +793,7 @@ const Integrations: React.FC = () => {
                             )}
                           </Button>
 
-                          {integration.status === 'Available' && integration.id === 'amazon' && (
+                          {integration.id === 'amazon' && (
                             <Button
                               variant="text"
                               size="small"
