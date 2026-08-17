@@ -59,6 +59,7 @@ import ColumnFilterControls from '../components/ColumnFilterControls';
 import { api } from '../services/api';
 import { apiService } from '../services/api/apiService';
 import { API_CONFIG } from '../services/api/config';
+import { useOrganization } from '../hooks/useOrganization';
 import { OrdersResponse, OrderItem, MarketplaceReconciliationResponse, TotalTransactionsResponse, TransactionRow as ApiTransactionRow, TransactionColumn, SalesTransactionsResponse, SalesTransactionsPagination } from '../services/api/types';
 import {
   ArrowBack as ArrowBackIcon,
@@ -1843,6 +1844,7 @@ const createQuadParamsSignature = (params: Record<string, any>) => {
 const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, transaction, statsData: propsStatsData, initialTab = 0, dateRange: propDateRange, initialPlatforms, initialFilters: propsInitialFilters }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { organizationId } = useOrganization();
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -2119,7 +2121,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Get current columns based on which API is being used
   const getCurrentColumns = () => {
-    const isSpecificOrg = ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'].includes(API_CONFIG.ORG_ID);
+    const isSpecificOrg = organizationId ? ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'].some(id => organizationId.includes(id)) : false;
     let cols: string[] = [];
 
     // Sales Report tab (index 4) - fixed columns
