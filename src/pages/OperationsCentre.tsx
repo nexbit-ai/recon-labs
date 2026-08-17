@@ -1676,6 +1676,69 @@ const OperationsCentrePage: React.FC = () => {
     }
   };
 
+  const handleDownloadClaimReport = async (batch: any) => {
+    try {
+      setApiLoading(true);
+      
+      const params: any = {
+        platform: selectedPlatform,
+        claim_status: batch.status,
+        limit: 10000,
+        page: 1,
+      };
+      
+      const response = await api.transactions.getTotalTransactions(params);
+      
+      if (response.success && response.data) {
+        const responseData = response.data as any;
+        const transactionData = responseData.transactions || responseData.data || [];
+        
+        const batchOrders = transactionData.filter((r: any) => {
+          const r1 = r.claim_reason;
+          const r2 = r.metadata?.mismatch_reason;
+          const r3 = r.metadata?.manual_override_note;
+          const r4 = r.mismatch_reason;
+          const b = batch.reason;
+          return r1 === b || r2 === b || r3 === b || r4 === b;
+        });
+
+        if (batchOrders.length === 0) {
+          setSnackbarMsg(`No orders found for this batch.`);
+          setSnackbarOpen(true);
+          return;
+        }
+        
+        // As per Flipkart claim upload template
+        let csv = 'Order ID,Order Item ID,SKU,Return ID,Courier AWB Number,Claim Reason,Expected Amount\n';
+        batchOrders.forEach((o: any) => {
+          const expectedAmount = o.diff !== undefined ? o.diff : (o.order_value || o.metadata?.order_value?.total || 0);
+          const itemId = o.item_id || o.metadata?.item_id || '';
+          const sku = o.sku || o.metadata?.sku || '';
+          const returnId = o.return_id || o.metadata?.return_id || '';
+          const awb = o.tracking_id || o.metadata?.tracking_id || '';
+          csv += `"${o.order_id}","${itemId}","${sku}","${returnId}","${awb}","${o.claim_reason || batch.reason}","${expectedAmount}"\n`;
+        });
+        
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `flipkart_claim_report_${batch.reason.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`;
+        a.click();
+      } else {
+        setSnackbarMsg("Failed to load orders for claim report.");
+        setSnackbarOpen(true);
+      }
+    } catch (err) {
+      console.error('Failed to download claim report:', err);
+      setSnackbarMsg("Failed to download claim report");
+      setSnackbarOpen(true);
+    } finally {
+      setApiLoading(false);
+      closeFlipkartDisputeDialog();
+    }
+  };
+
   const handleMarkClaimFiled = async () => {
     if (!pendingClaim) return;
     if (!claimTicketInput.trim()) {
@@ -2425,7 +2488,7 @@ const OperationsCentrePage: React.FC = () => {
             }}
           >
             <Tab value={2} label="Home" />
-            <Tab value={0} label={`Action Required (${getUnreconciledTotalCount()})`} />
+            <Tab value={0} label="Action Required" />
             {tokenManager.getOrgId() === '8e969cd6-1abe-44ae-84f1-89a41dbc99b5' && (
               <Tab value={3} label="Fee Audits" />
             )}
@@ -3681,21 +3744,19 @@ const OperationsCentrePage: React.FC = () => {
             Choose how you would like to proceed with raising a dispute for this batch.
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Button variant="outlined" sx={{ justifyContent: 'flex-start', py: 1.5, px: 2, textTransform: 'none', color: '#111827', borderColor: '#e5e7eb', borderRadius: 2, '&:hover': { background: '#f9fafb' } }}>
+            <Button 
+              variant="outlined" 
+              onClick={() => handleDownloadClaimReport(selectedBatchForClaim)}
+              sx={{ justifyContent: 'flex-start', py: 1.5, px: 2, textTransform: 'none', color: '#111827', borderColor: '#e5e7eb', borderRadius: 2, '&:hover': { background: '#f9fafb' } }}
+            >
               <Box sx={{ textAlign: 'left' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Setup Email Flow</Typography>
-                <Typography variant="caption" sx={{ color: '#6b7280' }}>Automatically send emails to Flipkart support</Typography>
-              </Box>
-            </Button>
-            <Button variant="outlined" sx={{ justifyContent: 'flex-start', py: 1.5, px: 2, textTransform: 'none', color: '#111827', borderColor: '#e5e7eb', borderRadius: 2, '&:hover': { background: '#f9fafb' } }}>
-              <Box sx={{ textAlign: 'left' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Setup Flipkart Credentials</Typography>
-                <Typography variant="caption" sx={{ color: '#6b7280' }}>Automate dispute filing directly via API</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Download claim report</Typography>
+                <Typography variant="caption" sx={{ color: '#6b7280' }}>Download a CSV file formatted as per the Flipkart claim upload template</Typography>
               </Box>
             </Button>
             <Box sx={{ mt: 1, p: 1.5, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 2 }}>
               <Typography variant="body2" sx={{ color: '#166534', fontWeight: 500, fontSize: '0.8125rem' }}>
-                💡 Note: Disputes are raised automatically every 7 days window.
+                💡 Note: You can use this report to easily file disputes on Flipkart Seller Hub.
               </Typography>
             </Box>
           </Box>

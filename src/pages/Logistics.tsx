@@ -191,6 +191,7 @@ const Logistics: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDummyData, setIsDummyData] = useState(false);
 
   const [orders, setOrders] = useState<LogisticOrder[]>([]);
   const [summary, setSummary] = useState<LogisticDashboardResponse['summary']>({});
@@ -339,10 +340,102 @@ const Logistics: React.FC = () => {
       if (selectedReason) params.reason = selectedReason;
       if (debugSkipCOD) params.debug_skip = 'cod';
 
+      const orgId = tokenManager.getOrgId();
+      if (true) { // Always show dummy data for now
+        setIsDummyData(true);
+        const dummyPayload = {
+          summary: {
+            total_orders: 1520,
+            mismatch_orders: 134,
+            matched_orders: 1386,
+            disputed_orders: 12,
+            total_actual_cost: 145000,
+            total_expected_cost: 142300,
+            abs_difference: 2700,
+            match_rate: 91,
+            slab_distribution: [
+              { name: '0-500g', value: 800 },
+              { name: '500g-1kg', value: 400 },
+              { name: '1kg-2kg', value: 200 },
+              { name: '2kg+', value: 120 }
+            ],
+            zone_distribution: [
+              { name: 'Local', value: 300 },
+              { name: 'Zonal', value: 500 },
+              { name: 'National', value: 720 }
+            ],
+            reason_distribution: [
+              { name: 'Wrong Slab Mapping', value: 45 },
+              { name: 'Weight Slab Inconsistency', value: 50 },
+              { name: 'Operational: Box Too Large', value: 39 }
+            ],
+            total_disputed_amount: 2700,
+            mismatch_orders_amount: 2700,
+            reasons_breakdown: [
+              { reason: 'Wrong Slab Mapping', count: 45, amount: 900 },
+              { reason: 'Weight Slab Inconsistency', count: 50, amount: 1000 },
+              { reason: 'Operational: Box Too Large', count: 39, amount: 800 }
+            ],
+            overcharged_orders: 134,
+            overcharged_orders_amount: 2700,
+            total_overcharged_amount: 2700
+          },
+          orders: [
+            {
+              id: 'dummy-1',
+              display_order_code: 'ORD-DUMMY-001',
+              awb: 'AWB123456789',
+              order_date: '2026-08-15',
+              payment_mode: 'Prepaid',
+              courier_partner: platform,
+              charged_weight: 1.5,
+              expected_weight: 0.5,
+              items_quantity: 1,
+              product_sku_code: 'SKU-TEST-1',
+              total_cost: 150,
+              expected_cost: 80,
+              difference: 70,
+              reason: 'Weight Slab Inconsistency',
+              dispute_raised: false,
+            },
+            {
+              id: 'dummy-2',
+              display_order_code: 'ORD-DUMMY-002',
+              awb: 'AWB987654321',
+              order_date: '2026-08-16',
+              payment_mode: 'COD',
+              courier_partner: platform,
+              charged_weight: 2.0,
+              expected_weight: 1.0,
+              items_quantity: 2,
+              product_sku_code: 'SKU-TEST-2',
+              total_cost: 200,
+              expected_cost: 120,
+              difference: 80,
+              reason: 'Wrong Slab Mapping',
+              dispute_raised: false,
+            }
+          ],
+          pagination: {
+            current_page: page,
+            total_pages: 1,
+            total_count: 2,
+            limit: limit
+          }
+        };
+        
+        setSummary(dummyPayload.summary as any);
+        setOrders(dummyPayload.orders as any);
+        setPagination(dummyPayload.pagination);
+        setLoading(false);
+        return;
+      }
+
+      setIsDummyData(false);
       const response = await api.logistics.getLogisticCostDashboard(params);
       const payload = (response.data || {}) as LogisticDashboardResponse;
       setSummary(payload.summary || {});
-      setOrders(Array.isArray(payload.orders) ? payload.orders : []);
+      setOrders((Array.isArray(payload.orders) ? payload.orders : []) as LogisticOrder[]);
       setPagination(payload.pagination || {});
     } catch (err: any) {
       setError(apiUtils.formatError(err));
@@ -773,6 +866,12 @@ const Logistics: React.FC = () => {
           </Button>
         </Box>
       </Box>
+
+      {isDummyData && (
+        <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+          Showing dummy data. Please connect data sources to view actual reports.
+        </Alert>
+      )}
 
       {/* Main View Switcher based on platform */}
       {platform === 'amazon' ? (
@@ -1220,12 +1319,12 @@ const Logistics: React.FC = () => {
                                   {r.label}
                                   <Tooltip
                                     title={
-                                      r.label.includes('|')
+                                      r.label?.includes('|')
                                         ? r.label.split('|').map(part => {
                                           const cleanPart = part.trim();
                                           return `${cleanPart}: ${REASON_DEFINITIONS[cleanPart] || 'Audit discrepancy'}`;
                                         }).join(' | ')
-                                        : (REASON_DEFINITIONS[r.label] || 'Unspecified audit reason')
+                                        : (r.label ? (REASON_DEFINITIONS[r.label] || 'Unspecified audit reason') : 'Unspecified audit reason')
                                     }
                                     arrow
                                     placement="right"

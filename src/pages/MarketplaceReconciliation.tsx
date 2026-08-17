@@ -2797,7 +2797,7 @@ const MarketplaceReconciliation: React.FC = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
                   {/* Last updated timestamp - inline left of date filter */}
                   <Box sx={{ 
-                    display: 'flex', 
+                    display: 'none', 
                     alignItems: 'center', 
                     justifyContent: 'flex-end',
                     gap: 0.5, 
