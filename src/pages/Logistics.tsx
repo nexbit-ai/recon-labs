@@ -350,76 +350,65 @@ const Logistics: React.FC = () => {
             matched_orders: 1386,
             disputed_orders: 12,
             total_actual_cost: 145000,
-            total_expected_cost: 142300,
-            abs_difference: 2700,
+            total_expected_cost: 80000,
+            abs_difference: 65000,
             match_rate: 91,
             slab_distribution: [
-              { name: '0-500g', value: 800 },
-              { name: '500g-1kg', value: 400 },
-              { name: '1kg-2kg', value: 200 },
-              { name: '2kg+', value: 120 }
+              { label: '0-500g', count: 800, order_share: 52.6, revenue_share: 40.2, avg_cost: 65.5 },
+              { label: '500g-1kg', count: 400, order_share: 26.3, revenue_share: 28.5, avg_cost: 105.0 },
+              { label: '1kg-2kg', count: 200, order_share: 13.1, revenue_share: 18.0, avg_cost: 165.0 },
+              { label: '2kg+', count: 120, order_share: 7.8, revenue_share: 13.3, avg_cost: 285.0 }
             ],
             zone_distribution: [
-              { name: 'Local', value: 300 },
-              { name: 'Zonal', value: 500 },
-              { name: 'National', value: 720 }
+              { label: 'Local', value: 15000, count: 300 },
+              { label: 'Zonal', value: 20000, count: 500 },
+              { label: 'National', value: 30000, count: 720 }
             ],
             reason_distribution: [
-              { name: 'Wrong Slab Mapping', value: 45 },
-              { name: 'Weight Slab Inconsistency', value: 50 },
-              { name: 'Operational: Box Too Large', value: 39 }
+              { label: 'Wrong Slab Mapping', value: 25000, count: 45 },
+              { label: 'Weight Slab Inconsistency', value: 22000, count: 50 },
+              { label: 'Operational: Box Too Large', value: 18000, count: 39 }
             ],
-            total_disputed_amount: 2700,
-            mismatch_orders_amount: 2700,
+            total_disputed_amount: 65000,
+            mismatch_orders_amount: 65000,
             reasons_breakdown: [
-              { reason: 'Wrong Slab Mapping', count: 45, amount: 900 },
-              { reason: 'Weight Slab Inconsistency', count: 50, amount: 1000 },
-              { reason: 'Operational: Box Too Large', count: 39, amount: 800 }
+              { reason: 'Wrong Slab Mapping', count: 45, amount: 25000 },
+              { reason: 'Weight Slab Inconsistency', count: 50, amount: 22000 },
+              { reason: 'Operational: Box Too Large', count: 39, amount: 18000 }
             ],
             overcharged_orders: 134,
-            overcharged_orders_amount: 2700,
-            total_overcharged_amount: 2700
+            overcharged_orders_amount: 65000,
+            total_overcharged_amount: 65000
           },
-          orders: [
-            {
-              id: 'dummy-1',
-              display_order_code: 'ORD-DUMMY-001',
-              awb: 'AWB123456789',
-              order_date: '2026-08-15',
-              payment_mode: 'Prepaid',
+          orders: Array.from({ length: 200 }).map((_, i) => {
+            const isWrongSlab = i % 3 === 0;
+            const isBoxTooLarge = i % 5 === 0;
+            const reason = isBoxTooLarge ? 'Operational: Box Too Large' : (isWrongSlab ? 'Wrong Slab Mapping' : 'Weight Slab Inconsistency');
+            const expectedCost = 80 + (i % 20) * 10;
+            const totalCost = expectedCost + 50 + (i % 5) * 20;
+            const difference = totalCost - expectedCost;
+            return {
+              id: `dummy-${i + 1}`,
+              display_order_code: `ORD-DUMMY-${String(i + 1).padStart(3, '0')}`,
+              awb: `AWB${100000000 + i}`,
+              order_date: `2026-08-${String((i % 28) + 1).padStart(2, '0')}`,
+              payment_mode: i % 2 === 0 ? 'Prepaid' : 'COD',
               courier_partner: platform,
-              charged_weight: 1.5,
-              expected_weight: 0.5,
-              items_quantity: 1,
-              product_sku_code: 'SKU-TEST-1',
-              total_cost: 150,
-              expected_cost: 80,
-              difference: 70,
-              reason: 'Weight Slab Inconsistency',
-              dispute_raised: false,
-            },
-            {
-              id: 'dummy-2',
-              display_order_code: 'ORD-DUMMY-002',
-              awb: 'AWB987654321',
-              order_date: '2026-08-16',
-              payment_mode: 'COD',
-              courier_partner: platform,
-              charged_weight: 2.0,
-              expected_weight: 1.0,
-              items_quantity: 2,
-              product_sku_code: 'SKU-TEST-2',
-              total_cost: 200,
-              expected_cost: 120,
-              difference: 80,
-              reason: 'Wrong Slab Mapping',
-              dispute_raised: false,
-            }
-          ],
+              charged_weight: 1.0 + (i % 5) * 0.5,
+              expected_weight: 0.5 + (i % 3) * 0.5,
+              items_quantity: 1 + (i % 3),
+              product_sku_code: `SKU-TEST-${(i % 10) + 1}`,
+              total_cost: totalCost,
+              expected_cost: expectedCost,
+              difference: difference,
+              reason: reason,
+              dispute_raised: i % 7 === 0,
+            };
+          }).slice((page - 1) * limit, page * limit),
           pagination: {
             current_page: page,
-            total_pages: 1,
-            total_count: 2,
+            total_pages: Math.ceil(200 / limit),
+            total_count: 200,
             limit: limit
           }
         };
@@ -1347,93 +1336,7 @@ const Logistics: React.FC = () => {
               </Card>
             </Grid>
           </Grid>
-          {/* KPI Cards Section */}
-          <Grid container spacing={2.5} sx={{ mb: 4 }}>
-            {[
-              { title: 'Matching Orders', value: summary?.matched_orders, color: '#16a34a', percent: summary?.match_rate, icon: <RefreshIcon /> },
-              { title: 'Mismatching Orders', value: summary?.mismatch_orders, color: '#6366F1', icon: <ErrorOutlineIcon /> },
-              { title: 'Absolute Leakage', value: summary?.abs_difference, isCurrency: true, color: '#0f172a', icon: <AssessmentIcon /> }
-            ].map((kpi, idx) => {
-              let displayValue = kpi.value;
-              if (kpi.title === 'Absolute Leakage' && platform === 'delhivery' && Math.abs(Number(kpi.value) - 36274.39) < 1) {
-                displayValue = 98786;
-              }
-              if (kpi.title === 'Matching Orders' && platform === 'delhivery' && Number(kpi.value) === 652909) {
-                displayValue = 252909;
-              }
 
-              return (
-                <Grid item xs={12} sm={6} md={4} key={idx}>
-                  <Card sx={{
-                    borderRadius: '16px',
-                    border: '1px solid #f1f5f9',
-                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-                    overflow: 'hidden',
-                    bgcolor: '#fff',
-                    height: 90
-                  }}>
-                    <CardContent sx={{ px: 2.5, py: 0, height: '100%', display: 'flex', alignItems: 'center' }}>
-                      <Box sx={{ width: '100%' }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                          <Box>
-                            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              {kpi.title}
-                            </Typography>
-                            <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 900, color: '#0f172a' }}>
-                              {loading ? '---' : (kpi.isCurrency ? toCurrency(Number(displayValue)) : toInteger(Number(displayValue)))}
-                            </Typography>
-                          </Box>
-                          {kpi.percent !== undefined && (
-                            <Box sx={{ px: 1.5, py: 0.75, bgcolor: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '12px' }}>
-                              <Typography variant="caption" sx={{ fontWeight: 900, color: kpi.color, display: 'block', textAlign: 'right' }}>
-                                {kpi.percent?.toFixed(1)}%
-                              </Typography>
-                              <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 600 }}>RECON RATE</Typography>
-                            </Box>
-                          )}
-                        </Stack>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              );
-            })}
-          </Grid>
-
-          {/* Slab Analysis Section - Modern High-Density Chart */}
-          <Card sx={{ mb: 4, px: 3, py: 3, border: '1px solid #f1f5f9', borderRadius: '16px', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)', bgcolor: '#fff' }}>
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#0f172a' }}>
-                Weight Slab Efficiency Matrix
-              </Typography>
-            </Box>
-            <Grid container spacing={4}>
-              <Grid item xs={12} md={12}>
-                <Box sx={{ height: 360 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={summary?.slab_distribution || []}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} />
-                      <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} tickFormatter={(val) => `${val}%`} />
-                      <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} tickFormatter={(val) => `₹${val}`} />
-                      <RechartsTooltip
-                        cursor={{ fill: 'rgba(99, 102, 241, 0.05)' }}
-                        contentStyle={{
-                          borderRadius: '12px',
-                          border: 'none',
-                          boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                          backgroundColor: '#0f172a',
-                          color: '#fff',
-                        }}
-                      />
-                      <Legend />
-                      <Bar yAxisId="left" dataKey="percentage" name="Order %" fill="#6366F1" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </Box>
-              </Grid>
-            </Grid>
-          </Card>
 
           {/* Main Table Section */}
           <Card sx={{ border: '1px solid #f1f5f9', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)', bgcolor: '#fff', overflow: 'hidden', mt: 4 }}>

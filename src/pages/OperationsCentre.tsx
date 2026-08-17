@@ -1621,6 +1621,7 @@ const OperationsCentrePage: React.FC = () => {
       const params: any = {
         platform: selectedPlatform,
         claim_status: batch.status, // Matches GetClaimBatches WHERE claim_status IS NOT NULL / ELIGIBLE
+        claim_reason: batch.reason,
         limit: 10000,
         page: 1,
       };
@@ -1631,14 +1632,7 @@ const OperationsCentrePage: React.FC = () => {
         const responseData = response.data as any;
         const transactionData = responseData.transactions || responseData.data || [];
         
-        const batchOrders = transactionData.filter((r: any) => {
-          const r1 = r.claim_reason;
-          const r2 = r.metadata?.mismatch_reason;
-          const r3 = r.metadata?.manual_override_note;
-          const r4 = r.mismatch_reason;
-          const b = batch.reason;
-          return r1 === b || r2 === b || r3 === b || r4 === b;
-        });
+        const batchOrders = transactionData;
 
         if (batchOrders.length === 0) {
           const sample = transactionData.length > 0 
@@ -1683,6 +1677,7 @@ const OperationsCentrePage: React.FC = () => {
       const params: any = {
         platform: selectedPlatform,
         claim_status: batch.status,
+        claim_reason: batch.reason,
         limit: 10000,
         page: 1,
       };
@@ -1693,14 +1688,7 @@ const OperationsCentrePage: React.FC = () => {
         const responseData = response.data as any;
         const transactionData = responseData.transactions || responseData.data || [];
         
-        const batchOrders = transactionData.filter((r: any) => {
-          const r1 = r.claim_reason;
-          const r2 = r.metadata?.mismatch_reason;
-          const r3 = r.metadata?.manual_override_note;
-          const r4 = r.mismatch_reason;
-          const b = batch.reason;
-          return r1 === b || r2 === b || r3 === b || r4 === b;
-        });
+        const batchOrders = transactionData;
 
         if (batchOrders.length === 0) {
           setSnackbarMsg(`No orders found for this batch.`);
@@ -1712,7 +1700,7 @@ const OperationsCentrePage: React.FC = () => {
         let csv = 'Order ID,Order Item ID,SKU,Return ID,Courier AWB Number,Claim Reason,Expected Amount\n';
         batchOrders.forEach((o: any) => {
           const expectedAmount = o.diff !== undefined ? o.diff : (o.order_value || o.metadata?.order_value?.total || 0);
-          const itemId = o.item_id || o.metadata?.item_id || '';
+          const itemId = o.order_item_id || o.item_id || o.metadata?.item_id || '';
           const sku = o.sku || o.metadata?.sku || '';
           const returnId = o.return_id || o.metadata?.return_id || '';
           const awb = o.tracking_id || o.metadata?.tracking_id || '';
@@ -3666,7 +3654,7 @@ const OperationsCentrePage: React.FC = () => {
         </Box>
       )}
 
-      <Snackbar open={snackbarOpen} autoHideDuration={2500} onClose={() => setSnackbarOpen(false)} message={snackbarMsg || 'Done'} />
+      <Snackbar anchorOrigin={{ vertical: 'top', horizontal: 'right' }} open={snackbarOpen} autoHideDuration={2500} onClose={() => setSnackbarOpen(false)} message={snackbarMsg || 'Done'} />
 
       {/* Note Dialog for Manual Action */}
       <Dialog open={noteDialogOpen} onClose={closeNoteDialog} PaperProps={{ sx: { borderRadius: 1, minWidth: 420 } }}>
