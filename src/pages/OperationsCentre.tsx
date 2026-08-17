@@ -2552,7 +2552,7 @@ const OperationsCentrePage: React.FC = () => {
                         <Radio size="small" checked={selectedPlatform === p} value={p} />
                         <Box>
                           <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p === 'flipkart' ? 'Flipkart' : p === 'amazon' ? 'Amazon' : p === 'amazon_uk' ? 'Amazon UK' : 'D2C'}</Typography>
-                          <Typography variant="caption" sx={{ color: '#6b7280' }}>{p === 'd2c' ? 'Website / D2C' : 'E-commerce marketplace'}</Typography>
+                          <Typography variant="caption" sx={{ color: '#6b7280' }}>E-commerce marketplace</Typography>
                         </Box>
                       </Box>
                     </MenuItem>

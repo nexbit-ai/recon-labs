@@ -2388,16 +2388,16 @@ const UploadDocuments: React.FC = () => {
                           ? '2px solid #16a34a'
                           : amazonSettlementStatus === 'pending'
                             ? '2px solid #f59e0b'
-                          : (!isVendorUploaded('amazon', 'sales_b2b') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
+                          : (!isVendorUploaded('amazon', 'sales') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
                         borderRadius: '12px',
                         background: amazonSettlementStatus === 'processing'
                           ? '#f0fdf4'
                           : amazonSettlementStatus === 'pending'
                             ? '#fffbeb'
-                          : (!isVendorUploaded('amazon', 'sales_b2b') ? '#f9fafb' : '#ffffff'),
+                          : (!isVendorUploaded('amazon', 'sales') ? '#f9fafb' : '#ffffff'),
                         position: 'relative',
                         zIndex: 2,
-                        opacity: isVendorUploaded('amazon', 'sales_b2b') ? 1 : 0.6
+                        opacity: isVendorUploaded('amazon', 'sales') ? 1 : 0.6
                       }}
                     >
                       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
@@ -2410,20 +2410,20 @@ const UploadDocuments: React.FC = () => {
                             ? '#16a34a'
                             : amazonSettlementStatus === 'pending'
                               ? '#f59e0b'
-                            : (!isVendorUploaded('amazon', 'sales_b2b') ? '#f3f4f6' : '#f3f4f6'),
+                            : (!isVendorUploaded('amazon', 'sales') ? '#f3f4f6' : '#f3f4f6'),
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
                           border: amazonSettlementStatus !== 'none'
                             ? 'none'
-                            : (!isVendorUploaded('amazon', 'sales_b2b') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
+                            : (!isVendorUploaded('amazon', 'sales') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
                           position: 'relative'
                         }}>
                           {amazonSettlementStatus === 'processing' ? (
                             <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
                           ) : amazonSettlementStatus === 'pending' ? (
                             <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
-                          ) : !isVendorUploaded('amazon', 'sales_b2b') ? (
+                          ) : !isVendorUploaded('amazon', 'sales') ? (
                             <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
                           ) : (
                             <></>
@@ -2431,7 +2431,7 @@ const UploadDocuments: React.FC = () => {
                         </Box>
                         
                         {/* Step Title */}
-                        <Typography variant="body2" fontWeight={600} color={isVendorUploaded('amazon', 'sales_b2b') ? '#111111' : '#9ca3af'} textAlign="center">
+                        <Typography variant="body2" fontWeight={600} color={isVendorUploaded('amazon', 'sales') ? '#111111' : '#9ca3af'} textAlign="center">
                           Settlement File
                         </Typography>
                         
@@ -2464,13 +2464,13 @@ const UploadDocuments: React.FC = () => {
                             }
                             e.target.value = '';
                           }}
-                          disabled={!!uploadingVendor || !isVendorUploaded('amazon', 'sales_b2b')}
+                          disabled={!!uploadingVendor || !isVendorUploaded('amazon', 'sales')}
                         />
                         <Button
                           variant={isVendorUploaded('amazon', 'settlement') ? "outlined" : "contained"}
                           size="small"
                           startIcon={<CloudUploadIcon />}
-                          disabled={!!uploadingVendor || uploadingVendor === 'amazon_settlement' || !isVendorUploaded('amazon', 'sales_b2b')}
+                          disabled={!!uploadingVendor || uploadingVendor === 'amazon_settlement' || !isVendorUploaded('amazon', 'sales')}
                           endIcon={uploadingVendor === 'amazon_settlement' ? <CircularProgress size={14} /> : null}
                           onClick={(e) => {
                             handleFileInputClick(e, 'amazon-settlement-upload', 'amazon', 'settlement');
@@ -2479,7 +2479,7 @@ const UploadDocuments: React.FC = () => {
                             minWidth: 120,
                             fontSize: '0.75rem',
                             py: 0.75,
-                            ...(!isVendorUploaded('amazon', 'sales_b2b') && {
+                            ...(!isVendorUploaded('amazon', 'sales') && {
                               background: '#f3f4f6',
                               color: '#9ca3af',
                               cursor: 'not-allowed',
