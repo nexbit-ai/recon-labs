@@ -178,6 +178,7 @@ const Integrations: React.FC = () => {
           setAmazonConfig(prev => ({
             ...prev,
             client_id: amazonResp.data?.client_id || '',
+            application_id: amazonResp.data?.application_id || '',
             marketplace_regions: amazonResp.data?.marketplace_regions || []
           }));
         }
@@ -192,6 +193,7 @@ const Integrations: React.FC = () => {
   const [amazonConfig, setAmazonConfig] = useState({
     client_id: '',
     client_secret: '',
+    application_id: '',
     marketplace_regions: [] as string[],
   });
 
@@ -267,6 +269,7 @@ const Integrations: React.FC = () => {
         await api.amazonAuth.saveConfig({
           client_id: amazonConfig.client_id,
           client_secret: amazonConfig.client_secret,
+          application_id: amazonConfig.application_id,
           marketplace_regions: amazonConfig.marketplace_regions,
         });
         setSuccess('Amazon configuration saved successfully!');
@@ -1166,7 +1169,14 @@ const Integrations: React.FC = () => {
           {configType === 'amazon' && (
             <Box sx={{ py: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
               <TextField
-                label="Client ID"
+                label="Application ID"
+                fullWidth
+                value={amazonConfig.application_id}
+                onChange={(e) => setAmazonConfig({ ...amazonConfig, application_id: e.target.value })}
+                placeholder="amzn1.sellerapps.app.xxx"
+              />
+              <TextField
+                label="Client ID (LWA)"
                 fullWidth
                 value={amazonConfig.client_id}
                 onChange={(e) => setAmazonConfig({ ...amazonConfig, client_id: e.target.value })}

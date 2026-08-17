@@ -325,12 +325,13 @@ export const amazonAuthAPI = {
   saveConfig: (config: {
     client_id: string;
     client_secret: string;
+    application_id: string;
     marketplace_regions: string[];
   }) =>
     apiService.post<{ message: string }>('/amazon/auth/config', config),
 
   getStatus: () =>
-    apiService.get<{ connected: boolean; client_id?: string; marketplace_regions?: string[] }>(API_CONFIG.ENDPOINTS.AMAZON_STATUS),
+    apiService.get<{ connected: boolean; client_id?: string; application_id?: string; marketplace_regions?: string[] }>(API_CONFIG.ENDPOINTS.AMAZON_STATUS),
 
   start: (state?: string) =>
     apiService.get<{ authorization_url: string; state: string }>(API_CONFIG.ENDPOINTS.AMAZON_AUTH_START, { state }),
