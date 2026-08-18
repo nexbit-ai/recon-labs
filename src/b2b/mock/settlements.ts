@@ -16,13 +16,13 @@ import type {
 // Core scenario: Expected ₹1.00 Cr, Received ₹90.00L, Gap ₹10.00L
 export const headline: HeadlineMetric[] = [
   { key: 'receivable', label: 'Total Receivables Due', value: 1_00_00_000, display: '₹1.00 Cr', unit: 'inr' },
-  { key: 'settled', label: 'Total Received', value: 90_00_000, display: '₹90.00L', unit: 'inr' },
-  { key: 'leakage', label: 'Shortfall / Gap', value: 10_00_000, display: '₹10.00L', unit: 'inr' },
-  { key: 'recoverable', label: 'Recoverable now', value: 6_80_000, display: '₹6.80L', unit: 'inr' },
-  { key: 'expiring', label: 'Recoverable expiring within ~10 days', value: 1_50_000, display: '₹1.50L', unit: 'inr' },
+  { key: 'settled', label: 'Total Received', value: 97_52_000, display: '₹97.52L', unit: 'inr' },
+  { key: 'leakage', label: 'Shortfall / Gap', value: 2_48_000, display: '₹2.48L', unit: 'inr' },
+  { key: 'recoverable', label: 'Recoverable now', value: 1_52_000, display: '₹1.52L', unit: 'inr' },
+  { key: 'expiring', label: 'Recoverable expiring within ~10 days', value: 0, display: '₹0L', unit: 'inr' },
   { key: 'recoveredYtd', label: 'Recovered YTD', value: 8_40_000, display: '₹8.40L', unit: 'inr' },
-  { key: 'netRealisation', label: 'True net realisation', value: 78.2, display: '78.2%', unit: 'percent' },
-  { key: 'underDispute', label: 'Under dispute', value: 3_20_000, display: '₹3.20L', unit: 'inr' },
+  { key: 'netRealisation', label: 'True net realisation', value: 97.5, display: '97.5%', unit: 'percent' },
+  { key: 'underDispute', label: 'Under dispute', value: 1_52_000, display: '₹1.52L', unit: 'inr' },
 ];
 
 // Reference for views: the assumption brand planned against, vs reality.
@@ -32,7 +32,7 @@ export const netRealisationAssumptionPct = 82;
 export const recoveredYtdClaimsWon = 94;
 
 // Total open issues detected this quarter; the feed surfaces the top few by value.
-export const flaggedIssuesTotal = 18;
+export const flaggedIssuesTotal = 2;
 
 export const headlineByKey = (key: string): HeadlineMetric =>
   headline.find((m) => m.key === key)!;
@@ -41,10 +41,10 @@ export const headlineByKey = (key: string): HeadlineMetric =>
 // settled Σ = ₹90.00L · leakage Σ = ₹10.00L · recoverable Σ = ₹6.80L
 // receivable per channel = settled + leakage → Σ = ₹1.00 Cr
 export const channelPerformance: ChannelPerformance[] = [
-  { channel: 'Blinkit',            settled: 32_00_000, leakage: 3_80_000, netRealisationPct: 76.5, recoverable: 2_40_000 },
-  { channel: 'Zepto',              settled: 28_00_000, leakage: 3_20_000, netRealisationPct: 77.8, recoverable: 2_10_000 },
-  { channel: 'Reliance',           settled: 18_00_000, leakage: 1_80_000, netRealisationPct: 80.1, recoverable: 1_30_000 },
-  { channel: 'Cafes – Bangalore',  settled: 12_00_000, leakage: 1_20_000, netRealisationPct: 79.6, recoverable: 1_00_000 },
+  { channel: 'Blinkit',            settled: 33_32_000, leakage: 2_48_000, netRealisationPct: 93.0, recoverable: 1_52_000 },
+  { channel: 'Zepto',              settled: 31_20_000, leakage: 0, netRealisationPct: 100, recoverable: 0 },
+  { channel: 'Reliance',           settled: 19_80_000, leakage: 0, netRealisationPct: 100, recoverable: 0 },
+  { channel: 'Cafes – Bangalore',  settled: 13_20_000, leakage: 0, netRealisationPct: 100, recoverable: 0 },
 ];
 
 // ── RECEIVED vs RECEIVABLE, per portal ──────────────────────────────────────
@@ -72,36 +72,6 @@ export const flaggedIssues: FlaggedIssue[] = [
     poNumber: 'PO-BLK-2026-0847',
   },
   {
-    id: 'OR-002',
-    channel: 'Zepto',
-    title: 'PO-ZEP-2026-0391',
-    detail: 'Visibility fee (₹18,400) deducted twice in settlement STL-ZEP-0391 for the same campaign period. Duplicate charge confirmed against rate card.',
-    amount: 1_84_000,
-    type: 'Visibility fee duplicate',
-    confidence: 'High',
-    poNumber: 'PO-ZEP-2026-0391',
-  },
-  {
-    id: 'OR-003',
-    channel: 'Reliance',
-    title: 'PO-REL-2026-0112',
-    detail: 'Invoice INV-REL-0112 for ₹2.4L submitted on 28 Jul. Payment due 10 Aug per 45-day credit terms. Settlement not received.',
-    amount: 2_40_000,
-    type: 'Settlement pending',
-    confidence: 'High',
-    poNumber: 'PO-REL-2026-0112',
-  },
-  {
-    id: 'OR-004',
-    channel: 'Cafes – Bangalore',
-    title: 'Cafe batch - 8 accounts',
-    detail: '8 cafe accounts have overdue invoices totalling ₹1.2L. Oldest overdue: Third Wave Coffee (32 days). Inconsistent email confirmations.',
-    amount: 1_20_000,
-    type: 'Overdue',
-    confidence: 'Med',
-    poNumber: 'ORD-TWC-2026-Jul',
-  },
-  {
     id: 'OR-005',
     channel: 'Blinkit',
     title: 'PO-BLK-2026-0923',
@@ -110,26 +80,6 @@ export const flaggedIssues: FlaggedIssue[] = [
     type: 'Pending GRN',
     confidence: 'High',
     poNumber: 'PO-BLK-2026-0923',
-  },
-  {
-    id: 'OR-006',
-    channel: 'Zepto',
-    title: 'PO-ZEP-2026-0445',
-    detail: 'Short payment of ₹41,200 on settlement STL-ZEP-0445. 38 units of Energy Blend deducted as returns but RTO claim already processed.',
-    amount: 41_200,
-    type: 'Short payment',
-    confidence: 'High',
-    poNumber: 'PO-ZEP-2026-0445',
-  },
-  {
-    id: 'OR-007',
-    channel: 'Reliance',
-    title: 'PO-REL-2026-0087',
-    detail: 'Invoice INV-REL-0087 for Immunity Mix not found in Reliance portal. PO exists, GRN accepted. Invoice needs to be re-uploaded.',
-    amount: 68_000,
-    type: 'Invoice missing',
-    confidence: 'High',
-    poNumber: 'PO-REL-2026-0087',
   },
 ];
 
@@ -222,7 +172,7 @@ export const reconLineItems: ReconLineItem[] = [
     ),
     nextAction: 'Dispute DN-0847 - request damage evidence photos from Blinkit warehouse. GRN accepted full 500 units with no damage flag.',
   },
-  // ── Zepto: Visibility fee deducted twice (flagged) ──
+  // ── Zepto: Matched (clean) ──
   {
     id: 'RC-0391',
     channel: 'Zepto',
@@ -235,22 +185,20 @@ export const reconLineItems: ReconLineItem[] = [
     salePeriod: '1–7 Aug 2026',
     expectedPayoutDate: '10 Aug 2026',
     expected: 3_80_000,
-    paid: 1_96_000,
-    variance: 1_84_000,
-    status: 'Over-deducted',
-    issueType: 'Visibility fee duplicate',
-    matchNote: 'FIFO match across W31 cycles. Visibility fee line VIS-ZEP-0391 appears twice for the same campaign period - confirmed duplicate deduction.',
+    paid: 3_80_000,
+    variance: 0,
+    status: 'Matched',
+    matchNote: 'Exact reference match - Zepto settlement reconciled successfully.',
     varianceBreakdown: [
-      { label: 'Visibility fee (duplicate)', amount: -1_72_600, why: 'Visibility / ad-recovery fee ₹18,400 deducted twice in settlement STL-ZEP-0391 for campaign "Aug Launch Push"' },
-      { label: 'Platform support fee excess', amount: -7_200, why: 'Platform support billed at 3.5% vs contracted 2% on ₹3.8L GMV' },
-      { label: 'TCS variance', amount: -4_200, why: 'TCS on the duplicate visibility fee amount' },
+      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted (420 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'All deductions reconcile to the Zepto rate card' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'GST and TCS credited as expected' },
     ],
     threeWayMatch: mkThreeWay(
       { ref: 'PO-ZEP-2026-0391', status: 'Matched', amount: 3_80_000 },
       { ref: 'GRN-ZEP-0391', status: 'Matched', amount: 3_80_000, unitsAccepted: 420, unitsOrdered: 420 },
       { ref: 'INV-ZEP-0391', status: 'Matched', amount: 3_80_000 },
     ),
-    nextAction: 'File duplicate deduction dispute with Zepto ops - attach settlement sheet showing VIS-ZEP-0391 appearing on lines 14 and 28 for identical campaign.',
   },
   // ── Blinkit: Pending GRN (flagged) ──
   {
@@ -282,7 +230,7 @@ export const reconLineItems: ReconLineItem[] = [
     ),
     nextAction: 'Follow up with Blinkit dark store ops for GRN acceptance of 120 units. Dispatch proof (AWB-BLK-0923) available.',
   },
-  // ── Zepto: Short payment / returns double-dip (flagged) ──
+  // ── Zepto: Matched (clean) ──
   {
     id: 'RC-0445',
     channel: 'Zepto',
@@ -295,24 +243,22 @@ export const reconLineItems: ReconLineItem[] = [
     salePeriod: '1–7 Aug 2026',
     expectedPayoutDate: '10 Aug 2026',
     expected: 2_88_000,
-    paid: 2_46_800,
-    variance: 41_200,
-    status: 'Short paid',
-    issueType: 'Short payment',
-    matchNote: 'FIFO match across W31 cycles. 38 units deducted as returns but RTO claim D-0931 already credited ₹36,800 for same units - double deduction.',
+    paid: 2_88_000,
+    variance: 0,
+    status: 'Matched',
+    matchNote: 'Exact reference match - Zepto settlement reconciled successfully.',
     varianceBreakdown: [
-      { label: 'Returns deduction (duplicate)', amount: -36_800, why: '38 units of Energy Blend deducted as returns. RTO claim D-0931 already processed for these units - duplicate recovery.' },
-      { label: 'Deduction variance', amount: -2_200, why: 'Handling charge on returned units already reversed in prior claim' },
-      { label: 'TCS variance', amount: -2_200, why: 'TCS on the duplicate returns deduction' },
+      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted (320 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'All deductions reconcile to the Zepto rate card' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'GST and TCS credited as expected' },
     ],
     threeWayMatch: mkThreeWay(
       { ref: 'PO-ZEP-2026-0445', status: 'Matched', amount: 2_88_000 },
       { ref: 'GRN-ZEP-0445', status: 'Matched', amount: 2_88_000, unitsAccepted: 320, unitsOrdered: 320 },
-      { ref: 'INV-ZEP-0445', status: 'Disputed', amount: 2_88_000 },
+      { ref: 'INV-ZEP-0445', status: 'Matched', amount: 2_88_000 },
     ),
-    nextAction: 'Raise dispute - attach prior RTO claim D-0931 settlement confirmation showing the 38 units already credited.',
   },
-  // ── Reliance: Settlement pending - overdue (flagged) ──
+  // ── Reliance: Matched (clean) ──
   {
     id: 'RC-0112',
     channel: 'Reliance',
@@ -325,24 +271,22 @@ export const reconLineItems: ReconLineItem[] = [
     salePeriod: '15–31 Jul 2026',
     expectedPayoutDate: '10 Aug 2026',
     expected: 2_40_000,
-    paid: 0,
-    variance: 2_40_000,
-    status: 'Short paid',
-    issueType: 'Settlement pending',
-    matchNote: 'PO, GRN, and invoice all match. 45-day credit term expired 10 Aug. Settlement not received from Reliance - overdue.',
+    paid: 2_40_000,
+    variance: 0,
+    status: 'Matched',
+    matchNote: 'Exact reference match - Reliance vendor portal settlement reconciled. 45-day credit terms met.',
     varianceBreakdown: [
-      { label: 'Settlement not received', amount: -2_40_000, why: 'Full invoice amount ₹2,40,000 pending. 45-day credit term (from 28 Jun invoice) expired on 10 Aug. No payment initiated by Reliance.' },
-      { label: 'Deduction variance', amount: 0, why: 'No settlement initiated - no deductions to reconcile' },
-      { label: 'Tax / TCS variance', amount: 0, why: 'No settlement to reconcile' },
+      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted (400 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'Margin and listing fees at contracted rates' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'GST and TCS credited as expected' },
     ],
     threeWayMatch: mkThreeWay(
       { ref: 'PO-REL-2026-0112', status: 'Matched', amount: 2_40_000 },
       { ref: 'GRN-REL-0112', status: 'Matched', amount: 2_40_000, unitsAccepted: 400, unitsOrdered: 400 },
       { ref: 'INV-REL-0112', status: 'Matched', amount: 2_40_000 },
     ),
-    nextAction: 'Escalate to Reliance finance - 45-day credit term expired. Send payment reminder with invoice copy and GRN confirmation.',
   },
-  // ── Reliance: Invoice missing (flagged) ──
+  // ── Reliance: Matched (clean) ──
   {
     id: 'RC-0087',
     channel: 'Reliance',
@@ -355,24 +299,22 @@ export const reconLineItems: ReconLineItem[] = [
     salePeriod: '1–15 Jul 2026',
     expectedPayoutDate: '14 Aug 2026',
     expected: 68_000,
-    paid: 0,
-    variance: 68_000,
-    status: 'Missing invoice',
-    issueType: 'Invoice missing',
-    matchNote: 'PO and GRN exist but invoice INV-REL-0087 not found in Reliance portal. Cannot initiate settlement without invoice on file.',
+    paid: 68_000,
+    variance: 0,
+    status: 'Matched',
+    matchNote: 'Exact reference match - Reliance vendor portal settlement reconciled. 45-day credit terms met.',
     varianceBreakdown: [
-      { label: 'Invoice not on portal', amount: -68_000, why: 'Invoice INV-REL-0087 for 113 units of Immunity Mix not uploaded to Reliance Vendor Portal. GRN accepted. Payment blocked.' },
-      { label: 'Deduction variance', amount: 0, why: 'No settlement - invoice missing' },
-      { label: 'Tax / TCS variance', amount: 0, why: 'No settlement to reconcile' },
+      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted (113 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'Margin and listing fees at contracted rates' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'GST and TCS credited as expected' },
     ],
     threeWayMatch: mkThreeWay(
       { ref: 'PO-REL-2026-0087', status: 'Matched', amount: 68_000 },
       { ref: 'GRN-REL-0087', status: 'Matched', amount: 68_000, unitsAccepted: 113, unitsOrdered: 113 },
-      { ref: 'INV-REL-0087', status: 'Missing', amount: 0 },
+      { ref: 'INV-REL-0087', status: 'Matched', amount: 68_000 },
     ),
-    nextAction: 'Re-upload invoice INV-REL-0087 to Reliance Vendor Portal. Attach GRN-REL-0087 confirmation as supporting document.',
   },
-  // ── Cafes – Bangalore: Overdue batch (flagged) ──
+  // ── Cafes – Bangalore: Matched (clean) ──
   {
     id: 'RC-CAF-001',
     channel: 'Cafes – Bangalore',
@@ -385,22 +327,20 @@ export const reconLineItems: ReconLineItem[] = [
     salePeriod: '1–31 Jul 2026',
     expectedPayoutDate: '7 Aug 2026',
     expected: 48_000,
-    paid: 0,
-    variance: 48_000,
-    status: 'Short paid',
-    issueType: 'Overdue',
-    matchNote: 'Email-based order from Third Wave Coffee. Delivery confirmed via WhatsApp. Invoice sent via email. Payment overdue by 6 days.',
+    paid: 48_000,
+    variance: 0,
+    status: 'Matched',
+    matchNote: 'Payment via NEFT reference XYZ123 matched against invoice INV-CAF-0034.',
     varianceBreakdown: [
-      { label: 'Payment overdue', amount: -48_000, why: 'Third Wave Coffee - Jul order ₹48,000 invoiced on 1 Aug, 7-day payment terms. No payment received as of 13 Aug.' },
-      { label: 'Deduction variance', amount: 0, why: 'No deductions - payment not initiated' },
-      { label: 'Tax / TCS variance', amount: 0, why: 'No payment to reconcile' },
+      { label: 'Quantity variance', amount: 0, why: 'Units delivered match order (80 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'Zero deductions' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'Tax component correctly settled' },
     ],
     threeWayMatch: mkThreeWay(
       { ref: 'ORD-TWC-2026-Jul', status: 'Matched', amount: 48_000 },
       { ref: 'DEL-CAF-0034', status: 'Matched', amount: 48_000, unitsAccepted: 80, unitsOrdered: 80 },
       { ref: 'INV-CAF-0034', status: 'Matched', amount: 48_000 },
     ),
-    nextAction: 'Send 7-day payment reminder to Third Wave Coffee (finance@thirdwavecoffee.com). Attach invoice INV-CAF-0034.',
   },
   // ── Blinkit: Matched (clean) ──
   {
@@ -514,7 +454,7 @@ export const reconLineItems: ReconLineItem[] = [
       { ref: 'INV-CAF-0041', status: 'Matched', amount: 36_000 },
     ),
   },
-  // ── Blinkit: Rate variance (flagged) ──
+  // ── Blinkit: Matched (clean) ──
   {
     id: 'RC-0876',
     channel: 'Blinkit',
@@ -527,22 +467,20 @@ export const reconLineItems: ReconLineItem[] = [
     salePeriod: '1–7 Aug 2026',
     expectedPayoutDate: '10 Aug 2026',
     expected: 2_20_000,
-    paid: 1_82_000,
-    variance: 38_000,
-    status: 'Over-deducted',
-    issueType: 'Rate variance',
-    matchNote: 'Exact reference match on STL-BLK-0876. Commission charged at 24% vs contracted 20% - ₹8,800 excess on ₹2.2L GMV.',
+    paid: 2_20_000,
+    variance: 0,
+    status: 'Matched',
+    matchNote: 'Exact reference match - settlement ID resolved on first pass, amount within ±₹1 tolerance.',
     varianceBreakdown: [
-      { label: 'Commission rate variance', amount: -34_200, why: 'Commission charged at 24% vs contracted 20% on ₹2.2L GMV. Excess = ₹8,800. Additional handling fee variance ₹25,400.' },
-      { label: 'Deduction variance', amount: -1_800, why: 'Handling fee applied at ₹6/unit vs contracted ₹4/unit on 300 units' },
-      { label: 'Tax / TCS variance', amount: -2_000, why: 'GST charged on the excess commission' },
+      { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted (300 units)' },
+      { label: 'Deduction variance', amount: 0, why: 'Commission charged at contracted 20%' },
+      { label: 'Tax / TCS variance', amount: 0, why: 'GST matches invoice' },
     ],
     threeWayMatch: mkThreeWay(
       { ref: 'PO-BLK-2026-0876', status: 'Matched', amount: 2_20_000 },
       { ref: 'GRN-BLK-0876', status: 'Matched', amount: 2_20_000, unitsAccepted: 300, unitsOrdered: 300 },
       { ref: 'INV-BLK-0876', status: 'Matched', amount: 2_20_000 },
     ),
-    nextAction: 'File rate variance dispute - attach contract BLK-CTR-FY26 showing 20% commission clause. Excess ₹34,200 recoverable.',
   },
   // ── Zepto: Matched (clean) ──
   {
