@@ -172,7 +172,24 @@ const mkThreeWay = (
   po: { ref: string; status: 'Matched' | 'Pending' | 'Missing' | 'Disputed'; amount: number },
   grn: { ref: string; status: 'Matched' | 'Pending' | 'Missing' | 'Disputed'; amount: number; unitsAccepted: number; unitsOrdered: number },
   inv: { ref: string; status: 'Matched' | 'Pending' | 'Missing' | 'Disputed'; amount: number },
-): ThreeWayMatch => ({ po, grn, invoice: inv });
+): ThreeWayMatch => {
+  let unitPrice = 0;
+  if (grn.unitsAccepted > 0) unitPrice = grn.amount / grn.unitsAccepted;
+  else if (grn.unitsOrdered > 0) unitPrice = grn.amount / grn.unitsOrdered;
+  else unitPrice = 1000;
+
+  const unitsInvoiced = grn.unitsAccepted > 0 ? grn.unitsAccepted + 5 : grn.unitsOrdered + 5;
+  const unitsOrderedNew = unitsInvoiced + 10;
+
+  const poAmount = Math.round(unitsOrderedNew * unitPrice);
+  const invoiceAmount = Math.round(unitsInvoiced * unitPrice);
+
+  return { 
+    po: { ...po, amount: poAmount }, 
+    grn: { ...grn, unitsOrdered: unitsOrderedNew }, 
+    invoice: { ...inv, amount: invoiceAmount } 
+  };
+};
 
 export const reconLineItems: ReconLineItem[] = [
   // ── Blinkit: Debit note for damages (flagged) ──

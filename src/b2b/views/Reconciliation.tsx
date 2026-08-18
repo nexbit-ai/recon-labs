@@ -76,8 +76,8 @@ const GRNStatusIcon: React.FC<{ status: GRNStatus }> = ({ status }) => {
 const ThreeWayMatchRow: React.FC<{ match: ThreeWayMatch }> = ({ match }) => {
   const items = [
     { label: 'PO', ref: match.po.ref, status: match.po.status, amount: match.po.amount },
-    { label: 'GRN', ref: match.grn.ref, status: match.grn.status, amount: match.grn.amount },
     { label: 'Invoice', ref: match.invoice.ref, status: match.invoice.status, amount: match.invoice.amount },
+    { label: 'GRN', ref: match.grn.ref, status: match.grn.status, amount: match.grn.amount },
   ];
   const statusIcon = (s: string) => {
     if (s === 'Matched') return <CheckCircleOutlined sx={{ fontSize: 14, color: colors.grey500 }} />;
@@ -87,17 +87,37 @@ const ThreeWayMatchRow: React.FC<{ match: ThreeWayMatch }> = ({ match }) => {
   };
 
   return (
-    <Box sx={{ display: 'flex', gap: `${space.md}px`, mt: `${space.md}px` }}>
-      {items.map((item) => (
-        <Box key={item.label} sx={{ flex: 1, border: hairline, p: `${space.md}px` }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px', mb: '4px' }}>
-            {statusIcon(item.status)}
-            <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase' }}>{item.label}</Typography>
-          </Box>
-          <Typography sx={{ fontSize: 12, color: colors.grey700, wordBreak: 'break-all' }}>{item.ref}</Typography>
-          <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, mt: '2px', ...tabularNums }}>{formatRupees(item.amount)}</Typography>
-        </Box>
-      ))}
+    <Box sx={{ display: 'flex', mt: `${space.md}px`, alignItems: 'stretch' }}>
+      {items.map((item, index) => {
+        const gap = index > 0 ? items[index - 1].amount - item.amount : 0;
+        
+        return (
+          <React.Fragment key={item.label}>
+            {index > 0 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', px: `${space.md}px`, minWidth: '80px' }}>
+                {index === 2 && gap > 0 && (
+                  <Typography sx={{ fontSize: 10, color: colors.grey500, textTransform: 'uppercase', letterSpacing: '0.04em', mb: '4px', whiteSpace: 'nowrap' }}>Debit Note</Typography>
+                )}
+                <Box sx={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ height: '1px', flex: 1, bgcolor: colors.grey500 }} />
+                  <Box sx={{ borderTop: '4px solid transparent', borderBottom: '4px solid transparent', borderLeft: `5px solid ${colors.grey500}` }} />
+                </Box>
+                {index === 2 && gap > 0 && (
+                  <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.accent, mt: '4px', ...tabularNums }}>−{formatRupees(gap)}</Typography>
+                )}
+              </Box>
+            )}
+            <Box sx={{ flex: 1, border: hairline, p: `${space.md}px`, minWidth: 0, bgcolor: colors.paper }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: '4px', mb: '4px' }}>
+                {statusIcon(item.status)}
+                <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase' }}>{item.label}</Typography>
+              </Box>
+              <Typography sx={{ fontSize: 12, color: colors.grey700, wordBreak: 'break-all', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.ref}>{item.ref}</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, mt: '2px', ...tabularNums }}>{formatRupees(item.amount)}</Typography>
+            </Box>
+          </React.Fragment>
+        );
+      })}
     </Box>
   );
 };
