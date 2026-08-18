@@ -1,7 +1,7 @@
 // SKU profitability for the MIS page, split into two labeled groups:
 // "Top performers" (margin desc) and "Kill list" (worst margin first). Kill-list
 // rows reuse the faint warning-wash used for loss-making channels, so a leaking
-// channel and its leaking SKUs read as the same story. No red token exists —
+// channel and its leaking SKUs read as the same story. No red token exists -
 // negatives use the muted warning/amber tone + a warning icon on the group head.
 import React from 'react';
 import { Box, Typography } from '@mui/material';
@@ -24,7 +24,7 @@ const rowVariant = {
   show: { opacity: 1, y: 0, transition: { duration: 0.28, ease: 'easeOut' as const } },
 };
 
-// Muted, neutral channel tag — matches the channel health chip treatment.
+// Muted, neutral channel tag - matches the channel health chip treatment.
 const ChannelChip: React.FC<{ name: string }> = ({ name }) => (
   <Box
     component="span"
@@ -170,7 +170,7 @@ const SkuProfitability: React.FC<{ skus: SkuRow[]; startDelay?: number }> = ({ s
                 <Box component="span" sx={{ fontWeight: 600, color: colors.ink, ...tabularNums }}>
                   {n} {noun}
                 </Box>{' '}
-                selling below cost — {where}.
+                selling below cost - {where}.
               </Typography>
             </Box>
           </>

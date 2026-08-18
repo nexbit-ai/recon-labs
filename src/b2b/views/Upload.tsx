@@ -1,8 +1,8 @@
-// B2B Upload — document intake. Auto-fetch / email-forwarding / manual drop, a
+// B2B Upload - document intake. Auto-fetch / email-forwarding / manual drop, a
 // daily processing summary, and a "recently received" feed. Conforms to
 // docs/B2B_DESIGN_SYSTEM.md: square corners, hairline borders, monochrome + one
 // accent (#7A5DBF). Status and low-confidence exceptions are NEVER colour-coded
-// — they are expressed through type weight and hairline-bordered labels. The
+// - they are expressed through type weight and hairline-bordered labels. The
 // accent appears only on the single primary action (Sync) and the modal CTA.
 import React, { useState } from 'react';
 import { Box, Typography, Button, IconButton } from '@mui/material';
@@ -17,16 +17,16 @@ import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
 import { cardSx, PageTitle, SectionTitle, ColumnLabel } from '../components/primitives';
 import UploadSettlementModal from '../components/UploadSettlementModal';
 
-const INBOX = 'inbox-kp@usenexbit.com';
+const INBOX = 'cosmix-orders@usenexbit.com';
 
 // ── Daily processing counts ─────────────────────────────────────────────────
 const PROCESSED_TODAY = [
-  { value: '8', label: 'Purchase Orders' },
-  { value: '14', label: 'GRNs' },
-  { value: '22', label: 'Invoices' },
+  { value: '14', label: 'Purchase Orders' },
+  { value: '28', label: 'GRNs' },
+  { value: '42', label: 'Invoices' },
   { value: '6', label: 'Settlements' },
-  { value: '1', label: 'Bank Statements' },
-  { value: '4', label: 'Debit / Credit Notes' },
+  { value: '12', label: 'Cafe Order Emails' },
+  { value: '5', label: 'Debit Notes' },
 ];
 
 // ── Recently received feed ──────────────────────────────────────────────────
@@ -47,74 +47,73 @@ interface ReceivedFile {
 
 const RECEIVED_FILES: ReceivedFile[] = [
   {
-    name: 'PO_Zepto_48291.pdf',
+    name: 'Re: August order - Third Wave',
+    docType: 'Cafe Order Email',
+    source: 'Email forwarding',
+    time: '12 mins ago',
+    confidence: 94,
+    amount: '₹48 K',
+    status: 'Processed',
+  },
+  {
+    name: 'PO_Zepto_0445.pdf',
     docType: 'Purchase Order',
     source: 'Auto-fetch',
-    time: '10 mins ago',
-    confidence: 99,
-    amount: '₹1.4 L',
-    status: 'Processed',
-  },
-  {
-    name: 'Invoice_BlinkitFMCG_Q2.xlsx',
-    docType: 'Invoice',
-    source: 'Email forwarding',
     time: '24 mins ago',
-    confidence: 96,
-    amount: '₹8.7 L',
+    confidence: 99,
+    amount: '₹2.8 L',
     status: 'Processed',
   },
   {
-    name: 'GRN_Instamart_scan_0917.jpg',
+    name: 'GRN_Blinkit_scan_0847.jpg',
     docType: 'GRN',
     source: 'Upload',
     time: '38 mins ago',
     confidence: 61,
-    amount: '₹2.1 L',
+    amount: '₹4.5 L',
     status: 'Needs review',
-    note: 'Low scan quality — line items partially unreadable',
+    note: 'Low scan quality - signature missing',
   },
   {
-    name: 'Settlement_Swiggy_May.csv',
+    name: 'Settlement_Reliance_Jul.csv',
     docType: 'Settlement',
     source: 'Auto-fetch',
     time: '1 hour ago',
     confidence: 92,
-    amount: '₹14.2 L',
+    amount: '₹18.0 L',
     status: 'Processed',
   },
   {
-    name: 'DebitNote_Reliance_unknown.pdf',
-    docType: 'Debit / Credit Note',
+    name: 'DebitNote_Blinkit_DN0847.pdf',
+    docType: 'Debit Note',
     source: 'Email forwarding',
     time: '2 hours ago',
-    confidence: 43,
-    amount: '—',
-    status: 'Exception',
-    note: 'Document type ambiguous — could not extract amount',
-  },
-  {
-    name: 'BankStatement_HDFC_Apr.pdf',
-    docType: 'Bank Statement',
-    source: 'Upload',
-    time: '3 hours ago',
-    confidence: 88,
-    amount: '₹52.0 L',
+    confidence: 98,
+    amount: '₹7.5 K',
     status: 'Processed',
   },
   {
-    name: 'PO_DMart_handwritten.png',
-    docType: 'Purchase Order',
+    name: 'bizeebuy_AP_Export_W31.xml',
+    docType: 'ERP Export',
     source: 'Upload',
+    time: '3 hours ago',
+    confidence: 99,
+    amount: '-',
+    status: 'Processed',
+  },
+  {
+    name: 'Fwd: order for pascucci',
+    docType: 'Cafe Order Email',
+    source: 'Email forwarding',
     time: '4 hours ago',
     confidence: 38,
-    amount: '₹76 K',
+    amount: '-',
     status: 'Exception',
-    note: 'Handwritten fields — vendor & SKU mapping uncertain',
+    note: 'Missing attachments, SKUs not identifiable',
   },
 ];
 
-// Square hairline-bordered status label — ink/grey only, never coloured.
+// Square hairline-bordered status label - ink/grey only, never coloured.
 // Neutral states sit on a grey-100 fill at weight 500; attention states use a
 // white fill, ink hairline and weight 600 (spec §6 "attention" chip variant).
 const StatusLabel: React.FC<{ status: ReceiveStatus }> = ({ status }) => {
@@ -253,7 +252,7 @@ const Upload: React.FC = () => {
         <Box sx={{ ...cardSx, p: `${space.xl}px` }}>
           <SectionTitle sx={{ mb: `${space.sm}px` }}>Email forwarding</SectionTitle>
           <Typography sx={{ ...type.body, color: colors.grey700, mb: `${space.lg}px`, lineHeight: '20px' }}>
-            Forward vendor emails, platform reports or internal invoices directly to your AI inbox.
+            Forward cafe orders, platform reports, or invoices directly to your AI inbox.
           </Typography>
           <Box
             sx={{
@@ -386,7 +385,7 @@ const Upload: React.FC = () => {
                   flexShrink: 0,
                   ...type.body,
                   fontWeight: 600,
-                  color: file.amount === '—' ? colors.grey500 : colors.ink,
+                  color: file.amount === '-' ? colors.grey500 : colors.ink,
                   ...tabularNums,
                 }}
               >

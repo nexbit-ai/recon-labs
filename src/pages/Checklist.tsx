@@ -144,12 +144,12 @@ const initialTasks: Task[] = [
       { label: 'Done', type: 'default' },
       { label: 'Marketplace', type: 'default' }
     ],
-    subtitle: 'REC-002 · Flipkart · Excess commission on 12% of electronics',
+    subtitle: 'REC-002 · Myntra · Excess commission on 12% of electronics',
     amount: '₹2,10,500',
     actionText: 'Assign to Agent',
     status: 'review',
     aiConfidence: 88,
-    aiInsights: "Nex AI Analysis: Flipkart Beauty category rate card shifted on May 1st, causing systemic overcharges.",
+    aiInsights: "Nex AI Analysis: Myntra Beauty category rate card shifted on May 1st, causing systemic overcharges.",
     trendData: [{val: 210}, {val: 210}, {val: 210}, {val: 210}, {val: 210}, {val: 210}, {val: 210}],
   },
   {
@@ -174,7 +174,7 @@ const cfoDailyTasks: Task[] = [
     id: 101,
     title: 'Daily Cash Flow Summary',
     tags: [{ label: 'Done', type: 'default' }],
-    subtitle: 'REC-CFO-1 · Verify T-1 incoming settlements across Amazon, Flipkart, and Razorpay',
+    subtitle: 'REC-CFO-1 · Verify T-1 incoming settlements across Amazon, Myntra, and Razorpay',
     actionText: 'Assign to Agent',
     status: 'review',
   },
@@ -198,17 +198,17 @@ const cfoDailyTasks: Task[] = [
     id: 104,
     title: 'Total Marketplace Settlement Daily Report',
     tags: [{ label: 'Pending', type: 'danger' }],
-    subtitle: 'REC-CFO-4 · Reconcile total incoming settlements from Amazon, Flipkart, Myntra',
+    subtitle: 'REC-CFO-4 · Reconcile total incoming settlements from Amazon, Myntra, Myntra',
     actionText: 'Assign to Agent',
     status: 'requires_action',
   },
 ];
 
 const suggestedQueries = [
-  "Do a flipkart Recon for march 26",
+  "Do a myntra Recon for march 26",
   "Is 2025 complete recon completed",
   "Analyze Amazon TAT for Q3",
-  "Explain Flipkart fee hike in May",
+  "Explain Myntra fee hike in May",
 ];
 
 const monthNames = [
@@ -378,9 +378,9 @@ const Checklist: React.FC = () => {
 
   const getLoadingSteps = (query: string): string[] => {
     const q = query.toLowerCase();
-    if (q.includes('flipkart recon') || q.includes('march 26')) {
+    if (q.includes('myntra recon') || q.includes('march 26')) {
       return [
-        "Scanning Flipkart March settlement data...",
+        "Scanning Myntra March settlement data...",
         "Fetching sales manifest from ledger...",
         "Cross-referencing Order IDs against settlements...",
         "Identifying fee and discount discrepancies...",
@@ -406,7 +406,7 @@ const Checklist: React.FC = () => {
     }
     if (q.includes('fee') || q.includes('may')) {
       return [
-        "Retrieving Flipkart historical rate cards...",
+        "Retrieving Myntra historical rate cards...",
         "Detecting marketplace fee structure changes...",
         "Calculating commission impact on beauty categories...",
         "Benchmarking net settlement vs expected sales...",
@@ -494,11 +494,11 @@ const Checklist: React.FC = () => {
 
     if (q.includes('daily cash flow summary') || q.includes('cfo-1')) {
       return {
-        text: "I've compiled the T-1 Cash Flow Summary (REC-CFO-1). We've processed the incoming settlements for Amazon, Flipkart, and Razorpay.\n\nSummary:\n• Total Expected: ₹14,50,000\n• Actual Received: ₹14,25,000\n• Variance: ₹25,000 (pending Razorpay T+2 hold)\n\nThe chart below compares expected vs actual. Shall I authorize the ledger sync for the verified amounts?",
+        text: "I've compiled the T-1 Cash Flow Summary (REC-CFO-1). We've processed the incoming settlements for Amazon, Myntra, and Razorpay.\n\nSummary:\n• Total Expected: ₹14,50,000\n• Actual Received: ₹14,25,000\n• Variance: ₹25,000 (pending Razorpay T+2 hold)\n\nThe chart below compares expected vs actual. Shall I authorize the ledger sync for the verified amounts?",
         chartType: 'bar',
         chartData: [
           { name: 'Amazon', value: 450000 },
-          { name: 'Flipkart', value: 380000 },
+          { name: 'Myntra', value: 380000 },
           { name: 'Razorpay', value: 595000 },
         ]
       };
@@ -527,7 +527,7 @@ const Checklist: React.FC = () => {
 
     if (q.includes('total marketplace settlement daily report') || q.includes('cfo-4')) {
       return {
-        text: "Generating Total Marketplace Settlement Daily Report (REC-CFO-4)... \n\nThe report is ready. It aggregates T-1 settlements from Amazon, Flipkart, and Myntra, matching them against expected sales ledger entries.\n\nYou can download the detailed settlement reconciliation below.",
+        text: "Generating Total Marketplace Settlement Daily Report (REC-CFO-4)... \n\nThe report is ready. It aggregates T-1 settlements from Amazon, Myntra, and Myntra, matching them against expected sales ledger entries.\n\nYou can download the detailed settlement reconciliation below.",
         hasDownload: true,
         downloadName: 'Marketplace_Settlements_Daily.csv'
       };
@@ -549,9 +549,9 @@ const Checklist: React.FC = () => {
       };
     }
 
-    if (q.includes('flipkart recon') || q.includes('march 26')) {
+    if (q.includes('myntra recon') || q.includes('march 26')) {
       return {
-        text: "I've initiated the Flipkart reconciliation for March 2026. Data ingestion is 100% complete. I found a gross discrepancy of ₹12,45,600 across 114 transactions, primarily due to 'Seller Share Discount' mismatches.\n\nMatching the dashboard figures: Gross Revenue is recorded at ₹4.41 Cr with Net settlement at ₹3.70 Cr.\n\nWould you like me to flag these 114 items for dispute?",
+        text: "I've initiated the Myntra reconciliation for March 2026. Data ingestion is 100% complete. I found a gross discrepancy of ₹12,45,600 across 114 transactions, primarily due to 'Seller Share Discount' mismatches.\n\nMatching the dashboard figures: Gross Revenue is recorded at ₹4.41 Cr with Net settlement at ₹3.70 Cr.\n\nWould you like me to flag these 114 items for dispute?",
         chartType: 'bar',
         chartData: [
           { name: 'Matched', value: 2450 },
@@ -563,7 +563,7 @@ const Checklist: React.FC = () => {
 
     if (q.includes('2025') && q.includes('completed')) {
       return {
-        text: "Summary for FY 2025 (Dashboard Integrety):\n\n• Flipkart: 100% Completed\n• Amazon: 98.2% Completed (Sept pending)\n• D2C/Razorpay: 100% Completed\n\nTotal Net Revenue: ₹3,85,76,000 (₹3.85 Cr)\nTotal Gross Revenue: ₹4,03,00,000 (₹4.03 Cr)\nTotal Returns: ₹82,90,258\n\nThe 8.2% leakage is primarily attributed to unrecovered Amazon RTO claims.",
+        text: "Summary for FY 2025 (Dashboard Integrety):\n\n• Myntra: 100% Completed\n• Amazon: 98.2% Completed (Sept pending)\n• D2C/Razorpay: 100% Completed\n\nTotal Net Revenue: ₹3,85,76,000 (₹3.85 Cr)\nTotal Gross Revenue: ₹4,03,00,000 (₹4.03 Cr)\nTotal Returns: ₹82,90,258\n\nThe 8.2% leakage is primarily attributed to unrecovered Amazon RTO claims.",
       };
     }
 

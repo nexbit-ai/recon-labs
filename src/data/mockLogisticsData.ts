@@ -1,6 +1,6 @@
 // Frontend-only mock data for the Logistics Cost Intelligence page (demo branch).
-// Everything the page renders — KPIs, slab/zone/reason distributions, the
-// mismatched-orders table and the rate-card config dialog — is generated here.
+// Everything the page renders - KPIs, slab/zone/reason distributions, the
+// mismatched-orders table and the rate-card config dialog - is generated here.
 // Numbers cross-foot: reason counts/values and zone values sum exactly to the
 // headline mismatch count and absolute leakage per provider.
 

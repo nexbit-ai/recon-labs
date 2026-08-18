@@ -1,4 +1,4 @@
-// "Live · updated just now" freshness signal for the MIS header — sells the
+// "Live · updated just now" freshness signal for the MIS header - sells the
 // real-time positioning. A subtle accent dot with a gentle pulse (disabled under
 // reduced-motion) + muted caption.
 import React from 'react';

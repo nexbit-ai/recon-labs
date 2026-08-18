@@ -1638,7 +1638,7 @@ interface TransactionSheetProps {
   statsData?: MarketplaceReconciliationResponse | null;
   initialTab?: number;
   dateRange?: { start: string; end: string };
-  initialPlatforms?: ('flipkart' | 'd2c' | 'amazon' | 'other' | 'amazon_uk')[];
+  initialPlatforms?: ('myntra' | 'd2c' | 'amazon' | 'other' | 'amazon_uk')[];
   initialFilters?: { [key: string]: any };
 }
 
@@ -1646,7 +1646,7 @@ interface TransactionSheetProps {
 const COLUMN_TO_API_PARAM_MAP: Record<string, {
   apiParam: string;
   type: 'string' | 'number' | 'date' | 'enum';
-  supportedPlatforms?: ('flipkart' | 'amazon' | 'd2c' | 'all' | 'amazon_uk')[];
+  supportedPlatforms?: ('myntra' | 'amazon' | 'd2c' | 'all' | 'amazon_uk')[];
   usesInSuffix?: boolean; // For CSV filters like status_in
 }> = {
   // Common filters (both platforms)
@@ -1720,10 +1720,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [headerDateRange, setHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   // Platform filter state - single selection only
-  const availablePlatforms = ['flipkart', 'amazon', 'amazon_uk', 'd2c', 'other'] as const;
+  const availablePlatforms = ['myntra', 'amazon', 'amazon_uk', 'd2c', 'other'] as const;
   type Platform = typeof availablePlatforms[number];
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Default: flipkart only
-  const [pendingSelectedPlatform, setPendingSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Pending platform before apply
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'myntra'); // Default: myntra only
+  const [pendingSelectedPlatform, setPendingSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'myntra'); // Pending platform before apply
   // Order ID chips state
   const [orderIdChips, setOrderIdChips] = useState<string[]>([]);
   // Order ID search in header
@@ -1834,7 +1834,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     {
       id: 'EXP-3921',
       type: 'Transactions CSV',
-      platform: 'Flipkart',
+      platform: 'Myntra',
       requestedOn: '20 Nov 2025 • 09:10 AM',
       status: 'ready',
       fileSize: '2.3 MB',
@@ -1845,7 +1845,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       platform: 'Amazon',
       requestedOn: '19 Nov 2025 • 08:42 PM',
       status: 'processing',
-      fileSize: '—',
+      fileSize: '-',
     },
     {
       id: 'EXP-3919',
@@ -1853,7 +1853,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       platform: 'D2C',
       requestedOn: '19 Nov 2025 • 04:05 PM',
       status: 'failed',
-      fileSize: '—',
+      fileSize: '-',
     },
   ]);
 
@@ -1915,7 +1915,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       platform: platformName,
       requestedOn: requestedOn,
       status: status,
-      fileSize: status === 'ready' ? '—' : '—', // File size not provided in API response
+      fileSize: status === 'ready' ? '-' : '-', // File size not provided in API response
       downloadUrl: item.download_url,
     };
   };
@@ -2005,10 +2005,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
 
       // Platform-specific column priority:
-      // Flipkart: order_item_id first, then order_id
+      // Myntra: order_item_id first, then order_id
       // Amazon & D2C: order_id first, then order_item_id
       const priorityKeys: Array<'order_id' | 'order_item_id'> =
-        selectedPlatform === 'flipkart'
+        selectedPlatform === 'myntra'
           ? ['order_item_id', 'order_id']
           : ['order_id', 'order_item_id'];
 
@@ -4163,14 +4163,14 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setSearchTerm('');
     setDateRange({ start: '', end: '' });
     setColumnFilters({});
-    setSelectedPlatform('flipkart'); // Reset to default platform
-    setPendingSelectedPlatform('flipkart'); // Reset pending platform too
+    setSelectedPlatform('myntra'); // Reset to default platform
+    setPendingSelectedPlatform('myntra'); // Reset pending platform too
     setOrderIdChips([]); // Clear order ID chips
     setOrderIdSearch(''); // Clear order ID search in header
     setShowOrderIdSearch(false); // Hide order ID search bar
     setPage(0);
     setCurrentPage(1);
-    fetchQuadTransactions(1, {}, { start: '', end: '' }, 'flipkart', []);
+    fetchQuadTransactions(1, {}, { start: '', end: '' }, 'myntra', []);
   };
 
   // Handle tab change
@@ -4285,7 +4285,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           platform: formattedPlatformLabel,
           requestedOn: formatExportRequestTimestamp(),
           status: 'processing',
-          fileSize: '—',
+          fileSize: '-',
         };
         setExportRequests((prev) => [newRequest, ...prev]);
 
@@ -4639,8 +4639,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 fontSize: { xs: '0.65rem', sm: '0.7rem' },
                                 whiteSpace: 'nowrap'
                               }}>
-                                {platform === 'flipkart'
-                                  ? 'Flipkart'
+                                {platform === 'myntra'
+                                  ? 'Myntra'
                                   : platform === 'amazon'
                                     ? 'Amazon'
                                     : platform === 'amazon_uk'
@@ -5346,8 +5346,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   >
                                     {getSalesReportSortIcon(column)}
                                   </IconButton>
-                                  {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
-                                  {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                  {/* Magnifying glass button for Sales Report search - order_item_id for Myntra, order_id for Amazon and D2C */}
+                                  {((selectedPlatform === 'myntra' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
                                     (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
                                     (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
                                       <IconButton
@@ -5484,7 +5484,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             )}
                             {/* Sales Report Search Bar - Floating Popover */}
                             {activeTab === 4 && showSalesReportSearch &&
-                              ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                              ((selectedPlatform === 'myntra' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
                                 (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
                                 (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
                                 <Box
@@ -5639,8 +5639,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   >
                                     {getSalesReportSortIcon(column)}
                                   </IconButton>
-                                  {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
-                                  {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                  {/* Magnifying glass button for Sales Report search - order_item_id for Myntra, order_id for Amazon and D2C */}
+                                  {((selectedPlatform === 'myntra' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
                                     (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
                                     (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
                                       <IconButton
@@ -5777,7 +5777,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             )}
                             {/* Sales Report Search Bar - Floating Popover */}
                             {activeTab === 4 && showSalesReportSearch &&
-                              ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                              ((selectedPlatform === 'myntra' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
                                 (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
                                 (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
                                 <Box
@@ -5947,8 +5947,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   >
                                     {getSalesReportSortIcon(column)}
                                   </IconButton>
-                                  {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
-                                  {((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                                  {/* Magnifying glass button for Sales Report search - order_item_id for Myntra, order_id for Amazon and D2C */}
+                                  {((selectedPlatform === 'myntra' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
                                     (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
                                     (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
                                       <IconButton
@@ -6085,7 +6085,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             )}
                             {/* Sales Report Search Bar - Floating Popover */}
                             {activeTab === 4 && showSalesReportSearch &&
-                              ((selectedPlatform === 'flipkart' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
+                              ((selectedPlatform === 'myntra' && (column === 'Order Item ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_item_id')) ||
                                 (selectedPlatform === 'amazon' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id')) ||
                                 (selectedPlatform === 'd2c' && (column === 'Order ID' || salesReportData?.columns?.find(col => col.title === column)?.key === 'order_id'))) && (
                                 <Box

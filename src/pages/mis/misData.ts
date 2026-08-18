@@ -1,14 +1,14 @@
 // Single source of truth for the AI-Powered MIS page (Tata 1mg demo).
-// Frontend-only fixtures — no backend, no fetch, no async. All amounts are in
+// Frontend-only fixtures - no backend, no fetch, no async. All amounts are in
 // whole rupees; percentages are plain numbers (e.g. 82.0 = 82.0%). These figures
 // are pre-built to tie out (channel GMV sums to total GMV, waterfall subtotals
-// resolve) — do not alter them.
+// resolve) - do not alter them.
 
 /** The seven channels Tata 1mg sells across in this demo. */
 export type MISChannelName =
   | 'Amazon'
   | 'Own website'
-  | 'Flipkart'
+  | 'Myntra'
   | 'HealthKart'
   | 'Blinkit'
   | 'Zepto'
@@ -27,7 +27,7 @@ export interface PnLLine {
   kind: PnLLineKind;
 }
 
-/** Prior-month headline figures — used only to compute delta arrows on the current period. */
+/** Prior-month headline figures - used only to compute delta arrows on the current period. */
 export interface PriorMonthSummary {
   period: string;
   gmv: number;
@@ -116,9 +116,9 @@ const priorMonth: PriorMonthSummary = {
 const channels: ChannelMISPerformance[] = [
   { channel: 'Amazon', gmv: 38_00_000, cm1Pct: 22, health: 'healthy' },
   { channel: 'Own website', gmv: 24_00_000, cm1Pct: 31, health: 'best', note: 'No marketplace commission' },
-  { channel: 'Flipkart', gmv: 22_00_000, cm1Pct: 9, health: 'thin' },
+  { channel: 'Myntra', gmv: 22_00_000, cm1Pct: 9, health: 'thin' },
   { channel: 'HealthKart', gmv: 20_00_000, cm1Pct: 24, health: 'strong', note: 'Category specialist' },
-  { channel: 'Blinkit', gmv: 16_00_000, cm1Pct: -4, health: 'loss', note: 'Loss-making — negative CM1' },
+  { channel: 'Blinkit', gmv: 16_00_000, cm1Pct: -4, health: 'loss', note: 'Loss-making - negative CM1' },
   { channel: 'Zepto', gmv: 12_00_000, cm1Pct: -2, health: 'negative' },
   { channel: 'BigBasket', gmv: 10_00_000, cm1Pct: 6, health: 'thin' },
 ];

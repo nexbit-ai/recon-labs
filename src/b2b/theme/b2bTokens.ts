@@ -1,4 +1,4 @@
-// B2B design tokens — single source of truth for the Nexbit B2B module.
+// B2B design tokens - single source of truth for the Nexbit B2B module.
 // Mirrors docs/B2B_DESIGN_SYSTEM.md exactly. Do not add colours or rounded corners.
 import { createTheme } from '@mui/material/styles';
 
@@ -8,7 +8,7 @@ export const colors = {
   paper: '#FFFFFF',
   grey700: '#6B7280',
   grey500: '#9CA3AF',
-  grey200: '#E5E7EB', // hairline — all borders / dividers / rules
+  grey200: '#E5E7EB', // hairline - all borders / dividers / rules
   grey100: '#F5F5F5', // subtle fills
   accent: '#7A5DBF',
   accentHover: '#6A4FB0',
@@ -74,7 +74,7 @@ export const shell = {
   gridGutter: 24,
 } as const;
 
-// ── B2B MUI THEME (scoped — never leaks into B2C) ──────────────────────────
+// ── B2B MUI THEME (scoped - never leaks into B2C) ──────────────────────────
 // Square corners everywhere, no shadows, hairline structure.
 export const b2bTheme = createTheme({
   palette: {

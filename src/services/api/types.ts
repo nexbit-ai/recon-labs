@@ -113,7 +113,7 @@ export interface MainSummaryResponse {
     providers: {
       paytm?: MainSummaryProviderEntry;
       payU?: MainSummaryProviderEntry;
-      flipkart?: MainSummaryProviderEntry;
+      myntra?: MainSummaryProviderEntry;
       cod?: MainSummaryProviderEntry[];
       [key: string]: any;
     };
@@ -131,7 +131,7 @@ export interface MainSummaryResponse {
     providers: {
       paytm?: MainSummaryProviderEntry;
       payU?: MainSummaryProviderEntry;
-      flipkart?: MainSummaryProviderEntry;
+      myntra?: MainSummaryProviderEntry;
       cod?: MainSummaryProviderEntry[];
       [key: string]: any;
     };
@@ -174,11 +174,11 @@ export interface MarketplaceReconciliationResponse {
     totalUnreconciled: {
       amount: string;
       number: number;
-      lessPaymentReceivedFromFlipkart: {
+      lessPaymentReceivedFromMyntra: {
         amount: string;
         number: number;
       };
-      excessPaymentReceivedFromFlipkart: {
+      excessPaymentReceivedFromMyntra: {
         amount: string;
         number: number;
       };

@@ -1,8 +1,8 @@
 // Channel performance breakdown for the MIS page. One row per channel, sorted
 // by CM1% descending so loss-making channels sink to the bottom regardless of
 // GMV size. Two independent encodings: GMV bar length = SIZE (neutral ink, never
-// implies profit); CM1% colour = HEALTH (green / grey / amber). The tension —
-// a long bar on an amber negative CM1% — is the point.
+// implies profit); CM1% colour = HEALTH (green / grey / amber). The tension -
+// a long bar on an amber negative CM1% - is the point.
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -164,7 +164,7 @@ const ChannelPerformance: React.FC<{ channels: ChannelMISPerformance[]; startDel
         })}
       </Box>
 
-      {/* Insight line — worst channel by CM1%, computed dynamically */}
+      {/* Insight line - worst channel by CM1%, computed dynamically */}
       <Box sx={{ mt: `${space.lg}px`, pt: `${space.lg}px`, borderTop: hairline }}>
         <Typography sx={{ ...type.body, color: colors.grey700 }}>
           <Box component="span" sx={{ fontWeight: 600, color: colors.ink }}>

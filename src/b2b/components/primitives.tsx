@@ -1,6 +1,6 @@
 // Shared B2B (Nexbit) UI primitives. Every view imports these so cards, titles,
 // channel labels, column headers, stat tiles, and clickable rows are visually
-// identical everywhere. Style only — no behaviour. See docs/B2B_DESIGN_SYSTEM.md.
+// identical everywhere. Style only - no behaviour. See docs/B2B_DESIGN_SYSTEM.md.
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material';
@@ -8,11 +8,11 @@ import { colors, hairline, type, space, tabularNums, focusRingSx } from '../them
 
 type Sx = SxProps<Theme>;
 
-// White, square, hairline-bordered surface — no shadow. Padding left to caller.
+// White, square, hairline-bordered surface - no shadow. Padding left to caller.
 export const cardSx = { bgcolor: colors.paper, border: hairline } as const;
 
-export const PageTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <Typography component="h1" sx={{ ...type.pageTitle, color: colors.ink, mb: `${space.xl}px` }}>
+export const PageTitle: React.FC<{ children: React.ReactNode; sx?: Sx }> = ({ children, sx }) => (
+  <Typography component="h1" sx={{ ...type.pageTitle, color: colors.ink, mb: `${space.xl}px`, ...sx }}>
     {children}
   </Typography>
 );
@@ -21,7 +21,7 @@ export const SectionTitle: React.FC<{ children: React.ReactNode; sx?: Sx }> = ({
   <Typography sx={{ ...type.sectionTitle, color: colors.ink, ...sx }}>{children}</Typography>
 );
 
-// Uppercase channel name label — never a coloured dot.
+// Uppercase channel name label - never a coloured dot.
 export const ChannelTag: React.FC<{ name: string }> = ({ name }) => (
   <Box component="span" sx={{ ...type.label, color: colors.grey500 }}>
     {name}

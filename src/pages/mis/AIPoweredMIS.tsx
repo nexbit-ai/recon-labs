@@ -1,6 +1,6 @@
-// AI-Powered MIS (Tata 1mg demo) — B2C page. Reads entirely from misData
-// (frontend-only). Composes five regions — reconciliation banner, P&L waterfall,
-// channel performance, SKU profitability, scripted Ask-your-data chat — into one
+// AI-Powered MIS (Tata 1mg demo) - B2C page. Reads entirely from misData
+// (frontend-only). Composes five regions - reconciliation banner, P&L waterfall,
+// channel performance, SKU profitability, scripted Ask-your-data chat - into one
 // page, rendered under the main app's rounded theme inside <Layout>.
 //
 // Load choreography: a four-beat reveal orchestrated here (not per-component).
@@ -9,7 +9,7 @@
 //   Beat 3  Channel Performance + SKU Profitability (together)
 //   Beat 4  Ask-your-data rail
 // The whole sequence runs once per session (module `hasPlayed` flag) and is
-// skipped entirely under prefers-reduced-motion — everything just appears.
+// skipped entirely under prefers-reduced-motion - everything just appears.
 import React from 'react';
 import { Box } from '@mui/material';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -58,7 +58,7 @@ const AIPoweredMIS: React.FC = () => {
   return (
     <Box sx={{ px: { xs: 1.5, sm: 3 }, py: 3, bgcolor: colors.canvas, minHeight: '100vh' }}>
       <Box sx={{ maxWidth: shell.canvasMaxWidth, mx: 'auto' }}>
-        {/* Beat 1 — header row */}
+        {/* Beat 1 - header row */}
         <Box
           component={motion.div}
           {...beat(BEAT.b1)}
@@ -78,7 +78,7 @@ const AIPoweredMIS: React.FC = () => {
           </Box>
         </Box>
 
-        {/* Beat 1 — reconciliation completeness banner (hero / trust anchor) */}
+        {/* Beat 1 - reconciliation completeness banner (hero / trust anchor) */}
         <Box component={motion.div} {...beat(BEAT.b1)}>
           <ReconciliationBanner data={misData.reconciliation} />
         </Box>
@@ -95,14 +95,14 @@ const AIPoweredMIS: React.FC = () => {
         >
           {/* Main analytics column */}
           <Box sx={{ display: 'grid', gap: `${REGION_GAP}px`, minWidth: 0 }}>
-            {/* Beat 2 — P&L waterfall */}
+            {/* Beat 2 - P&L waterfall */}
             <Box component={motion.div} {...beat(BEAT.b2)} sx={{ minWidth: 0 }}>
               <PlaceholderRegion id="mis-pnl" title="Profit & Loss" minBodyHeight={0}>
                 <PnLWaterfall lines={misData.pnl} priorMonth={misData.priorMonth} startDelay={sd(BEAT.b2)} />
               </PlaceholderRegion>
             </Box>
 
-            {/* Beat 3 — Channel Performance + SKU Profitability together */}
+            {/* Beat 3 - Channel Performance + SKU Profitability together */}
             <Box
               component={motion.div}
               {...beat(BEAT.b3)}
@@ -123,7 +123,7 @@ const AIPoweredMIS: React.FC = () => {
             </Box>
           </Box>
 
-          {/* Beat 4 — Ask-your-data rail (sticky on lg lives on the beat wrapper so
+          {/* Beat 4 - Ask-your-data rail (sticky on lg lives on the beat wrapper so
               it can travel within the tall grid row) */}
           <Box
             component={motion.div}

@@ -38,7 +38,7 @@ const categories: IntegrationCategory[] = [
     title: 'Marketplaces',
     items: [
       { id: 'amazon', name: 'Amazon', domain: 'amazon.com', status: 'connected' },
-      { id: 'flipkart', name: 'Flipkart', domain: 'flipkart.com', status: 'connected' },
+      { id: 'myntra', name: 'Myntra', domain: 'myntra.com', status: 'connected' },
       { id: 'myntra', name: 'Myntra', domain: 'myntra.com', status: 'available' },
       { id: 'nykaa', name: 'Nykaa', domain: 'nykaa.com', status: 'available' },
       { id: 'supertails', name: 'Supertails', domain: 'supertails.com', status: 'available' },

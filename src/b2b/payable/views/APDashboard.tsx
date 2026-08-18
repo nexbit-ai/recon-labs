@@ -1,4 +1,4 @@
-// AP Dashboard — command screen for finance teams.
+// AP Dashboard - command screen for finance teams.
 // 8 KPI tiles + recent invoice summary feed.
 // Theme: square corners, hairline borders, monochrome + accent, Inter, tabular nums.
 import React from 'react';
@@ -209,7 +209,7 @@ const APDashboard: React.FC = () => {
           icon={TimerOutlined}
         />
         <KPITile
-          label="Blocked — Missing PO"
+          label="Blocked - Missing PO"
           value={d.blockedMissingPO}
           sub="Awaiting PO condition"
           icon={BlockOutlined}
@@ -244,7 +244,7 @@ const APDashboard: React.FC = () => {
       </Box>
 
       {/* ── Invoice summary table ─────────────────────────────────── */}
-      <SectionTitle sx={{ mb: `${space.lg}px` }}>Invoice pipeline — today</SectionTitle>
+      <SectionTitle sx={{ mb: `${space.lg}px` }}>Invoice pipeline - today</SectionTitle>
       <Box sx={{ ...cardSx }}>
         {/* Table header */}
         <Box
@@ -319,7 +319,7 @@ const APDashboard: React.FC = () => {
       >
         <Box>
           <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>
-            Payment blocked — GST mismatch on INV-7824
+            Payment blocked - GST mismatch on INV-7824
           </Typography>
           <Typography sx={{ fontSize: 13, color: colors.grey700, mt: '2px' }}>
             {formatINR(d.overdueAmount)} at risk · Vendor: Infosys BPO Services · Due 10 Aug 2024

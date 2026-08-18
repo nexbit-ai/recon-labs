@@ -1,4 +1,4 @@
-// PayableShell — AP-specific sidebar + top bar + content canvas.
+// PayableShell - AP-specific sidebar + top bar + content canvas.
 // Follows exact same pattern as B2BShell: square corners, hairline borders,
 // monochrome + one accent (#7A5DBF), Inter, no shadows.
 import React from 'react';
@@ -7,7 +7,7 @@ import { Box, Typography } from '@mui/material';
 import { colors, hairline, shell, type, space } from '../../theme/b2bTokens';
 import { PAYABLE_SECTIONS, type PayableSectionDef } from './payableSections';
 import { Pressable } from '../../components/primitives';
-// @ts-ignore — shared logo
+// @ts-ignore - shared logo
 import logo from '../../../assets/logo_fresh.jpg';
 
 const NavItem: React.FC<{ section: PayableSectionDef; active: boolean; onClick: () => void }> = ({

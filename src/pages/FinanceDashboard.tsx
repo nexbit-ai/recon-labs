@@ -100,7 +100,7 @@ const mockMarketplaceData: MarketplaceOverviewResponse = {
       revenue: "250000.00",
       unitsSold: 250,
       growth: "12%",
-      platform: "Flipkart"
+      platform: "Myntra"
     },
     {
       id: "2",
@@ -167,14 +167,14 @@ const tabs = ['Overview', 'Sales Overview'];
 const platforms: { value: Platform; label: string }[] = [
   { value: 'shopify', label: 'Shopify' },
   { value: 'amazon', label: 'Amazon' },
-  { value: 'flipkart', label: 'Flipkart' },
+  { value: 'myntra', label: 'Myntra' },
   { value: 'myntra', label: 'Myntra' },
 ];
 
 const FinanceDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['flipkart', 'amazon']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['myntra', 'amazon']);
   const [apiData, setApiData] = useState<MarketplaceOverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [apiLoading, setApiLoading] = useState(false);
@@ -573,7 +573,7 @@ const FinanceDashboard: React.FC = () => {
                 },
               }}
             >
-              Platform: Flipkart
+              Platform: Myntra
             </Button>
           </Box>
         </Box>

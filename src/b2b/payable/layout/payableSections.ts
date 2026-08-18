@@ -1,4 +1,4 @@
-// AP sidebar section definitions — single source for nav + routing.
+// AP sidebar section definitions - single source for nav + routing.
 import {
   DashboardOutlined,
   ReceiptLongOutlined,

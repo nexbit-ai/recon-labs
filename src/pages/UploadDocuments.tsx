@@ -45,7 +45,7 @@ interface UploadListResponse {
 
 const vendors: Vendor[] = [
   { id: 'amazon', name: 'Amazon' },
-  { id: 'flipkart', name: 'Flipkart' },
+  { id: 'myntra', name: 'Myntra' },
   { id: 'delhivery', name: 'Delhivery' },
   { id: 'ecomexpress', name: 'Ecom Express' },
   { id: 'bluedart', name: 'Blue Dart' },
@@ -80,14 +80,14 @@ const months = [
 const years = [2025, 2026];
 
 const CSV_ONLY_EXTENSIONS = ['.csv'];
-const FLIPKART_EXTENSIONS = ['.csv', '.xlsx', '.xls'];
+const MYNTRA_EXTENSIONS = ['.csv', '.xlsx', '.xls'];
 
-const isFlipkartVendor = (vendorId?: string | null) => vendorId?.toLowerCase() === 'flipkart';
+const isMyntraVendor = (vendorId?: string | null) => vendorId?.toLowerCase() === 'myntra';
 const getExtensionsForVendor = (vendorId?: string | null) =>
-  isFlipkartVendor(vendorId) ? FLIPKART_EXTENSIONS : CSV_ONLY_EXTENSIONS;
+  isMyntraVendor(vendorId) ? MYNTRA_EXTENSIONS : CSV_ONLY_EXTENSIONS;
 const getAcceptForVendor = (vendorId?: string | null) => getExtensionsForVendor(vendorId).join(',');
 const getFormatLabelForVendor = (vendorId?: string | null) =>
-  isFlipkartVendor(vendorId) ? 'CSV/XLSX' : 'CSV only';
+  isMyntraVendor(vendorId) ? 'CSV/XLSX' : 'CSV only';
 
 type ViewType = 'years' | 'marketplace' | 'd2c' | 'logistic';
 
@@ -102,7 +102,7 @@ const UploadDocuments: React.FC = () => {
   // Marketplace files (per kind)
   const [marketplaceFiles, setMarketplaceFiles] = useState<Record<string, { sales: File | null; sales_b2b?: File | null; settlement: File | null }>>({
     amazon: { sales: null, sales_b2b: null, settlement: null },
-    flipkart: { sales: null, settlement: null },
+    myntra: { sales: null, settlement: null },
   });
   // D2C files (sales and settlement)
   const [d2cFiles, setD2cFiles] = useState<Record<string, { sales: File | null; settlement: File | null }>>({});
@@ -124,7 +124,7 @@ const UploadDocuments: React.FC = () => {
   const [loadingUploads, setLoadingUploads] = useState(false);
   const normalizedReconciliationStatus = useReconciliationStatus(reconciliationStatus);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [rightPanelVendor, setRightPanelVendor] = useState<'amazon' | 'flipkart' | null>(null);
+  const [rightPanelVendor, setRightPanelVendor] = useState<'amazon' | 'myntra' | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingUpload, setPendingUpload] = useState<{ vendorId: string; kind: string } | null>(null);
   const [pendingFileInputId, setPendingFileInputId] = useState<string | null>(null);
@@ -161,12 +161,12 @@ const UploadDocuments: React.FC = () => {
   };
 
   // Map vendor/kind to backend report_type
-  // Marketplace (amazon/flipkart): use format {vendorid}_{kind}
+  // Marketplace (amazon/myntra): use format {vendorid}_{kind}
   // All others: just use vendor name in lowercase
   const getReportType = (vendorId: string, kind?: 'sales' | 'sales_b2b' | 'settlement'): string => {
     const vendorIdLower = vendorId.toLowerCase();
     // Marketplace vendors use format: {vendorid}_{kind}
-    if (vendorIdLower === 'amazon' || vendorIdLower === 'flipkart' || vendorIdLower === 'amazon_uk') {
+    if (vendorIdLower === 'amazon' || vendorIdLower === 'myntra' || vendorIdLower === 'amazon_uk') {
       if (kind === 'sales_b2b') {
         return 'amazon_sales_b2b';
       }
@@ -227,7 +227,7 @@ const UploadDocuments: React.FC = () => {
     setHoveredMonth(null);
   };
 
-  const openRightPanel = (vendorId: 'amazon' | 'flipkart') => {
+  const openRightPanel = (vendorId: 'amazon' | 'myntra') => {
     setRightPanelVendor(vendorId);
     setRightPanelOpen(true);
   };
@@ -631,8 +631,8 @@ const UploadDocuments: React.FC = () => {
     }
   };
 
-  // Marketplace uploads (Amazon/Flipkart/Amazon UK) with separate Sales and Settlement
-  const setMarketplaceFile = (vendorId: 'amazon' | 'flipkart' | 'amazon_uk', kind: 'sales' | 'sales_b2b' | 'settlement', file: File | null) => {
+  // Marketplace uploads (Amazon/Myntra/Amazon UK) with separate Sales and Settlement
+  const setMarketplaceFile = (vendorId: 'amazon' | 'myntra' | 'amazon_uk', kind: 'sales' | 'sales_b2b' | 'settlement', file: File | null) => {
     setMarketplaceFiles((prev) => ({
       ...prev,
       [vendorId]: { ...prev[vendorId], [kind]: file },
@@ -650,7 +650,7 @@ const UploadDocuments: React.FC = () => {
       let hasPendingFile = false;
       if (vendorId === 'unicommerce') {
         hasPendingFile = !!unicommerceFile;
-      } else if (vendorId === 'amazon' || vendorId === 'flipkart' || vendorId === 'amazon_uk') {
+      } else if (vendorId === 'amazon' || vendorId === 'myntra' || vendorId === 'amazon_uk') {
         hasPendingFile = !!(marketplaceFiles as any)[vendorId]?.[kind];
       } else {
         hasPendingFile = !!(d2cFiles as any)[vendorId]?.[kind];
@@ -674,7 +674,7 @@ const UploadDocuments: React.FC = () => {
     return true;
   };
 
-  const handleMarketplaceUploadClick = (vendorId: 'amazon' | 'flipkart' | 'amazon_uk', kind: 'sales' | 'sales_b2b' | 'settlement') => {
+  const handleMarketplaceUploadClick = (vendorId: 'amazon' | 'myntra' | 'amazon_uk', kind: 'sales' | 'sales_b2b' | 'settlement') => {
     const file = marketplaceFiles[vendorId]?.[kind];
     if (!file || selectedYear === null || selectedMonth === null) return;
 
@@ -716,7 +716,7 @@ const UploadDocuments: React.FC = () => {
     setPendingFileInputId(null);
   };
 
-  const performMarketplaceUpload = async (vendorId: 'amazon' | 'flipkart' | 'amazon_uk', kind: 'sales' | 'sales_b2b' | 'settlement', selectedFile?: File) => {
+  const performMarketplaceUpload = async (vendorId: 'amazon' | 'myntra' | 'amazon_uk', kind: 'sales' | 'sales_b2b' | 'settlement', selectedFile?: File) => {
     const file = selectedFile || marketplaceFiles[vendorId]?.[kind];
     if (!file || selectedYear === null || selectedMonth === null) return;
 
@@ -763,7 +763,7 @@ const UploadDocuments: React.FC = () => {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
         if (response.status === 400) {
-          const vendorName = vendorId === 'amazon' ? 'Amazon' : vendorId === 'flipkart' ? 'Flipkart' : vendorId;
+          const vendorName = vendorId === 'amazon' ? 'Amazon' : vendorId === 'myntra' ? 'Myntra' : vendorId;
           throw new Error(`Please upload the correct ${kind} file for ${vendorName}`);
         }
         throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
@@ -784,7 +784,7 @@ const UploadDocuments: React.FC = () => {
     }
   };
 
-  const handleMarketplaceBulkUpload = async (vendorId: 'amazon' | 'flipkart') => {
+  const handleMarketplaceBulkUpload = async (vendorId: 'amazon' | 'myntra') => {
     const salesFile = marketplaceFiles[vendorId]?.sales;
     const salesB2bFile = vendorId === 'amazon' ? marketplaceFiles[vendorId]?.sales_b2b : null;
     const settlementFile = marketplaceFiles[vendorId]?.settlement;
@@ -844,7 +844,7 @@ const UploadDocuments: React.FC = () => {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Bulk upload failed' }));
         if (response.status === 400) {
-          const vendorName = vendorId === 'amazon' ? 'Amazon' : 'Flipkart';
+          const vendorName = vendorId === 'amazon' ? 'Amazon' : 'Myntra';
           throw new Error(`Please upload the correct files for ${vendorName}`);
         }
         throw new Error(errorData.message || errorData.error || `Bulk upload failed with status ${response.status}`);
@@ -1137,10 +1137,10 @@ const UploadDocuments: React.FC = () => {
     return doc.sync_status === 'DONE' ? 'processing' : 'pending';
   };
 
-  const flipkartSalesDoc = getUploadedDocument('flipkart', 'sales');
-  const flipkartSalesStatus = getUploadProcessingStatus(flipkartSalesDoc);
-  const flipkartSettlementDoc = getUploadedDocument('flipkart', 'settlement');
-  const flipkartSettlementStatus = getUploadProcessingStatus(flipkartSettlementDoc);
+  const myntraSalesDoc = getUploadedDocument('myntra', 'sales');
+  const myntraSalesStatus = getUploadProcessingStatus(myntraSalesDoc);
+  const myntraSettlementDoc = getUploadedDocument('myntra', 'settlement');
+  const myntraSettlementStatus = getUploadProcessingStatus(myntraSettlementDoc);
 
   const amazonSalesDoc = getUploadedDocument('amazon', 'sales');
   const amazonSalesStatus = getUploadProcessingStatus(amazonSalesDoc);
@@ -1465,7 +1465,7 @@ const UploadDocuments: React.FC = () => {
         )}
 
 
-        {/* Marketplace View - Flipkart, Amazon, CRED */}
+        {/* Marketplace View - Myntra, Amazon, CRED */}
         {currentView === 'marketplace' && selectedMonth !== null && (
           <Paper 
             elevation={0} 
@@ -1519,11 +1519,11 @@ const UploadDocuments: React.FC = () => {
               </Alert>
             )}
             <Grid container spacing={4}>
-              {/* Flipkart */}
+              {/* Myntra */}
               <Grid item xs={12}>
                 <Paper elevation={0} sx={{ p: 3, border: '2px solid #e5e7eb', borderRadius: '12px' }}>
                   <Typography variant="h6" fontWeight={700} color="#111111" mb={4}>
-                    Flipkart
+                    Myntra
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 0, position: 'relative', maxWidth: 800, mx: 'auto' }}>
                     {/* Step 1: Sales File */}
@@ -1533,15 +1533,15 @@ const UploadDocuments: React.FC = () => {
                         flex: '0 0 auto',
                         width: 220,
                         p: 2,
-                        border: flipkartSalesStatus === 'processing'
+                        border: myntraSalesStatus === 'processing'
                           ? '2px solid #16a34a'
-                          : flipkartSalesStatus === 'pending'
+                          : myntraSalesStatus === 'pending'
                             ? '2px solid #f59e0b'
                             : '2px solid #e5e7eb',
                         borderRadius: '12px',
-                        background: flipkartSalesStatus === 'processing'
+                        background: myntraSalesStatus === 'processing'
                           ? '#f0fdf4'
-                          : flipkartSalesStatus === 'pending'
+                          : myntraSalesStatus === 'pending'
                             ? '#fffbeb'
                             : '#ffffff',
                         position: 'relative',
@@ -1554,19 +1554,19 @@ const UploadDocuments: React.FC = () => {
                           width: 32, 
                           height: 32, 
                           borderRadius: '50%', 
-                          background: flipkartSalesStatus === 'processing'
+                          background: myntraSalesStatus === 'processing'
                             ? '#16a34a'
-                            : flipkartSalesStatus === 'pending'
+                            : myntraSalesStatus === 'pending'
                               ? '#f59e0b'
                               : '#f3f4f6',
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          border: flipkartSalesStatus !== 'none' ? 'none' : '2px solid #d1d5db'
+                          border: myntraSalesStatus !== 'none' ? 'none' : '2px solid #d1d5db'
                         }}>
-                          {flipkartSalesStatus === 'processing' ? (
+                          {myntraSalesStatus === 'processing' ? (
                             <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
-                          ) : flipkartSalesStatus === 'pending' ? (
+                          ) : myntraSalesStatus === 'pending' ? (
                             <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
                           ) : (
                             <Typography variant="body2" fontWeight={700} color="#6b7280">1</Typography>
@@ -1579,60 +1579,60 @@ const UploadDocuments: React.FC = () => {
                         </Typography>
                         
                         {/* Uploaded File Info */}
-                        {flipkartSalesDoc && flipkartSalesStatus !== 'none' && (
+                        {myntraSalesDoc && myntraSalesStatus !== 'none' && (
                           <Typography
                             variant="caption"
-                            color={flipkartSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            color={myntraSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
                             sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
                           >
-                            {flipkartSalesDoc.filename} • {flipkartSalesStatus === 'processing' ? 'Processed' : 'Pending'}
+                            {myntraSalesDoc.filename} • {myntraSalesStatus === 'processing' ? 'Processed' : 'Pending'}
                           </Typography>
                         )}
                         
                         {/* File Input */}
                         <input
-                          accept={getAcceptForVendor('flipkart')}
+                          accept={getAcceptForVendor('myntra')}
                           style={{ display: 'none' }}
-                          id="flipkart-sales-upload"
+                          id="myntra-sales-upload"
                           type="file"
                           onChange={async (e) => {
                             const file = e.target.files?.[0] || null;
                             if (file) {
-                              if (!validateFileType(file, 'flipkart', 'Flipkart sales')) {
+                              if (!validateFileType(file, 'myntra', 'Myntra sales')) {
                                 e.target.value = '';
                                 return;
                               }
-                              setMarketplaceFile('flipkart', 'sales', file);
-                              await performMarketplaceUpload('flipkart', 'sales', file);
+                              setMarketplaceFile('myntra', 'sales', file);
+                              await performMarketplaceUpload('myntra', 'sales', file);
                             }
                             e.target.value = '';
                           }}
                           disabled={!!uploadingVendor}
                         />
                         <Button
-                          variant={isVendorUploaded('flipkart', 'sales') ? "outlined" : "contained"}
+                          variant={isVendorUploaded('myntra', 'sales') ? "outlined" : "contained"}
                           size="small"
                           startIcon={<CloudUploadIcon />}
-                          disabled={!!uploadingVendor || uploadingVendor === 'flipkart_sales'}
-                          endIcon={uploadingVendor === 'flipkart_sales' ? <CircularProgress size={14} /> : null}
+                          disabled={!!uploadingVendor || uploadingVendor === 'myntra_sales'}
+                          endIcon={uploadingVendor === 'myntra_sales' ? <CircularProgress size={14} /> : null}
                           onClick={(e) => {
-                            handleFileInputClick(e, 'flipkart-sales-upload', 'flipkart', 'sales');
+                            handleFileInputClick(e, 'myntra-sales-upload', 'myntra', 'sales');
                           }}
                           sx={{ 
                             minWidth: 120,
                             fontSize: '0.75rem',
                             py: 0.75,
-                            ...(isVendorUploaded('flipkart', 'sales') && {
-                              borderColor: flipkartSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                              color: flipkartSalesStatus === 'pending' ? '#b45309' : '#16a34a'
+                            ...(isVendorUploaded('myntra', 'sales') && {
+                              borderColor: myntraSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                              color: myntraSalesStatus === 'pending' ? '#b45309' : '#16a34a'
                             })
                           }}
                         >
-                          {uploadingVendor === 'flipkart_sales' ? 'Uploading...' : isVendorUploaded('flipkart', 'sales') ? 'Re-upload' : 'Upload'}
+                          {uploadingVendor === 'myntra_sales' ? 'Uploading...' : isVendorUploaded('myntra', 'sales') ? 'Re-upload' : 'Upload'}
                         </Button>
-                        {marketplaceFiles.flipkart?.sales && !isVendorUploaded('flipkart', 'sales') && (
+                        {marketplaceFiles.myntra?.sales && !isVendorUploaded('myntra', 'sales') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
-                            {marketplaceFiles.flipkart.sales.name}
+                            {marketplaceFiles.myntra.sales.name}
                           </Typography>
                         )}
                       </Box>
@@ -1642,15 +1642,15 @@ const UploadDocuments: React.FC = () => {
                     <Box sx={{ 
                       width: 80,
                       height: '3px',
-                      background: flipkartSalesStatus === 'processing'
+                      background: myntraSalesStatus === 'processing'
                         ? 'linear-gradient(to right, #16a34a, #16a34a)'
-                        : flipkartSalesStatus === 'pending'
+                        : myntraSalesStatus === 'pending'
                           ? 'linear-gradient(to right, #f59e0b, #f59e0b)'
                           : 'linear-gradient(to right, #d1d5db, #d1d5db)',
                       position: 'relative',
                       zIndex: 3
                     }}>
-                      {flipkartSalesStatus !== 'none' && (
+                      {myntraSalesStatus !== 'none' && (
                         <Box sx={{
                           position: 'absolute',
                           right: -8,
@@ -1659,7 +1659,7 @@ const UploadDocuments: React.FC = () => {
                           width: 16,
                           height: 16,
                           borderRadius: '50%',
-                          background: flipkartSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                          background: myntraSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1677,20 +1677,20 @@ const UploadDocuments: React.FC = () => {
                         flex: '0 0 auto',
                         width: 220,
                         p: 2,
-                        border: flipkartSettlementStatus === 'processing'
+                        border: myntraSettlementStatus === 'processing'
                           ? '2px solid #16a34a'
-                          : flipkartSettlementStatus === 'pending'
+                          : myntraSettlementStatus === 'pending'
                             ? '2px solid #f59e0b'
-                          : (!isVendorUploaded('flipkart', 'sales') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
+                          : (!isVendorUploaded('myntra', 'sales') ? '2px dashed #d1d5db' : '2px solid #e5e7eb'),
                         borderRadius: '12px',
-                        background: flipkartSettlementStatus === 'processing'
+                        background: myntraSettlementStatus === 'processing'
                           ? '#f0fdf4'
-                          : flipkartSettlementStatus === 'pending'
+                          : myntraSettlementStatus === 'pending'
                             ? '#fffbeb'
-                          : (!isVendorUploaded('flipkart', 'sales') ? '#f9fafb' : '#ffffff'),
+                          : (!isVendorUploaded('myntra', 'sales') ? '#f9fafb' : '#ffffff'),
                         position: 'relative',
                         zIndex: 2,
-                        opacity: isVendorUploaded('flipkart', 'sales') ? 1 : 0.6
+                        opacity: isVendorUploaded('myntra', 'sales') ? 1 : 0.6
                       }}
                     >
                       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
@@ -1699,24 +1699,24 @@ const UploadDocuments: React.FC = () => {
                           width: 32, 
                           height: 32, 
                           borderRadius: '50%', 
-                          background: flipkartSettlementStatus === 'processing'
+                          background: myntraSettlementStatus === 'processing'
                             ? '#16a34a'
-                            : flipkartSettlementStatus === 'pending'
+                            : myntraSettlementStatus === 'pending'
                               ? '#f59e0b'
-                            : (!isVendorUploaded('flipkart', 'sales') ? '#f3f4f6' : '#f3f4f6'),
+                            : (!isVendorUploaded('myntra', 'sales') ? '#f3f4f6' : '#f3f4f6'),
                           display: 'flex', 
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          border: flipkartSettlementStatus !== 'none'
+                          border: myntraSettlementStatus !== 'none'
                             ? 'none'
-                            : (!isVendorUploaded('flipkart', 'sales') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
+                            : (!isVendorUploaded('myntra', 'sales') ? '2px dashed #d1d5db' : '2px solid #d1d5db'),
                           position: 'relative'
                         }}>
-                          {flipkartSettlementStatus === 'processing' ? (
+                          {myntraSettlementStatus === 'processing' ? (
                             <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
-                          ) : flipkartSettlementStatus === 'pending' ? (
+                          ) : myntraSettlementStatus === 'pending' ? (
                             <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
-                          ) : !isVendorUploaded('flipkart', 'sales') ? (
+                          ) : !isVendorUploaded('myntra', 'sales') ? (
                             <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
                           ) : (
                             <Typography variant="body2" fontWeight={700} color="#6b7280">2</Typography>
@@ -1724,56 +1724,56 @@ const UploadDocuments: React.FC = () => {
                   </Box>
                         
                         {/* Step Title */}
-                        <Typography variant="body2" fontWeight={600} color={isVendorUploaded('flipkart', 'sales') ? '#111111' : '#9ca3af'} textAlign="center">
+                        <Typography variant="body2" fontWeight={600} color={isVendorUploaded('myntra', 'sales') ? '#111111' : '#9ca3af'} textAlign="center">
                           Settlement File
                         </Typography>
                         
                         {/* Uploaded File Info */}
-                        {flipkartSettlementDoc && flipkartSettlementStatus !== 'none' && (
+                        {myntraSettlementDoc && myntraSettlementStatus !== 'none' && (
                           <Typography
                             variant="caption"
-                            color={flipkartSettlementStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            color={myntraSettlementStatus === 'processing' ? '#16a34a' : '#b45309'}
                             sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
                           >
-                            {flipkartSettlementDoc.filename} •{' '}
-                            {flipkartSettlementStatus === 'processing' ? 'Processed' : 'Pending'}
+                            {myntraSettlementDoc.filename} •{' '}
+                            {myntraSettlementStatus === 'processing' ? 'Processed' : 'Pending'}
                           </Typography>
                         )}
                         
                         {/* File Input */}
                         <input
-                          accept={getAcceptForVendor('flipkart')}
+                          accept={getAcceptForVendor('myntra')}
                           style={{ display: 'none' }}
-                          id="flipkart-settlement-upload"
+                          id="myntra-settlement-upload"
                           type="file"
                           onChange={async (e) => {
                             const file = e.target.files?.[0] || null;
                             if (file) {
-                              if (!validateFileType(file, 'flipkart', 'Flipkart settlement')) {
+                              if (!validateFileType(file, 'myntra', 'Myntra settlement')) {
                                 e.target.value = '';
                                 return;
                               }
-                              setMarketplaceFile('flipkart', 'settlement', file);
-                              await performMarketplaceUpload('flipkart', 'settlement', file);
+                              setMarketplaceFile('myntra', 'settlement', file);
+                              await performMarketplaceUpload('myntra', 'settlement', file);
                             }
                             e.target.value = '';
                           }}
-                          disabled={!!uploadingVendor || !isVendorUploaded('flipkart', 'sales')}
+                          disabled={!!uploadingVendor || !isVendorUploaded('myntra', 'sales')}
                         />
                         <Button
-                          variant={isVendorUploaded('flipkart', 'settlement') ? "outlined" : "contained"}
+                          variant={isVendorUploaded('myntra', 'settlement') ? "outlined" : "contained"}
                           size="small"
                           startIcon={<CloudUploadIcon />}
-                          disabled={!!uploadingVendor || uploadingVendor === 'flipkart_settlement' || !isVendorUploaded('flipkart', 'sales')}
-                          endIcon={uploadingVendor === 'flipkart_settlement' ? <CircularProgress size={14} /> : null}
+                          disabled={!!uploadingVendor || uploadingVendor === 'myntra_settlement' || !isVendorUploaded('myntra', 'sales')}
+                          endIcon={uploadingVendor === 'myntra_settlement' ? <CircularProgress size={14} /> : null}
                           onClick={(e) => {
-                            handleFileInputClick(e, 'flipkart-settlement-upload', 'flipkart', 'settlement');
+                            handleFileInputClick(e, 'myntra-settlement-upload', 'myntra', 'settlement');
                           }}
                           sx={{ 
                             minWidth: 120,
                             fontSize: '0.75rem',
                             py: 0.75,
-                            ...(!isVendorUploaded('flipkart', 'sales') && {
+                            ...(!isVendorUploaded('myntra', 'sales') && {
                               background: '#f3f4f6',
                               color: '#9ca3af',
                               cursor: 'not-allowed',
@@ -1782,17 +1782,17 @@ const UploadDocuments: React.FC = () => {
                                 background: '#f3f4f6',
                               }
                             }),
-                            ...(isVendorUploaded('flipkart', 'settlement') && {
-                              borderColor: flipkartSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                              color: flipkartSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
+                            ...(isVendorUploaded('myntra', 'settlement') && {
+                              borderColor: myntraSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                              color: myntraSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
                             })
                           }}
                         >
-                          {uploadingVendor === 'flipkart_settlement' ? 'Uploading...' : isVendorUploaded('flipkart', 'settlement') ? 'Re-upload' : 'Upload'}
+                          {uploadingVendor === 'myntra_settlement' ? 'Uploading...' : isVendorUploaded('myntra', 'settlement') ? 'Re-upload' : 'Upload'}
                         </Button>
-                        {marketplaceFiles.flipkart?.settlement && !isVendorUploaded('flipkart', 'settlement') && (
+                        {marketplaceFiles.myntra?.settlement && !isVendorUploaded('myntra', 'settlement') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
-                            {marketplaceFiles.flipkart.settlement.name}
+                            {marketplaceFiles.myntra.settlement.name}
                       </Typography>
                     )}
                   </Box>
@@ -3489,7 +3489,7 @@ const UploadDocuments: React.FC = () => {
                   {/* Settlement Providers List */}
                   <Box sx={{ width: '100%', mt: 1 }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                      {vendors.filter(v => v.id !== 'amazon' && v.id !== 'flipkart' && v.id !== 'cred' && v.id !== 'amazon_uk').map((vendor) => {
+                      {vendors.filter(v => v.id !== 'amazon' && v.id !== 'myntra' && v.id !== 'cred' && v.id !== 'amazon_uk').map((vendor) => {
                         const isSettlementUploaded = isVendorUploaded(vendor.id, 'settlement');
                         const uploadedSettlementDoc = getUploadedDocument(vendor.id, 'settlement');
                         const isSettlementUploading = uploadingVendor === `${vendor.id}_settlement`;
@@ -3601,7 +3601,7 @@ const UploadDocuments: React.FC = () => {
       <Drawer anchor="right" open={rightPanelOpen} onClose={closeRightPanel} PaperProps={{ sx: { width: { xs: '100%', sm: 480 } } }}>
         <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>
-            {rightPanelVendor ? (rightPanelVendor === 'amazon' ? 'Amazon' : 'Flipkart') : 'Marketplace'} uploads
+            {rightPanelVendor ? (rightPanelVendor === 'amazon' ? 'Amazon' : 'Myntra') : 'Marketplace'} uploads
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {selectedYear !== null && selectedMonth !== null ? `${months[selectedMonth]} ${selectedYear}` : 'Select a month and year'}
@@ -3659,7 +3659,7 @@ const UploadDocuments: React.FC = () => {
                         const vendorKey = rightPanelVendor;
                         const file = e.target.files?.[0] || null;
                         if (vendorKey && file) {
-                          const vendorLabel = vendorKey === 'flipkart' ? 'Flipkart' : 'Amazon';
+                          const vendorLabel = vendorKey === 'myntra' ? 'Myntra' : 'Amazon';
                           if (!validateFileType(file, vendorKey, `${vendorLabel} B2C sales`)) {
                             e.target.value = '';
                             return;
@@ -3830,7 +3830,7 @@ const UploadDocuments: React.FC = () => {
                         const vendorKey = rightPanelVendor;
                         const file = e.target.files?.[0] || null;
                         if (vendorKey && file) {
-                          const vendorLabel = vendorKey === 'flipkart' ? 'Flipkart' : 'Amazon';
+                          const vendorLabel = vendorKey === 'myntra' ? 'Myntra' : 'Amazon';
                           if (!validateFileType(file, vendorKey, `${vendorLabel} settlement`)) {
                             e.target.value = '';
                             return;

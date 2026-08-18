@@ -93,12 +93,12 @@ const generateAmazonMockData = (): TransactionApiResponse[] => {
   });
 };
 
-const generateFlipkartMockData = (): TransactionApiResponse[] => {
+const generateMyntraMockData = (): TransactionApiResponse[] => {
   return Array.from({ length: 500 }).map((_, i) => {
-    const base = getBaseMockAttributes(i, 'FK', 'flipkart', 2500, 320);
+    const base = getBaseMockAttributes(i, 'FK', 'myntra', 2500, 320);
     return {
       ...base,
-      settlement_provider: 'Flipkart',
+      settlement_provider: 'Myntra',
       metadata: {
         settlement_value: {
           seller_share_offer: base.order_value * 0.9,
@@ -135,7 +135,7 @@ const generateD2CMockData = (): TransactionApiResponse[] => {
 };
 
 const AMAZON_MOCK_DATA = generateAmazonMockData();
-const FLIPKART_MOCK_DATA = generateFlipkartMockData();
+const MYNTRA_MOCK_DATA = generateMyntraMockData();
 const D2C_MOCK_DATA = generateD2CMockData();
 
 const getMockColumnsForPlatform = (platform: string) => {
@@ -157,7 +157,7 @@ export const mockTransactionsApi = {
     
     const platform = (params.platform || 'amazon').toLowerCase();
     let sourceData = AMAZON_MOCK_DATA;
-    if (platform === 'flipkart') sourceData = FLIPKART_MOCK_DATA;
+    if (platform === 'myntra') sourceData = MYNTRA_MOCK_DATA;
     if (platform === 'd2c') sourceData = D2C_MOCK_DATA;
 
     let filteredData = sourceData;
@@ -200,7 +200,7 @@ export const mockTransactionsApi = {
     
     const platform = (params.platform || 'amazon').toLowerCase();
     let sourceData = AMAZON_MOCK_DATA;
-    if (platform === 'flipkart') sourceData = FLIPKART_MOCK_DATA;
+    if (platform === 'myntra') sourceData = MYNTRA_MOCK_DATA;
     if (platform === 'd2c') sourceData = D2C_MOCK_DATA;
 
     const totalCount = sourceData.length;

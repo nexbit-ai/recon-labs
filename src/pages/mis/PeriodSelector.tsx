@@ -1,5 +1,5 @@
 // Period selector for the MIS header. Static/mock: it opens a native-looking
-// menu of recent periods but selecting one only updates the label — the demo
+// menu of recent periods but selecting one only updates the label - the demo
 // data is always June 2026. Rounded control, hairline border, accent focus ring.
 import React from 'react';
 import { Box, Menu, MenuItem, Typography } from '@mui/material';

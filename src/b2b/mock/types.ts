@@ -1,11 +1,11 @@
-// Shared types for the B2B (Nexbit) mock-data layer.
-// Frontend-only fixtures — no backend, no fetch. All amounts in whole rupees.
+// Shared types for the B2B (Nexbit) mock-data layer - Cosmix demo.
+// Frontend-only fixtures - no backend, no fetch. All amounts in whole rupees.
 
-export type ChannelName = 'Amazon' | 'Flipkart' | 'Blinkit' | 'Zepto' | 'Instamart' | 'Offline Stores';
+export type ChannelName = 'Blinkit' | 'Zepto' | 'Reliance' | 'Cafes – Bangalore' | 'Amazon' | 'Reliance Retail' | 'Third Wave Coffee' | 'Blue Tokai Coffee' | 'Subko Coffee' | 'Starbucks' | 'Hatti Kaapi';
 
 export interface Channel {
   name: ChannelName;
-  /** Marketplace settlement model, shown as context only. */
+  /** Marketplace / channel settlement model, shown as context only. */
   model: string;
   connected: boolean;
 }
@@ -14,11 +14,11 @@ export interface Sku {
   id: string;
   product: string;
   variant: string;
-  /** Display name, e.g. "Protein Wafer 6-pack — Choco". */
+  /** Display name, e.g. "Plant Protein - 250g". */
   label: string;
 }
 
-/** Canonical, cross-footed headline numbers. Later views reference these — never redefine. */
+/** Canonical, cross-footed headline numbers. Later views reference these - never redefine. */
 export interface HeadlineMetric {
   key: string;
   label: string;
@@ -37,7 +37,17 @@ export interface ChannelPerformance {
   recoverable: number; // rupees recoverable now
 }
 
-export type IssueType = 'Contract breach' | 'Short payment' | 'Overcharge' | 'Rate variance' | 'Duplicate' | 'Overdue' | 'Pending' | 'Partial Pay' | 'In Term';
+export type IssueType =
+  | 'Pending GRN'
+  | 'Short payment'
+  | 'Debit note – damages'
+  | 'Debit note – returns'
+  | 'Visibility fee duplicate'
+  | 'Invoice missing'
+  | 'Settlement pending'
+  | 'Rate variance'
+  | 'Overdue';
+
 export type Confidence = 'High' | 'Med' | 'Low';
 
 export interface FlaggedIssue {
@@ -48,9 +58,12 @@ export interface FlaggedIssue {
   amount: number;
   type: IssueType;
   confidence: Confidence;
+  poNumber?: string;
 }
 
-export type ReconStatus = 'Matched' | 'Unpaid' | 'Over-deducted' | 'Rate variance' | 'Disputed';
+export type GRNStatus = 'Accepted' | 'Pending' | 'Partial' | 'Missing';
+
+export type ReconStatus = 'Matched' | 'Pending GRN' | 'Short paid' | 'Over-deducted' | 'Disputed' | 'Missing invoice';
 
 export interface VariancePart {
   label: string;
@@ -60,21 +73,42 @@ export interface VariancePart {
   why: string;
 }
 
+/** Three-way matching status for a reconciliation line item. */
+export interface ThreeWayMatch {
+  po: { ref: string; status: 'Matched' | 'Pending' | 'Missing' | 'Disputed'; amount: number };
+  grn: { ref: string; status: 'Matched' | 'Pending' | 'Missing' | 'Disputed'; amount: number; unitsAccepted: number; unitsOrdered: number };
+  invoice: { ref: string; status: 'Matched' | 'Pending' | 'Missing' | 'Disputed'; amount: number };
+}
+
 export interface ReconLineItem {
   id: string;
   channel: ChannelName;
   skuId: string;
   skuLabel: string;
+  /** PO reference number. */
+  poNumber: string;
+  /** Invoice reference number. */
+  invoiceNumber: string;
+  /** GRN reference number. */
   grn: string;
-  invoice: string;
+  grnStatus: GRNStatus;
+  /** Sale period label, e.g. "1–15 Aug 2026". */
+  salePeriod: string;
+  /** Expected payout date, e.g. "10 Aug 2026". */
+  expectedPayoutDate: string;
   expected: number;
   paid: number;
   variance: number; // gap = expected - paid (positive = underpaid)
   status: ReconStatus;
-  /** "How this matched" note — references the matching policy. */
+  issueType?: IssueType;
+  /** "How this matched" note - references the matching policy. */
   matchNote: string;
   /** Always three parts: Quantity, Deduction, Tax / TCS. Σ(amount) = paid - expected. */
   varianceBreakdown: VariancePart[];
+  /** PO vs GRN vs Invoice three-way matching detail. */
+  threeWayMatch: ThreeWayMatch;
+  /** What exact next action is needed to resolve this issue. */
+  nextAction?: string;
 }
 
 export interface ReconPurchaseOrder {
@@ -88,7 +122,8 @@ export interface ReconPurchaseOrder {
   lineItems: ReconLineItem[];
 }
 
-export type DisputeStatus = 'Drafted' | 'Filed' | 'In review' | 'Recovered';
+// ── Cosmix 5-stage dispute workflow ──────────────────────────────────────────
+export type DisputeStatus = 'Detected' | 'Awaiting documents' | 'Ready to dispute' | 'Disputed' | 'Resolved';
 
 export interface Dispute {
   id: string;
@@ -96,22 +131,45 @@ export interface Dispute {
   reason: string;
   amount: number;
   status: DisputeStatus;
-  /** Dispute-window days remaining; 0 once recovered/closed. */
+  /** Dispute-window days remaining; 0 once resolved/closed. */
   windowDaysRemaining: number;
   /** Nearest-deadline claims that need attention. */
   urgent?: boolean;
   /** Surfaced in the high-value claims table. */
   highValue?: boolean;
+  /** Related line items for this dispute. */
+  lineItems?: ReconLineItem[];
 }
 
 /** Aggregate counts across the dispute pipeline (more than the illustrative array). */
 export interface DisputePipeline {
-  drafted: number;
-  filed: number;
-  inReview: number;
-  recovered: number;
+  detected: number;
+  awaitingDocuments: number;
+  readyToDispute: number;
+  disputed: number;
+  resolved: number;
 }
 
+// ── Follow-up automation / nudge system ──────────────────────────────────────
+export type NudgeType = '7-day' | '15-day';
+export type NudgeStatus = 'Sent' | 'Pending' | 'Scheduled';
+
+export interface FollowUpNudge {
+  id: string;
+  channel: ChannelName;
+  /** Reference to the related receivable / dispute / PO. */
+  relatedRef: string;
+  nudgeType: NudgeType;
+  daysSinceIssue: number;
+  message: string;
+  status: NudgeStatus;
+  /** ISO date when nudge was sent or is scheduled. */
+  date: string;
+  /** Timeline of events for this nudge. */
+  history: { date: string; action: string; status: NudgeStatus }[];
+}
+
+// ── Rate card & contract types ───────────────────────────────────────────────
 export interface RateCardLine {
   code: string;
   label: string;
@@ -125,7 +183,7 @@ export interface RateCardLine {
 /** One channel's full signed contract: the rate card plus its provenance. */
 export interface ChannelContract {
   channel: ChannelName;
-  /** Marketplace settlement model, e.g. "Quick-commerce (SOR)". */
+  /** Channel settlement model, e.g. "Quick-commerce (SOR)". */
   model: string;
   contractRef: string;
   effective: string;
@@ -138,12 +196,10 @@ export type DiscountType = 'percent' | 'perUnit';
 export type DiscountStatus = 'Active' | 'Scheduled' | 'Ended';
 
 /**
- * A secondary (promotional) discount a marketplace runs on specific SKUs for a
- * bounded date window — e.g. Blinkit marks down three SKUs in week 1 of the
+ * A secondary (promotional) discount a channel runs on specific SKUs for a
+ * bounded date window - e.g. Blinkit marks down three SKUs in week 1 of the
  * month. The brand co-funds it. Recon needs this declared so the settlement
- * deduction reconciles instead of flagging as unexplained variance: the
- * "expected amount to receive" is lowered by the brand-funded promo cost for
- * exactly this window and SKU set.
+ * deduction reconciles instead of flagging as unexplained variance.
  */
 export interface SecondaryDiscount {
   id: string;
@@ -160,10 +216,76 @@ export interface SecondaryDiscount {
   /** ISO date 'YYYY-MM-DD', inclusive. */
   startDate: string;
   endDate: string;
-  /** Units sold on these SKUs during the window — drives the impact math. */
+  /** Units sold on these SKUs during the window - drives the impact math. */
   unitsInWindow: number;
-  /** Avg selling price (₹/unit) — used to cost a percent discount. */
+  /** Avg selling price (₹/unit) - used to cost a percent discount. */
   avgSellingPrice: number;
+}
+
+// ── Email ingestion types (cafe workflow) ────────────────────────────────────
+export type ExtractionConfidence = 'High' | 'Medium' | 'Low';
+
+export interface ExtractedLineItem {
+  product: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface EmailIngestRecord {
+  id: string;
+  /** Cafe account name. */
+  cafeAccount: string;
+  /** Sender email address. */
+  senderEmail: string;
+  subject: string;
+  /** ISO date received. */
+  receivedDate: string;
+  /** Email body snippet. */
+  bodySnippet: string;
+  /** Attachment filenames. */
+  attachments: string[];
+  /** Extracted order/invoice data from attachment or body. */
+  extractedItems: ExtractedLineItem[];
+  totalExtracted: number;
+  extractionConfidence: ExtractionConfidence;
+  /** Whether this has been mapped to a receivable. */
+  mapped: boolean;
+  /** Resulting receivable ID if mapped. */
+  receivableId?: string;
+  /** Note from the AI extraction. */
+  extractionNote?: string;
+}
+
+// ── Channel drilldown types ─────────────────────────────────────────────────
+export interface DeductionBreakdownLine {
+  label: string;
+  contracted: string;
+  actual: number;
+  expected: number;
+  variance: number;
+}
+
+export interface ChannelDrilldownData {
+  channel: ChannelName;
+  model: string;
+  contractRef: string;
+  payoutLogic: string;
+  salesInPeriod: number;
+  grossDeductions: number;
+  expectedReceivable: number;
+  receivedAmount: number;
+  pendingBalance: number;
+  deductionBreakdown: DeductionBreakdownLine[];
+  issueFlags: { type: IssueType; count: number; amount: number }[];
+  upcomingPayouts: { date: string; amount: number; status: 'Expected' | 'Overdue' | 'Partial' }[];
+  accounts?: {
+    name: string;
+    salesInPeriod: number;
+    receivedAmount: number;
+    pendingBalance: number;
+    status: 'Settled' | 'Overdue' | 'Partial' | 'Pending';
+  }[];
 }
 
 export interface AskNexQA {

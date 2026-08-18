@@ -251,7 +251,7 @@ const Logistics: React.FC = () => {
 
     setMasterWeightUploadLoading(true);
     try {
-      // Demo build: no backend — simulate the upload and refresh.
+      // Demo build: no backend - simulate the upload and refresh.
       await mockDelay(700);
       await fetchDashboard();
     } finally {
@@ -280,7 +280,7 @@ const Logistics: React.FC = () => {
         return;
       }
 
-      // Demo build: all data is served from frontend mocks — no backend calls.
+      // Demo build: all data is served from frontend mocks - no backend calls.
       await mockDelay();
       const payload = getMockLogisticsDashboard({
         provider: platform,

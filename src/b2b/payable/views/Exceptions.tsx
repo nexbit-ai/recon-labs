@@ -1,4 +1,4 @@
-// Exceptions — the killer screen. AI-native exception review queue.
+// Exceptions - the killer screen. AI-native exception review queue.
 // 6 hardcoded exception types: OCR uncertainty, HSN/SAC mismatch, GST mismatch,
 // Qty mismatch, Freight not in PO, Missing vendor code.
 // Each card expands to show: issue, why flagged, suggested action, confidence,
@@ -28,7 +28,7 @@ function formatINR(value: number): string {
   return `₹${value.toLocaleString('en-IN')}`;
 }
 
-// Exception type label styling — hairline, uppercase, weight differentiation only
+// Exception type label styling - hairline, uppercase, weight differentiation only
 const TYPE_WEIGHT: Record<ExceptionType, number> = {
   'OCR uncertainty': 500,
   'HSN/SAC mismatch': 600,
@@ -88,7 +88,7 @@ const ReviewerBadge: React.FC<{ reviewer: Reviewer }> = ({ reviewer }) => (
   </Box>
 );
 
-// Confidence bar — uses accent fill, grey-100 track
+// Confidence bar - uses accent fill, grey-100 track
 const ConfidenceBar: React.FC<{ value: number }> = ({ value }) => {
   const isLow = value < 60;
   return (
@@ -176,7 +176,7 @@ const ExceptionCard: React.FC<ExceptionCardProps> = ({ exc, isOpen, onToggle, ve
         }}
       >
         <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.grey700, flex: 1 }}>
-          {exc.id} — {exc.type} · Resolved ✓
+          {exc.id} - {exc.type} · Resolved ✓
         </Typography>
       </Box>
     );
@@ -184,7 +184,7 @@ const ExceptionCard: React.FC<ExceptionCardProps> = ({ exc, isOpen, onToggle, ve
 
   return (
     <Box sx={{ ...cardSx, borderLeft: `2px solid ${colors.accent}` }}>
-      {/* Header row — always visible */}
+      {/* Header row - always visible */}
       <Box
         onClick={onToggle}
         sx={{

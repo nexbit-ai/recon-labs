@@ -1,5 +1,5 @@
 // B2B (Nexbit) root. Scopes the B2B MUI theme (square corners, monochrome +
-// one accent, Inter) to this subtree only — it never leaks into B2C. Mounted by
+// one accent, Inter) to this subtree only - it never leaks into B2C. Mounted by
 // App.tsx at '/b2b/*'. Frontend-only: no providers for auth/API here.
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
@@ -14,10 +14,10 @@ import Overview from './views/Overview';
 import Reconciliation from './views/Reconciliation';
 import Disputes from './views/Disputes';
 import Channels from './views/Channels';
+import ChannelDrilldown from './views/ChannelDrilldown';
+
 import Contracts from './views/Contracts';
 import AskNex from './views/AskNex';
-// AP (Accounts Payable) sub-module — isolated shell + routing under /b2b/payable/*
-import PayableApp from './payable/PayableApp';
 // Reuse the exact same Integrations module from the B2C app.
 import Integrations from '../pages/Integrations';
 
@@ -28,6 +28,7 @@ const VIEWS: Record<string, React.ReactNode> = {
   reconciliation: <Reconciliation />,
   disputes: <Disputes />,
   channels: <Channels />,
+
   contracts: <Contracts />,
   ask: <AskNex />,
 };
@@ -36,13 +37,12 @@ const B2BApp: React.FC = () => (
   <ThemeProvider theme={b2bTheme}>
     <ScopedCssBaseline>
       <Routes>
-        {/* AP payable — standalone shell, must be BEFORE the B2BShell catch-all */}
-        <Route path="payable/*" element={<PayableApp />} />
         <Route element={<B2BShell />}>
           <Route index element={<Navigate to="overview" replace />} />
           {SECTIONS.map((s) => (
             <Route key={s.key} path={s.path} element={VIEWS[s.key] ?? <Placeholder title={s.title} />} />
           ))}
+          <Route path="channels/:channelId" element={<ChannelDrilldown />} />
           <Route path="upload" element={<Upload />} />
           <Route path="integrations" element={<Integrations />} />
           <Route path="*" element={<Navigate to="overview" replace />} />
@@ -53,3 +53,4 @@ const B2BApp: React.FC = () => (
 );
 
 export default B2BApp;
+
