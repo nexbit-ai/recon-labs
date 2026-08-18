@@ -31,6 +31,7 @@ import Logistics from './pages/Logistics';
 import Integrations from './pages/Integrations';
 import ShopifyCallback from './pages/ShopifyCallback';
 import AmazonCallback from './pages/AmazonCallback';
+import FlipkartCallback from './pages/FlipkartCallback';
 
 // Components
 import Layout from './components/Layout';
@@ -472,6 +473,11 @@ function App() {
             <Route path="/integrations/callback" element={
               <ProtectedRoute>
                 <Layout><AmazonCallback /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/integrations/flipkart/callback" element={
+              <ProtectedRoute>
+                <Layout><FlipkartCallback /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/logistics" element={

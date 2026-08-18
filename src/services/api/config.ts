@@ -99,6 +99,15 @@ export const API_CONFIG = {
     NOTIFICATIONS: '/notifications',
     SECURITY: '/security',
     
+    // Flipkart Auth & Listings
+    FLIPKART_AUTH_START: '/flipkart/auth/start',
+    FLIPKART_AUTH_CALLBACK: '/flipkart/auth/callback',
+    FLIPKART_AUTH_STATUS: '/flipkart/auth/status',
+    FLIPKART_AUTH_CONFIG: '/flipkart/auth/config',
+    FLIPKART_AUTH_DISCONNECT: '/flipkart/auth/disconnect',
+    FLIPKART_LISTINGS_SYNC: '/flipkart/listings/sync',
+    FLIPKART_LISTINGS: '/flipkart/listings',
+
     // Amazon Auth
     AMAZON_AUTH_START: '/amazon/auth/start',
     AMAZON_AUTH_CALLBACK: '/amazon/auth/callback',

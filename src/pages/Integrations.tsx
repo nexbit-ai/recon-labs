@@ -44,7 +44,7 @@ const Integrations: React.FC = () => {
   const [loading, setLoading] = useState<string | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [shopifyDialogOpen, setShopifyDialogOpen] = useState(false);
-  const [configType, setConfigType] = useState<'amazon' | 'shopify' | 'razorpay' | 'clickpost' | 'payu' | 'paytm' | 'shiprocket' | 'unicommerce' | null>(null);
+  const [configType, setConfigType] = useState<'amazon' | 'shopify' | 'razorpay' | 'clickpost' | 'payu' | 'paytm' | 'shiprocket' | 'unicommerce' | 'flipkart' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [infoDialogOpen, setInfoDialogOpen] = useState(false);
@@ -183,6 +183,18 @@ const Integrations: React.FC = () => {
           }));
         }
       } catch (e) { console.error('Amazon status fetch failed', e); }
+
+      // Fetch Flipkart status
+      try {
+        const flipkartResp = await api.flipkartAuth.getStatus();
+        if (flipkartResp.statusCode === 200 && flipkartResp.data?.connected) {
+          setFlipkartConnected(true);
+          setFlipkartConfig(prev => ({
+            ...prev,
+            client_id: flipkartResp.data?.client_id || '',
+          }));
+        }
+      } catch (e) { console.error('Flipkart status fetch failed', e); }
     };
 
     fetchStatuses();
@@ -196,6 +208,53 @@ const Integrations: React.FC = () => {
     application_id: '',
     marketplace_regions: [] as string[],
   });
+
+  // Flipkart State
+  const [flipkartConnected, setFlipkartConnected] = useState(false);
+  const [flipkartSyncing, setFlipkartSyncing] = useState(false);
+  const [flipkartConfig, setFlipkartConfig] = useState({
+    client_id: '',
+    client_secret: '',
+    redirect_uri: '',
+  });
+
+  const handleFlipkartAuth = async () => {
+    setLoading('flipkart');
+    setError(null);
+    try {
+      const state = Math.random().toString(36).substring(7);
+      const response = await api.flipkartAuth.start(state);
+      if (response.data?.authorize_url) {
+        window.location.href = response.data.authorize_url;
+      } else {
+        setError('No authorization URL received. Please check your Flipkart configuration.');
+      }
+    } catch (err: any) {
+      console.error('Failed to initiate Flipkart Auth:', err);
+      setError(err?.error || err?.response?.data?.error || 'Failed to initiate Flipkart connection.');
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleFlipkartListingSync = async () => {
+    setFlipkartSyncing(true);
+    setError(null);
+    try {
+      const response = await api.flipkartListings.sync();
+      if (response.statusCode === 200) {
+        const count = response.data?.result?.total_saved || 0;
+        setSuccess(`Flipkart listings synced successfully! (${count} listings saved/updated)`);
+      } else {
+        throw new Error('Failed to sync listings');
+      }
+    } catch (err: any) {
+      console.error('Failed to sync Flipkart listings:', err);
+      setError(err?.error || err?.response?.data?.error || 'Failed to sync Flipkart listings.');
+    } finally {
+      setFlipkartSyncing(false);
+    }
+  };
 
   const handleAmazonAuth = async () => {
     setLoading('amazon');
@@ -274,6 +333,17 @@ const Integrations: React.FC = () => {
         });
         setSuccess('Amazon configuration saved successfully!');
         setAmazonConnected(true);
+      } else if (configType === 'flipkart') {
+        if (!flipkartConfig.client_id || !flipkartConfig.client_secret) {
+          setError('Please enter both Application ID (Client ID) and Application Secret');
+          return;
+        }
+        await api.flipkartAuth.saveConfig({
+          client_id: flipkartConfig.client_id,
+          client_secret: flipkartConfig.client_secret,
+          redirect_uri: flipkartConfig.redirect_uri || undefined,
+        });
+        setSuccess('Flipkart configuration saved successfully!');
       } else if (configType === 'razorpay') {
         if (!razorpayConfig.key_id || !razorpayConfig.key_secret) {
           setError('Please enter both Key ID and Key Secret');
@@ -627,11 +697,26 @@ const Integrations: React.FC = () => {
       id: 'flipkart',
       name: 'Flipkart Seller API',
       category: 'Marketplaces',
-      description: 'Direct integration with Flipkart Seller Hub for automated data fetching.',
+      description: 'Direct OAuth integration with Flipkart Seller Hub to automatically sync listings, orders, and settlements.',
       logo: 'https://cdn.worldvectorlogo.com/logos/flipkart.svg',
-      status: 'Coming Soon',
-      onConnect: () => { },
-      onConfig: () => { },
+      status: flipkartConnected ? 'Connected' : 'Available',
+      onConnect: handleFlipkartAuth,
+      onConfig: () => {
+        setConfigType('flipkart');
+        setConfigOpen(true);
+      },
+      onInfo: () => {
+        setInfoContent({
+          title: 'How to Authenticate Flipkart Seller API',
+          steps: [
+            'Log into Flipkart Partner Dashboard at partners.flipkart.com/manage-api-access.',
+            'Ensure your application has redirect URI set to: ' + (window.location.origin + '/integrations/flipkart/callback'),
+            'Click "Connect" to log in with your Flipkart Seller Hub credentials and click "Allow" on the permissions screen.',
+            'Your listings, orders, and settlement data will sync automatically into Nexbit table organization-wise.'
+          ]
+        });
+        setInfoDialogOpen(true);
+      }
     },
   ];
 
@@ -805,6 +890,32 @@ const Integrations: React.FC = () => {
                             </Button>
                           )}
 
+                          {integration.id === 'flipkart' && (
+                            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                              {flipkartConnected && (
+                                <Button
+                                  variant="text"
+                                  size="small"
+                                  startIcon={flipkartSyncing ? <CircularProgress size={12} sx={{ color: '#2874f0' }} /> : <SyncIcon sx={{ fontSize: '14px !important' }} />}
+                                  onClick={handleFlipkartListingSync}
+                                  disabled={flipkartSyncing}
+                                  sx={{ color: '#2874f0', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
+                                >
+                                  {flipkartSyncing ? 'Syncing...' : 'Sync Listings'}
+                                </Button>
+                              )}
+                              <Button
+                                variant="text"
+                                size="small"
+                                startIcon={<SettingsIcon sx={{ fontSize: '14px !important' }} />}
+                                onClick={integration.onConfig}
+                                sx={{ color: '#718096', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
+                              >
+                                Config
+                              </Button>
+                            </Box>
+                          )}
+
                           {integration.id === 'shopify' && (
                             <Button
                               variant="text"
@@ -972,12 +1083,42 @@ const Integrations: React.FC = () => {
         PaperProps={{ sx: { borderRadius: 2, boxShadow: '0 20px 40px rgba(0,0,0,0.1)' } }}
       >
         <DialogTitle sx={{ fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 3, color: '#1a202c' }}>
-          Configure {configType === 'amazon' ? 'Amazon SP-API' : configType === 'razorpay' ? 'Razorpay PG' : configType === 'clickpost' ? 'Clickpost' : configType === 'payu' ? 'PayU' : configType === 'paytm' ? 'Paytm' : ''}
+          Configure {configType === 'flipkart' ? 'Flipkart Seller API' : configType === 'amazon' ? 'Amazon SP-API' : configType === 'razorpay' ? 'Razorpay PG' : configType === 'clickpost' ? 'Clickpost' : configType === 'payu' ? 'PayU' : configType === 'paytm' ? 'Paytm' : ''}
           <IconButton onClick={() => setConfigOpen(false)} size="small">
             <CloseIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 4, minHeight: '350px' }}>
+          {configType === 'flipkart' && (
+            <Box sx={{ py: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Enter your Flipkart Partner Application credentials from partners.flipkart.com/manage-api-access.
+              </Typography>
+              <TextField
+                label="Application ID (Client ID)"
+                fullWidth
+                value={flipkartConfig.client_id}
+                onChange={(e) => setFlipkartConfig({ ...flipkartConfig, client_id: e.target.value })}
+                placeholder="e.g. your-flipkart-app-id"
+              />
+              <TextField
+                label="Application Secret (Client Secret)"
+                type="password"
+                fullWidth
+                value={flipkartConfig.client_secret}
+                onChange={(e) => setFlipkartConfig({ ...flipkartConfig, client_secret: e.target.value })}
+                placeholder="••••••••"
+              />
+              <TextField
+                label="Redirect URI (Optional)"
+                fullWidth
+                value={flipkartConfig.redirect_uri}
+                onChange={(e) => setFlipkartConfig({ ...flipkartConfig, redirect_uri: e.target.value })}
+                placeholder="http://localhost:5173/integrations/flipkart/callback"
+                helperText="Defaults to your current domain callback URL"
+              />
+            </Box>
+          )}
           {configType === 'paytm' && (
             <Box sx={{ py: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>

@@ -320,6 +320,40 @@ export const fileAPI = {
     apiService.download(`/files/${fileId}`, filename),
 };
 
+// Flipkart Auth API
+export const flipkartAuthAPI = {
+  saveConfig: (config: {
+    client_id: string;
+    client_secret: string;
+    redirect_uri?: string;
+  }) =>
+    apiService.post<{ message: string }>(API_CONFIG.ENDPOINTS.FLIPKART_AUTH_CONFIG, config),
+
+  getStatus: () =>
+    apiService.get<{ connected: boolean; client_id?: string; expires_at?: string; has_refresh_token?: boolean }>(API_CONFIG.ENDPOINTS.FLIPKART_AUTH_STATUS),
+
+  start: (state?: string, scope?: string) =>
+    apiService.get<{ authorize_url: string; state: string }>(API_CONFIG.ENDPOINTS.FLIPKART_AUTH_START, { state, scope }),
+
+  callback: (code: string, state: string) =>
+    apiService.get<{ message: string; access_token: string; expires_in: number }>(API_CONFIG.ENDPOINTS.FLIPKART_AUTH_CALLBACK, { code, state }),
+
+  disconnect: () =>
+    apiService.post<{ message: string }>(API_CONFIG.ENDPOINTS.FLIPKART_AUTH_DISCONNECT),
+};
+
+// Flipkart Listings API
+export const flipkartListingAPI = {
+  sync: (skus?: string[]) =>
+    apiService.post<{ message: string; result: any }>(API_CONFIG.ENDPOINTS.FLIPKART_LISTINGS_SYNC, { skus: skus || [] }),
+
+  getListings: (params?: { page?: number; limit?: number; status?: string; search?: string }) =>
+    apiService.get<{ listings: any[]; total: number; page: number; limit: number; total_pages: number }>(API_CONFIG.ENDPOINTS.FLIPKART_LISTINGS, params),
+
+  getListingBySKU: (sku: string) =>
+    apiService.get<{ listing: any }>(`${API_CONFIG.ENDPOINTS.FLIPKART_LISTINGS}/${encodeURIComponent(sku)}`),
+};
+
 // Amazon Auth API
 export const amazonAuthAPI = {
   saveConfig: (config: {
@@ -478,6 +512,8 @@ export const api = {
   ai: aiAPI,
   settings: settingsAPI,
   files: fileAPI,
+  flipkartAuth: flipkartAuthAPI,
+  flipkartListings: flipkartListingAPI,
   amazonAuth: amazonAuthAPI,
   shopifyAuth: shopifyAuthAPI,
   razorpayAuth: razorpayAuthAPI,
