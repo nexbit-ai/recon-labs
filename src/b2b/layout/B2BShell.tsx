@@ -2,7 +2,7 @@
 // Square surfaces, hairline borders, no shadows. Accent only for active nav,
 // the primary CTA-adjacent live-sync signal, and recovered amounts (in views).
 import React, { useState } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Box, Button, Typography } from '@mui/material';
 import { FileUploadOutlined, ExtensionOutlined } from '@mui/icons-material';
 import { colors, hairline, shell, type, space } from '../theme/b2bTokens';
@@ -67,8 +67,31 @@ const Pill: React.FC<{ children: React.ReactNode; dot?: boolean }> = ({ children
 const B2BShell: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlChannel = searchParams.get('channel');
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [platformFilter, setPlatformFilter] = useState('all');
+  const [platformFilter, setPlatformFilter] = useState(urlChannel ? urlChannel.toLowerCase() : 'all');
+
+  React.useEffect(() => {
+    if (urlChannel && urlChannel.toLowerCase() !== platformFilter.toLowerCase()) {
+      setPlatformFilter(urlChannel.toLowerCase());
+    }
+  }, [urlChannel]);
+
+  const handlePlatformChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setPlatformFilter(val);
+    
+    if (searchParams.has('channel') || val !== 'all') {
+      const newParams = new URLSearchParams(searchParams);
+      if (val === 'all') {
+        newParams.delete('channel');
+      } else {
+        newParams.set('channel', val);
+      }
+      setSearchParams(newParams);
+    }
+  };
 
   const active =
     SECTIONS.find((s) => location.pathname.startsWith(`/b2b/${s.path}`)) ?? SECTIONS[0];
@@ -200,7 +223,7 @@ const B2BShell: React.FC = () => {
                 <Typography sx={{ ...type.label, color: colors.grey700 }}>PLATFORM:</Typography>
                 <select 
                   value={platformFilter} 
-                  onChange={(e) => setPlatformFilter(e.target.value)}
+                  onChange={handlePlatformChange}
                   style={{
                     padding: '6px 12px',
                     border: hairline,

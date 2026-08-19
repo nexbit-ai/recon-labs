@@ -2,7 +2,8 @@
 // channel labels, column headers, stat tiles, and clickable rows are visually
 // identical everywhere. Style only - no behaviour. See docs/B2B_DESIGN_SYSTEM.md.
 import React from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, Tooltip } from '@mui/material';
+import { InfoOutlined } from '@mui/icons-material';
 import type { SxProps, Theme } from '@mui/material';
 import { colors, hairline, type, space, tabularNums, focusRingSx } from '../theme/b2bTokens';
 
@@ -39,10 +40,17 @@ export const ColumnLabel: React.FC<{ children?: React.ReactNode; align?: 'left' 
 );
 
 // Bordered stat tile: value over an uppercase label (Contracts / Upload modal).
-export const StatTile: React.FC<{ label: string; value: React.ReactNode; sx?: Sx }> = ({ label, value, sx }) => (
+export const StatTile: React.FC<{ label: string; value: React.ReactNode; sx?: Sx; info?: React.ReactNode }> = ({ label, value, sx, info }) => (
   <Box sx={{ flex: 1, border: hairline, p: `${space.lg}px`, ...sx }}>
     <Typography sx={{ ...type.statValue, color: colors.ink }}>{value}</Typography>
-    <Typography sx={{ ...type.label, color: colors.grey700, mt: '2px' }}>{label}</Typography>
+    <Box sx={{ display: 'flex', alignItems: 'center', mt: '2px', gap: '4px' }}>
+      <Typography sx={{ ...type.label, color: colors.grey700 }}>{label}</Typography>
+      {info && (
+        <Tooltip title={info} placement="top" arrow>
+          <InfoOutlined sx={{ fontSize: 14, color: colors.grey500, cursor: 'pointer', '&:hover': { color: colors.ink } }} />
+        </Tooltip>
+      )}
+    </Box>
   </Box>
 );
 

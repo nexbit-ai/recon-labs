@@ -2,9 +2,9 @@
 // Settlement → Invoice → Order → Item drill-down with financial traceability.
 // Uses right-side Drawer with content stack for deep navigation.
 import React from 'react';
-import { useOutletContext, useLocation } from 'react-router-dom';
+import { useOutletContext, useLocation, useSearchParams } from 'react-router-dom';
 import {
-  Box, Typography, Drawer, IconButton, TextField, InputAdornment,
+  Box, Typography, Drawer, IconButton, TextField, InputAdornment, Tooltip,
 } from '@mui/material';
 import {
   ExpandMoreOutlined, CheckCircleOutlined, ErrorOutlineOutlined,
@@ -281,7 +281,7 @@ const SettlementDrawerContent: React.FC<{
 
       {/* Key facts */}
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${space.md}px`, mb: `${space.xl}px` }}>
-        <StatTile label="Expected payout" value={formatRupees(settlement.expected)} />
+        <StatTile label="Expected payout" value={formatRupees(settlement.expected)} info={<ExpectedBreakdownTooltipContent settlement={settlement} />} />
         <StatTile label="Actual payout" value={formatRupees(settlement.actual)} />
         <StatTile label="Difference" value={settlement.difference === 0 ? '₹0' : formatRupees(settlement.difference)} sx={settlement.difference > 0 ? { borderColor: '#EF4444' } : undefined} />
         <StatTile label="Status" value={<StatusBadge status={settlement.status} />} />
@@ -543,7 +543,7 @@ const InvoiceDrawerContent: React.FC<{
       {/* Amount + status */}
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${space.md}px`, mb: `${space.xl}px` }}>
         <StatTile label="Invoice amount" value={formatRupees(invoice.amount)} />
-        <StatTile label="Net payout" value={formatRupees(invoice.netPayout)} />
+        <StatTile label="Net payout" value={formatRupees(invoice.netPayout)} info={<InvoiceBreakdownTooltipContent invoice={invoice} />} />
       </Box>
 
       {/* Many-to-one / one-to-many relationship */}
@@ -911,9 +911,79 @@ const StorageDrawerContent: React.FC = () => (
 
 // ── MAIN RECONCILIATION COMPONENT ───────────────────────────────────────────
 
+const getChannelExpectedInfo = (channel: string) => {
+  const c = channel.toLowerCase();
+  if (c.includes('blinkit')) return "Calculated per contract: Gross Revenue − (Commission @ 2%) − (Shipping @ ₹60/unit) − (TDS @ 0.1%) − GST + Other Additions.";
+  if (c.includes('zepto')) return "Calculated per contract: Gross Revenue − (Commission @ 2.5%) − (Shipping @ ₹50/unit) − (TDS @ 0.1%) − GST + Credits.";
+  if (c.includes('reliance')) return "Calculated per contract: Gross Revenue − (Margin @ 15%) − (Logistics @ 1%) − (TDS @ 0.1%) − GST.";
+  return "Calculated per contract terms for this channel.";
+};
+
+const ExpectedBreakdownTooltipContent: React.FC<{ settlement: BkSettlement }> = ({ settlement }) => {
+  if (!settlement.components || settlement.components.length === 0) {
+    return (
+      <Box sx={{ p: '4px' }}>
+        <Typography sx={{ fontSize: 12, color: '#fff' }}>
+          {getChannelExpectedInfo(settlement.channel)}
+        </Typography>
+      </Box>
+    );
+  }
+  return (
+    <Box sx={{ p: '4px', minWidth: 260 }}>
+      <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#fff', mb: '10px' }}>Expected calculation</Typography>
+      {settlement.components.map((c, i) => (
+        <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: '6px' }}>
+          <Box sx={{ pr: '16px' }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 500, color: '#fff' }}>{c.label}</Typography>
+            {c.calculation && <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', mt: '2px' }}>{c.calculation}</Typography>}
+          </Box>
+          <Typography sx={{ fontSize: 12, fontWeight: c.type === 'revenue' ? 600 : 500, color: '#fff', ...tabularNums, whiteSpace: 'nowrap' }}>
+            {c.type === 'revenue' ? '' : c.amount < 0 ? '+' : '−'}{formatRupees(Math.abs(c.amount))}
+          </Typography>
+        </Box>
+      ))}
+      <Box sx={{ borderTop: '1px solid rgba(255,255,255,0.2)', pt: '6px', mt: '8px', display: 'flex', justifyContent: 'space-between' }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>Expected Payout</Typography>
+        <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#fff', ...tabularNums }}>{formatRupees(settlement.expected)}</Typography>
+      </Box>
+    </Box>
+  );
+};
+
+const InvoiceBreakdownTooltipContent: React.FC<{ invoice: BkInvoice }> = ({ invoice }) => {
+  if (!invoice.deductions || invoice.deductions.length === 0) return null;
+  return (
+    <Box sx={{ p: '4px', minWidth: 260 }}>
+      <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#fff', mb: '10px' }}>Net Payout calculation</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: '6px' }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 500, color: '#fff' }}>Invoice Value</Typography>
+        <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#fff', ...tabularNums }}>{formatRupees(invoice.amount)}</Typography>
+      </Box>
+      {invoice.deductions.map((d, i) => (
+        <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: '6px' }}>
+          <Box sx={{ pr: '16px' }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 500, color: '#fff' }}>{d.label}</Typography>
+            {d.calculation && <Typography sx={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', mt: '2px' }}>{d.calculation}</Typography>}
+          </Box>
+          <Typography sx={{ fontSize: 12, fontWeight: 500, color: '#fff', ...tabularNums, whiteSpace: 'nowrap' }}>
+            −{formatRupees(d.amount)}
+          </Typography>
+        </Box>
+      ))}
+      <Box sx={{ borderTop: '1px solid rgba(255,255,255,0.2)', pt: '6px', mt: '8px', display: 'flex', justifyContent: 'space-between' }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>Net Payout</Typography>
+        <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#fff', ...tabularNums }}>{formatRupees(invoice.netPayout)}</Typography>
+      </Box>
+    </Box>
+  );
+};
+
 const Reconciliation: React.FC = () => {
   const reduce = useReducedMotion();
-  const { platformFilter } = useOutletContext<{ platformFilter: string }>() || { platformFilter: 'all' };
+  const [searchParams] = useSearchParams();
+  const context = useOutletContext<{ platformFilter: string }>() || { platformFilter: 'all' };
+  const platformFilter = searchParams.get('channel') || context.platformFilter;
 
   const [activeTab, setActiveTab] = React.useState<TabKey>('settlements');
   const [filter, setFilter] = React.useState<Filter>('all');
@@ -966,7 +1036,7 @@ const Reconciliation: React.FC = () => {
   const totalActual = summarySettlements.reduce((s, t) => s + t.actual, 0);
   const totalDifference = totalExpected - totalActual;
   const matchedCount = summarySettlements.filter(s => s.status === 'Matched').length;
-  const exceptionCount = summarySettlements.filter(s => s.status !== 'Matched').length;
+  const exceptionCount = exceptions.length;
 
   // Drawer title
   const drawerTitle = currentDrawer
@@ -1111,7 +1181,12 @@ const Reconciliation: React.FC = () => {
                 </Box>
                 <Typography sx={{ fontSize: 13, color: colors.grey700 }}>{s.period}</Typography>
                 <Typography sx={{ fontSize: 13, color: colors.ink, textAlign: 'right', ...tabularNums }}>{s.invoiceCount}</Typography>
-                <Typography sx={{ fontSize: 13, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatCompactINR(s.expected)}</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                  <Typography sx={{ fontSize: 13, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatCompactINR(s.expected)}</Typography>
+                  <Tooltip title={<ExpectedBreakdownTooltipContent settlement={s} />} placement="top" arrow>
+                    <InfoOutlined sx={{ fontSize: 14, color: colors.grey500, cursor: 'pointer', '&:hover': { color: colors.ink } }} />
+                  </Tooltip>
+                </Box>
                 <Typography sx={{ fontSize: 13, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatCompactINR(s.actual)}</Typography>
                 <Typography sx={{ fontSize: 13, fontWeight: s.difference > 0 ? 600 : 400, color: s.difference > 0 ? '#991B1B' : colors.ink, textAlign: 'right', ...tabularNums }}>
                   {s.difference === 0 ? '₹0' : formatRupees(s.difference)}
@@ -1164,7 +1239,12 @@ const Reconciliation: React.FC = () => {
                   <Typography sx={{ fontSize: 12, color: colors.grey500 }}>{item?.itemId ?? '—'}</Typography>
                   <Typography sx={{ fontSize: 13, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatRupees(inv.amount)}</Typography>
                   <Typography sx={{ fontSize: 13, color: colors.grey700, textAlign: 'right', ...tabularNums }}>{formatRupees(totalDed)}</Typography>
-                  <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatRupees(inv.netPayout)}</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                    <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatRupees(inv.netPayout)}</Typography>
+                    <Tooltip title={<InvoiceBreakdownTooltipContent invoice={inv} />} placement="top" arrow>
+                      <InfoOutlined sx={{ fontSize: 14, color: colors.grey500, cursor: 'pointer', '&:hover': { color: colors.ink } }} />
+                    </Tooltip>
+                  </Box>
                   <Typography sx={{ fontSize: 12, color: colors.grey700 }}>{inv.settlementId}</Typography>
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}><StatusBadge status={inv.status} /></Box>
                 </Pressable>

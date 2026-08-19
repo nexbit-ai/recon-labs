@@ -9,7 +9,7 @@ export const channelDrilldownData: Record<string, ChannelDrilldownData> = {
     model: 'Quick-commerce (SOR)',
     contractRef: 'BLK-CTR-FY26',
     payoutLogic: 'Weekly settlement cycle (every Tuesday). Sale-or-return model - Cosmix retains ownership until consumer purchase. Settlement = GMV less commission, fulfilment, visibility, and handling fees.',
-    salesInPeriod: 35_80_000,
+    salesInPeriod: 43_32_000,
     grossDeductions: 7_52_000,
     expectedReceivable: 35_80_000,
     receivedAmount: 33_32_000,
@@ -26,7 +26,6 @@ export const channelDrilldownData: Record<string, ChannelDrilldownData> = {
     issueFlags: [
       { type: 'Debit note – damages', count: 2, amount: 1_52_000 },
       { type: 'Pending GRN', count: 1, amount: 96_000 },
-      { type: 'Rate variance', count: 1, amount: 38_000 },
     ],
     upcomingPayouts: [
       { date: '14 Aug 2026', amount: 5_60_000, status: 'Expected' },
@@ -40,7 +39,7 @@ export const channelDrilldownData: Record<string, ChannelDrilldownData> = {
     model: 'Quick-commerce (SOR)',
     contractRef: 'ZEP-CTR-FY26',
     payoutLogic: 'Weekly settlement cycle (every Wednesday). Sale-or-return - Zepto owns the dark-store shelf, Cosmix retains product ownership. Settlement = GMV less margin, fulfilment, platform support, and visibility fees.',
-    salesInPeriod: 31_20_000,
+    salesInPeriod: 38_06_400,
     grossDeductions: 6_86_400,
     expectedReceivable: 31_20_000,
     receivedAmount: 31_20_000,
@@ -66,7 +65,7 @@ export const channelDrilldownData: Record<string, ChannelDrilldownData> = {
     model: 'Modern Trade (Credit terms)',
     contractRef: 'REL-CTR-FY26',
     payoutLogic: '45-day credit terms from invoice date. PO → dispatch → GRN → invoice uploaded to Reliance Vendor Portal → payment after 45 days. Trade margin + listing + shelf placement deducted from invoice value.',
-    salesInPeriod: 19_80_000,
+    salesInPeriod: 23_36_400,
     grossDeductions: 3_56_400,
     expectedReceivable: 19_80_000,
     receivedAmount: 19_80_000,
@@ -106,7 +105,7 @@ export const channelDrilldownData: Record<string, ChannelDrilldownData> = {
       { date: '23 Aug 2026', amount: 1_40_000, status: 'Expected' },
     ],
     accounts: [
-      { name: 'Third Wave Coffee - Koramangala', salesInPeriod: 2_40_000, receivedAmount: 2_40_000, pendingBalance: 0, status: 'Settled' },
+      { name: 'Third Wave Coffee - Koramangala', salesInPeriod: 4_60_000, receivedAmount: 4_60_000, pendingBalance: 0, status: 'Settled' },
       { name: 'Starbucks - Indiranagar', salesInPeriod: 3_10_000, receivedAmount: 3_10_000, pendingBalance: 0, status: 'Settled' },
       { name: 'Paper and Pie - Whitefield', salesInPeriod: 1_80_000, receivedAmount: 1_80_000, pendingBalance: 0, status: 'Settled' },
       { name: 'Blue Tokai - Jayanagar', salesInPeriod: 2_20_000, receivedAmount: 2_20_000, pendingBalance: 0, status: 'Settled' },

@@ -7,7 +7,7 @@ with open('src/b2b/mock/settlements.ts', 'r') as f:
 content = re.sub(
     r"export const headline: HeadlineMetric\[\] = \[.*?\];",
     """export const headline: HeadlineMetric[] = [
-  { key: 'receivable', label: 'Total Receivables Due', value: 1_00_00_000, display: '₹1.00 Cr', unit: 'inr' },
+  { key: 'receivable', label: 'Total Receivables', value: 1_00_00_000, display: '₹1.00 Cr', unit: 'inr' },
   { key: 'settled', label: 'Total Received', value: 97_52_000, display: '₹97.52L', unit: 'inr' },
   { key: 'leakage', label: 'Shortfall / Gap', value: 2_48_000, display: '₹2.48L', unit: 'inr' },
   { key: 'recoverable', label: 'Recoverable now', value: 1_52_000, display: '₹1.52L', unit: 'inr' },

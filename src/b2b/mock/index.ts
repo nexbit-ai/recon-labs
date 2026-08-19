@@ -22,11 +22,11 @@ if (import.meta.env.DEV) {
     if (Math.abs(got - want) > 1) console.warn(`[b2b/mock] ${label}: ${got} ≠ expected ${want}`);
   };
 
-  expect('Σ channel settled = ₹90.00L', sum(channelPerformance.map((c) => c.settled)), headlineByKey('settled').value);
-  expect('Σ channel leakage = ₹10.00L', sum(channelPerformance.map((c) => c.leakage)), headlineByKey('leakage').value);
-  expect('Σ channel recoverable = ₹6.80L', sum(channelPerformance.map((c) => c.recoverable)), headlineByKey('recoverable').value);
+  expect('Σ channel settled = ₹97.52L', sum(channelPerformance.map((c) => c.settled)), headlineByKey('settled').value);
+  expect('Σ channel leakage = ₹2.48L', sum(channelPerformance.map((c) => c.leakage)), headlineByKey('leakage').value);
+  expect('Σ channel recoverable = ₹1.52L', sum(channelPerformance.map((c) => c.recoverable)), headlineByKey('recoverable').value);
   expect('Σ channel receivable = ₹1.00 Cr', sum(channelPerformance.map((c) => c.settled + c.leakage)), headlineByKey('receivable').value);
-  expect('Σ expiring-soon disputes = ₹1.50L', sumAmount(expiringSoonDisputes), headlineByKey('expiring').value);
+  expect('Σ expiring-soon disputes = ₹1.52L', sumAmount(expiringSoonDisputes), headlineByKey('expiring').value);
 
   // Each recon line's breakdown must explain the gap exactly (residual = ₹0).
   reconLineItems.forEach((li) => {

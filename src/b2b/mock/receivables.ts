@@ -6,17 +6,7 @@ import { reconLineItems } from './settlements';
 
 export const disputes: Dispute[] = [
   // ── High-value named claims (shown in the Disputes table) ──
-  { id: 'D-2001', channel: 'Blinkit', reason: 'Transit damage debit note - no damage evidence in GRN', amount: 1_52_000, status: 'Ready to dispute', windowDaysRemaining: 28, highValue: true, lineItems: reconLineItems.filter(li => li.id === 'RC-0847') },
-  { id: 'D-2002', channel: 'Zepto', reason: 'Visibility fee deducted twice for same campaign', amount: 1_84_000, status: 'Detected', windowDaysRemaining: 45, urgent: true, highValue: true, lineItems: reconLineItems.filter(li => li.id === 'RC-0391') },
-  { id: 'D-2003', channel: 'Reliance', reason: 'Settlement overdue - 45-day credit term expired', amount: 2_40_000, status: 'Awaiting documents', windowDaysRemaining: 30, highValue: true, lineItems: reconLineItems.filter(li => li.id === 'RC-0112') },
-  { id: 'D-2004', channel: 'Cafes – Bangalore', reason: 'Batch of 8 cafes - overdue invoices', amount: 1_20_000, status: 'Detected', windowDaysRemaining: 60, highValue: true, lineItems: reconLineItems.filter(li => li.id === 'RC-CAF-001') },
-  { id: 'D-2005', channel: 'Blinkit', reason: 'Commission rate charged at 24% vs contracted 20%', amount: 38_000, status: 'Disputed', windowDaysRemaining: 14, urgent: true, highValue: true, lineItems: reconLineItems.filter(li => li.id === 'RC-0876') },
-  { id: 'D-2006', channel: 'Zepto', reason: 'Returns deduction on units already credited via RTO', amount: 41_200, status: 'Ready to dispute', windowDaysRemaining: 22, highValue: true, lineItems: reconLineItems.filter(li => li.id === 'RC-0445') },
-
-  // ── Other active claims expiring within ~10 days (Σ = ₹1,50,000 = ₹1.5L) ──
-  { id: 'D-2011', channel: 'Blinkit', reason: 'Dark store placement fee not in rate card', amount: 62_000, status: 'Detected', windowDaysRemaining: 8, urgent: true },
-  { id: 'D-2012', channel: 'Zepto', reason: 'Platform support excess - 3.5% vs 2% contracted', amount: 48_000, status: 'Ready to dispute', windowDaysRemaining: 9 },
-  { id: 'D-2013', channel: 'Cafes – Bangalore', reason: 'Dyu Art Cafe - disputed invoice amount', amount: 40_000, status: 'Awaiting documents', windowDaysRemaining: 7 },
+  { id: 'D-2001', channel: 'Blinkit', reason: 'Transit damage debit note - no damage evidence in GRN', amount: 1_52_000, status: 'Ready to dispute', windowDaysRemaining: 8, highValue: true, lineItems: reconLineItems.filter(li => li.id === 'RC-0847') },
 
   // ── Resolved (recent - subset of Recovered YTD ₹8.40L) ──
   { id: 'D-1901', channel: 'Blinkit', reason: 'Handling fee overcharge reversed (May batch)', amount: 2_10_000, status: 'Resolved', windowDaysRemaining: 0 },
@@ -27,10 +17,10 @@ export const disputes: Dispute[] = [
 
 // Pipeline aggregates (the full book, larger than the illustrative array above).
 export const disputePipeline: DisputePipeline = {
-  detected: 6,
-  awaitingDocuments: 4,
-  readyToDispute: 5,
-  disputed: 3,
+  detected: 0,
+  awaitingDocuments: 0,
+  readyToDispute: 1,
+  disputed: 0,
   resolved: 94,
 };
 

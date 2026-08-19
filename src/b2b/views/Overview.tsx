@@ -128,7 +128,7 @@ const TypewriterGreeting: React.FC = () => {
     let timeOfDay = 'morning';
     if (hour >= 12 && hour < 17) timeOfDay = 'afternoon';
     else if (hour >= 17) timeOfDay = 'evening';
-    return `Hello Shaantnu, good ${timeOfDay}!`;
+    return `Hello Shivam, good ${timeOfDay}!`;
   });
 
   React.useEffect(() => {
@@ -206,7 +206,7 @@ const Overview: React.FC = () => {
         }}
       >
         <Box sx={cardSx}>
-          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px` }}>Total Receivables Due</Typography>
+          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px` }}>Total Receivables</Typography>
           <CountUpMetric value={rawReceivable} format={formatINRShort} />
         </Box>
 
