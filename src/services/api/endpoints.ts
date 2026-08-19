@@ -91,6 +91,10 @@ export const transactionsAPI = {
   getTotalTransactionsSummary: (params?: FilterParams) =>
     apiService.get<any>(API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS_SUMMARY, params),
 
+  // Get profitability data
+  getProfitability: (params?: FilterParams) =>
+    apiService.get<any>(API_CONFIG.ENDPOINTS.PROFITABILITY, params),
+
   // Get D2C transactions with specific parameters
   getD2CTransactions: (params?: { page?: number; limit?: number; recon_status?: string; platform?: string; pagination?: boolean }) =>
     apiService.get<TotalTransactionsResponse>(API_CONFIG.ENDPOINTS.D2C_TRANSACTIONS, params, { useD2CHeaders: true }),
@@ -346,6 +350,15 @@ export const flipkartAuthAPI = {
 export const flipkartListingAPI = {
   sync: (skus?: string[]) =>
     apiService.post<{ message: string; result: any }>(API_CONFIG.ENDPOINTS.FLIPKART_LISTINGS_SYNC, { skus: skus || [] }),
+
+  startSyncJob: () =>
+    apiService.post<{ message: string }>(API_CONFIG.ENDPOINTS.FLIPKART_LISTINGS_SYNC_START, {}),
+
+  stopSyncJob: () =>
+    apiService.post<{ message: string }>(API_CONFIG.ENDPOINTS.FLIPKART_LISTINGS_SYNC_STOP, {}),
+
+  getSyncJobStatus: () =>
+    apiService.get<{ status: string; processed_count: number; total_count: number; logs: string[] }>(API_CONFIG.ENDPOINTS.FLIPKART_LISTINGS_SYNC_STATUS),
 
   getListings: (params?: { page?: number; limit?: number; status?: string; search?: string }) =>
     apiService.get<{ listings: any[]; total: number; page: number; limit: number; total_pages: number }>(API_CONFIG.ENDPOINTS.FLIPKART_LISTINGS, params),

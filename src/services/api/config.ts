@@ -55,6 +55,7 @@ export const API_CONFIG = {
     // Transactions
     TOTAL_TRANSACTIONS: '/recon/total-transactions',
     TOTAL_TRANSACTIONS_SUMMARY: '/recon/total-transactions/summary',
+    PROFITABILITY: '/recon/profitability',
     D2C_TRANSACTIONS: '/recon/total-transactions',
     SALES_TRANSACTIONS: '/recon/sales-transactions',
     EXPORT_TRANSACTIONS: '/recon/export',
@@ -106,6 +107,9 @@ export const API_CONFIG = {
     FLIPKART_AUTH_CONFIG: '/flipkart/auth/config',
     FLIPKART_AUTH_DISCONNECT: '/flipkart/auth/disconnect',
     FLIPKART_LISTINGS_SYNC: '/flipkart/listings/sync',
+    FLIPKART_LISTINGS_SYNC_START: '/flipkart/listings/sync/start',
+    FLIPKART_LISTINGS_SYNC_STOP: '/flipkart/listings/sync/stop',
+    FLIPKART_LISTINGS_SYNC_STATUS: '/flipkart/listings/sync/status',
     FLIPKART_LISTINGS: '/flipkart/listings',
 
     // Amazon Auth

@@ -38,6 +38,7 @@ import { api } from '../services/api';
 import shiprocketLogo from '../assets/providers/shiprocket.png';
 import unicommerceLogo from '../assets/providers/unicommerce.png';
 import amazonLogo from '../assets/providers/amazon.jpg';
+import FlipkartSyncModal from '../components/FlipkartSyncModal';
 
 const Integrations: React.FC = () => {
   const theme = useTheme();
@@ -211,7 +212,7 @@ const Integrations: React.FC = () => {
 
   // Flipkart State
   const [flipkartConnected, setFlipkartConnected] = useState(false);
-  const [flipkartSyncing, setFlipkartSyncing] = useState(false);
+  const [flipkartSyncModalOpen, setFlipkartSyncModalOpen] = useState(false);
   const [flipkartConfig, setFlipkartConfig] = useState({
     client_id: '',
     client_secret: '',
@@ -237,24 +238,6 @@ const Integrations: React.FC = () => {
     }
   };
 
-  const handleFlipkartListingSync = async () => {
-    setFlipkartSyncing(true);
-    setError(null);
-    try {
-      const response = await api.flipkartListings.sync();
-      if (response.statusCode === 200) {
-        const count = response.data?.result?.total_saved || 0;
-        setSuccess(`Flipkart listings synced successfully! (${count} listings saved/updated)`);
-      } else {
-        throw new Error('Failed to sync listings');
-      }
-    } catch (err: any) {
-      console.error('Failed to sync Flipkart listings:', err);
-      setError(err?.error || err?.response?.data?.error || 'Failed to sync Flipkart listings.');
-    } finally {
-      setFlipkartSyncing(false);
-    }
-  };
 
   const handleAmazonAuth = async () => {
     setLoading('amazon');
@@ -896,12 +879,11 @@ const Integrations: React.FC = () => {
                                 <Button
                                   variant="text"
                                   size="small"
-                                  startIcon={flipkartSyncing ? <CircularProgress size={12} sx={{ color: '#2874f0' }} /> : <SyncIcon sx={{ fontSize: '14px !important' }} />}
-                                  onClick={handleFlipkartListingSync}
-                                  disabled={flipkartSyncing}
+                                  startIcon={<SyncIcon sx={{ fontSize: '14px !important' }} />}
+                                  onClick={() => setFlipkartSyncModalOpen(true)}
                                   sx={{ color: '#2874f0', fontWeight: 600, textTransform: 'none', fontSize: '0.7rem', minWidth: 'auto', p: 0.5 }}
                                 >
-                                  {flipkartSyncing ? 'Syncing...' : 'Sync Listings'}
+                                  Sync Listings
                                 </Button>
                               )}
                               <Button
@@ -1501,6 +1483,7 @@ const Integrations: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      <FlipkartSyncModal open={flipkartSyncModalOpen} onClose={() => setFlipkartSyncModalOpen(false)} />
     </Box>
   );
 };

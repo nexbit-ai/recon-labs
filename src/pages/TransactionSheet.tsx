@@ -1945,6 +1945,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Sales Report state management
   const [salesReportData, setSalesReportData] = useState<SalesTransactionsResponse | null>(null);
   const [salesReportTotalCount, setSalesReportTotalCount] = useState<number | null>(null);
+  
+  // Profitability Data
+  const [profitabilityData, setProfitabilityData] = useState<any[] | null>(null);
+  const [profitabilityTotalCount, setProfitabilityTotalCount] = useState<number | null>(null);
   const [salesReportLoading, setSalesReportLoading] = useState(false);
   const [lastSalesReportDateRange, setLastSalesReportDateRange] = useState<{ start: string, end: string } | null>(null);
   const [salesReportPagination, setSalesReportPagination] = useState<SalesTransactionsPagination | null>(null);
@@ -2085,6 +2089,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Sales Report tab (index 4)
     if (activeTab === 4) {
       return salesReportData?.transactions || [];
+    }
+
+    // Profitability tab (index 5)
+    if (activeTab === 5) {
+      return profitabilityData || [];
     }
 
     // Use quad API data if available (can be null when filtering)
@@ -3852,6 +3861,37 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   };
 
+  const fetchProfitabilityData = async (
+    dateRangeFilter?: { start: string, end: string },
+    overridePlatform?: Platform
+  ) => {
+    try {
+      const activePlatform = overridePlatform ?? selectedPlatform;
+      // Build parameters
+      const params: any = {
+        platform: activePlatform,
+      };
+
+      if (dateRangeFilter?.start) params.date_from = dateRangeFilter.start;
+      if (dateRangeFilter?.end) params.date_to = dateRangeFilter.end;
+
+      const response = await api.transactions.getProfitability(params);
+
+      if (response && response.data) {
+        setProfitabilityData(response.data);
+        setProfitabilityTotalCount(response.data.length);
+      } else {
+        setProfitabilityData([]);
+        setProfitabilityTotalCount(0);
+      }
+    } catch (err: any) {
+      console.error('[fetchProfitabilityData] Error:', err);
+      setError(err?.message || 'Failed to fetch profitability data');
+      setProfitabilityData([]);
+      setProfitabilityTotalCount(0);
+    }
+  };
+
   // Fetch data from new total transactions API
   const fetchTotalTransactions = async (
     pageNumber: number = 1,
@@ -4290,9 +4330,10 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
   }, [searchTerm, dateRange, columnFilters, activeTab, allTransactionData, sortConfig]);
 
-  // Handle pagination
+  // Handle page change
   const handleChangePage = (event: unknown, newPage: number) => {
-    const newPageNumber = newPage + 1; // Convert from 0-based to 1-based
+    // newPage is 0-indexed from MUI, but our API uses 1-indexed pages
+    const newPageNumber = newPage + 1;
     setPage(newPage);
 
     if (activeTab === 4) {
@@ -4300,10 +4341,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       return;
     }
 
+    if (activeTab === 5) {
+      fetchProfitabilityData(dateRange, selectedPlatform);
+      return;
+    }
+
     // Always use dual API with current filters
     fetchQuadTransactions(newPageNumber, columnFilters, dateRange, selectedPlatform);
   };
 
+  // Handle rows per page change
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newRowsPerPage = parseInt(event.target.value, 10);
     setRowsPerPage(newRowsPerPage);
@@ -4311,6 +4358,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Reset to first page when changing rows per page
     if (activeTab === 4) {
       fetchSalesTransactions(dateRange, selectedPlatform, { page: 1, limit: newRowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+    } else if (activeTab === 5) {
+      fetchProfitabilityData(dateRange, selectedPlatform);
     } else {
       fetchQuadTransactions(1, columnFilters, dateRange, selectedPlatform);
     }
@@ -4348,6 +4397,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Sales Report tab (index 4) - fetch data when clicked
     if (newValue === 4) {
       fetchSalesTransactions(dateRange, selectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+      return;
+    }
+
+    // Profitability tab (index 5) - fetch data when clicked
+    if (newValue === 5) {
+      fetchProfitabilityData(dateRange, selectedPlatform);
       return;
     }
 
@@ -4518,6 +4573,16 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Get visible columns
   const getVisibleColumns = () => {
+    if (activeTab === 5) {
+      return [
+        'SKU', 'Category', 'Sales', 'RTO / Cancellations', 'Customer Returns', 'Net Sales', 
+        'List Price', 'GT Charges', 'Revenue', 'Output GST', 'Taxes On Marketplace Fees', 
+        'Taxable Sales', 'Marketplace Fee On Delivered Orders', 'Marketplace Fee On Customer Returns', 
+        'MP Fee Rebate', 'SPF Received', 'Gross Profit', 'Cost Price Per Unit', 'Total Cost Price', 
+        'Net Profit', 'Net Profit / Unit', '% Of Total Sales', '% Of Total Revenue', 
+        'Customer Return %', 'Courier Return %', 'Return %'
+      ];
+    }
     const base = [
       "Order ID",
       "Order Value",
@@ -4538,6 +4603,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     { label: 'Unsettled', count: unsettledTotalCount },
     { label: 'All', count: allTotalCount },
     { label: 'Sales Report', count: salesReportTotalCount },
+    { label: 'Profitability', count: profitabilityTotalCount },
   ];
 
   const selectedDateRangeLabel = useMemo(() => {
@@ -6295,6 +6361,36 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     const salesColumnDef = salesReportData?.columns?.find(col => col.title === column);
                                     const fieldName = salesColumnDef?.key;
                                     value = fieldName ? (row as any)[fieldName] : undefined;
+                                  } else if (activeTab === 5) {
+                                    const mapping: Record<string, string> = {
+                                      'SKU': 'sku',
+                                      'Category': 'category',
+                                      'Sales': 'sales',
+                                      'RTO / Cancellations': 'rto_cancellations',
+                                      'Customer Returns': 'customer_returns',
+                                      'Net Sales': 'net_sales',
+                                      'List Price': 'list_price',
+                                      'GT Charges': 'gt_charges',
+                                      'Revenue': 'revenue',
+                                      'Output GST': 'output_gst',
+                                      'Taxes On Marketplace Fees': 'taxes_on_marketplace_fees',
+                                      'Taxable Sales': 'taxable_sales',
+                                      'Marketplace Fee On Delivered Orders': 'marketplace_fee_on_delivered',
+                                      'Marketplace Fee On Customer Returns': 'marketplace_fee_on_returns',
+                                      'MP Fee Rebate': 'mp_fee_rebate',
+                                      'SPF Received': 'spf_received',
+                                      'Gross Profit': 'gross_profit',
+                                      'Cost Price Per Unit': 'cost_price_per_unit',
+                                      'Total Cost Price': 'total_cost_price',
+                                      'Net Profit': 'net_profit',
+                                      'Net Profit / Unit': 'net_profit_per_unit',
+                                      '% Of Total Sales': 'percentage_of_total_sales',
+                                      '% Of Total Revenue': 'percentage_of_total_revenue',
+                                      'Customer Return %': 'customer_return_percentage',
+                                      'Courier Return %': 'courier_return_percentage',
+                                      'Return %': 'return_percentage'
+                                    };
+                                    value = (row as any)[mapping[column]];
                                   } else if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
                                     // Use quad API data
                                     let currentData: TotalTransactionsResponse | null = null;
@@ -6355,8 +6451,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   // Format value based on type
                                   let displayValue = value;
 
-                                  // Sales Report tab formatting
-                                  if (activeTab === 4) {
+                                  if (activeTab === 5) {
+                                    if (['Sales', 'RTO / Cancellations', 'Customer Returns', 'Net Sales'].includes(column)) {
+                                      const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
+                                      displayValue = numericValue !== null && !Number.isNaN(numericValue) ? numericValue.toLocaleString() : '0';
+                                    } else if (column.includes('%')) {
+                                      const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
+                                      displayValue = numericValue !== null && !Number.isNaN(numericValue) ? `${numericValue.toFixed(2)}%` : '0.00%';
+                                    } else if (!['SKU', 'Category'].includes(column)) {
+                                      // All others are currency (floats)
+                                      const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
+                                      displayValue = numericValue !== null && !Number.isNaN(numericValue) ? formatCurrency(numericValue) : formatCurrency(0);
+                                    } else {
+                                      displayValue = value !== undefined && value !== null ? String(value) : '';
+                                    }
+                                  } else if (activeTab === 4) {
                                     const salesColumnDef = salesReportData?.columns?.find(col => col.title === column);
                                     const columnType = salesColumnDef?.type;
                                     const fieldName = salesColumnDef?.key;
@@ -6606,7 +6715,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 <TablePagination
                   rowsPerPageOptions={[100]}
                   component="div"
-                  count={activeTab === 4 ? (salesReportTotalCount ?? 0) : (totalCount || filteredData.length)}
+                  count={activeTab === 4 ? (salesReportTotalCount ?? 0) : activeTab === 5 ? (profitabilityTotalCount ?? 0) : (totalCount || filteredData.length)}
                   rowsPerPage={rowsPerPage}
                   page={page}
                   onPageChange={handleChangePage}
