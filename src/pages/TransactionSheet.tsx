@@ -2156,6 +2156,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       cols = [...prioritized, ...remaining].map(col => col.title);
     }
 
+    // Profitability tab (index 5) - fixed columns
+    else if (activeTab === 5) {
+      cols = visibleColumns;
+    }
+
     // Use quad API data if available (can be null when filtering)
     else if (matchedData !== null || mismatchedLessReceivedData !== null || mismatchedMoreReceivedData !== null || unsettledData !== null || allData !== null) {
       let currentData: TotalTransactionsResponse | null = null;
@@ -3244,7 +3249,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Lazy-load data when active tab or mismatched sub-tab changes after initial load
   useEffect(() => {
     if (!hasInitialLoad) return;
-    if (activeTab === 4) return; // Sales Report tab is fetched separately in handleTabChange
+    if (activeTab === 4 || activeTab === 5) return; // Sales Report and Profitability tabs are fetched separately in handleTabChange
     fetchQuadTransactions(currentPage);
   }, [activeTab, mismatchedSubTab, hasInitialLoad]);
 
@@ -3259,6 +3264,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Use dual API with filters and pending platform
     if (activeTab === 4) {
       fetchSalesTransactions(pendingDateRange, pendingSelectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+    } else if (activeTab === 5) {
+      fetchProfitabilityData(pendingDateRange, pendingSelectedPlatform);
     } else {
       fetchQuadTransactions(1, pendingColumnFilters, pendingDateRange, pendingSelectedPlatform);
     }
@@ -3275,6 +3282,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     if (activeTab === 4) {
       // When on Sales Report tab, update both Sales Report and the other 4 tabs
       fetchSalesTransactions(dateRange, pendingSelectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+      fetchQuadTransactions(1, columnFilters, dateRange, pendingSelectedPlatform);
+    } else if (activeTab === 5) {
+      fetchProfitabilityData(dateRange, pendingSelectedPlatform);
       fetchQuadTransactions(1, columnFilters, dateRange, pendingSelectedPlatform);
     } else {
       // When on any other tab, only update the 4 tabs (Sales Report will be fetched when user switches to it)
@@ -3314,6 +3324,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setCurrentPage(1);
     if (activeTab === 4) {
       fetchSalesTransactions(pendingHeaderDateRange, selectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+    } else if (activeTab === 5) {
+      fetchProfitabilityData(pendingHeaderDateRange, selectedPlatform);
     } else {
       fetchQuadTransactions(1, columnFilters, pendingHeaderDateRange, selectedPlatform);
     }
@@ -3866,6 +3878,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     overridePlatform?: Platform
   ) => {
     try {
+      setLoading(true);
+      setError(null);
       const activePlatform = overridePlatform ?? selectedPlatform;
       // Build parameters
       const params: any = {
@@ -3877,18 +3891,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       const response = await api.transactions.getProfitability(params);
 
-      if (response && response.data) {
-        setProfitabilityData(response.data);
-        setProfitabilityTotalCount(response.data.length);
-      } else {
-        setProfitabilityData([]);
-        setProfitabilityTotalCount(0);
-      }
+      const items = Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(response?.data?.data)
+          ? response.data.data
+          : [];
+
+      setProfitabilityData(items);
+      setProfitabilityTotalCount(items.length);
     } catch (err: any) {
       console.error('[fetchProfitabilityData] Error:', err);
       setError(err?.message || 'Failed to fetch profitability data');
       setProfitabilityData([]);
       setProfitabilityTotalCount(0);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -6081,7 +6098,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       activeTab === 1 ? '#f59e0b' : // Mismatched - orange
                                         activeTab === 2 ? '#ef4444' : // Unsettled - red
                                           activeTab === 4 ? '#8b5cf6' : // Sales Report - purple
-                                            '#6366f1' // All - indigo
+                                            activeTab === 5 ? '#0ea5e9' : // Profitability - sky blue
+                                              '#6366f1' // All - indigo
                                     }`,
                                   background: '#ffffff',
                                   position: 'relative',
