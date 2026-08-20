@@ -1956,6 +1956,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Sales Report search state
   const [salesReportSearch, setSalesReportSearch] = useState<string>('');
   const [showSalesReportSearch, setShowSalesReportSearch] = useState<string | null>(null);
+  // Profitability search state
+  const [profitabilitySearch, setProfitabilitySearch] = useState<string>('');
+  const [showProfitabilitySearch, setShowProfitabilitySearch] = useState<string | null>(null);
   // Amazon Sales Report business mode (B2C default)
   const [amazonBusinessMode, setAmazonBusinessMode] = useState<'B2C' | 'B2B'>('B2C');
   const [exportDrawerOpen, setExportDrawerOpen] = useState(false);
@@ -2093,7 +2096,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
     // Profitability tab (index 5)
     if (activeTab === 5) {
-      return profitabilityData || [];
+      let list = profitabilityData || [];
+      if (profitabilitySearch && profitabilitySearch.trim()) {
+        const q = profitabilitySearch.trim().toLowerCase();
+        list = list.filter(row =>
+          (row.sku && String(row.sku).toLowerCase().includes(q)) ||
+          (row.category && String(row.category).toLowerCase().includes(q))
+        );
+      }
+      return list;
     }
 
     // Use quad API data if available (can be null when filtering)
@@ -2473,6 +2484,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }, salesReportSortConfig, null).finally(() => {
       setIsSorting(false);
     });
+  };
+
+  // Profitability search handlers
+  const handleProfitabilitySearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setProfitabilitySearch(value);
+    setPage(0);
+    setCurrentPage(1);
+  };
+
+  const handleProfitabilitySearchClear = () => {
+    setProfitabilitySearch('');
+    setShowProfitabilitySearch(null);
+    setPage(0);
+    setCurrentPage(1);
   };
 
   const sortData = (data: TransactionRow[]) => {
@@ -4398,6 +4424,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     setOrderIdChips([]); // Clear order ID chips
     setOrderIdSearch(''); // Clear order ID search in header
     setShowOrderIdSearch(false); // Hide order ID search bar
+    setProfitabilitySearch('');
+    setShowProfitabilitySearch(null);
     setPage(0);
     setCurrentPage(1);
     fetchQuadTransactions(1, {}, { start: '', end: '' }, 'flipkart', []);
@@ -4413,6 +4441,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     if (newValue !== 4) {
       setSalesReportSearch('');
       setShowSalesReportSearch(null);
+    }
+
+    // Clear Profitability search when switching away from Profitability tab
+    if (newValue !== 5) {
+      setProfitabilitySearch('');
+      setShowProfitabilitySearch(null);
     }
 
     // Sales Report tab (index 4) - fetch data when clicked
@@ -5558,7 +5592,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   >
                                     {getSalesReportSortIcon(column)}
                                   </IconButton>
-                                  {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
+                                  {/* Magnifying glass button for Sales Report search */}
                                   {(['Order ID', 'Order Item ID', 'HSN', 'Marketplace SKU Code'].includes(column) || 
                                     ['order_id', 'order_item_id', 'hsn', 'marketplace_sku_code'].includes(salesReportData?.columns?.find(col => col.title === column)?.key || '')) && (
                                       <IconButton
@@ -5579,6 +5613,29 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         <SearchIcon sx={{ fontSize: '1rem' }} />
                                       </IconButton>
                                     )}
+                                </>
+                              ) : activeTab === 5 ? (
+                                // Profitability tab search
+                                <>
+                                  {['SKU', 'Category'].includes(column) && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowProfitabilitySearch(showProfitabilitySearch === column ? null : column);
+                                      }}
+                                      sx={{
+                                        ml: 0.5,
+                                        color: showProfitabilitySearch === column || (profitabilitySearch && ['SKU', 'Category'].includes(column)) ? '#1f2937' : '#6b7280',
+                                        background: showProfitabilitySearch === column || (profitabilitySearch && ['SKU', 'Category'].includes(column)) ? '#e5e7eb' : 'transparent',
+                                        '&:hover': { background: '#f3f4f6' },
+                                      }}
+                                      aria-label={`Toggle search for ${column}`}
+                                    >
+                                      <SearchIcon sx={{ fontSize: '1rem' }} />
+                                    </IconButton>
+                                  )}
                                 </>
                               ) : (
                                 // Other tabs sorting
@@ -5625,7 +5682,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               )}
                             </Box>
                             {/* Order ID Search Bar - Floating Popover */}
-                            {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && (
+                            {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && activeTab !== 5 && (
                               <Box
                                 sx={{
                                   position: 'absolute',
@@ -5643,39 +5700,42 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               >
                                 <TextField
                                   size="small"
+                                  placeholder="Search Order ID..."
+                                  autoFocus
                                   value={orderIdSearch}
                                   onChange={handleOrderIdSearchChange}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                       e.preventDefault();
                                       handleOrderIdSearchClick();
+                                    } else if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      setShowOrderIdSearch(false);
                                     }
                                   }}
                                   InputProps={{
                                     endAdornment: (
                                       <InputAdornment position="end">
-                                        {orderIdSearch?.trim() && (
-                                          <IconButton
-                                            size="small"
-                                            onClick={handleOrderIdSearchClear}
-                                            disabled={(loading || quadApiLoading) && !isSorting}
-                                            sx={{ p: 0.5, mr: 0.25 }}
-                                          >
-                                            <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
-                                          </IconButton>
-                                        )}
                                         <IconButton
                                           size="small"
-                                          onClick={() => { setShowOrderIdSearch(false); handleOrderIdSearchClear(); }}
+                                          onClick={() => {
+                                            if (orderIdSearch?.trim()) {
+                                              handleOrderIdSearchClear();
+                                            } else {
+                                              setShowOrderIdSearch(false);
+                                            }
+                                          }}
                                           sx={{ p: 0.5, mr: 0.25 }}
+                                          aria-label="Clear or close search"
                                         >
-                                          <CloseIcon sx={{ fontSize: '1rem', color: '#111827' }} />
+                                          <CloseIcon sx={{ fontSize: '0.95rem', color: '#6b7280' }} />
                                         </IconButton>
                                         <IconButton
                                           size="small"
                                           onClick={handleOrderIdSearchClick}
                                           disabled={(loading || quadApiLoading) && !isSorting}
                                           sx={{ p: 0.5 }}
+                                          aria-label="Submit search"
                                         >
                                           <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
                                         </IconButton>
@@ -5714,39 +5774,43 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 >
                                   <TextField
                                     size="small"
+                                    placeholder={`Search ${column}...`}
+                                    autoFocus
                                     value={salesReportSearch}
                                     onChange={handleSalesReportSearchChange}
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') {
                                         e.preventDefault();
                                         handleSalesReportSearchClick();
+                                      } else if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        setShowSalesReportSearch(null);
                                       }
                                     }}
                                     InputProps={{
                                       endAdornment: (
                                         <InputAdornment position="end">
-                                          {salesReportSearch?.trim() && (
-                                            <IconButton
-                                              size="small"
-                                              onClick={handleSalesReportSearchClear}
-                                              disabled={salesReportLoading && !isSorting}
-                                              sx={{ p: 0.5, mr: 0.25 }}
-                                            >
-                                              <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
-                                            </IconButton>
-                                          )}
                                           <IconButton
                                             size="small"
-                                            onClick={() => { setShowSalesReportSearch(null); handleSalesReportSearchClear(); }}
+                                            onClick={() => {
+                                              if (salesReportSearch?.trim()) {
+                                                handleSalesReportSearchClear();
+                                              } else {
+                                                setShowSalesReportSearch(null);
+                                              }
+                                            }}
+                                            disabled={salesReportLoading && !isSorting}
                                             sx={{ p: 0.5, mr: 0.25 }}
+                                            aria-label="Clear or close search"
                                           >
-                                            <CloseIcon sx={{ fontSize: '1rem', color: '#111827' }} />
+                                            <CloseIcon sx={{ fontSize: '0.95rem', color: '#6b7280' }} />
                                           </IconButton>
                                           <IconButton
                                             size="small"
                                             onClick={handleSalesReportSearchClick}
                                             disabled={salesReportLoading && !isSorting}
                                             sx={{ p: 0.5 }}
+                                            aria-label="Submit search"
                                           >
                                             <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
                                           </IconButton>
@@ -5764,6 +5828,66 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   />
                                 </Box>
                               )}
+                            {/* Profitability Search Bar - Floating Popover */}
+                            {activeTab === 5 && showProfitabilitySearch === column && ['SKU', 'Category'].includes(column) && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  zIndex: 20,
+                                  background: '#f3f4f6',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '0 4px'
+                                }}
+                              >
+                                <TextField
+                                  size="small"
+                                  placeholder={`Search ${column}...`}
+                                  autoFocus
+                                  value={profitabilitySearch}
+                                  onChange={handleProfitabilitySearchChange}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      setShowProfitabilitySearch(null);
+                                    }
+                                  }}
+                                  InputProps={{
+                                    endAdornment: (
+                                      <InputAdornment position="end">
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => {
+                                            if (profitabilitySearch?.trim()) {
+                                              setProfitabilitySearch('');
+                                            } else {
+                                              setShowProfitabilitySearch(null);
+                                            }
+                                          }}
+                                          sx={{ p: 0.5 }}
+                                          aria-label="Clear or close search"
+                                        >
+                                          <CloseIcon sx={{ fontSize: '0.95rem', color: '#6b7280' }} />
+                                        </IconButton>
+                                      </InputAdornment>
+                                    ),
+                                  }}
+                                  sx={{
+                                    width: '260px',
+                                    '& .MuiOutlinedInput-root': {
+                                      height: '32px',
+                                      fontSize: '0.75rem',
+                                      background: 'white',
+                                    }
+                                  }}
+                                />
+                              </Box>
+                            )}
                           </Box>
                         </TableCell>
                       ))}
@@ -5849,7 +5973,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   >
                                     {getSalesReportSortIcon(column)}
                                   </IconButton>
-                                  {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
+                                  {/* Magnifying glass button for Sales Report search */}
                                   {(['Order ID', 'Order Item ID', 'HSN', 'Marketplace SKU Code'].includes(column) || 
                                     ['order_id', 'order_item_id', 'hsn', 'marketplace_sku_code'].includes(salesReportData?.columns?.find(col => col.title === column)?.key || '')) && (
                                       <IconButton
@@ -5870,6 +5994,29 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         <SearchIcon sx={{ fontSize: '1rem' }} />
                                       </IconButton>
                                     )}
+                                </>
+                              ) : activeTab === 5 ? (
+                                // Profitability tab search
+                                <>
+                                  {['SKU', 'Category'].includes(column) && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowProfitabilitySearch(showProfitabilitySearch === column ? null : column);
+                                      }}
+                                      sx={{
+                                        ml: 0.5,
+                                        color: showProfitabilitySearch === column || (profitabilitySearch && ['SKU', 'Category'].includes(column)) ? '#1f2937' : '#6b7280',
+                                        background: showProfitabilitySearch === column || (profitabilitySearch && ['SKU', 'Category'].includes(column)) ? '#e5e7eb' : 'transparent',
+                                        '&:hover': { background: '#f3f4f6' },
+                                      }}
+                                      aria-label={`Toggle search for ${column}`}
+                                    >
+                                      <SearchIcon sx={{ fontSize: '1rem' }} />
+                                    </IconButton>
+                                  )}
                                 </>
                               ) : (
                                 // Other tabs sorting
@@ -5916,7 +6063,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               )}
                             </Box>
                             {/* Order ID Search Bar - Floating Popover */}
-                            {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && (
+                            {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && activeTab !== 5 && (
                               <Box
                                 sx={{
                                   position: 'absolute',
@@ -5934,39 +6081,42 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               >
                                 <TextField
                                   size="small"
+                                  placeholder="Search Order ID..."
+                                  autoFocus
                                   value={orderIdSearch}
                                   onChange={handleOrderIdSearchChange}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                       e.preventDefault();
                                       handleOrderIdSearchClick();
+                                    } else if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      setShowOrderIdSearch(false);
                                     }
                                   }}
                                   InputProps={{
                                     endAdornment: (
                                       <InputAdornment position="end">
-                                        {orderIdSearch?.trim() && (
-                                          <IconButton
-                                            size="small"
-                                            onClick={handleOrderIdSearchClear}
-                                            disabled={(loading || quadApiLoading) && !isSorting}
-                                            sx={{ p: 0.5, mr: 0.25 }}
-                                          >
-                                            <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
-                                          </IconButton>
-                                        )}
                                         <IconButton
                                           size="small"
-                                          onClick={() => { setShowOrderIdSearch(false); handleOrderIdSearchClear(); }}
+                                          onClick={() => {
+                                            if (orderIdSearch?.trim()) {
+                                              handleOrderIdSearchClear();
+                                            } else {
+                                              setShowOrderIdSearch(false);
+                                            }
+                                          }}
                                           sx={{ p: 0.5, mr: 0.25 }}
+                                          aria-label="Clear or close search"
                                         >
-                                          <CloseIcon sx={{ fontSize: '1rem', color: '#111827' }} />
+                                          <CloseIcon sx={{ fontSize: '0.95rem', color: '#6b7280' }} />
                                         </IconButton>
                                         <IconButton
                                           size="small"
                                           onClick={handleOrderIdSearchClick}
                                           disabled={(loading || quadApiLoading) && !isSorting}
                                           sx={{ p: 0.5 }}
+                                          aria-label="Submit search"
                                         >
                                           <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
                                         </IconButton>
@@ -6005,39 +6155,43 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 >
                                   <TextField
                                     size="small"
+                                    placeholder={`Search ${column}...`}
+                                    autoFocus
                                     value={salesReportSearch}
                                     onChange={handleSalesReportSearchChange}
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') {
                                         e.preventDefault();
                                         handleSalesReportSearchClick();
+                                      } else if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        setShowSalesReportSearch(null);
                                       }
                                     }}
                                     InputProps={{
                                       endAdornment: (
                                         <InputAdornment position="end">
-                                          {salesReportSearch?.trim() && (
-                                            <IconButton
-                                              size="small"
-                                              onClick={handleSalesReportSearchClear}
-                                              disabled={salesReportLoading && !isSorting}
-                                              sx={{ p: 0.5, mr: 0.25 }}
-                                            >
-                                              <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
-                                            </IconButton>
-                                          )}
                                           <IconButton
                                             size="small"
-                                            onClick={() => { setShowSalesReportSearch(null); handleSalesReportSearchClear(); }}
+                                            onClick={() => {
+                                              if (salesReportSearch?.trim()) {
+                                                handleSalesReportSearchClear();
+                                              } else {
+                                                setShowSalesReportSearch(null);
+                                              }
+                                            }}
+                                            disabled={salesReportLoading && !isSorting}
                                             sx={{ p: 0.5, mr: 0.25 }}
+                                            aria-label="Clear or close search"
                                           >
-                                            <CloseIcon sx={{ fontSize: '1rem', color: '#111827' }} />
+                                            <CloseIcon sx={{ fontSize: '0.95rem', color: '#6b7280' }} />
                                           </IconButton>
                                           <IconButton
                                             size="small"
                                             onClick={handleSalesReportSearchClick}
                                             disabled={salesReportLoading && !isSorting}
                                             sx={{ p: 0.5 }}
+                                            aria-label="Submit search"
                                           >
                                             <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
                                           </IconButton>
@@ -6055,6 +6209,66 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   />
                                 </Box>
                               )}
+                            {/* Profitability Search Bar - Floating Popover */}
+                            {activeTab === 5 && showProfitabilitySearch === column && ['SKU', 'Category'].includes(column) && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  zIndex: 20,
+                                  background: '#f3f4f6',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '0 4px'
+                                }}
+                              >
+                                <TextField
+                                  size="small"
+                                  placeholder={`Search ${column}...`}
+                                  autoFocus
+                                  value={profitabilitySearch}
+                                  onChange={handleProfitabilitySearchChange}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      setShowProfitabilitySearch(null);
+                                    }
+                                  }}
+                                  InputProps={{
+                                    endAdornment: (
+                                      <InputAdornment position="end">
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => {
+                                            if (profitabilitySearch?.trim()) {
+                                              setProfitabilitySearch('');
+                                            } else {
+                                              setShowProfitabilitySearch(null);
+                                            }
+                                          }}
+                                          sx={{ p: 0.5 }}
+                                          aria-label="Clear or close search"
+                                        >
+                                          <CloseIcon sx={{ fontSize: '0.95rem', color: '#6b7280' }} />
+                                        </IconButton>
+                                      </InputAdornment>
+                                    ),
+                                  }}
+                                  sx={{
+                                    width: '260px',
+                                    '& .MuiOutlinedInput-root': {
+                                      height: '32px',
+                                      fontSize: '0.75rem',
+                                      background: 'white',
+                                    }
+                                  }}
+                                />
+                              </Box>
+                            )}
                           </Box>
                         </TableCell>
                       ))}
@@ -6156,7 +6370,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   >
                                     {getSalesReportSortIcon(column)}
                                   </IconButton>
-                                  {/* Magnifying glass button for Sales Report search - order_item_id for Flipkart, order_id for Amazon and D2C */}
+                                  {/* Magnifying glass button for Sales Report search */}
                                   {(['Order ID', 'Order Item ID', 'HSN', 'Marketplace SKU Code'].includes(column) || 
                                     ['order_id', 'order_item_id', 'hsn', 'marketplace_sku_code'].includes(salesReportData?.columns?.find(col => col.title === column)?.key || '')) && (
                                       <IconButton
@@ -6177,6 +6391,29 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         <SearchIcon sx={{ fontSize: '1rem' }} />
                                       </IconButton>
                                     )}
+                                </>
+                              ) : activeTab === 5 ? (
+                                // Profitability tab search
+                                <>
+                                  {['SKU', 'Category'].includes(column) && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowProfitabilitySearch(showProfitabilitySearch === column ? null : column);
+                                      }}
+                                      sx={{
+                                        ml: 0.5,
+                                        color: showProfitabilitySearch === column || (profitabilitySearch && ['SKU', 'Category'].includes(column)) ? '#1f2937' : '#6b7280',
+                                        background: showProfitabilitySearch === column || (profitabilitySearch && ['SKU', 'Category'].includes(column)) ? '#e5e7eb' : 'transparent',
+                                        '&:hover': { background: '#f3f4f6' },
+                                      }}
+                                      aria-label={`Toggle search for ${column}`}
+                                    >
+                                      <SearchIcon sx={{ fontSize: '1rem' }} />
+                                    </IconButton>
+                                  )}
                                 </>
                               ) : (
                                 // Other tabs sorting
@@ -6223,7 +6460,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               )}
                             </Box>
                             {/* Order ID Search Bar - Floating Popover */}
-                            {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && (
+                            {column === 'Order ID' && showOrderIdSearch && activeTab !== 4 && activeTab !== 5 && (
                               <Box
                                 sx={{
                                   position: 'absolute',
@@ -6241,39 +6478,42 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               >
                                 <TextField
                                   size="small"
+                                  placeholder="Search Order ID..."
+                                  autoFocus
                                   value={orderIdSearch}
                                   onChange={handleOrderIdSearchChange}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                       e.preventDefault();
                                       handleOrderIdSearchClick();
+                                    } else if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      setShowOrderIdSearch(false);
                                     }
                                   }}
                                   InputProps={{
                                     endAdornment: (
                                       <InputAdornment position="end">
-                                        {orderIdSearch?.trim() && (
-                                          <IconButton
-                                            size="small"
-                                            onClick={handleOrderIdSearchClear}
-                                            disabled={(loading || quadApiLoading) && !isSorting}
-                                            sx={{ p: 0.5, mr: 0.25 }}
-                                          >
-                                            <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
-                                          </IconButton>
-                                        )}
                                         <IconButton
                                           size="small"
-                                          onClick={() => { setShowOrderIdSearch(false); handleOrderIdSearchClear(); }}
+                                          onClick={() => {
+                                            if (orderIdSearch?.trim()) {
+                                              handleOrderIdSearchClear();
+                                            } else {
+                                              setShowOrderIdSearch(false);
+                                            }
+                                          }}
                                           sx={{ p: 0.5, mr: 0.25 }}
+                                          aria-label="Clear or close search"
                                         >
-                                          <CloseIcon sx={{ fontSize: '1rem', color: '#111827' }} />
+                                          <CloseIcon sx={{ fontSize: '0.95rem', color: '#6b7280' }} />
                                         </IconButton>
                                         <IconButton
                                           size="small"
                                           onClick={handleOrderIdSearchClick}
                                           disabled={(loading || quadApiLoading) && !isSorting}
                                           sx={{ p: 0.5 }}
+                                          aria-label="Submit search"
                                         >
                                           <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
                                         </IconButton>
@@ -6312,39 +6552,43 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 >
                                   <TextField
                                     size="small"
+                                    placeholder={`Search ${column}...`}
+                                    autoFocus
                                     value={salesReportSearch}
                                     onChange={handleSalesReportSearchChange}
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') {
                                         e.preventDefault();
                                         handleSalesReportSearchClick();
+                                      } else if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        setShowSalesReportSearch(null);
                                       }
                                     }}
                                     InputProps={{
                                       endAdornment: (
                                         <InputAdornment position="end">
-                                          {salesReportSearch?.trim() && (
-                                            <IconButton
-                                              size="small"
-                                              onClick={handleSalesReportSearchClear}
-                                              disabled={salesReportLoading && !isSorting}
-                                              sx={{ p: 0.5, mr: 0.25 }}
-                                            >
-                                              <ClearIcon sx={{ fontSize: '1rem', color: '#6b7280' }} />
-                                            </IconButton>
-                                          )}
                                           <IconButton
                                             size="small"
-                                            onClick={() => { setShowSalesReportSearch(null); handleSalesReportSearchClear(); }}
+                                            onClick={() => {
+                                              if (salesReportSearch?.trim()) {
+                                                handleSalesReportSearchClear();
+                                              } else {
+                                                setShowSalesReportSearch(null);
+                                              }
+                                            }}
+                                            disabled={salesReportLoading && !isSorting}
                                             sx={{ p: 0.5, mr: 0.25 }}
+                                            aria-label="Clear or close search"
                                           >
-                                            <CloseIcon sx={{ fontSize: '1rem', color: '#111827' }} />
+                                            <CloseIcon sx={{ fontSize: '0.95rem', color: '#6b7280' }} />
                                           </IconButton>
                                           <IconButton
                                             size="small"
                                             onClick={handleSalesReportSearchClick}
                                             disabled={salesReportLoading && !isSorting}
                                             sx={{ p: 0.5 }}
+                                            aria-label="Submit search"
                                           >
                                             <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
                                           </IconButton>
@@ -6362,6 +6606,66 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   />
                                 </Box>
                               )}
+                            {/* Profitability Search Bar - Floating Popover */}
+                            {activeTab === 5 && showProfitabilitySearch === column && ['SKU', 'Category'].includes(column) && (
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  zIndex: 20,
+                                  background: '#f3f4f6',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '0 4px'
+                                }}
+                              >
+                                <TextField
+                                  size="small"
+                                  placeholder={`Search ${column}...`}
+                                  autoFocus
+                                  value={profitabilitySearch}
+                                  onChange={handleProfitabilitySearchChange}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      setShowProfitabilitySearch(null);
+                                    }
+                                  }}
+                                  InputProps={{
+                                    endAdornment: (
+                                      <InputAdornment position="end">
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => {
+                                            if (profitabilitySearch?.trim()) {
+                                              setProfitabilitySearch('');
+                                            } else {
+                                              setShowProfitabilitySearch(null);
+                                            }
+                                          }}
+                                          sx={{ p: 0.5 }}
+                                          aria-label="Clear or close search"
+                                        >
+                                          <CloseIcon sx={{ fontSize: '0.95rem', color: '#6b7280' }} />
+                                        </IconButton>
+                                      </InputAdornment>
+                                    ),
+                                  }}
+                                  sx={{
+                                    width: '260px',
+                                    '& .MuiOutlinedInput-root': {
+                                      height: '32px',
+                                      fontSize: '0.75rem',
+                                      background: 'white',
+                                    }
+                                  }}
+                                />
+                              </Box>
+                            )}
                           </Box>
                         </TableCell>
                       ))}
@@ -6737,7 +7041,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                 <TablePagination
                   rowsPerPageOptions={[100]}
                   component="div"
-                  count={activeTab === 4 ? (salesReportTotalCount ?? 0) : activeTab === 5 ? (profitabilityTotalCount ?? 0) : (totalCount || filteredData.length)}
+                  count={activeTab === 4 ? (salesReportTotalCount ?? 0) : activeTab === 5 ? (profitabilitySearch.trim() ? getCurrentData().length : (profitabilityTotalCount ?? (profitabilityData?.length || 0))) : (totalCount || filteredData.length)}
                   rowsPerPage={rowsPerPage}
                   page={page}
                   onPageChange={handleChangePage}
