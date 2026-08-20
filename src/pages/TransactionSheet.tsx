@@ -3166,7 +3166,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   useEffect(() => {
     if (location.state?.initialTab !== undefined) {
       const newTab = location.state.initialTab;
-      if (typeof newTab === 'number' && newTab >= 0 && newTab <= 4) {
+      if (typeof newTab === 'number' && newTab >= 0 && newTab <= 5) {
         setActiveTab(newTab);
       } else {
         setActiveTab(0);
@@ -3179,10 +3179,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Handle initialTab prop changes (when opening TransactionSheet with different initialTab)
   useEffect(() => {
     if (initialTab !== undefined) {
-      const tabToSet = typeof initialTab === 'number' && initialTab >= 0 && initialTab <= 4 ? initialTab : 0;
+      const tabToSet = typeof initialTab === 'number' && initialTab >= 0 && initialTab <= 5 ? initialTab : 0;
       setActiveTab(tabToSet);
       if (tabToSet === 4) {
         fetchSalesTransactions(dateRange, selectedPlatform, { page: 1, limit: 100, force: true }, undefined, salesReportSearch || null);
+      } else if (tabToSet === 5) {
+        fetchProfitabilityData(dateRange, selectedPlatform);
       }
     }
   }, [initialTab]);

@@ -249,6 +249,8 @@ const MarketplaceReconciliation: React.FC = () => {
   const [reconciliationData, setReconciliationData] = useState<MarketplaceReconciliationResponse>(mockReconciliationData);
   const [mainSummary, setMainSummary] = useState<MainSummaryResponse | null>(null);
   const [reconciliationStatus, setReconciliationStatus] = useState<ReconciliationStatus | null>(null);
+  const [skuProfitabilityData, setSkuProfitabilityData] = useState<any[] | null>(null);
+  const [skuProfitabilityLoading, setSkuProfitabilityLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(false);
@@ -1260,6 +1262,61 @@ const MarketplaceReconciliation: React.FC = () => {
     }
   };
 
+  const fetchSkuProfitability = async (startDate?: string, endDate?: string) => {
+    if (!hasFlipkartSubPlatforms) return;
+    try {
+      setSkuProfitabilityLoading(true);
+      const params: any = {
+        platform: 'flipkart',
+      };
+      if (startDate) params.date_from = startDate;
+      if (endDate) params.date_to = endDate;
+
+      const resp = await apiIndex.transactions.getProfitability(params);
+      const items = Array.isArray(resp?.data)
+        ? resp.data
+        : Array.isArray(resp?.data?.data)
+          ? resp.data.data
+          : [];
+      setSkuProfitabilityData(items);
+    } catch (err) {
+      console.error('Error fetching SKU profitability:', err);
+      setSkuProfitabilityData([]);
+    } finally {
+      setSkuProfitabilityLoading(false);
+    }
+  };
+
+  const topProfitableSKUs = useMemo(() => {
+    if (!skuProfitabilityData || skuProfitabilityData.length === 0) return [];
+    return [...skuProfitabilityData]
+      .sort((a, b) => (Number(b.net_profit) || 0) - (Number(a.net_profit) || 0))
+      .slice(0, 5);
+  }, [skuProfitabilityData]);
+
+  const topReturnedSKUs = useMemo(() => {
+    if (!skuProfitabilityData || skuProfitabilityData.length === 0) return [];
+    return [...skuProfitabilityData]
+      .filter(item => ((Number(item.customer_returns) || 0) + (Number(item.rto_cancellations) || 0)) > 0)
+      .sort((a, b) => {
+        const totalReturnsB = (Number(b.customer_returns) || 0) + (Number(b.rto_cancellations) || 0);
+        const totalReturnsA = (Number(a.customer_returns) || 0) + (Number(a.rto_cancellations) || 0);
+        if (totalReturnsB !== totalReturnsA) return totalReturnsB - totalReturnsA;
+        return (Number(b.return_percentage) || 0) - (Number(a.return_percentage) || 0);
+      })
+      .slice(0, 5);
+  }, [skuProfitabilityData]);
+
+  const maxProfit = useMemo(() => {
+    if (topProfitableSKUs.length === 0) return 1;
+    return Math.max(...topProfitableSKUs.map(s => Number(s.net_profit) || 0), 1);
+  }, [topProfitableSKUs]);
+
+  const maxReturns = useMemo(() => {
+    if (topReturnedSKUs.length === 0) return 1;
+    return Math.max(...topReturnedSKUs.map(s => (Number(s.customer_returns) || 0) + (Number(s.rto_cancellations) || 0)), 1);
+  }, [topReturnedSKUs]);
+
   const fetchAgeingAnalysis = async () => {
     // For custom range, wait until both dates are selected
     if (selectedDateRange === 'custom' && (!customStartDate || !customEndDate)) {
@@ -2084,6 +2141,17 @@ const MarketplaceReconciliation: React.FC = () => {
     if (selectedPlatform && (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || selectedPlatform === 'other')) {
       fetchMonthOnMonthGrowth();
     }
+    // Fetch SKU profitability for Flipkart when relevant
+    if (hasFlipkartSubPlatforms && (selectedPlatform === 'flipkart' || !selectedPlatform)) {
+      if (selectedDateRange === 'custom') {
+        if (customStartDate && customEndDate) {
+          fetchSkuProfitability(customStartDate, customEndDate);
+        }
+      } else {
+        const { start, end } = effectiveDateRangeForTs;
+        fetchSkuProfitability(start, end);
+      }
+    }
     // Call upload-list API at the same time as main-summary and ageing-analysis
     fetchUploadList();
   }, [selectedDateRange, customStartDate, customEndDate, dateField, selectedPlatform, isInitialized, hasValidCredentials]);
@@ -2126,6 +2194,10 @@ const MarketplaceReconciliation: React.FC = () => {
         setInitialTsTab(1);
       } else if (normalizedTab === 'unsettled') {
         setInitialTsTab(2);
+      } else if (normalizedTab === 'sales' || normalizedTab === 'sales report') {
+        setInitialTsTab(4);
+      } else if (normalizedTab === 'profitability' || normalizedTab === 'profit' || normalizedTab === 'sku') {
+        setInitialTsTab(5);
       } else {
         setInitialTsTab(0);
       }
@@ -5346,6 +5418,172 @@ const MarketplaceReconciliation: React.FC = () => {
                   </Grid>
                 ))}
               </Grid>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* SKU Breakdown - Only for Flipkart and Designated Organizations */}
+        {hasFlipkartSubPlatforms && (selectedPlatform === 'flipkart' || !selectedPlatform) && (
+          <Card sx={{
+            background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+            borderRadius: '16px',
+            border: '1px solid #f1f3f4',
+            boxShadow: 'none',
+            mb: 6,
+          }}>
+            <CardContent sx={{ p: 4 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h3" sx={{ fontWeight: 600, color: '#1f2937' }}>
+                  SKU Breakdown
+                </Typography>
+                <Button
+                  variant="text"
+                  size="small"
+                  endIcon={<ArrowForwardIcon sx={{ fontSize: '0.9rem' }} />}
+                  onClick={() => {
+                    setInitialTsTab(5);
+                    setShowTransactionSheet(true);
+                  }}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: '0.8125rem',
+                    color: '#2563eb',
+                    p: 0,
+                    minWidth: 'auto',
+                    '&:hover': {
+                      backgroundColor: 'transparent',
+                      color: '#1d4ed8',
+                    }
+                  }}
+                >
+                  View All in Transaction Sheet
+                </Button>
+              </Box>
+
+              {skuProfitabilityLoading ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 6, gap: 1 }}>
+                  <CircularProgress size={28} sx={{ color: '#6b7280' }} />
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>Loading SKU breakdown...</Typography>
+                </Box>
+              ) : (!skuProfitabilityData || skuProfitabilityData.length === 0) ? (
+                <Box sx={{ p: 3, textAlign: 'center', backgroundColor: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                    No SKU profitability data available for the selected period.
+                  </Typography>
+                </Box>
+              ) : (
+                <Grid container spacing={3}>
+                  {/* Top 5 Profitable SKUs */}
+                  <Grid item xs={12} md={6}>
+                    <Box sx={{
+                      p: 2.5,
+                      borderRadius: '12px',
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: '#ffffff',
+                      height: '100%',
+                    }}>
+                      <Typography sx={{ fontWeight: 600, color: '#374151', mb: 2, fontSize: '0.95rem' }}>
+                        Top 5 Profitable SKUs
+                      </Typography>
+                      <TableContainer sx={{ border: '1px solid #f1f3f4', borderRadius: '8px' }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow sx={{ backgroundColor: '#f9fafb' }}>
+                              <TableCell sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1 }}>SKU</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1 }}>Net Sales</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1 }}>Revenue</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1 }}>Net Profit</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {topProfitableSKUs.map((sku) => (
+                              <TableRow key={sku.sku} sx={{ '&:last-child td': { borderBottom: 0 }, '&:hover': { backgroundColor: '#f9fafb' } }}>
+                                <TableCell sx={{ py: 1, fontSize: '0.8125rem', fontWeight: 500, color: '#111827' }}>
+                                  {sku.sku}
+                                  {sku.category && (
+                                    <Typography variant="caption" display="block" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>
+                                      {sku.category}
+                                    </Typography>
+                                  )}
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 1, fontSize: '0.8125rem', color: '#374151' }}>
+                                  {Number(sku.net_sales || 0).toLocaleString('en-IN')}
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 1, fontSize: '0.8125rem', color: '#374151' }}>
+                                  {getCurrencySymbol()}{Math.round(Number(sku.revenue || 0)).toLocaleString(getCurrencyLocale())}
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 1, fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>
+                                  {getCurrencySymbol()}{Math.round(Number(sku.net_profit || 0)).toLocaleString(getCurrencyLocale())}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Box>
+                  </Grid>
+
+                  {/* Top 5 Returned SKUs */}
+                  <Grid item xs={12} md={6}>
+                    <Box sx={{
+                      p: 2.5,
+                      borderRadius: '12px',
+                      border: '1px solid #e5e7eb',
+                      backgroundColor: '#ffffff',
+                      height: '100%',
+                    }}>
+                      <Typography sx={{ fontWeight: 600, color: '#374151', mb: 2, fontSize: '0.95rem' }}>
+                        Top 5 Returned SKUs
+                      </Typography>
+                      <TableContainer sx={{ border: '1px solid #f1f3f4', borderRadius: '8px' }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow sx={{ backgroundColor: '#f9fafb' }}>
+                              <TableCell sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1 }}>SKU</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1 }}>Cust. Ret.</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1 }}>RTO</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1 }}>Total Returns</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {topReturnedSKUs.map((sku) => {
+                              const custReturns = Number(sku.customer_returns || 0);
+                              const rto = Number(sku.rto_cancellations || 0);
+                              const totalRet = custReturns + rto;
+                              const retPct = Number(sku.return_percentage) || (Number(sku.sales) > 0 ? (totalRet / Number(sku.sales)) * 100 : 0);
+                              return (
+                                <TableRow key={sku.sku} sx={{ '&:last-child td': { borderBottom: 0 }, '&:hover': { backgroundColor: '#f9fafb' } }}>
+                                  <TableCell sx={{ py: 1, fontSize: '0.8125rem', fontWeight: 500, color: '#111827' }}>
+                                    {sku.sku}
+                                    {sku.category && (
+                                      <Typography variant="caption" display="block" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>
+                                        {sku.category}
+                                      </Typography>
+                                    )}
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ py: 1, fontSize: '0.8125rem', color: '#374151' }}>
+                                    {custReturns.toLocaleString('en-IN')}
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ py: 1, fontSize: '0.8125rem', color: '#374151' }}>
+                                    {rto.toLocaleString('en-IN')}
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ py: 1, fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>
+                                    {totalRet.toLocaleString('en-IN')}
+                                    <Typography variant="caption" display="block" sx={{ color: '#6b7280', fontSize: '0.7rem', fontWeight: 400 }}>
+                                      {retPct.toFixed(1)}%
+                                    </Typography>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Box>
+                  </Grid>
+                </Grid>
+              )}
             </CardContent>
           </Card>
         )}
