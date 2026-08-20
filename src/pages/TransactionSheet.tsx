@@ -3877,7 +3877,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   const fetchProfitabilityData = async (
     dateRangeFilter?: { start: string, end: string },
-    overridePlatform?: Platform
+    overridePlatform?: Platform,
+    subPlatformFilter?: string
   ) => {
     try {
       setLoading(true);
@@ -3890,6 +3891,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       if (dateRangeFilter?.start) params.date_from = dateRangeFilter.start;
       if (dateRangeFilter?.end) params.date_to = dateRangeFilter.end;
+      if (subPlatformFilter) params.sub_platform = subPlatformFilter;
 
       const response = await api.transactions.getProfitability(params);
 

@@ -251,6 +251,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [reconciliationStatus, setReconciliationStatus] = useState<ReconciliationStatus | null>(null);
   const [skuProfitabilityData, setSkuProfitabilityData] = useState<any[] | null>(null);
   const [skuProfitabilityLoading, setSkuProfitabilityLoading] = useState(false);
+  const [selectedSkuSubPlatform, setSelectedSkuSubPlatform] = useState<string>('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(false);
@@ -1262,7 +1263,14 @@ const MarketplaceReconciliation: React.FC = () => {
     }
   };
 
-  const fetchSkuProfitability = async (startDate?: string, endDate?: string) => {
+  const availableSkuSubPlatforms = useMemo(() => {
+    if (mainSummary?.subPlatformBreakdown && mainSummary.subPlatformBreakdown.length > 0) {
+      return mainSummary.subPlatformBreakdown.map((item: any) => item.sub_platform || item.name).filter(Boolean);
+    }
+    return ['Main Account', 'bengaluru', 'Guwahati', 'Hyderabad', 'Kolkata'];
+  }, [mainSummary?.subPlatformBreakdown]);
+
+  const fetchSkuProfitability = async (startDate?: string, endDate?: string, subPlatformOverride?: string) => {
     if (!hasFlipkartSubPlatforms) return;
     try {
       setSkuProfitabilityLoading(true);
@@ -1271,6 +1279,10 @@ const MarketplaceReconciliation: React.FC = () => {
       };
       if (startDate) params.date_from = startDate;
       if (endDate) params.date_to = endDate;
+      const sp = subPlatformOverride !== undefined ? subPlatformOverride : selectedSkuSubPlatform;
+      if (sp && sp !== 'all') {
+        params.sub_platform = sp;
+      }
 
       const resp = await apiIndex.transactions.getProfitability(params);
       const items = Array.isArray(resp?.data)
@@ -1287,10 +1299,10 @@ const MarketplaceReconciliation: React.FC = () => {
     }
   };
 
-  const topProfitableSKUs = useMemo(() => {
+  const topSalesSKUs = useMemo(() => {
     if (!skuProfitabilityData || skuProfitabilityData.length === 0) return [];
     return [...skuProfitabilityData]
-      .sort((a, b) => (Number(b.net_profit) || 0) - (Number(a.net_profit) || 0))
+      .sort((a, b) => (Number(b.revenue) || 0) - (Number(a.revenue) || 0))
       .slice(0, 5);
   }, [skuProfitabilityData]);
 
@@ -1306,16 +1318,6 @@ const MarketplaceReconciliation: React.FC = () => {
       })
       .slice(0, 5);
   }, [skuProfitabilityData]);
-
-  const maxProfit = useMemo(() => {
-    if (topProfitableSKUs.length === 0) return 1;
-    return Math.max(...topProfitableSKUs.map(s => Number(s.net_profit) || 0), 1);
-  }, [topProfitableSKUs]);
-
-  const maxReturns = useMemo(() => {
-    if (topReturnedSKUs.length === 0) return 1;
-    return Math.max(...topReturnedSKUs.map(s => (Number(s.customer_returns) || 0) + (Number(s.rto_cancellations) || 0)), 1);
-  }, [topReturnedSKUs]);
 
   const fetchAgeingAnalysis = async () => {
     // For custom range, wait until both dates are selected
@@ -2154,7 +2156,7 @@ const MarketplaceReconciliation: React.FC = () => {
     }
     // Call upload-list API at the same time as main-summary and ageing-analysis
     fetchUploadList();
-  }, [selectedDateRange, customStartDate, customEndDate, dateField, selectedPlatform, isInitialized, hasValidCredentials]);
+  }, [selectedDateRange, customStartDate, customEndDate, dateField, selectedPlatform, selectedSkuSubPlatform, isInitialized, hasValidCredentials]);
 
   // Load sales overview data
   useEffect(() => {
@@ -5432,33 +5434,64 @@ const MarketplaceReconciliation: React.FC = () => {
             mb: 6,
           }}>
             <CardContent sx={{ p: 4 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1.5 }}>
                 <Typography variant="h3" sx={{ fontWeight: 600, color: '#1f2937' }}>
                   SKU Breakdown
                 </Typography>
-                <Button
-                  variant="text"
-                  size="small"
-                  endIcon={<ArrowForwardIcon sx={{ fontSize: '0.9rem' }} />}
-                  onClick={() => {
-                    setInitialTsTab(5);
-                    setShowTransactionSheet(true);
-                  }}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    fontSize: '0.8125rem',
-                    color: '#2563eb',
-                    p: 0,
-                    minWidth: 'auto',
-                    '&:hover': {
-                      backgroundColor: 'transparent',
-                      color: '#1d4ed8',
-                    }
-                  }}
-                >
-                  View All in Transaction Sheet
-                </Button>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Select
+                    size="small"
+                    value={selectedSkuSubPlatform}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedSkuSubPlatform(val);
+                      const { start, end } = selectedDateRange === 'custom'
+                        ? { start: customStartDate, end: customEndDate }
+                        : effectiveDateRangeForTs;
+                      fetchSkuProfitability(start, end, val);
+                    }}
+                    sx={{
+                      height: '32px',
+                      fontSize: '0.8125rem',
+                      borderRadius: '8px',
+                      backgroundColor: '#ffffff',
+                      color: '#374151',
+                      '& .MuiSelect-select': {
+                        py: 0.5,
+                        px: 1.5,
+                      },
+                    }}
+                  >
+                    <MenuItem value="all" sx={{ fontSize: '0.8125rem' }}>All Sub-Platforms</MenuItem>
+                    {availableSkuSubPlatforms.map((sp: string) => (
+                      <MenuItem key={sp} value={sp} sx={{ fontSize: '0.8125rem' }}>{sp}</MenuItem>
+                    ))}
+                  </Select>
+
+                  <Button
+                    variant="text"
+                    size="small"
+                    endIcon={<ArrowForwardIcon sx={{ fontSize: '0.9rem' }} />}
+                    onClick={() => {
+                      setInitialTsTab(5);
+                      setShowTransactionSheet(true);
+                    }}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: '0.8125rem',
+                      color: '#2563eb',
+                      p: 0,
+                      minWidth: 'auto',
+                      '&:hover': {
+                        backgroundColor: 'transparent',
+                        color: '#1d4ed8',
+                      }
+                    }}
+                  >
+                    View All in Transaction Sheet
+                  </Button>
+                </Box>
               </Box>
 
               {skuProfitabilityLoading ? (
@@ -5474,7 +5507,7 @@ const MarketplaceReconciliation: React.FC = () => {
                 </Box>
               ) : (
                 <Grid container spacing={3}>
-                  {/* Top 5 Profitable SKUs */}
+                  {/* Top 5 SKUs by Sales */}
                   <Grid item xs={12} md={6}>
                     <Box sx={{
                       p: 2.5,
@@ -5484,40 +5517,67 @@ const MarketplaceReconciliation: React.FC = () => {
                       height: '100%',
                     }}>
                       <Typography sx={{ fontWeight: 600, color: '#374151', mb: 2, fontSize: '0.95rem' }}>
-                        Top 5 Profitable SKUs
+                        Top 5 SKUs by Sales
                       </Typography>
-                      <TableContainer sx={{ border: '1px solid #f1f3f4', borderRadius: '8px' }}>
+                      <TableContainer sx={{ border: '1px solid #f1f3f4', borderRadius: '8px', overflowX: 'auto' }}>
                         <Table size="small">
                           <TableHead>
                             <TableRow sx={{ backgroundColor: '#f9fafb' }}>
                               <TableCell sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1 }}>SKU</TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1 }}>Net Sales</TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1 }}>Revenue</TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1 }}>Net Profit</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1, whiteSpace: 'nowrap' }}>Net Sales</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1, whiteSpace: 'nowrap' }}>Total Listing Amount</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1, whiteSpace: 'nowrap' }}>Total Invoice Amount</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1, whiteSpace: 'nowrap' }}>GT Charge</TableCell>
                             </TableRow>
                           </TableHead>
                           <TableBody>
-                            {topProfitableSKUs.map((sku) => (
-                              <TableRow key={sku.sku} sx={{ '&:last-child td': { borderBottom: 0 }, '&:hover': { backgroundColor: '#f9fafb' } }}>
-                                <TableCell sx={{ py: 1, fontSize: '0.8125rem', fontWeight: 500, color: '#111827' }}>
-                                  {sku.sku}
-                                  {sku.category && (
+                            {topSalesSKUs.map((sku) => {
+                              const listPrice = Number(sku.list_price || 0);
+                              const grossUnits = Number(sku.sales || 0);
+                              const netUnits = Number(sku.net_sales || 0);
+                              const totalListingAmount = Math.round(listPrice * grossUnits);
+                              const totalInvoiceAmount = Math.round(Number(sku.revenue || 0));
+                              const unitInvoicePrice = grossUnits > 0 ? Math.round(totalInvoiceAmount / grossUnits) : 0;
+                              const gtCharge = Math.round(Number(sku.gt_charges || 0));
+                              return (
+                                <TableRow key={sku.sku} sx={{ '&:last-child td': { borderBottom: 0 }, '&:hover': { backgroundColor: '#f9fafb' } }}>
+                                  <TableCell sx={{ py: 1.25, fontSize: '0.8125rem', fontWeight: 500, color: '#111827' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.25 }}>
+                                      <Typography sx={{ fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>
+                                        {sku.sku}
+                                      </Typography>
+                                      {sku.category && (
+                                        <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem', backgroundColor: '#f3f4f6', px: 0.75, py: 0.2, borderRadius: '4px' }}>
+                                          {sku.category}
+                                        </Typography>
+                                      )}
+                                    </Box>
                                     <Typography variant="caption" display="block" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>
-                                      {sku.category}
+                                      {listPrice > 0 ? `Listing Price: ${getCurrencySymbol()}${Math.round(listPrice).toLocaleString('en-IN')}` : ''}
+                                      {listPrice > 0 && unitInvoicePrice > 0 ? ' · ' : ''}
+                                      {unitInvoicePrice > 0 ? `Invoice Price: ${getCurrencySymbol()}${unitInvoicePrice.toLocaleString('en-IN')}` : ''}
                                     </Typography>
-                                  )}
-                                </TableCell>
-                                <TableCell align="right" sx={{ py: 1, fontSize: '0.8125rem', color: '#374151' }}>
-                                  {Number(sku.net_sales || 0).toLocaleString('en-IN')}
-                                </TableCell>
-                                <TableCell align="right" sx={{ py: 1, fontSize: '0.8125rem', color: '#374151' }}>
-                                  {getCurrencySymbol()}{Math.round(Number(sku.revenue || 0)).toLocaleString(getCurrencyLocale())}
-                                </TableCell>
-                                <TableCell align="right" sx={{ py: 1, fontSize: '0.8125rem', fontWeight: 600, color: '#111827' }}>
-                                  {getCurrencySymbol()}{Math.round(Number(sku.net_profit || 0)).toLocaleString(getCurrencyLocale())}
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ py: 1.25, fontSize: '0.8125rem', color: '#374151', whiteSpace: 'nowrap' }}>
+                                    {netUnits.toLocaleString('en-IN')}
+                                    {grossUnits > netUnits && (
+                                      <Typography variant="caption" display="block" sx={{ color: '#9ca3af', fontSize: '0.6875rem' }}>
+                                        Gross: {grossUnits.toLocaleString('en-IN')}
+                                      </Typography>
+                                    )}
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ py: 1.25, fontSize: '0.8125rem', color: '#374151', whiteSpace: 'nowrap' }}>
+                                    {getCurrencySymbol()}{totalListingAmount.toLocaleString(getCurrencyLocale())}
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ py: 1.25, fontSize: '0.8125rem', color: '#111827', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                    {getCurrencySymbol()}{totalInvoiceAmount.toLocaleString(getCurrencyLocale())}
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ py: 1.25, fontSize: '0.8125rem', color: gtCharge > 0 ? '#dc2626' : '#374151', fontWeight: gtCharge > 0 ? 500 : 400, whiteSpace: 'nowrap' }}>
+                                    {gtCharge > 0 ? `-${getCurrencySymbol()}${gtCharge.toLocaleString(getCurrencyLocale())}` : `${getCurrencySymbol()}0`}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </TableContainer>
