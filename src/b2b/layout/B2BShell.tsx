@@ -138,30 +138,12 @@ const B2BShell: React.FC = () => {
           ))}
         </Box>
 
-        {/* Upload (opens the /b2b/upload view) + Integrations + workspace badge */}
+        {/* Settings (opens the /b2b/settings view) */}
         <Box sx={{ p: `${space.lg}px`, display: 'flex', flexDirection: 'column', gap: `${space.md}px` }}>
           <Button
             fullWidth
             disableElevation
-            onClick={() => navigate('/b2b/upload')}
-            startIcon={<FileUploadOutlined sx={{ fontSize: 20 }} />}
-            sx={{
-              borderRadius: 0,
-              bgcolor: colors.paper,
-              color: colors.ink,
-              border: hairline,
-              fontSize: 13,
-              fontWeight: 600,
-              py: `${space.md}px`,
-              '&:hover': { bgcolor: colors.grey100 },
-            }}
-          >
-            Upload
-          </Button>
-          <Button
-            fullWidth
-            disableElevation
-            onClick={() => navigate('/b2b/integrations')}
+            onClick={() => navigate('/b2b/settings')}
             startIcon={<ExtensionOutlined sx={{ fontSize: 20 }} />}
             sx={{
               borderRadius: 0,
@@ -174,9 +156,8 @@ const B2BShell: React.FC = () => {
               '&:hover': { bgcolor: colors.grey100 },
             }}
           >
-            Integrations
+            Settings
           </Button>
-
         </Box>
       </Box>
 

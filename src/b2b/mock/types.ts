@@ -31,10 +31,10 @@ export interface HeadlineMetric {
 
 export interface ChannelPerformance {
   channel: ChannelName;
-  settled: number; // rupees settled this quarter
-  leakage: number; // rupees of leakage detected
-  netRealisationPct: number; // true net realisation %
-  recoverable: number; // rupees recoverable now
+  expected: number; 
+  received: number; 
+  unresolved: number; 
+  netRealisationPct: number;
 }
 
 export type IssueType =
@@ -46,7 +46,9 @@ export type IssueType =
   | 'Invoice missing'
   | 'Settlement pending'
   | 'Rate variance'
-  | 'Overdue';
+  | 'Overdue'
+  | 'Commission discrepancy'
+  | 'Storage overcharge';
 
 export type Confidence = 'High' | 'Med' | 'Low';
 
@@ -58,11 +60,12 @@ export interface FlaggedIssue {
   amount: number;
   type: IssueType;
   confidence: Confidence;
-  poNumber?: string;
+  status?: string; 
+  daysOpen?: number;
+  urgency?: string;
 }
 
 export type GRNStatus = 'Accepted' | 'Pending' | 'Partial' | 'Missing';
-
 export type ReconStatus = 'Matched' | 'Pending GRN' | 'Short paid' | 'Over-deducted' | 'Disputed' | 'Missing invoice';
 
 export interface VariancePart {
@@ -80,93 +83,55 @@ export interface ThreeWayMatch {
   invoice: { ref: string; status: 'Matched' | 'Pending' | 'Missing' | 'Disputed'; amount: number };
 }
 
-export interface ReconLineItem {
-  id: string;
-  channel: ChannelName;
-  skuId: string;
-  skuLabel: string;
-  /** PO reference number. */
-  poNumber: string;
-  /** Invoice reference number. */
-  invoiceNumber: string;
-  /** GRN reference number. */
-  grn: string;
-  grnStatus: GRNStatus;
-  /** Sale period label, e.g. "1–15 Aug 2026". */
-  salePeriod: string;
-  /** Expected payout date, e.g. "10 Aug 2026". */
-  expectedPayoutDate: string;
-  expected: number;
-  paid: number;
-  variance: number; // gap = expected - paid (positive = underpaid)
-  status: ReconStatus;
-  issueType?: IssueType;
-  /** "How this matched" note - references the matching policy. */
-  matchNote: string;
-  /** Always three parts: Quantity, Deduction, Tax / TCS. Σ(amount) = paid - expected. */
-  varianceBreakdown: VariancePart[];
-  /** PO vs GRN vs Invoice three-way matching detail. */
-  threeWayMatch: ThreeWayMatch;
-  /** What exact next action is needed to resolve this issue. */
-  nextAction?: string;
-}
+// ── Action Timeline / Action Centre types ──────────────────────────────────────
+export type DisputeStatus = 'Detected' | 'Reviewed' | 'Dispute initiated' | 'Follow-up' | 'Resolved';
 
-export interface ReconPurchaseOrder {
-  id: string; // e.g., 'PO-ZEP-1049'
-  channel: ChannelName;
+export interface IssueAction {
   date: string;
-  expected: number; // Sum of expected across line items
-  paid: number; // Sum of paid across line items
-  variance: number; // expected - paid
-  status: ReconStatus;
-  lineItems: ReconLineItem[];
+  action: string;
+  status: 'Sent' | 'Pending' | 'Scheduled' | 'Resolved' | 'Detected' | 'Reviewed' | 'Dispute raised' | 'Evidence requested';
 }
 
-// ── Cosmix 5-stage dispute workflow ──────────────────────────────────────────
-export type DisputeStatus = 'Detected' | 'Awaiting documents' | 'Ready to dispute' | 'Disputed' | 'Resolved';
-
-export interface Dispute {
+export interface ActionItem {
   id: string;
+  issue: string;
   channel: ChannelName;
-  reason: string;
   amount: number;
-  status: DisputeStatus;
-  /** Dispute-window days remaining; 0 once resolved/closed. */
-  windowDaysRemaining: number;
-  /** Nearest-deadline claims that need attention. */
-  urgent?: boolean;
-  /** Surfaced in the high-value claims table. */
-  highValue?: boolean;
-  /** Related line items for this dispute. */
-  lineItems?: ReconLineItem[];
+  status: DisputeStatus | 'Dispute ready' | 'Follow-up sent';
+  daysOpen: number;
+  urgency: string; 
+  history: IssueAction[];
+  nextAction?: string;
+  relatedRef?: string;
 }
 
-/** Aggregate counts across the dispute pipeline (more than the illustrative array). */
+export interface ChannelPosition {
+  channel: ChannelName;
+  expected: number;
+  received: number;
+  unresolved: number;
+  issues: ActionItem[];
+}
+
 export interface DisputePipeline {
   detected: number;
-  awaitingDocuments: number;
-  readyToDispute: number;
+  reviewed: number;
   disputed: number;
+  followUp: number;
   resolved: number;
 }
 
-// ── Follow-up automation / nudge system ──────────────────────────────────────
-export type NudgeType = '7-day' | '15-day';
+export type NudgeType = '7-day' | '15-day' | 'Dispute' | 'Escalation';
 export type NudgeStatus = 'Sent' | 'Pending' | 'Scheduled';
 
 export interface FollowUpNudge {
   id: string;
   channel: ChannelName;
-  /** Reference to the related receivable / dispute / PO. */
-  relatedRef: string;
+  relatedIssue: string;
   nudgeType: NudgeType;
-  daysSinceIssue: number;
   message: string;
   status: NudgeStatus;
-  /** ISO date when nudge was sent or is scheduled. */
   date: string;
-  /** Timeline of events for this nudge. */
-  history: { date: string; action: string; status: NudgeStatus }[];
 }
 
 // ── Rate card & contract types ───────────────────────────────────────────────
@@ -180,14 +145,11 @@ export interface RateCardLine {
   note?: string;
 }
 
-/** One channel's full signed contract: the rate card plus its provenance. */
 export interface ChannelContract {
   channel: ChannelName;
-  /** Channel settlement model, e.g. "Quick-commerce (SOR)". */
   model: string;
   contractRef: string;
   effective: string;
-  /** How Nex assembled the rate card, e.g. "Agreement + 3 email amendments". */
   source: string;
   rateCard: RateCardLine[];
 }
@@ -195,66 +157,18 @@ export interface ChannelContract {
 export type DiscountType = 'percent' | 'perUnit';
 export type DiscountStatus = 'Active' | 'Scheduled' | 'Ended';
 
-/**
- * A secondary (promotional) discount a channel runs on specific SKUs for a
- * bounded date window - e.g. Blinkit marks down three SKUs in week 1 of the
- * month. The brand co-funds it. Recon needs this declared so the settlement
- * deduction reconciles instead of flagging as unexplained variance.
- */
 export interface SecondaryDiscount {
   id: string;
   channel: ChannelName;
-  /** Human name of the promo, e.g. "Month-Start Blitz". */
   name: string;
-  /** SKUs the discount applies to (ids into `skus`). */
   skuIds: string[];
   discountType: DiscountType;
-  /** Percent off (percent) or ₹ off per unit (perUnit). */
   discountValue: number;
-  /** Share of the markdown the brand funds, 0–100. Rest is platform-funded. */
   brandFundedPct: number;
-  /** ISO date 'YYYY-MM-DD', inclusive. */
   startDate: string;
   endDate: string;
-  /** Units sold on these SKUs during the window - drives the impact math. */
   unitsInWindow: number;
-  /** Avg selling price (₹/unit) - used to cost a percent discount. */
   avgSellingPrice: number;
-}
-
-// ── Email ingestion types (cafe workflow) ────────────────────────────────────
-export type ExtractionConfidence = 'High' | 'Medium' | 'Low';
-
-export interface ExtractedLineItem {
-  product: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-}
-
-export interface EmailIngestRecord {
-  id: string;
-  /** Cafe account name. */
-  cafeAccount: string;
-  /** Sender email address. */
-  senderEmail: string;
-  subject: string;
-  /** ISO date received. */
-  receivedDate: string;
-  /** Email body snippet. */
-  bodySnippet: string;
-  /** Attachment filenames. */
-  attachments: string[];
-  /** Extracted order/invoice data from attachment or body. */
-  extractedItems: ExtractedLineItem[];
-  totalExtracted: number;
-  extractionConfidence: ExtractionConfidence;
-  /** Whether this has been mapped to a receivable. */
-  mapped: boolean;
-  /** Resulting receivable ID if mapped. */
-  receivableId?: string;
-  /** Note from the AI extraction. */
-  extractionNote?: string;
 }
 
 // ── Channel drilldown types ─────────────────────────────────────────────────
@@ -288,8 +202,17 @@ export interface ChannelDrilldownData {
   }[];
 }
 
-export interface AskNexQA {
-  id: string;
-  question: string;
-  answer: string;
+// Monthly trend data point
+export interface TrendDataPoint {
+  month: string;
+  expectedLakhs: number;
+  receivedLakhs: number;
+  gapLakhs: number;
+}
+
+export interface UpcomingPayout {
+  channel: string;
+  date: string;
+  amount: number;
+  status: 'Expected' | 'Overdue' | 'Partial';
 }

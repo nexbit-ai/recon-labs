@@ -9,28 +9,16 @@ import { b2bTheme } from './theme/b2bTokens';
 import B2BShell from './layout/B2BShell';
 import { SECTIONS } from './layout/sections';
 import Placeholder from './views/Placeholder';
-import Upload from './views/Upload';
 import Overview from './views/Overview';
 import Reconciliation from './views/Reconciliation';
 import Disputes from './views/Disputes';
-import Channels from './views/Channels';
-import ChannelDrilldown from './views/ChannelDrilldown';
-
-import Contracts from './views/Contracts';
-import AskNex from './views/AskNex';
-// Reuse the exact same Integrations module from the B2C app.
-import Integrations from '../pages/Integrations';
+import Settings from './views/Settings';
 
 // Sections with a real view built; the rest fall back to a titled placeholder.
 const VIEWS: Record<string, React.ReactNode> = {
-  upload: <Upload />,
   overview: <Overview />,
-  reconciliation: <Reconciliation />,
-  disputes: <Disputes />,
-  channels: <Channels />,
-
-  contracts: <Contracts />,
-  ask: <AskNex />,
+  ledger: <Reconciliation />,
+  actions: <Disputes />,
 };
 
 const B2BApp: React.FC = () => (
@@ -42,9 +30,7 @@ const B2BApp: React.FC = () => (
           {SECTIONS.map((s) => (
             <Route key={s.key} path={s.path} element={VIEWS[s.key] ?? <Placeholder title={s.title} />} />
           ))}
-          <Route path="channels/:channelId" element={<ChannelDrilldown />} />
-          <Route path="upload" element={<Upload />} />
-          <Route path="integrations" element={<Integrations />} />
+          <Route path="settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="overview" replace />} />
         </Route>
       </Routes>
@@ -53,4 +39,3 @@ const B2BApp: React.FC = () => (
 );
 
 export default B2BApp;
-

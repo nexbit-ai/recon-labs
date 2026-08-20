@@ -23,10 +23,10 @@ import {
   SaveOutlined,
 } from '@mui/icons-material';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
-import { cardSx, PageTitle, SectionTitle, Pressable, ChannelTag } from '../components/primitives';
-import AddDiscountModal from '../components/AddDiscountModal';
-import { formatRupees } from '../lib/format';
+import { colors, hairline, type, space, tabularNums } from '../../theme/b2bTokens';
+import { cardSx, PageTitle, SectionTitle, Pressable, ChannelTag } from '../../components/primitives';
+import AddDiscountModal from '../../components/AddDiscountModal';
+import { formatRupees } from '../../lib/format';
 import {
   channelContracts,
   secondaryDiscounts as seedDiscounts,
@@ -35,14 +35,14 @@ import {
   discountValueLabel,
   blinkitBreach,
   skuById,
-} from '../mock';
+} from '../../mock';
 import type {
   ChannelContract,
   ChannelName,
   RateCardLine,
   SecondaryDiscount,
   DiscountStatus,
-} from '../mock';
+} from '../../mock';
 
 const DISPUTES_ROUTE = '/b2b/disputes';
 
@@ -470,7 +470,7 @@ const Contracts: React.FC = () => {
         }}
       >
         <Box>
-          <PageTitle>Contracts</PageTitle>
+
           <Typography sx={{ mt: `-${space.md}px`, fontSize: type.body.fontSize, color: colors.grey700, maxWidth: 760 }}>
             One contract per channel. Each defines the rate card <b style={{ color: colors.ink }}>and</b> the secondary
             discounts running on it - together they set the “expected amount to receive” that reconciliation checks every

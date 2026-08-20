@@ -13,9 +13,8 @@ import {
   InsertDriveFileOutlined,
   SyncOutlined,
 } from '@mui/icons-material';
-import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
-import { cardSx, PageTitle, SectionTitle, ColumnLabel } from '../components/primitives';
-import UploadSettlementModal from '../components/UploadSettlementModal';
+import { colors, hairline, type, space, tabularNums } from '../../theme/b2bTokens';
+import { cardSx, PageTitle, SectionTitle, ColumnLabel } from '../../components/primitives';
 
 const INBOX = 'cosmix-orders@usenexbit.com';
 
@@ -141,10 +140,12 @@ const StatusLabel: React.FC<{ status: ReceiveStatus }> = ({ status }) => {
   );
 };
 
-const Upload: React.FC = () => {
+interface UploadProps {
+  onOpenModal: () => void;
+}
+
+const Upload: React.FC<UploadProps> = ({ onOpenModal }) => {
   const reduce = useReducedMotion();
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const openModal = () => setUploadOpen(true);
 
   return (
     <Box
@@ -153,41 +154,7 @@ const Upload: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
     >
-      {/* ── Title + primary action ─────────────────────────────── */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: `${space.lg}px`,
-          flexWrap: 'wrap',
-        }}
-      >
-        <PageTitle>Upload</PageTitle>
-        <Button
-          onClick={openModal}
-          startIcon={
-            <SyncOutlined
-              sx={{
-                fontSize: 18,
-                animation: uploadOpen && !reduce ? 'b2bspin 1s linear infinite' : 'none',
-                '@keyframes b2bspin': { to: { transform: 'rotate(360deg)' } },
-              }}
-            />
-          }
-          sx={{
-            bgcolor: colors.accent,
-            color: colors.paper,
-            fontSize: 13,
-            fontWeight: 600,
-            px: `${space.xl}px`,
-            py: `${space.md}px`,
-            '&:hover': { bgcolor: colors.accentHover },
-          }}
-        >
-          Sync
-        </Button>
-      </Box>
+      {/* ── Title + primary action (Moved to Settings) ──────────────── */}
 
       {/* ── Intake row: drop zone + email forwarding ─────────────── */}
       <Box
@@ -202,11 +169,11 @@ const Upload: React.FC = () => {
         <Box
           role="button"
           tabIndex={0}
-          onClick={openModal}
+          onClick={onOpenModal}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              openModal();
+              onOpenModal();
             }
           }}
           sx={{
@@ -232,7 +199,7 @@ const Upload: React.FC = () => {
           <Button
             onClick={(e) => {
               e.stopPropagation();
-              openModal();
+              onOpenModal();
             }}
             sx={{
               bgcolor: colors.ink,
@@ -398,8 +365,6 @@ const Upload: React.FC = () => {
           );
         })}
       </Box>
-
-      <UploadSettlementModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
     </Box>
   );
 };
