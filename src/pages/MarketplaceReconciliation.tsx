@@ -5527,7 +5527,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1, whiteSpace: 'nowrap' }}>Net Sales</TableCell>
                               <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1, whiteSpace: 'nowrap' }}>Total Listing Amount</TableCell>
                               <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1, whiteSpace: 'nowrap' }}>Total Invoice Amount</TableCell>
-                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1, whiteSpace: 'nowrap' }}>GT Charge</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600, color: '#4b5563', fontSize: '0.75rem', py: 1, whiteSpace: 'nowrap' }}>Settlement Received</TableCell>
                             </TableRow>
                           </TableHead>
                           <TableBody>
@@ -5538,7 +5538,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               const totalListingAmount = Math.round(listPrice * grossUnits);
                               const totalInvoiceAmount = Math.round(Number(sku.revenue || 0));
                               const unitInvoicePrice = grossUnits > 0 ? Math.round(totalInvoiceAmount / grossUnits) : 0;
-                              const gtCharge = Math.round(Number(sku.gt_charges || 0));
+                              const settlementAmount = Math.round(Number(sku.settlement_amount ?? sku.settlement_value ?? 0));
                               return (
                                 <TableRow key={sku.sku} sx={{ '&:last-child td': { borderBottom: 0 }, '&:hover': { backgroundColor: '#f9fafb' } }}>
                                   <TableCell sx={{ py: 1.25, fontSize: '0.8125rem', fontWeight: 500, color: '#111827' }}>
@@ -5572,8 +5572,8 @@ const MarketplaceReconciliation: React.FC = () => {
                                   <TableCell align="right" sx={{ py: 1.25, fontSize: '0.8125rem', color: '#111827', fontWeight: 600, whiteSpace: 'nowrap' }}>
                                     {getCurrencySymbol()}{totalInvoiceAmount.toLocaleString(getCurrencyLocale())}
                                   </TableCell>
-                                  <TableCell align="right" sx={{ py: 1.25, fontSize: '0.8125rem', color: gtCharge > 0 ? '#dc2626' : '#374151', fontWeight: gtCharge > 0 ? 500 : 400, whiteSpace: 'nowrap' }}>
-                                    {gtCharge > 0 ? `-${getCurrencySymbol()}${gtCharge.toLocaleString(getCurrencyLocale())}` : `${getCurrencySymbol()}0`}
+                                  <TableCell align="right" sx={{ py: 1.25, fontSize: '0.8125rem', color: settlementAmount >= 0 ? '#111827' : '#dc2626', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                    {settlementAmount < 0 ? `-${getCurrencySymbol()}${Math.abs(settlementAmount).toLocaleString(getCurrencyLocale())}` : `${getCurrencySymbol()}${settlementAmount.toLocaleString(getCurrencyLocale())}`}
                                   </TableCell>
                                 </TableRow>
                               );
