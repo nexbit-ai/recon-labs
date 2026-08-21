@@ -2205,7 +2205,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
 
     if (!isSpecificOrg) {
-      cols = cols.filter(title => title !== 'Sub-Platform');
+      cols = cols.filter(title => title !== 'Sub-Platform' && title !== 'Listing Price');
     }
     return cols;
   };
@@ -6799,7 +6799,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       displayValue = value ? formatDate(String(value)) : '';
                                     } else if (columnType === 'currency') {
                                       const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
-                                      displayValue = numericValue !== null && !Number.isNaN(numericValue) ? formatCurrency(numericValue) : '';
+                                      if (fieldName === 'listing_price' && (numericValue === null || numericValue === 0)) {
+                                        displayValue = '-';
+                                      } else {
+                                        displayValue = numericValue !== null && !Number.isNaN(numericValue) ? formatCurrency(numericValue) : '';
+                                      }
                                     } else if (columnType === 'number' && column.toLowerCase().includes('rate')) {
                                       const numericValue = value === null || value === undefined || value === '' ? null : Number(value);
                                       // gst_rate is already in percentage form (12 = 12%), so don't multiply by 100
