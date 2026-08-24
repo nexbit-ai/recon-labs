@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, Typography, Paper, Grid, Breadcrumbs, Link, Chip, Button, Alert, CircularProgress, Drawer, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, MenuItem, Card, CardContent, Select } from '@mui/material';
+import { Box, Typography, Paper, Grid, Breadcrumbs, Link, Chip, Button, Alert, CircularProgress, Drawer, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, MenuItem, Card, CardContent, Select, Tooltip, IconButton } from '@mui/material';
 import { 
   CalendarToday as CalendarIcon,
   CheckCircle as CheckCircleIcon,
@@ -10,7 +10,8 @@ import {
   ArrowDownward as ArrowDownwardIcon,
   KeyboardArrowRight as KeyboardArrowRightIcon,
   Lock as LockIcon,
-  Schedule as ScheduleIcon
+  Schedule as ScheduleIcon,
+  Download as DownloadIcon
 } from '@mui/icons-material';
 import { API_CONFIG } from '../services/api/config';
 import { tokenManager } from '../services/api/tokenManager';
@@ -303,6 +304,71 @@ const UploadDocuments: React.FC = () => {
       setReconciliationStatus(undefined);
     } finally {
       setLoadingUploads(false);
+    }
+  };
+
+  const [downloadingDocId, setDownloadingDocId] = useState<string | null>(null);
+
+  const handleDownloadDocument = async (doc?: UploadedDocument, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    if (!doc || !doc.id) {
+      return;
+    }
+    setDownloadingDocId(doc.id);
+    try {
+      let customToken: string | null = null;
+      if (session) {
+        const customSessionData = {
+          member_id: session.member_id,
+          member_session_id: session.member_session_id,
+          organization_id: session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
+          organization_slug: session.organization_slug,
+          roles: session.roles,
+        };
+        customToken = await JWTService.generateToken(customSessionData);
+      }
+      
+      const headers: Record<string, string> = {
+        'x-api-key': API_CONFIG.API_KEY,
+        'x-org-id': session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID,
+      };
+      if (customToken) {
+        headers['Authorization'] = `Bearer ${customToken}`;
+      }
+
+      const response = await fetch(`${API_CONFIG.BASE_URL}/v1/recon/upload/${doc.id}/download`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        let errMsg = 'Failed to download file';
+        try {
+          const errJson = await response.json();
+          errMsg = errJson.error || errJson.message || errMsg;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.filename || 'uploaded_file.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download error:', error);
+      setUploadStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to download file. Please try again.',
+      });
+    } finally {
+      setDownloadingDocId(null);
     }
   };
 
@@ -1368,27 +1434,58 @@ const UploadDocuments: React.FC = () => {
                 }}
                 disabled={!!uploadingVendor}
               />
-              <Button
-                variant={isVendorUploaded('flipkart', 'sales', spParam) ? "outlined" : "contained"}
-                size="small"
-                startIcon={<CloudUploadIcon />}
-                disabled={!!uploadingVendor || uploadingVendor === upVendorSales}
-                endIcon={uploadingVendor === upVendorSales ? <CircularProgress size={14} /> : null}
-                onClick={(e) => {
-                  handleFileInputClick(e, `flipkart-sales-upload${spSuffix}`, 'flipkart', 'sales');
-                }}
-                sx={{ 
-                  minWidth: 120,
-                  fontSize: '0.75rem',
-                  py: 0.75,
-                  ...(isVendorUploaded('flipkart', 'sales', spParam) && {
-                    borderColor: fSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                    color: fSalesStatus === 'pending' ? '#b45309' : '#16a34a'
-                  })
-                }}
-              >
-                {uploadingVendor === upVendorSales ? 'Uploading...' : isVendorUploaded('flipkart', 'sales', spParam) ? 'Re-upload' : 'Upload'}
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                {fSalesDoc && (
+                  <Tooltip title={`Download ${fSalesDoc.filename}`}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={downloadingDocId === fSalesDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                      disabled={downloadingDocId === fSalesDoc.id}
+                      onClick={(e) => handleDownloadDocument(fSalesDoc, e)}
+                      sx={{
+                        fontSize: '0.75rem',
+                        py: 0.75,
+                        px: 1.2,
+                        fontWeight: 600,
+                        color: '#16a34a',
+                        borderColor: '#86efac',
+                        backgroundColor: '#f0fdf4',
+                        textTransform: 'none',
+                        '&:hover': {
+                          backgroundColor: '#dcfce7',
+                          borderColor: '#16a34a',
+                        },
+                      }}
+                    >
+                      {downloadingDocId === fSalesDoc.id ? '...' : 'Download'}
+                    </Button>
+                  </Tooltip>
+                )}
+                <Button
+                  variant={isVendorUploaded('flipkart', 'sales', spParam) ? "outlined" : "contained"}
+                  size="small"
+                  startIcon={<CloudUploadIcon />}
+                  disabled={!!uploadingVendor || uploadingVendor === upVendorSales}
+                  endIcon={uploadingVendor === upVendorSales ? <CircularProgress size={14} /> : null}
+                  onClick={(e) => {
+                    handleFileInputClick(e, `flipkart-sales-upload${spSuffix}`, 'flipkart', 'sales');
+                  }}
+                  sx={{ 
+                    minWidth: 90,
+                    fontSize: '0.75rem',
+                    py: 0.75,
+                    px: 1.2,
+                    textTransform: 'none',
+                    ...(isVendorUploaded('flipkart', 'sales', spParam) && {
+                      borderColor: fSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                      color: fSalesStatus === 'pending' ? '#b45309' : '#16a34a'
+                    })
+                  }}
+                >
+                  {uploadingVendor === upVendorSales ? 'Uploading...' : isVendorUploaded('flipkart', 'sales', spParam) ? 'Re-upload' : 'Upload'}
+                </Button>
+              </Box>
             </Box>
           </Paper>
 
@@ -1507,27 +1604,58 @@ const UploadDocuments: React.FC = () => {
                 }}
                 disabled={!!uploadingVendor}
               />
-              <Button
-                variant={isVendorUploaded('flipkart', 'settlement', spParam) ? "outlined" : "contained"}
-                size="small"
-                startIcon={<CloudUploadIcon />}
-                disabled={!!uploadingVendor || uploadingVendor === upVendorSettlement}
-                endIcon={uploadingVendor === upVendorSettlement ? <CircularProgress size={14} /> : null}
-                onClick={(e) => {
-                  handleFileInputClick(e, `flipkart-settlement-upload${spSuffix}`, 'flipkart', 'settlement');
-                }}
-                sx={{ 
-                  minWidth: 120,
-                  fontSize: '0.75rem',
-                  py: 0.75,
-                  ...(isVendorUploaded('flipkart', 'settlement', spParam) && {
-                    borderColor: fSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                    color: fSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
-                  })
-                }}
-              >
-                {uploadingVendor === upVendorSettlement ? 'Uploading...' : isVendorUploaded('flipkart', 'settlement', spParam) ? 'Re-upload' : 'Upload'}
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                {fSettlementDoc && (
+                  <Tooltip title={`Download ${fSettlementDoc.filename}`}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={downloadingDocId === fSettlementDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                      disabled={downloadingDocId === fSettlementDoc.id}
+                      onClick={(e) => handleDownloadDocument(fSettlementDoc, e)}
+                      sx={{
+                        fontSize: '0.75rem',
+                        py: 0.75,
+                        px: 1.2,
+                        fontWeight: 600,
+                        color: '#16a34a',
+                        borderColor: '#86efac',
+                        backgroundColor: '#f0fdf4',
+                        textTransform: 'none',
+                        '&:hover': {
+                          backgroundColor: '#dcfce7',
+                          borderColor: '#16a34a',
+                        },
+                      }}
+                    >
+                      {downloadingDocId === fSettlementDoc.id ? '...' : 'Download'}
+                    </Button>
+                  </Tooltip>
+                )}
+                <Button
+                  variant={isVendorUploaded('flipkart', 'settlement', spParam) ? "outlined" : "contained"}
+                  size="small"
+                  startIcon={<CloudUploadIcon />}
+                  disabled={!!uploadingVendor || uploadingVendor === upVendorSettlement}
+                  endIcon={uploadingVendor === upVendorSettlement ? <CircularProgress size={14} /> : null}
+                  onClick={(e) => {
+                    handleFileInputClick(e, `flipkart-settlement-upload${spSuffix}`, 'flipkart', 'settlement');
+                  }}
+                  sx={{ 
+                    minWidth: 90,
+                    fontSize: '0.75rem',
+                    py: 0.75,
+                    px: 1.2,
+                    textTransform: 'none',
+                    ...(isVendorUploaded('flipkart', 'settlement', spParam) && {
+                      borderColor: fSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                      color: fSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
+                    })
+                  }}
+                >
+                  {uploadingVendor === upVendorSettlement ? 'Uploading...' : isVendorUploaded('flipkart', 'settlement', spParam) ? 'Re-upload' : 'Upload'}
+                </Button>
+              </Box>
             </Box>
           </Paper>
         </Box>
@@ -1968,23 +2096,54 @@ const UploadDocuments: React.FC = () => {
                                 }}
                                 disabled={!!uploadingVendor}
                               />
-                              <Button
-                                variant={isVendorUploaded('flipkart', 'sales', sp) ? 'outlined' : 'contained'}
-                                size="small"
-                                startIcon={<CloudUploadIcon sx={{ fontSize: '0.8rem !important' }} />}
-                                disabled={!!uploadingVendor}
-                                endIcon={(uploadingVendor === `flipkart_${sp}_sales` || uploadingVendor === `flipkart_sales`) ? <CircularProgress size={10} /> : null}
-                                onClick={(e) => handleFileInputClick(e, salesId, 'flipkart', 'sales')}
-                                sx={{
-                                  fontSize: '0.68rem', py: 0.4, px: 1, minWidth: 80,
-                                  ...(isVendorUploaded('flipkart', 'sales', sp) && {
-                                    borderColor: flipkartSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                                    color: flipkartSalesStatus === 'pending' ? '#b45309' : '#16a34a'
-                                  })
-                                }}
-                              >
-                                {(uploadingVendor === `flipkart_${sp}_sales` || uploadingVendor === `flipkart_sales`) ? '...' : isVendorUploaded('flipkart', 'sales', sp) ? 'Re-upload' : 'Upload'}
-                              </Button>
+                              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                {flipkartSalesDoc && (
+                                  <Tooltip title={`Download ${flipkartSalesDoc.filename}`}>
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      startIcon={downloadingDocId === flipkartSalesDoc.id ? <CircularProgress size={10} /> : <DownloadIcon sx={{ fontSize: '0.75rem !important' }} />}
+                                      disabled={downloadingDocId === flipkartSalesDoc.id}
+                                      onClick={(e) => handleDownloadDocument(flipkartSalesDoc, e)}
+                                      sx={{
+                                        fontSize: '0.68rem',
+                                        py: 0.4,
+                                        px: 0.8,
+                                        minWidth: 65,
+                                        fontWeight: 600,
+                                        color: '#16a34a',
+                                        borderColor: '#86efac',
+                                        backgroundColor: '#f0fdf4',
+                                        textTransform: 'none',
+                                        '&:hover': {
+                                          backgroundColor: '#dcfce7',
+                                          borderColor: '#16a34a',
+                                        },
+                                      }}
+                                    >
+                                      {downloadingDocId === flipkartSalesDoc.id ? '...' : 'Download'}
+                                    </Button>
+                                  </Tooltip>
+                                )}
+                                <Button
+                                  variant={isVendorUploaded('flipkart', 'sales', sp) ? 'outlined' : 'contained'}
+                                  size="small"
+                                  startIcon={<CloudUploadIcon sx={{ fontSize: '0.8rem !important' }} />}
+                                  disabled={!!uploadingVendor}
+                                  endIcon={(uploadingVendor === `flipkart_${sp}_sales` || uploadingVendor === `flipkart_sales`) ? <CircularProgress size={10} /> : null}
+                                  onClick={(e) => handleFileInputClick(e, salesId, 'flipkart', 'sales')}
+                                  sx={{
+                                    fontSize: '0.68rem', py: 0.4, px: 0.8, minWidth: 65,
+                                    textTransform: 'none',
+                                    ...(isVendorUploaded('flipkart', 'sales', sp) && {
+                                      borderColor: flipkartSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                                      color: flipkartSalesStatus === 'pending' ? '#b45309' : '#16a34a'
+                                    })
+                                  }}
+                                >
+                                  {(uploadingVendor === `flipkart_${sp}_sales` || uploadingVendor === `flipkart_sales`) ? '...' : isVendorUploaded('flipkart', 'sales', sp) ? 'Re-upload' : 'Upload'}
+                                </Button>
+                              </Box>
                             </Box>
                           </Paper>
 
@@ -2040,23 +2199,54 @@ const UploadDocuments: React.FC = () => {
                                 }}
                                 disabled={!!uploadingVendor}
                               />
-                              <Button
-                                variant={isVendorUploaded('flipkart', 'settlement', sp) ? 'outlined' : 'contained'}
-                                size="small"
-                                startIcon={<CloudUploadIcon sx={{ fontSize: '0.8rem !important' }} />}
-                                disabled={!!uploadingVendor}
-                                endIcon={(uploadingVendor === `flipkart_${sp}_settlement` || uploadingVendor === `flipkart_settlement`) ? <CircularProgress size={10} /> : null}
-                                onClick={(e) => handleFileInputClick(e, settlementId, 'flipkart', 'settlement')}
-                                sx={{
-                                  fontSize: '0.68rem', py: 0.4, px: 1, minWidth: 80,
-                                  ...(isVendorUploaded('flipkart', 'settlement', sp) && {
-                                    borderColor: flipkartSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                                    color: flipkartSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
-                                  })
-                                }}
-                              >
-                                {(uploadingVendor === `flipkart_${sp}_settlement` || uploadingVendor === `flipkart_settlement`) ? '...' : isVendorUploaded('flipkart', 'settlement', sp) ? 'Re-upload' : 'Upload'}
-                              </Button>
+                              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                {flipkartSettlementDoc && (
+                                  <Tooltip title={`Download ${flipkartSettlementDoc.filename}`}>
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      startIcon={downloadingDocId === flipkartSettlementDoc.id ? <CircularProgress size={10} /> : <DownloadIcon sx={{ fontSize: '0.75rem !important' }} />}
+                                      disabled={downloadingDocId === flipkartSettlementDoc.id}
+                                      onClick={(e) => handleDownloadDocument(flipkartSettlementDoc, e)}
+                                      sx={{
+                                        fontSize: '0.68rem',
+                                        py: 0.4,
+                                        px: 0.8,
+                                        minWidth: 65,
+                                        fontWeight: 600,
+                                        color: '#16a34a',
+                                        borderColor: '#86efac',
+                                        backgroundColor: '#f0fdf4',
+                                        textTransform: 'none',
+                                        '&:hover': {
+                                          backgroundColor: '#dcfce7',
+                                          borderColor: '#16a34a',
+                                        },
+                                      }}
+                                    >
+                                      {downloadingDocId === flipkartSettlementDoc.id ? '...' : 'Download'}
+                                    </Button>
+                                  </Tooltip>
+                                )}
+                                <Button
+                                  variant={isVendorUploaded('flipkart', 'settlement', sp) ? 'outlined' : 'contained'}
+                                  size="small"
+                                  startIcon={<CloudUploadIcon sx={{ fontSize: '0.8rem !important' }} />}
+                                  disabled={!!uploadingVendor}
+                                  endIcon={(uploadingVendor === `flipkart_${sp}_settlement` || uploadingVendor === `flipkart_settlement`) ? <CircularProgress size={10} /> : null}
+                                  onClick={(e) => handleFileInputClick(e, settlementId, 'flipkart', 'settlement')}
+                                  sx={{
+                                    fontSize: '0.68rem', py: 0.4, px: 0.8, minWidth: 65,
+                                    textTransform: 'none',
+                                    ...(isVendorUploaded('flipkart', 'settlement', sp) && {
+                                      borderColor: flipkartSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                                      color: flipkartSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
+                                    })
+                                  }}
+                                >
+                                  {(uploadingVendor === `flipkart_${sp}_settlement` || uploadingVendor === `flipkart_settlement`) ? '...' : isVendorUploaded('flipkart', 'settlement', sp) ? 'Re-upload' : 'Upload'}
+                                </Button>
+                              </Box>
                             </Box>
                           </Paper>
                         </Box>
@@ -2157,27 +2347,58 @@ const UploadDocuments: React.FC = () => {
                           }}
                           disabled={!!uploadingVendor}
                         />
-                        <Button
-                          variant={isVendorUploaded('amazon', 'sales') ? "outlined" : "contained"}
-                          size="small"
-                          startIcon={<CloudUploadIcon />}
-                          disabled={!!uploadingVendor || uploadingVendor === 'amazon_sales'}
-                          endIcon={uploadingVendor === 'amazon_sales' ? <CircularProgress size={14} /> : null}
-                          onClick={(e) => {
-                            handleFileInputClick(e, 'amazon-sales-upload', 'amazon', 'sales');
-                          }}
-                          sx={{ 
-                            minWidth: 120,
-                            fontSize: '0.75rem',
-                            py: 0.75,
-                            ...(isVendorUploaded('amazon', 'sales') && {
-                              borderColor: amazonSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                              color: amazonSalesStatus === 'pending' ? '#b45309' : '#16a34a'
-                            })
-                          }}
-                        >
-                          {uploadingVendor === 'amazon_sales' ? 'Uploading...' : isVendorUploaded('amazon', 'sales') ? 'Re-upload' : 'Upload'}
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          {amazonSalesDoc && (
+                            <Tooltip title={`Download ${amazonSalesDoc.filename}`}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloadingDocId === amazonSalesDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                disabled={downloadingDocId === amazonSalesDoc.id}
+                                onClick={(e) => handleDownloadDocument(amazonSalesDoc, e)}
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  py: 0.75,
+                                  px: 1.2,
+                                  fontWeight: 600,
+                                  color: '#16a34a',
+                                  borderColor: '#86efac',
+                                  backgroundColor: '#f0fdf4',
+                                  textTransform: 'none',
+                                  '&:hover': {
+                                    backgroundColor: '#dcfce7',
+                                    borderColor: '#16a34a',
+                                  },
+                                }}
+                              >
+                                {downloadingDocId === amazonSalesDoc.id ? '...' : 'Download'}
+                              </Button>
+                            </Tooltip>
+                          )}
+                          <Button
+                            variant={isVendorUploaded('amazon', 'sales') ? "outlined" : "contained"}
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'amazon_sales'}
+                            endIcon={uploadingVendor === 'amazon_sales' ? <CircularProgress size={14} /> : null}
+                            onClick={(e) => {
+                              handleFileInputClick(e, 'amazon-sales-upload', 'amazon', 'sales');
+                            }}
+                            sx={{ 
+                              minWidth: 80,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              px: 1.2,
+                              textTransform: 'none',
+                              ...(isVendorUploaded('amazon', 'sales') && {
+                                borderColor: amazonSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                                color: amazonSalesStatus === 'pending' ? '#b45309' : '#16a34a'
+                              })
+                            }}
+                          >
+                            {uploadingVendor === 'amazon_sales' ? 'Uploading...' : isVendorUploaded('amazon', 'sales') ? 'Re-upload' : 'Upload'}
+                          </Button>
+                        </Box>
                         {marketplaceFiles.amazon?.sales && !isVendorUploaded('amazon', 'sales') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
                             {marketplaceFiles.amazon.sales.name}
@@ -2307,36 +2528,67 @@ const UploadDocuments: React.FC = () => {
                           }}
                           disabled={!!uploadingVendor || !isVendorUploaded('amazon', 'sales')}
                         />
-                        <Button
-                          variant={isVendorUploaded('amazon', 'sales_b2b') ? "outlined" : "contained"}
-                          size="small"
-                          startIcon={<CloudUploadIcon />}
-                          disabled={!!uploadingVendor || uploadingVendor === 'amazon_sales_b2b' || !isVendorUploaded('amazon', 'sales')}
-                          endIcon={uploadingVendor === 'amazon_sales_b2b' ? <CircularProgress size={14} /> : null}
-                          onClick={(e) => {
-                            handleFileInputClick(e, 'amazon-sales-b2b-upload', 'amazon', 'sales_b2b');
-                          }}
-                          sx={{ 
-                            minWidth: 120,
-                            fontSize: '0.75rem',
-                            py: 0.75,
-                            ...(!isVendorUploaded('amazon', 'sales') && {
-                              background: '#f3f4f6',
-                              color: '#9ca3af',
-                              cursor: 'not-allowed',
-                              border: 'none',
-                              '&:hover': {
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          {amazonSalesB2BDoc && (
+                            <Tooltip title={`Download ${amazonSalesB2BDoc.filename}`}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloadingDocId === amazonSalesB2BDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                disabled={downloadingDocId === amazonSalesB2BDoc.id}
+                                onClick={(e) => handleDownloadDocument(amazonSalesB2BDoc, e)}
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  py: 0.75,
+                                  px: 1.2,
+                                  fontWeight: 600,
+                                  color: '#16a34a',
+                                  borderColor: '#86efac',
+                                  backgroundColor: '#f0fdf4',
+                                  textTransform: 'none',
+                                  '&:hover': {
+                                    backgroundColor: '#dcfce7',
+                                    borderColor: '#16a34a',
+                                  },
+                                }}
+                              >
+                                {downloadingDocId === amazonSalesB2BDoc.id ? '...' : 'Download'}
+                              </Button>
+                            </Tooltip>
+                          )}
+                          <Button
+                            variant={isVendorUploaded('amazon', 'sales_b2b') ? "outlined" : "contained"}
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'amazon_sales_b2b' || !isVendorUploaded('amazon', 'sales')}
+                            endIcon={uploadingVendor === 'amazon_sales_b2b' ? <CircularProgress size={14} /> : null}
+                            onClick={(e) => {
+                              handleFileInputClick(e, 'amazon-sales-b2b-upload', 'amazon', 'sales_b2b');
+                            }}
+                            sx={{ 
+                              minWidth: 80,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              px: 1.2,
+                              textTransform: 'none',
+                              ...(!isVendorUploaded('amazon', 'sales') && {
                                 background: '#f3f4f6',
-                              }
-                            }),
-                            ...(isVendorUploaded('amazon', 'sales_b2b') && {
-                              borderColor: amazonSalesB2BStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                              color: amazonSalesB2BStatus === 'pending' ? '#b45309' : '#16a34a'
-                            })
-                          }}
-                        >
-                          {uploadingVendor === 'amazon_sales_b2b' ? 'Uploading...' : isVendorUploaded('amazon', 'sales_b2b') ? 'Re-upload' : 'Upload'}
-                        </Button>
+                                color: '#9ca3af',
+                                cursor: 'not-allowed',
+                                border: 'none',
+                                '&:hover': {
+                                  background: '#f3f4f6',
+                                }
+                              }),
+                              ...(isVendorUploaded('amazon', 'sales_b2b') && {
+                                borderColor: amazonSalesB2BStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                                color: amazonSalesB2BStatus === 'pending' ? '#b45309' : '#16a34a'
+                              })
+                            }}
+                          >
+                            {uploadingVendor === 'amazon_sales_b2b' ? 'Uploading...' : isVendorUploaded('amazon', 'sales_b2b') ? 'Re-upload' : 'Upload'}
+                          </Button>
+                        </Box>
                         {marketplaceFiles.amazon?.sales_b2b && !isVendorUploaded('amazon', 'sales_b2b') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
                             {marketplaceFiles.amazon.sales_b2b.name}
@@ -2466,36 +2718,67 @@ const UploadDocuments: React.FC = () => {
                           }}
                           disabled={!!uploadingVendor || !isVendorUploaded('amazon', 'sales')}
                         />
-                        <Button
-                          variant={isVendorUploaded('amazon', 'settlement') ? "outlined" : "contained"}
-                          size="small"
-                          startIcon={<CloudUploadIcon />}
-                          disabled={!!uploadingVendor || uploadingVendor === 'amazon_settlement' || !isVendorUploaded('amazon', 'sales')}
-                          endIcon={uploadingVendor === 'amazon_settlement' ? <CircularProgress size={14} /> : null}
-                          onClick={(e) => {
-                            handleFileInputClick(e, 'amazon-settlement-upload', 'amazon', 'settlement');
-                          }}
-                          sx={{ 
-                            minWidth: 120,
-                            fontSize: '0.75rem',
-                            py: 0.75,
-                            ...(!isVendorUploaded('amazon', 'sales') && {
-                              background: '#f3f4f6',
-                              color: '#9ca3af',
-                              cursor: 'not-allowed',
-                              border: 'none',
-                              '&:hover': {
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          {amazonSettlementDoc && (
+                            <Tooltip title={`Download ${amazonSettlementDoc.filename}`}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloadingDocId === amazonSettlementDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                disabled={downloadingDocId === amazonSettlementDoc.id}
+                                onClick={(e) => handleDownloadDocument(amazonSettlementDoc, e)}
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  py: 0.75,
+                                  px: 1.2,
+                                  fontWeight: 600,
+                                  color: '#16a34a',
+                                  borderColor: '#86efac',
+                                  backgroundColor: '#f0fdf4',
+                                  textTransform: 'none',
+                                  '&:hover': {
+                                    backgroundColor: '#dcfce7',
+                                    borderColor: '#16a34a',
+                                  },
+                                }}
+                              >
+                                {downloadingDocId === amazonSettlementDoc.id ? '...' : 'Download'}
+                              </Button>
+                            </Tooltip>
+                          )}
+                          <Button
+                            variant={isVendorUploaded('amazon', 'settlement') ? "outlined" : "contained"}
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'amazon_settlement' || !isVendorUploaded('amazon', 'sales')}
+                            endIcon={uploadingVendor === 'amazon_settlement' ? <CircularProgress size={14} /> : null}
+                            onClick={(e) => {
+                              handleFileInputClick(e, 'amazon-settlement-upload', 'amazon', 'settlement');
+                            }}
+                            sx={{ 
+                              minWidth: 80,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              px: 1.2,
+                              textTransform: 'none',
+                              ...(!isVendorUploaded('amazon', 'sales') && {
                                 background: '#f3f4f6',
-                              }
-                            }),
-                            ...(isVendorUploaded('amazon', 'settlement') && {
-                              borderColor: amazonSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                              color: amazonSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
-                            })
-                          }}
-                        >
-                          {uploadingVendor === 'amazon_settlement' ? 'Uploading...' : isVendorUploaded('amazon', 'settlement') ? 'Re-upload' : 'Upload'}
-                        </Button>
+                                color: '#9ca3af',
+                                cursor: 'not-allowed',
+                                border: 'none',
+                                '&:hover': {
+                                  background: '#f3f4f6',
+                                }
+                              }),
+                              ...(isVendorUploaded('amazon', 'settlement') && {
+                                borderColor: amazonSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                                color: amazonSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
+                              })
+                            }}
+                          >
+                            {uploadingVendor === 'amazon_settlement' ? 'Uploading...' : isVendorUploaded('amazon', 'settlement') ? 'Re-upload' : 'Upload'}
+                          </Button>
+                        </Box>
                         {marketplaceFiles.amazon?.settlement && !isVendorUploaded('amazon', 'settlement') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
                             {marketplaceFiles.amazon.settlement.name}
@@ -2596,27 +2879,58 @@ const UploadDocuments: React.FC = () => {
                           }}
                           disabled={!!uploadingVendor}
                         />
-                        <Button
-                          variant={isVendorUploaded('amazon_uk', 'sales') ? "outlined" : "contained"}
-                          size="small"
-                          startIcon={<CloudUploadIcon />}
-                          disabled={!!uploadingVendor || uploadingVendor === 'amazon_uk_sales'}
-                          endIcon={uploadingVendor === 'amazon_uk_sales' ? <CircularProgress size={14} /> : null}
-                          onClick={(e) => {
-                            handleFileInputClick(e, 'amazon-uk-sales-upload', 'amazon_uk', 'sales');
-                          }}
-                          sx={{ 
-                            minWidth: 120,
-                            fontSize: '0.75rem',
-                            py: 0.75,
-                            ...(isVendorUploaded('amazon_uk', 'sales') && {
-                              borderColor: amazonUkSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                              color: amazonUkSalesStatus === 'pending' ? '#b45309' : '#16a34a'
-                            })
-                          }}
-                        >
-                          {uploadingVendor === 'amazon_uk_sales' ? 'Uploading...' : isVendorUploaded('amazon_uk', 'sales') ? 'Re-upload' : 'Upload'}
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          {amazonUkSalesDoc && (
+                            <Tooltip title={`Download ${amazonUkSalesDoc.filename}`}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloadingDocId === amazonUkSalesDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                disabled={downloadingDocId === amazonUkSalesDoc.id}
+                                onClick={(e) => handleDownloadDocument(amazonUkSalesDoc, e)}
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  py: 0.75,
+                                  px: 1.2,
+                                  fontWeight: 600,
+                                  color: '#16a34a',
+                                  borderColor: '#86efac',
+                                  backgroundColor: '#f0fdf4',
+                                  textTransform: 'none',
+                                  '&:hover': {
+                                    backgroundColor: '#dcfce7',
+                                    borderColor: '#16a34a',
+                                  },
+                                }}
+                              >
+                                {downloadingDocId === amazonUkSalesDoc.id ? '...' : 'Download'}
+                              </Button>
+                            </Tooltip>
+                          )}
+                          <Button
+                            variant={isVendorUploaded('amazon_uk', 'sales') ? "outlined" : "contained"}
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'amazon_uk_sales'}
+                            endIcon={uploadingVendor === 'amazon_uk_sales' ? <CircularProgress size={14} /> : null}
+                            onClick={(e) => {
+                              handleFileInputClick(e, 'amazon-uk-sales-upload', 'amazon_uk', 'sales');
+                            }}
+                            sx={{ 
+                              minWidth: 80,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              px: 1.2,
+                              textTransform: 'none',
+                              ...(isVendorUploaded('amazon_uk', 'sales') && {
+                                borderColor: amazonUkSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                                color: amazonUkSalesStatus === 'pending' ? '#b45309' : '#16a34a'
+                              })
+                            }}
+                          >
+                            {uploadingVendor === 'amazon_uk_sales' ? 'Uploading...' : isVendorUploaded('amazon_uk', 'sales') ? 'Re-upload' : 'Upload'}
+                          </Button>
+                        </Box>
                         {marketplaceFiles.amazon_uk?.sales && !isVendorUploaded('amazon_uk', 'sales') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
                             {marketplaceFiles.amazon_uk.sales.name}
@@ -2746,36 +3060,67 @@ const UploadDocuments: React.FC = () => {
                           }}
                           disabled={!!uploadingVendor || !isVendorUploaded('amazon_uk', 'sales')}
                         />
-                        <Button
-                          variant={isVendorUploaded('amazon_uk', 'settlement') ? "outlined" : "contained"}
-                          size="small"
-                          startIcon={<CloudUploadIcon />}
-                          disabled={!!uploadingVendor || uploadingVendor === 'amazon_uk_settlement' || !isVendorUploaded('amazon_uk', 'sales')}
-                          endIcon={uploadingVendor === 'amazon_uk_settlement' ? <CircularProgress size={14} /> : null}
-                          onClick={(e) => {
-                            handleFileInputClick(e, 'amazon-uk-settlement-upload', 'amazon_uk', 'settlement');
-                          }}
-                          sx={{ 
-                            minWidth: 120,
-                            fontSize: '0.75rem',
-                            py: 0.75,
-                            ...(!isVendorUploaded('amazon_uk', 'sales') && {
-                              background: '#f3f4f6',
-                              color: '#9ca3af',
-                              cursor: 'not-allowed',
-                              border: 'none',
-                              '&:hover': {
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          {amazonUkSettlementDoc && (
+                            <Tooltip title={`Download ${amazonUkSettlementDoc.filename}`}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloadingDocId === amazonUkSettlementDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                disabled={downloadingDocId === amazonUkSettlementDoc.id}
+                                onClick={(e) => handleDownloadDocument(amazonUkSettlementDoc, e)}
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  py: 0.75,
+                                  px: 1.2,
+                                  fontWeight: 600,
+                                  color: '#16a34a',
+                                  borderColor: '#86efac',
+                                  backgroundColor: '#f0fdf4',
+                                  textTransform: 'none',
+                                  '&:hover': {
+                                    backgroundColor: '#dcfce7',
+                                    borderColor: '#16a34a',
+                                  },
+                                }}
+                              >
+                                {downloadingDocId === amazonUkSettlementDoc.id ? '...' : 'Download'}
+                              </Button>
+                            </Tooltip>
+                          )}
+                          <Button
+                            variant={isVendorUploaded('amazon_uk', 'settlement') ? "outlined" : "contained"}
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'amazon_uk_settlement' || !isVendorUploaded('amazon_uk', 'sales')}
+                            endIcon={uploadingVendor === 'amazon_uk_settlement' ? <CircularProgress size={14} /> : null}
+                            onClick={(e) => {
+                              handleFileInputClick(e, 'amazon-uk-settlement-upload', 'amazon_uk', 'settlement');
+                            }}
+                            sx={{ 
+                              minWidth: 80,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              px: 1.2,
+                              textTransform: 'none',
+                              ...(!isVendorUploaded('amazon_uk', 'sales') && {
                                 background: '#f3f4f6',
-                              }
-                            }),
-                            ...(isVendorUploaded('amazon_uk', 'settlement') && {
-                              borderColor: amazonUkSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                              color: amazonUkSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
-                            })
-                          }}
-                        >
-                          {uploadingVendor === 'amazon_uk_settlement' ? 'Uploading...' : isVendorUploaded('amazon_uk', 'settlement') ? 'Re-upload' : 'Upload'}
-                        </Button>
+                                color: '#9ca3af',
+                                cursor: 'not-allowed',
+                                border: 'none',
+                                '&:hover': {
+                                  background: '#f3f4f6',
+                                }
+                              }),
+                              ...(isVendorUploaded('amazon_uk', 'settlement') && {
+                                borderColor: amazonUkSettlementStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                                color: amazonUkSettlementStatus === 'pending' ? '#b45309' : '#16a34a'
+                              })
+                            }}
+                          >
+                            {uploadingVendor === 'amazon_uk_settlement' ? 'Uploading...' : isVendorUploaded('amazon_uk', 'settlement') ? 'Re-upload' : 'Upload'}
+                          </Button>
+                        </Box>
                         {marketplaceFiles.amazon_uk?.settlement && !isVendorUploaded('amazon_uk', 'settlement') && (
                           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}>
                             {marketplaceFiles.amazon_uk.settlement.name}
@@ -2889,23 +3234,54 @@ const UploadDocuments: React.FC = () => {
                           }}
                           disabled={!!uploadingVendor}
                         />
-                        <Button
-                          variant={isVendorUploaded('cred', 'sales') ? 'outlined' : 'contained'}
-                          size="small"
-                          startIcon={<CloudUploadIcon />}
-                          disabled={!!uploadingVendor || uploadingVendor === 'cred_sales'}
-                          endIcon={uploadingVendor === 'cred_sales' ? <CircularProgress size={14} /> : null}
-                          onClick={(e) => {
-                            handleFileInputClick(e, 'cred-sales-upload', 'cred' as any, 'sales' as any);
-                          }}
-                          sx={{
-                            minWidth: 120,
-                            fontSize: '0.75rem',
-                            py: 0.75,
-                          }}
-                        >
-                          {uploadingVendor === 'cred_sales' ? 'Uploading...' : isVendorUploaded('cred', 'sales') ? 'Re-upload' : 'Upload'}
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          {credSalesDoc && (
+                            <Tooltip title={`Download ${credSalesDoc.filename}`}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloadingDocId === credSalesDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                disabled={downloadingDocId === credSalesDoc.id}
+                                onClick={(e) => handleDownloadDocument(credSalesDoc, e)}
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  py: 0.75,
+                                  px: 1.2,
+                                  fontWeight: 600,
+                                  color: '#16a34a',
+                                  borderColor: '#86efac',
+                                  backgroundColor: '#f0fdf4',
+                                  textTransform: 'none',
+                                  '&:hover': {
+                                    backgroundColor: '#dcfce7',
+                                    borderColor: '#16a34a',
+                                  },
+                                }}
+                              >
+                                {downloadingDocId === credSalesDoc.id ? '...' : 'Download'}
+                              </Button>
+                            </Tooltip>
+                          )}
+                          <Button
+                            variant={isVendorUploaded('cred', 'sales') ? 'outlined' : 'contained'}
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'cred_sales'}
+                            endIcon={uploadingVendor === 'cred_sales' ? <CircularProgress size={14} /> : null}
+                            onClick={(e) => {
+                              handleFileInputClick(e, 'cred-sales-upload', 'cred' as any, 'sales' as any);
+                            }}
+                            sx={{
+                              minWidth: 80,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              px: 1.2,
+                              textTransform: 'none',
+                            }}
+                          >
+                            {uploadingVendor === 'cred_sales' ? 'Uploading...' : isVendorUploaded('cred', 'sales') ? 'Re-upload' : 'Upload'}
+                          </Button>
+                        </Box>
                         {d2cFiles.cred?.sales && (
                           <Typography
                             variant="caption"
@@ -3016,32 +3392,63 @@ const UploadDocuments: React.FC = () => {
                           }}
                           disabled={!!uploadingVendor || credSalesStatus !== 'processing'}
                         />
-                        <Button
-                          variant={isVendorUploaded('cred', 'settlement') ? 'outlined' : 'contained'}
-                          size="small"
-                          startIcon={<CloudUploadIcon />}
-                          disabled={!!uploadingVendor || uploadingVendor === 'cred_settlement' || credSalesStatus !== 'processing'}
-                          endIcon={uploadingVendor === 'cred_settlement' ? <CircularProgress size={14} /> : null}
-                          onClick={(e) => {
-                            handleFileInputClick(e, 'cred-settlement-upload', 'cred' as any, 'settlement' as any);
-                          }}
-                          sx={{
-                            minWidth: 120,
-                            fontSize: '0.75rem',
-                            py: 0.75,
-                            ...(credSalesStatus !== 'processing' && {
-                              background: '#f3f4f6',
-                              color: '#9ca3af',
-                              cursor: 'not-allowed',
-                              border: 'none',
-                              '&:hover': {
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          {credSettlementDoc && (
+                            <Tooltip title={`Download ${credSettlementDoc.filename}`}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloadingDocId === credSettlementDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                disabled={downloadingDocId === credSettlementDoc.id}
+                                onClick={(e) => handleDownloadDocument(credSettlementDoc, e)}
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  py: 0.75,
+                                  px: 1.2,
+                                  fontWeight: 600,
+                                  color: '#16a34a',
+                                  borderColor: '#86efac',
+                                  backgroundColor: '#f0fdf4',
+                                  textTransform: 'none',
+                                  '&:hover': {
+                                    backgroundColor: '#dcfce7',
+                                    borderColor: '#16a34a',
+                                  },
+                                }}
+                              >
+                                {downloadingDocId === credSettlementDoc.id ? '...' : 'Download'}
+                              </Button>
+                            </Tooltip>
+                          )}
+                          <Button
+                            variant={isVendorUploaded('cred', 'settlement') ? 'outlined' : 'contained'}
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'cred_settlement' || credSalesStatus !== 'processing'}
+                            endIcon={uploadingVendor === 'cred_settlement' ? <CircularProgress size={14} /> : null}
+                            onClick={(e) => {
+                              handleFileInputClick(e, 'cred-settlement-upload', 'cred' as any, 'settlement' as any);
+                            }}
+                            sx={{
+                              minWidth: 80,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              px: 1.2,
+                              textTransform: 'none',
+                              ...(credSalesStatus !== 'processing' && {
                                 background: '#f3f4f6',
-                              }
-                            })
-                          }}
-                        >
-                          {uploadingVendor === 'cred_settlement' ? 'Uploading...' : isVendorUploaded('cred', 'settlement') ? 'Re-upload' : 'Upload'}
-                        </Button>
+                                color: '#9ca3af',
+                                cursor: 'not-allowed',
+                                border: 'none',
+                                '&:hover': {
+                                  background: '#f3f4f6',
+                                }
+                              })
+                            }}
+                          >
+                            {uploadingVendor === 'cred_settlement' ? 'Uploading...' : isVendorUploaded('cred', 'settlement') ? 'Re-upload' : 'Upload'}
+                          </Button>
+                        </Box>
                         {d2cFiles.cred?.settlement && (
                           <Typography
                             variant="caption"
@@ -3141,7 +3548,7 @@ const UploadDocuments: React.FC = () => {
                         transition: 'all 0.2s ease-in-out',
                         '&:hover': {
                           boxShadow: '0 8px 16px rgba(0,0,0,0.04)',
-                          borderColor: '#2563eb',
+                          borderColor: '#16a34a',
                         },
                         borderRadius: 1.5,
                         border: '1px solid #edf2f7',
@@ -3185,7 +3592,7 @@ const UploadDocuments: React.FC = () => {
                           </Typography>
                         )}
 
-                        <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
+                        <Box sx={{ mt: 'auto', display: 'flex', gap: 1, width: '100%', alignItems: 'center' }}>
                           <input
                             accept={getAcceptForVendor('delhivery')}
                             style={{ display: 'none' }}
@@ -3206,7 +3613,36 @@ const UploadDocuments: React.FC = () => {
                             disabled={!!uploadingVendor}
                           />
 
-                          <label htmlFor="logistic-rate-card-upload" style={{ width: '100%' }}>
+                          {logisticRateCardDoc && (
+                            <Tooltip title={`Download ${logisticRateCardDoc.filename}`}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloadingDocId === logisticRateCardDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                disabled={downloadingDocId === logisticRateCardDoc.id}
+                                onClick={(e) => handleDownloadDocument(logisticRateCardDoc, e)}
+                                sx={{
+                                  py: 0.6,
+                                  px: 1,
+                                  borderRadius: 1,
+                                  fontWeight: 600,
+                                  textTransform: 'none',
+                                  fontSize: '0.75rem',
+                                  color: '#16a34a',
+                                  borderColor: '#86efac',
+                                  backgroundColor: '#f0fdf4',
+                                  '&:hover': {
+                                    backgroundColor: '#dcfce7',
+                                    borderColor: '#16a34a',
+                                  },
+                                }}
+                              >
+                                {downloadingDocId === logisticRateCardDoc.id ? '...' : 'Download'}
+                              </Button>
+                            </Tooltip>
+                          )}
+
+                          <label htmlFor="logistic-rate-card-upload" style={{ flex: 1, width: '100%' }}>
                             <Button
                               variant={logisticRateCardDoc ? 'outlined' : 'contained'}
                               component="span"
@@ -3246,7 +3682,7 @@ const UploadDocuments: React.FC = () => {
                         transition: 'all 0.2s ease-in-out',
                         '&:hover': {
                           boxShadow: '0 8px 16px rgba(0,0,0,0.04)',
-                          borderColor: '#2563eb',
+                          borderColor: '#16a34a',
                         },
                         borderRadius: 1.5,
                         border: '1px solid #edf2f7',
@@ -3290,7 +3726,7 @@ const UploadDocuments: React.FC = () => {
                           </Typography>
                         )}
 
-                        <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
+                        <Box sx={{ mt: 'auto', display: 'flex', gap: 1, width: '100%', alignItems: 'center' }}>
                           <input
                             accept={getAcceptForVendor('delhivery')}
                             style={{ display: 'none' }}
@@ -3311,7 +3747,36 @@ const UploadDocuments: React.FC = () => {
                             disabled={!!uploadingVendor}
                           />
 
-                          <label htmlFor="logistic-master-weight-upload" style={{ width: '100%' }}>
+                          {logisticMasterWeightDoc && (
+                            <Tooltip title={`Download ${logisticMasterWeightDoc.filename}`}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloadingDocId === logisticMasterWeightDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                disabled={downloadingDocId === logisticMasterWeightDoc.id}
+                                onClick={(e) => handleDownloadDocument(logisticMasterWeightDoc, e)}
+                                sx={{
+                                  py: 0.6,
+                                  px: 1,
+                                  borderRadius: 1,
+                                  fontWeight: 600,
+                                  textTransform: 'none',
+                                  fontSize: '0.75rem',
+                                  color: '#16a34a',
+                                  borderColor: '#86efac',
+                                  backgroundColor: '#f0fdf4',
+                                  '&:hover': {
+                                    backgroundColor: '#dcfce7',
+                                    borderColor: '#16a34a',
+                                  },
+                                }}
+                              >
+                                {downloadingDocId === logisticMasterWeightDoc.id ? '...' : 'Download'}
+                              </Button>
+                            </Tooltip>
+                          )}
+
+                          <label htmlFor="logistic-master-weight-upload" style={{ flex: 1, width: '100%' }}>
                             <Button
                               variant={logisticMasterWeightDoc ? 'outlined' : 'contained'}
                               component="span"
@@ -3378,7 +3843,7 @@ const UploadDocuments: React.FC = () => {
                         transition: 'all 0.2s ease-in-out',
                         '&:hover': {
                           boxShadow: '0 8px 16px rgba(0,0,0,0.04)',
-                          borderColor: '#2563eb',
+                          borderColor: '#16a34a',
                         },
                         borderRadius: 1.5,
                         border: '1px solid #edf2f7',
@@ -3422,7 +3887,7 @@ const UploadDocuments: React.FC = () => {
                           </Typography>
                         )}
 
-                        <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
+                        <Box sx={{ mt: 'auto', display: 'flex', gap: 1, width: '100%', alignItems: 'center' }}>
                           <input
                             accept={getAcceptForVendor('delhivery')}
                             style={{ display: 'none' }}
@@ -3443,7 +3908,36 @@ const UploadDocuments: React.FC = () => {
                             disabled={!!uploadingVendor}
                           />
 
-                          <label htmlFor="delhivery-logistic-recon-upload" style={{ width: '100%' }}>
+                          {delhiveryLogisticReconDoc && (
+                            <Tooltip title={`Download ${delhiveryLogisticReconDoc.filename}`}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloadingDocId === delhiveryLogisticReconDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                disabled={downloadingDocId === delhiveryLogisticReconDoc.id}
+                                onClick={(e) => handleDownloadDocument(delhiveryLogisticReconDoc, e)}
+                                sx={{
+                                  py: 0.6,
+                                  px: 1,
+                                  borderRadius: 1,
+                                  fontWeight: 600,
+                                  textTransform: 'none',
+                                  fontSize: '0.75rem',
+                                  color: '#16a34a',
+                                  borderColor: '#86efac',
+                                  backgroundColor: '#f0fdf4',
+                                  '&:hover': {
+                                    backgroundColor: '#dcfce7',
+                                    borderColor: '#16a34a',
+                                  },
+                                }}
+                              >
+                                {downloadingDocId === delhiveryLogisticReconDoc.id ? '...' : 'Download'}
+                              </Button>
+                            </Tooltip>
+                          )}
+
+                          <label htmlFor="delhivery-logistic-recon-upload" style={{ flex: 1, width: '100%' }}>
                             <Button
                               variant={delhiveryLogisticReconDoc ? 'outlined' : 'contained'}
                               component="span"
@@ -3483,7 +3977,7 @@ const UploadDocuments: React.FC = () => {
                         transition: 'all 0.2s ease-in-out',
                         '&:hover': {
                           boxShadow: '0 8px 16px rgba(0,0,0,0.04)',
-                          borderColor: '#2563eb',
+                          borderColor: '#16a34a',
                         },
                         borderRadius: 1.5,
                         border: '1px solid #edf2f7',
@@ -3527,7 +4021,7 @@ const UploadDocuments: React.FC = () => {
                           </Typography>
                         )}
 
-                        <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
+                        <Box sx={{ mt: 'auto', display: 'flex', gap: 1, width: '100%', alignItems: 'center' }}>
                           <input
                             accept={getAcceptForVendor('shadowfax')}
                             style={{ display: 'none' }}
@@ -3548,7 +4042,36 @@ const UploadDocuments: React.FC = () => {
                             disabled={!!uploadingVendor}
                           />
 
-                          <label htmlFor="shadowfax-logistic-recon-upload" style={{ width: '100%' }}>
+                          {shadowfaxLogisticReconDoc && (
+                            <Tooltip title={`Download ${shadowfaxLogisticReconDoc.filename}`}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloadingDocId === shadowfaxLogisticReconDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                disabled={downloadingDocId === shadowfaxLogisticReconDoc.id}
+                                onClick={(e) => handleDownloadDocument(shadowfaxLogisticReconDoc, e)}
+                                sx={{
+                                  py: 0.6,
+                                  px: 1,
+                                  borderRadius: 1,
+                                  fontWeight: 600,
+                                  textTransform: 'none',
+                                  fontSize: '0.75rem',
+                                  color: '#16a34a',
+                                  borderColor: '#86efac',
+                                  backgroundColor: '#f0fdf4',
+                                  '&:hover': {
+                                    backgroundColor: '#dcfce7',
+                                    borderColor: '#16a34a',
+                                  },
+                                }}
+                              >
+                                {downloadingDocId === shadowfaxLogisticReconDoc.id ? '...' : 'Download'}
+                              </Button>
+                            </Tooltip>
+                          )}
+
+                          <label htmlFor="shadowfax-logistic-recon-upload" style={{ flex: 1, width: '100%' }}>
                             <Button
                               variant={shadowfaxLogisticReconDoc ? 'outlined' : 'contained'}
                               component="span"
@@ -3718,27 +4241,58 @@ const UploadDocuments: React.FC = () => {
                       }}
                       disabled={uploadingVendor === 'unicommerce_sales'}
                     />
-                    <Button
-                      variant={isVendorUploaded('unicommerce') ? 'outlined' : 'contained'}
-                      size="small"
-                      startIcon={<CloudUploadIcon />}
-                      disabled={uploadingVendor === 'unicommerce_sales'}
-                      endIcon={uploadingVendor === 'unicommerce_sales' ? <CircularProgress size={14} /> : null}
-                      onClick={(e) => {
-                        handleFileInputClick(e, 'd2c-unicommerce-sales-upload', 'unicommerce' as any, 'sales' as any);
-                      }}
-                      sx={{ 
-                        minWidth: 120,
-                        fontSize: '0.75rem',
-                        py: 0.75,
-                        ...(isVendorUploaded('unicommerce') && {
-                          borderColor: unicommerceStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                          color: unicommerceStatus === 'pending' ? '#b45309' : '#16a34a'
-                        })
-                      }}
-                    >
-                      {uploadingVendor === 'unicommerce_sales' ? 'Uploading...' : isVendorUploaded('unicommerce') ? 'Re-upload' : 'Upload'}
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      {unicommerceDoc && (
+                        <Tooltip title={`Download ${unicommerceDoc.filename}`}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={downloadingDocId === unicommerceDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                            disabled={downloadingDocId === unicommerceDoc.id}
+                            onClick={(e) => handleDownloadDocument(unicommerceDoc, e)}
+                            sx={{
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              px: 1.2,
+                              fontWeight: 600,
+                              color: '#16a34a',
+                              borderColor: '#86efac',
+                              backgroundColor: '#f0fdf4',
+                              textTransform: 'none',
+                              '&:hover': {
+                                backgroundColor: '#dcfce7',
+                                borderColor: '#16a34a',
+                              },
+                            }}
+                          >
+                            {downloadingDocId === unicommerceDoc.id ? '...' : 'Download'}
+                          </Button>
+                        </Tooltip>
+                      )}
+                      <Button
+                        variant={isVendorUploaded('unicommerce') ? 'outlined' : 'contained'}
+                        size="small"
+                        startIcon={<CloudUploadIcon />}
+                        disabled={uploadingVendor === 'unicommerce_sales'}
+                        endIcon={uploadingVendor === 'unicommerce_sales' ? <CircularProgress size={14} /> : null}
+                        onClick={(e) => {
+                          handleFileInputClick(e, 'd2c-unicommerce-sales-upload', 'unicommerce' as any, 'sales' as any);
+                        }}
+                        sx={{ 
+                          minWidth: 80,
+                          fontSize: '0.75rem',
+                          py: 0.75,
+                          px: 1.2,
+                          textTransform: 'none',
+                          ...(isVendorUploaded('unicommerce') && {
+                            borderColor: unicommerceStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                            color: unicommerceStatus === 'pending' ? '#b45309' : '#16a34a'
+                          })
+                        }}
+                      >
+                        {uploadingVendor === 'unicommerce_sales' ? 'Uploading...' : isVendorUploaded('unicommerce') ? 'Re-upload' : 'Upload'}
+                      </Button>
+                    </Box>
             </Box>
                 </Paper>
 
@@ -3833,27 +4387,58 @@ const UploadDocuments: React.FC = () => {
                       }}
                       disabled={uploadingVendor === 'magento_sales'}
                     />
-                    <Button
-                      variant={isVendorUploaded('magento_sales') ? 'outlined' : 'contained'}
-                      size="small"
-                      startIcon={<CloudUploadIcon />}
-                      disabled={uploadingVendor === 'magento_sales'}
-                      endIcon={uploadingVendor === 'magento_sales' ? <CircularProgress size={14} /> : null}
-                      onClick={(e) => {
-                        handleFileInputClick(e, 'd2c-magento-sales-upload', 'magento_sales' as any, 'sales' as any);
-                      }}
-                      sx={{ 
-                        minWidth: 120,
-                        fontSize: '0.75rem',
-                        py: 0.75,
-                        ...(isVendorUploaded('magento_sales') && {
-                          borderColor: magentoStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                          color: magentoStatus === 'pending' ? '#b45309' : '#16a34a'
-                        })
-                      }}
-                    >
-                      {uploadingVendor === 'magento_sales' ? 'Uploading...' : isVendorUploaded('magento_sales') ? 'Re-upload' : 'Upload'}
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      {magentoDoc && (
+                        <Tooltip title={`Download ${magentoDoc.filename}`}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={downloadingDocId === magentoDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                            disabled={downloadingDocId === magentoDoc.id}
+                            onClick={(e) => handleDownloadDocument(magentoDoc, e)}
+                            sx={{
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              px: 1.2,
+                              fontWeight: 600,
+                              color: '#16a34a',
+                              borderColor: '#86efac',
+                              backgroundColor: '#f0fdf4',
+                              textTransform: 'none',
+                              '&:hover': {
+                                backgroundColor: '#dcfce7',
+                                borderColor: '#16a34a',
+                              },
+                            }}
+                          >
+                            {downloadingDocId === magentoDoc.id ? '...' : 'Download'}
+                          </Button>
+                        </Tooltip>
+                      )}
+                      <Button
+                        variant={isVendorUploaded('magento_sales') ? 'outlined' : 'contained'}
+                        size="small"
+                        startIcon={<CloudUploadIcon />}
+                        disabled={uploadingVendor === 'magento_sales'}
+                        endIcon={uploadingVendor === 'magento_sales' ? <CircularProgress size={14} /> : null}
+                        onClick={(e) => {
+                          handleFileInputClick(e, 'd2c-magento-sales-upload', 'magento_sales' as any, 'sales' as any);
+                        }}
+                        sx={{ 
+                          minWidth: 80,
+                          fontSize: '0.75rem',
+                          py: 0.75,
+                          px: 1.2,
+                          textTransform: 'none',
+                          ...(isVendorUploaded('magento_sales') && {
+                            borderColor: magentoStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                            color: magentoStatus === 'pending' ? '#b45309' : '#16a34a'
+                          })
+                        }}
+                      >
+                        {uploadingVendor === 'magento_sales' ? 'Uploading...' : isVendorUploaded('magento_sales') ? 'Re-upload' : 'Upload'}
+                      </Button>
+                    </Box>
                   </Box>
                 </Paper>
                 </>
@@ -3913,10 +4498,10 @@ const UploadDocuments: React.FC = () => {
                     width: 32, 
                     height: 32, 
                     borderRadius: '50%', 
-                    background: '#f3f4f6',
+                    background: '#f3f4f6', 
                     display: 'flex', 
                     alignItems: 'center', 
-                    justifyContent: 'center',
+                    justifyContent: 'center', 
                     border: '2px solid #d1d5db',
                     position: 'relative'
                   }}>
@@ -4005,28 +4590,58 @@ const UploadDocuments: React.FC = () => {
                                 }}
                                 disabled={isSettlementUploading}
                               />
-                              <Button
-                                variant={isSettlementUploaded ? 'outlined' : 'contained'}
-                                size="small"
-                                disabled={isSettlementUploading}
-                                onClick={(e) => {
-                                  handleFileInputClick(e, `d2c-settlement-upload-${vendor.id}`, vendor.id as any, 'settlement');
-                                }}
-                                endIcon={isSettlementUploading ? <CircularProgress size={12} /> : null}
-                                sx={{ 
-                                  minWidth: 70,
-                                  fontSize: '0.7rem',
-                                  py: 0.5,
-                                  px: 1,
-                                  ...(isSettlementUploaded && {
-                                    borderColor: '#16a34a',
-                                    color: '#16a34a',
-                                    minWidth: 80
-                                  })
-                                }}
-                              >
-                                {isSettlementUploading ? '...' : isSettlementUploaded ? 'Re-upload' : 'Upload'}
-                              </Button>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                {uploadedSettlementDoc && (
+                                  <Tooltip title={`Download ${uploadedSettlementDoc.filename}`}>
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      startIcon={downloadingDocId === uploadedSettlementDoc.id ? <CircularProgress size={10} /> : <DownloadIcon sx={{ fontSize: '0.75rem !important' }} />}
+                                      disabled={downloadingDocId === uploadedSettlementDoc.id}
+                                      onClick={(e) => handleDownloadDocument(uploadedSettlementDoc, e)}
+                                      sx={{
+                                        fontSize: '0.68rem',
+                                        py: 0.4,
+                                        px: 0.8,
+                                        minWidth: 65,
+                                        fontWeight: 600,
+                                        color: '#16a34a',
+                                        borderColor: '#86efac',
+                                        backgroundColor: '#f0fdf4',
+                                        textTransform: 'none',
+                                        '&:hover': {
+                                          backgroundColor: '#dcfce7',
+                                          borderColor: '#16a34a',
+                                        },
+                                      }}
+                                    >
+                                      {downloadingDocId === uploadedSettlementDoc.id ? '...' : 'Download'}
+                                    </Button>
+                                  </Tooltip>
+                                )}
+                                <Button
+                                  variant={isSettlementUploaded ? 'outlined' : 'contained'}
+                                  size="small"
+                                  disabled={isSettlementUploading}
+                                  onClick={(e) => {
+                                    handleFileInputClick(e, `d2c-settlement-upload-${vendor.id}`, vendor.id as any, 'settlement');
+                                  }}
+                                  endIcon={isSettlementUploading ? <CircularProgress size={12} /> : null}
+                                  sx={{ 
+                                    minWidth: 65,
+                                    fontSize: '0.68rem',
+                                    py: 0.4,
+                                    px: 0.8,
+                                    textTransform: 'none',
+                                    ...(isSettlementUploaded && {
+                                      borderColor: '#16a34a',
+                                      color: '#16a34a',
+                                    })
+                                  }}
+                                >
+                                  {isSettlementUploading ? '...' : isSettlementUploaded ? 'Re-upload' : 'Upload'}
+                                </Button>
+                              </Box>
                             </Box>
                           </Paper>
                         );
@@ -4091,7 +4706,7 @@ const UploadDocuments: React.FC = () => {
                       {new Date(drawerSalesDoc.upload_date).toLocaleDateString()}
                     </Typography>
                   )}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                     <input
                       accept={getAcceptForVendor(rightPanelVendor)}
                       style={{ display: 'none' }}
@@ -4113,6 +4728,33 @@ const UploadDocuments: React.FC = () => {
                       }}
                       disabled={!!uploadingVendor}
                     />
+                    {drawerSalesDoc && (
+                      <Tooltip title={`Download ${drawerSalesDoc.filename}`}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={downloadingDocId === drawerSalesDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                          disabled={downloadingDocId === drawerSalesDoc.id}
+                          onClick={(e) => handleDownloadDocument(drawerSalesDoc, e)}
+                          sx={{
+                            fontSize: '0.75rem',
+                            py: 0.5,
+                            px: 1.2,
+                            fontWeight: 600,
+                            color: '#16a34a',
+                            borderColor: '#86efac',
+                            backgroundColor: '#f0fdf4',
+                            textTransform: 'none',
+                            '&:hover': {
+                              backgroundColor: '#dcfce7',
+                              borderColor: '#16a34a',
+                            },
+                          }}
+                        >
+                          {downloadingDocId === drawerSalesDoc.id ? '...' : 'Download'}
+                        </Button>
+                      </Tooltip>
+                    )}
                     <Button
                       variant={isVendorUploaded(rightPanelVendor, 'sales') ? 'outlined' : 'contained'}
                       size="small"
@@ -4126,7 +4768,8 @@ const UploadDocuments: React.FC = () => {
                         color: isVendorUploaded(rightPanelVendor, 'sales') ? '#111111' : '#ffffff',
                         borderColor: isVendorUploaded(rightPanelVendor, 'sales') ? '#e5e7eb' : 'transparent',
                         flexShrink: 0,
-                        minWidth: 120,
+                        minWidth: 100,
+                        textTransform: 'none',
                         '&:hover': { 
                           background: isVendorUploaded(rightPanelVendor, 'sales') ? '#f8fafc' : '#333333',
                           borderColor: isVendorUploaded(rightPanelVendor, 'sales') ? '#d1d5db' : 'transparent'
@@ -4177,7 +4820,7 @@ const UploadDocuments: React.FC = () => {
                         {new Date(drawerSalesB2BDoc.upload_date).toLocaleDateString()}
                       </Typography>
                     )}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                       <input
                         accept={getAcceptForVendor('amazon')}
                         style={{ display: 'none' }}
@@ -4198,6 +4841,33 @@ const UploadDocuments: React.FC = () => {
                         }}
                         disabled={!!uploadingVendor}
                       />
+                      {drawerSalesB2BDoc && (
+                        <Tooltip title={`Download ${drawerSalesB2BDoc.filename}`}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={downloadingDocId === drawerSalesB2BDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                            disabled={downloadingDocId === drawerSalesB2BDoc.id}
+                            onClick={(e) => handleDownloadDocument(drawerSalesB2BDoc, e)}
+                            sx={{
+                              fontSize: '0.75rem',
+                              py: 0.5,
+                              px: 1.2,
+                              fontWeight: 600,
+                              color: '#16a34a',
+                              borderColor: '#86efac',
+                              backgroundColor: '#f0fdf4',
+                              textTransform: 'none',
+                              '&:hover': {
+                                backgroundColor: '#dcfce7',
+                                borderColor: '#16a34a',
+                              },
+                            }}
+                          >
+                            {downloadingDocId === drawerSalesB2BDoc.id ? '...' : 'Download'}
+                          </Button>
+                        </Tooltip>
+                      )}
                       <Button
                         variant={isVendorUploaded(rightPanelVendor, 'sales_b2b') ? 'outlined' : 'contained'}
                         size="small"
@@ -4211,7 +4881,8 @@ const UploadDocuments: React.FC = () => {
                           color: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#111111' : '#ffffff',
                           borderColor: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#e5e7eb' : 'transparent',
                           flexShrink: 0,
-                          minWidth: 120,
+                          minWidth: 100,
+                          textTransform: 'none',
                           '&:hover': { 
                             background: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#f8fafc' : '#333333',
                             borderColor: isVendorUploaded(rightPanelVendor, 'sales_b2b') ? '#d1d5db' : 'transparent'
@@ -4262,7 +4933,7 @@ const UploadDocuments: React.FC = () => {
                       {new Date(drawerSettlementDoc.upload_date).toLocaleDateString()}
                     </Typography>
                   )}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                     <input
                       accept={getAcceptForVendor(rightPanelVendor)}
                       style={{ display: 'none' }}
@@ -4284,6 +4955,33 @@ const UploadDocuments: React.FC = () => {
                       }}
                       disabled={!!uploadingVendor}
                     />
+                    {drawerSettlementDoc && (
+                      <Tooltip title={`Download ${drawerSettlementDoc.filename}`}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={downloadingDocId === drawerSettlementDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                          disabled={downloadingDocId === drawerSettlementDoc.id}
+                          onClick={(e) => handleDownloadDocument(drawerSettlementDoc, e)}
+                          sx={{
+                            fontSize: '0.75rem',
+                            py: 0.5,
+                            px: 1.2,
+                            fontWeight: 600,
+                            color: '#16a34a',
+                            borderColor: '#86efac',
+                            backgroundColor: '#f0fdf4',
+                            textTransform: 'none',
+                            '&:hover': {
+                              backgroundColor: '#dcfce7',
+                              borderColor: '#16a34a',
+                            },
+                          }}
+                        >
+                          {downloadingDocId === drawerSettlementDoc.id ? '...' : 'Download'}
+                        </Button>
+                      </Tooltip>
+                    )}
                     <Button
                       variant={isVendorUploaded(rightPanelVendor, 'settlement') ? 'outlined' : 'contained'}
                       size="small"
@@ -4297,7 +4995,8 @@ const UploadDocuments: React.FC = () => {
                         color: isVendorUploaded(rightPanelVendor, 'settlement') ? '#111111' : '#ffffff',
                         borderColor: isVendorUploaded(rightPanelVendor, 'settlement') ? '#e5e7eb' : 'transparent',
                         flexShrink: 0,
-                        minWidth: 120,
+                        minWidth: 100,
+                        textTransform: 'none',
                         '&:hover': { 
                           background: isVendorUploaded(rightPanelVendor, 'settlement') ? '#f8fafc' : '#333333',
                           borderColor: isVendorUploaded(rightPanelVendor, 'settlement') ? '#d1d5db' : 'transparent'
