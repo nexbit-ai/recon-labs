@@ -206,7 +206,7 @@ const EXPORT_STATUS_META: Record<ExportStatus, { label: string; bg: string; colo
   },
 };
 
-const TAB_LABELS = ['Matched', 'Mismatched', 'Unsettled', 'All', 'Sales Report'] as const;
+const TAB_LABELS = ['Matched', 'Mismatched', 'Unsettled', 'All', 'Sales Report', 'Profitability'] as const;
 
 // Helper function to format settlement provider: capitalize first letter, replace underscores with spaces
 const formatSettlementProvider = (value: string | null | undefined): string => {
@@ -1848,6 +1848,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
+  const isSpecificOrg = organizationId ? ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'].some(id => organizationId.includes(id)) : false;
+
   // Get initialTab from navigation state or props
   const getInitialTab = () => {
     if (location.state?.initialTab !== undefined) {
@@ -1889,7 +1891,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(() => {
     const tab = getInitialTab();
-    if (typeof tab === 'number' && tab >= 0 && tab <= 4) {
+    if (typeof tab === 'number' && tab >= 0 && tab <= 5) {
       return tab;
     }
     return 0;
@@ -2141,7 +2143,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Get current columns based on which API is being used
   const getCurrentColumns = () => {
-    const isSpecificOrg = organizationId ? ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'].some(id => organizationId.includes(id)) : false;
     let cols: string[] = [];
 
     // Sales Report tab (index 4) - fixed columns
@@ -2205,7 +2206,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     }
 
     if (!isSpecificOrg) {
-      cols = cols.filter(title => title !== 'Sub-Platform' && title !== 'Listing Price');
+      cols = cols.filter(title => title !== 'Sub-Platform' && title !== 'Listing Price' && title !== 'GT Charge');
     }
     return cols;
   };
@@ -3270,6 +3271,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     const initialDateRange = propDateRange || { start: '2025-04-01', end: '2025-04-30' };
     setHeaderDateRange(initialDateRange);
     setPendingHeaderDateRange(initialDateRange);
+    const initialActiveTab = getInitialTab();
+    if (initialActiveTab === 4) {
+      fetchSalesTransactions(initialDateRange, selectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+    } else if (initialActiveTab === 5) {
+      fetchProfitabilityData(initialDateRange, selectedPlatform);
+    }
     fetchQuadTransactions(1, propsInitialFilters, initialDateRange);
     setHasInitialLoad(true);
   }, []);
@@ -3312,7 +3319,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       fetchSalesTransactions(dateRange, pendingSelectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
       fetchQuadTransactions(1, columnFilters, dateRange, pendingSelectedPlatform);
     } else if (activeTab === 5) {
-      fetchProfitabilityData(dateRange, pendingSelectedPlatform);
+      if (pendingSelectedPlatform === 'flipkart') {
+        fetchProfitabilityData(dateRange, pendingSelectedPlatform);
+      } else {
+        setActiveTab(0);
+      }
       fetchQuadTransactions(1, columnFilters, dateRange, pendingSelectedPlatform);
     } else {
       // When on any other tab, only update the 4 tabs (Sales Report will be fetched when user switches to it)
@@ -4654,6 +4665,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     return base;
   };
 
+  const showProfitabilityTab = isSpecificOrg && (selectedPlatform === 'flipkart' || !selectedPlatform);
   const visibleColumns = getVisibleColumns();
   const tabDefinitions = [
     { label: 'Matched', count: matchedTotalCount },
@@ -4661,8 +4673,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     { label: 'Unsettled', count: unsettledTotalCount },
     { label: 'All', count: allTotalCount },
     { label: 'Sales Report', count: salesReportTotalCount },
-    { label: 'Profitability', count: profitabilityTotalCount },
+    ...(showProfitabilityTab ? [{ label: 'Profitability', count: profitabilityTotalCount }] : []),
   ];
+
+  // Reset activeTab if Profitability tab is no longer eligible (e.g. platform changed to D2C/Amazon)
+  useEffect(() => {
+    if (!showProfitabilityTab && activeTab === 5) {
+      setActiveTab(0);
+    }
+  }, [showProfitabilityTab, activeTab]);
 
   const selectedDateRangeLabel = useMemo(() => {
     if (dateRange.start && dateRange.end) {
@@ -6677,7 +6696,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       )}
                       itemContent={(_index, row) => {
                         const rowIndex = _index;
-                        const isSelected = (selectedTransaction?.["Order ID"] || selectedTransaction?.["Order Item ID"]) === (row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"]);
+                        const rowId = (row as any)["Order ID"] || (row as any)["Order Item ID"] || (row as any)["order_id"] || (row as any)["order_item_id"] || (row as any).sku || (row as any).SKU || `row-${rowIndex}`;
+                        const isSelected = selectedTransaction && (
+                          ((selectedTransaction as any)?.["Order ID"] || (selectedTransaction as any)?.["Order Item ID"] || (selectedTransaction as any)?.order_id || (selectedTransaction as any)?.sku) ===
+                          ((row as any)["Order ID"] || (row as any)["Order Item ID"] || (row as any)["order_id"] || (row as any)["order_item_id"] || (row as any).sku)
+                        );
                         return (
                           <>
                             
@@ -6931,7 +6954,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
                                   return (
                                     <TableCell
-                                      key={`${(row["Order ID"] || row["Order Item ID"] || row["order_id"] || row["order_item_id"])}-${column}-${colIndex}`}
+                                      key={`${rowId}-${column}-${colIndex}`}
                                       sx={{
                                         background: '#ffffff',
                                         textAlign: 'center',
