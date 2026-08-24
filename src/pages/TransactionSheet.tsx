@@ -2153,12 +2153,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       }
 
       // Platform-specific column priority:
-      // Flipkart: order_item_id first, then order_id
-      // Amazon & D2C: order_id first, then order_item_id
-      const priorityKeys: Array<'order_id' | 'order_item_id'> =
+      // Flipkart: order_item_id first, then order_id, then event_type
+      // Amazon & D2C: order_id first, then order_item_id, then event_type
+      const priorityKeys: Array<'order_id' | 'order_item_id' | 'event_type'> =
         selectedPlatform === 'flipkart'
-          ? ['order_item_id', 'order_id']
-          : ['order_id', 'order_item_id'];
+          ? ['order_item_id', 'order_id', 'event_type']
+          : ['order_id', 'order_item_id', 'event_type'];
 
       const prioritized = priorityKeys
         .map(priorityKey => salesColumns.find(col => col.key === priorityKey))
