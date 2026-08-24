@@ -1285,11 +1285,13 @@ const MarketplaceReconciliation: React.FC = () => {
       }
 
       const resp = await apiIndex.transactions.getProfitability(params);
-      const items = Array.isArray(resp?.data)
-        ? resp.data
-        : Array.isArray(resp?.data?.data)
-          ? resp.data.data
-          : [];
+      const items = Array.isArray(resp)
+        ? resp
+        : Array.isArray(resp?.data)
+          ? resp.data
+          : Array.isArray(resp?.data?.data)
+            ? resp.data.data
+            : [];
       setSkuProfitabilityData(items);
     } catch (err) {
       console.error('Error fetching SKU profitability:', err);
@@ -2156,7 +2158,7 @@ const MarketplaceReconciliation: React.FC = () => {
     }
     // Call upload-list API at the same time as main-summary and ageing-analysis
     fetchUploadList();
-  }, [selectedDateRange, customStartDate, customEndDate, dateField, selectedPlatform, selectedSkuSubPlatform, isInitialized, hasValidCredentials]);
+  }, [selectedDateRange, customStartDate, customEndDate, dateField, selectedPlatform, selectedSkuSubPlatform, isInitialized, hasValidCredentials, hasFlipkartSubPlatforms, organizationId]);
 
   // Load sales overview data
   useEffect(() => {
