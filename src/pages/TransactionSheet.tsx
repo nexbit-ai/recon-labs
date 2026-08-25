@@ -1810,6 +1810,8 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   'Settlement Provider': { apiParam: 'settlement_provider', type: 'enum', supportedPlatforms: ['d2c'] },
   'Payment Mode': { apiParam: 'payment_mode', type: 'enum', supportedPlatforms: ['d2c'] },
   'Shipping Courier': { apiParam: 'shipping_courier_in', type: 'enum', supportedPlatforms: ['d2c'] },
+  'Shipping Package Code': { apiParam: 'shipping_package_code', type: 'string', supportedPlatforms: ['d2c'] },
+  'Tracking Number': { apiParam: 'tracking_number', type: 'string', supportedPlatforms: ['d2c'] },
 };
 
 // Mapping of sortable UI columns to backend sort_by values
