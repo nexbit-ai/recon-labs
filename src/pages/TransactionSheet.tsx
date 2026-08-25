@@ -4538,6 +4538,22 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         if (salesReportSearch && salesReportSearch.trim()) {
           exportParams.search = salesReportSearch.trim();
         }
+      } else if (activeTab === 5) {
+        // Build export params for Profitability Report
+        if (!dateRange.start || !dateRange.end) {
+          throw new Error('Please select a date range to export profitability report');
+        }
+
+        exportParams = {
+          export_type: 'profitability',
+          platform: selectedPlatform,
+          order_date_from: dateRange.start,
+          order_date_to: dateRange.end,
+        };
+
+        if (profitabilitySearch && profitabilitySearch.trim()) {
+          exportParams.search = profitabilitySearch.trim();
+        }
       } else {
         // Build query params using the same logic as getTotalTransactions
         // But exclude pagination params (page, limit)
