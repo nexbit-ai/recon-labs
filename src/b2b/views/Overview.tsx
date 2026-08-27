@@ -3,7 +3,6 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Box, Typography } from '@mui/material';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
-  LineChart,
   Line,
   XAxis,
   YAxis,
@@ -11,7 +10,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  BarChart,
   Bar,
   ComposedChart
 } from 'recharts';
@@ -135,57 +133,74 @@ const Overview: React.FC = () => {
         </Box>
         <Box sx={{ width: '100%', height: 320 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart
+            <ComposedChart
               data={trendData}
-              margin={{ top: 10, right: 30, left: 20, bottom: 10 }}
+              margin={{ top: 10, right: 20, left: 20, bottom: 10 }}
+              barGap={2}
+              barCategoryGap="25%"
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={colors.grey200} />
               <XAxis dataKey="month" tick={{ fontSize: 12, fill: colors.grey500 }} axisLine={false} tickLine={false} dy={10} />
-              <YAxis tick={{ fontSize: 12, fill: colors.grey500 }} axisLine={false} tickLine={false} tickFormatter={(value) => `₹${value}L`} dx={-10} />
+              {/* Left axis – absolute settlement amounts */}
+              <YAxis
+                yAxisId="left"
+                tick={{ fontSize: 12, fill: colors.grey500 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(value: number) => `₹${value}L`}
+                dx={-10}
+              />
+              {/* Right axis – gap amount (much smaller scale) */}
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fontSize: 12, fill: '#b45309' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(value: number) => `₹${value}L`}
+                domain={[0, (max: number) => Math.ceil(max + 1)]}
+                dx={6}
+              />
               <Tooltip
-                contentStyle={{ borderRadius: 4, border: hairline, borderColor: colors.grey200, fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+                contentStyle={{ borderRadius: 6, border: hairline, borderColor: colors.grey200, fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                 itemStyle={{ fontWeight: 500 }}
-                formatter={(value: number) => [`₹${value} L`, undefined]}
+                formatter={(value: number, name: string) => [`₹${value} L`, name]}
               />
               <Legend wrapperStyle={{ fontSize: 13, paddingTop: 20 }} iconType="circle" />
-              <Line 
-                type="monotone" 
-                dataKey="expectedLakhs" 
-                name="Expected" 
-                stroke={colors.grey500} 
-                strokeWidth={2} 
-                strokeDasharray="4 4"
-                dot={{ r: 0 }} 
-                activeDot={{ r: 4, fill: colors.grey500 }}
+              <Bar
+                yAxisId="left"
+                dataKey="expectedLakhs"
+                name="Expected"
+                fill={colors.grey200}
+                radius={[4, 4, 0, 0]}
+                isAnimationActive={true}
+                animationDuration={1200}
+                animationEasing="ease-out"
+              />
+              <Bar
+                yAxisId="left"
+                dataKey="receivedLakhs"
+                name="Received"
+                fill={colors.ink}
+                radius={[4, 4, 0, 0]}
+                isAnimationActive={true}
+                animationDuration={1200}
+                animationEasing="ease-out"
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="gapLakhs"
+                name="Unresolved Gap"
+                stroke="#d97706"
+                strokeWidth={2.5}
+                dot={{ r: 4, fill: '#d97706', strokeWidth: 2, stroke: '#fff' }}
+                activeDot={{ r: 6, fill: '#d97706', stroke: '#fff', strokeWidth: 2 }}
                 isAnimationActive={true}
                 animationDuration={1500}
                 animationEasing="ease-out"
               />
-              <Line 
-                type="monotone" 
-                dataKey="receivedLakhs" 
-                name="Received" 
-                stroke={colors.ink} 
-                strokeWidth={2} 
-                dot={{ r: 0 }} 
-                activeDot={{ r: 4, fill: colors.ink }}
-                isAnimationActive={true}
-                animationDuration={1500}
-                animationEasing="ease-out"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="gapLakhs" 
-                name="Unresolved Gap" 
-                stroke={colors.accent} 
-                strokeWidth={2} 
-                dot={{ r: 0 }} 
-                activeDot={{ r: 4, fill: colors.accent }}
-                isAnimationActive={true}
-                animationDuration={1500}
-                animationEasing="ease-out"
-              />
-            </LineChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </Box>
       </Box>

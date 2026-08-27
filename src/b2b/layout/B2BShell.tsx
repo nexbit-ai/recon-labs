@@ -73,8 +73,13 @@ const B2BShell: React.FC = () => {
   const [platformFilter, setPlatformFilter] = useState(urlChannel ? urlChannel.toLowerCase() : 'all');
 
   React.useEffect(() => {
-    if (urlChannel && urlChannel.toLowerCase() !== platformFilter.toLowerCase()) {
-      setPlatformFilter(urlChannel.toLowerCase());
+    if (urlChannel) {
+      if (urlChannel.toLowerCase() !== platformFilter.toLowerCase()) {
+        setPlatformFilter(urlChannel.toLowerCase());
+      }
+    } else {
+      // Reset to 'all' when navigating to a page without ?channel (e.g. browser back)
+      setPlatformFilter('all');
     }
   }, [urlChannel]);
 

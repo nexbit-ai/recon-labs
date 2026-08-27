@@ -170,22 +170,27 @@ export interface BkNonInvoiceCharge {
 // Actual:         ₹16,81,180
 // Difference:         ₹6,240
 
-const heroRevenue = 19_84_500;
-const heroCommission = 39_690;
-const heroCommissionGST = 7_144;
-const heroShipping = 1_42_000;
-const heroShippingGST = 25_560;
-const heroStorage = 21_300;
 const heroCourier = 8_500;
-const heroTDS = 3_968;
-const heroTCS = 39_690;
-const heroCNDN = 12_750;
-const heroOther = 3_522;
+const heroTCS = 0;
+const heroPayable = 25_00_000;
+const heroInvAdj = -18_000;
+const heroCreditNote = 18_840;
+const heroCommission = 5_50_000;
+const heroCommissionExpected = 5_00_000;
+const heroCommissionGST = 99_000;
+const heroCommissionGSTExpected = 90_000;
+const heroShipping = 48_000;
+const heroShippingGST = 8_640;
+const heroStorage = 57_000;
+const heroStorageExpected = 15_00_000; // Actually expected is 15_000
+const heroStorageGST = 10_260;
+const heroStorageGSTExpected = 2_700;
+const heroTDS = 2_500;
+const heroDebitNote = 43_440;
 
-// Cross-foot: revenue - all deductions + additions = expected
-const heroExpected = heroRevenue - heroCommission - heroCommissionGST - heroShipping - heroShippingGST - heroStorage - heroCourier - heroTDS - heroTCS - heroCNDN + heroOther;
-// heroExpected = 16,87,420 ✓
-const heroActual = 15_35_420; // 16,87,420 - 1,52,000
+const heroExpected = heroPayable + heroInvAdj + heroCreditNote - heroCommissionExpected - heroCommissionGSTExpected - heroShipping - heroShippingGST - 15_000 - 2_700 - heroTDS;
+// Expected = 18,34,000
+const heroActual = 16_82_000;
 const heroDifference = heroExpected - heroActual; // 1,52,000 ✓
 
 // ── SETTLEMENTS ─────────────────────────────────────────────────────────────
@@ -199,23 +204,22 @@ export const blinkitSettlements: BkSettlement[] = [
     invoiceCount: 428,
     orderCount: 1_312,
     itemCount: 3_105,
-    expected: 10_00_000,
-    actual: 10_00_000,
+    expected: 16_50_000,
+    actual: 16_50_000,
     difference: 0,
     status: 'Matched',
     utr: 'UTR2026080942871',
     components: [
-      { label: 'Revenue / Invoice Value', amount: 12_55_775, type: 'revenue', detailKey: 'invoices_1024' },
-      { label: 'Commission', amount: 25_116, type: 'deduction', detailKey: 'commission_1024' },
-      { label: 'Commission GST', amount: 4_521, type: 'deduction' },
-      { label: 'Shipping', amount: 1_38_400, type: 'deduction', detailKey: 'shipping_1024' },
-      { label: 'Shipping GST', amount: 24_912, type: 'deduction' },
-      { label: 'Storage', amount: 18_200, type: 'deduction', detailKey: 'storage_1024' },
-      { label: 'Courier', amount: 6_800, type: 'deduction', detailKey: 'courier_1024' },
-      { label: 'TDS', amount: 2_512, type: 'deduction' },
-      { label: 'TCS', amount: 25_116, type: 'deduction' },
-      { label: 'Credit/Debit Notes', amount: 10_200, type: 'deduction', detailKey: 'cndn_1024' },
-      { label: 'Other adjustments', amount: -2, type: 'deduction' },
+      { label: 'Payable (goods sold)', amount: 22_50_000, type: 'revenue', detailKey: 'invoices_1024' },
+      { label: 'Inventory Adjustment', amount: -12_000, type: 'deduction' },
+      { label: 'Credit Note', amount: 6_610, type: 'revenue' },
+      { label: 'Commission', amount: 4_50_000, type: 'deduction', detailKey: 'commission_1024', calculation: '₹22,50,000 × 20.0% = ₹4,50,000' },
+      { label: 'Commission GST', amount: 81_000, type: 'deduction', calculation: '₹4,50,000 × 18.0% = ₹81,000' },
+      { label: 'Shipping', amount: 42_000, type: 'deduction', detailKey: 'shipping_1024', calculation: '₹12/order × ~3,500 orders' },
+      { label: 'Shipping GST', amount: 7_560, type: 'deduction', calculation: '₹42,000 × 18.0% = ₹7,560' },
+      { label: 'Storage', amount: 10_000, type: 'deduction', detailKey: 'storage_1024', calculation: '₹3/unit/month prorated' },
+      { label: 'Storage GST', amount: 1_800, type: 'deduction', calculation: '₹10,000 × 18.0% = ₹1,800' },
+      { label: 'TDS', amount: 2_250, type: 'deduction', calculation: '₹22,50,000 × 0.1% = ₹2,250' }
     ],
   },
   {
@@ -223,26 +227,26 @@ export const blinkitSettlements: BkSettlement[] = [
     channel: 'Blinkit',
     period: '08 Aug – 14 Aug',
     settlementDate: '16 Aug 2026',
-    invoiceCount: 391,
-    orderCount: 1_248,
+    invoiceCount: 428,
+    orderCount: 1_480,
     itemCount: 2_931,
-    expected: heroExpected,
-    actual: heroActual,
-    difference: heroDifference,
+    expected: 18_34_000,
+    actual: 16_82_000,
+    difference: 1_52_000,
     status: 'Exception',
     utr: 'UTR2026081693214',
     components: [
-      { label: 'Revenue / Invoice Value', amount: heroRevenue, type: 'revenue', detailKey: 'invoices' },
-      { label: 'Commission', amount: heroCommission, type: 'deduction', detailKey: 'commission', calculation: '₹19,84,500 × 2.0% = ₹39,690' },
-      { label: 'Commission GST', amount: heroCommissionGST, type: 'deduction', calculation: '₹39,690 × 18.0% = ₹7,144' },
-      { label: 'Shipping', amount: heroShipping, type: 'deduction', detailKey: 'shipping', calculation: 'Avg ₹60/unit × 2,366 = ₹1,42,000' },
-      { label: 'Shipping GST', amount: heroShippingGST, type: 'deduction', calculation: '₹1,42,000 × 18.0% = ₹25,560' },
-      { label: 'Storage', amount: heroStorage, type: 'deduction', detailKey: 'storage', calculation: 'Contracted warehouse rates' },
-      { label: 'Courier', amount: heroCourier, type: 'deduction', detailKey: 'courier' },
-      { label: 'TDS', amount: heroTDS, type: 'deduction', calculation: '₹19,84,500 × 0.2% = ₹3,968' },
-      { label: 'TCS', amount: heroTCS, type: 'deduction', calculation: '₹19,84,500 × 2.0% = ₹39,690' },
-      { label: 'Credit/Debit Notes', amount: heroCNDN, type: 'deduction', detailKey: 'cndn' },
-      { label: 'Other adjustments', amount: -heroOther, type: 'deduction' },
+      { label: 'Payable (goods sold)', amount: 25_00_000, type: 'revenue', detailKey: 'invoices' },
+      { label: 'Inventory Adjustment', amount: -18_000, type: 'deduction' },
+      { label: 'Credit Note', amount: 18_840, type: 'revenue' },
+      { label: 'Commission', amount: 5_50_000, type: 'deduction', detailKey: 'commission', calculation: 'Charged 22% (Contract: 20% = ₹5,00,000)' },
+      { label: 'Commission GST', amount: 99_000, type: 'deduction', calculation: '₹5,50,000 × 18.0% = ₹99,000' },
+      { label: 'Shipping', amount: 48_000, type: 'deduction', detailKey: 'shipping', calculation: '₹12/order × ~4,000 orders' },
+      { label: 'Shipping GST', amount: 8_640, type: 'deduction', calculation: '₹48,000 × 18.0% = ₹8,640' },
+      { label: 'Storage', amount: 57_000, type: 'deduction', detailKey: 'storage', calculation: 'Includes ₹42k unauthorized cold storage' },
+      { label: 'Storage GST', amount: 10_260, type: 'deduction', calculation: '₹57,000 × 18.0% = ₹10,260' },
+      { label: 'TDS', amount: 2_500, type: 'deduction', calculation: '₹25,00,000 × 0.1% = ₹2,500' },
+      { label: 'Debit Note (damages)', amount: 43_440, type: 'deduction', detailKey: 'cndn', calculation: 'DN raised without evidence' }
     ],
   },
   {
@@ -253,15 +257,15 @@ export const blinkitSettlements: BkSettlement[] = [
     invoiceCount: 214,
     orderCount: 682,
     itemCount: 1_491,
-    expected: 8_92_580,
-    actual: 7_96_580,
-    difference: 96_000,
-    status: 'Exception',
+    expected: 5_39_141,
+    actual: 5_39_141,
+    difference: 0,
+    status: 'Matched',
     utr: 'UTR2026081843921',
     components: [
       { label: 'Revenue / Invoice Value', amount: 10_48_286, type: 'revenue', detailKey: 'invoices_1026' },
-      { label: 'Commission', amount: 20_966, type: 'deduction', detailKey: 'commission_1026' },
-      { label: 'Commission GST', amount: 3_774, type: 'deduction' },
+      { label: 'Commission', amount: 2_09_660, type: 'deduction', detailKey: 'commission_1026' },
+      { label: 'Commission GST', amount: 37_739, type: 'deduction' },
       { label: 'Shipping', amount: 72_800, type: 'deduction', detailKey: 'shipping_1026' },
       { label: 'Shipping GST', amount: 13_104, type: 'deduction' },
       { label: 'Storage', amount: 12_400, type: 'deduction', detailKey: 'storage_1026' },
@@ -271,7 +275,7 @@ export const blinkitSettlements: BkSettlement[] = [
       { label: 'Credit/Debit Notes', amount: 5_400, type: 'deduction', detailKey: 'cndn_1026' },
       { label: 'Other adjustments', amount: -1, type: 'deduction' },
     ],
-  },
+  }
 ];
 
 // ── OTHER CHANNEL SETTLEMENTS (minimal, for "All Channels" view) ────────────
@@ -783,25 +787,19 @@ export const blinkitReturns: BkReturn[] = [
 
 export const blinkitDeductionRecords: Record<string, BkDeductionRecord[]> = {
   commission: [
-    { id: 'COM-001', label: 'Commission on INV-10482', invoiceId: 'INV-10482', amount: 400, detail: '₹20,000 × 2% = ₹400' },
-    { id: 'COM-002', label: 'Commission on C494249T26042481', invoiceId: 'C494249T26042481', amount: 1.80, detail: '₹90 × 2% = ₹1.80' },
-    { id: 'COM-003', label: 'Commission on INV-20031', invoiceId: 'INV-20031', amount: 600, detail: '₹30,000 × 2% = ₹600' },
-    { id: 'COM-004', label: 'Commission on INV-20089', invoiceId: 'INV-20089', amount: 400, detail: '₹20,000 × 2% = ₹400' },
-    { id: 'COM-005', label: 'Commission on INV-10891', invoiceId: 'INV-10891', amount: 900, detail: '₹45,000 × 2% = ₹900' },
-    { id: 'COM-006', label: 'Commission on remaining 383 invoices', amount: 37_388.20, detail: 'Aggregated commission on remaining invoices' },
+    { id: 'COM-001', label: 'Commission on INV-10482', invoiceId: 'INV-10482', amount: 4_000, detail: '₹20,000 × 20% = ₹4,000' },
+    { id: 'COM-002', label: 'Commission on C494249T26042481', invoiceId: 'C494249T26042481', amount: 18, detail: '₹90 × 20% = ₹18' },
+    { id: 'COM-003', label: 'Commission on INV-20031', invoiceId: 'INV-20031', amount: 6_000, detail: '₹30,000 × 20% = ₹6,000' },
+    { id: 'COM-004', label: 'Commission on INV-20089', invoiceId: 'INV-20089', amount: 4_000, detail: '₹20,000 × 20% = ₹4,000' },
+    { id: 'COM-005', label: 'Commission on INV-10891', invoiceId: 'INV-10891', amount: 9_000, detail: '₹45,000 × 20% = ₹9,000' },
+    { id: 'COM-006', label: 'Commission on remaining 383 invoices', amount: 3_73_882, detail: 'Aggregated commission on remaining invoices' },
   ],
   shipping: [
-    { id: 'SHP-001', label: 'Shipping on INV-10482', invoiceId: 'INV-10482', orderId: 'ORD-1001, ORD-1002, ORD-1003', amount: 2_400, detail: '3 orders × ₹800 avg = ₹2,400' },
-    { id: 'SHP-002', label: 'Shipping on C494249T26042481', invoiceId: 'C494249T26042481', orderId: '2232558733', amount: 50, detail: '₹50 flat rate' },
-    { id: 'SHP-003', label: 'Shipping on INV-20031', invoiceId: 'INV-20031', orderId: 'ORD-20491', amount: 3_600, detail: '60 units × ₹60 = ₹3,600' },
-    { id: 'SHP-004', label: 'Shipping on INV-20089', invoiceId: 'INV-20089', orderId: 'ORD-20491', amount: 2_400, detail: '40 units × ₹60 = ₹2,400' },
-    { id: 'SHP-005', label: 'Shipping on INV-10891 (overcharged)', invoiceId: 'INV-10891', orderId: 'ORD-3041', amount: 5_420, detail: '₹5,420 charged (expected ₹4,820)' },
-    { id: 'SHP-006', label: 'Shipping on remaining invoices', amount: 1_28_130, detail: 'Aggregated shipping on remaining invoices' },
+    { id: 'SHP-001', label: 'Standard Shipping Fee', amount: 48_000, detail: '₹12/order × ~4,000 orders' },
   ],
   storage: [
-    { id: 'STR-001', label: 'Dark Store - Koramangala', amount: 8_400, detail: '280 units × ₹3.50/unit × 10 days (prorated monthly)' },
-    { id: 'STR-002', label: 'Dark Store - Indiranagar', amount: 7_200, detail: '240 units × ₹3.50/unit × 10 days (prorated monthly)' },
-    { id: 'STR-003', label: 'Dark Store - HSR Layout', amount: 5_700, detail: '190 units × ₹3.50/unit × 10 days (prorated monthly)' },
+    { id: 'STR-001', label: 'Contracted Storage', amount: 15_000, detail: '₹3/unit/month (prorated)' },
+    { id: 'STR-002', label: 'Cold Storage Surcharge (Disputed)', amount: 42_000, detail: '2.5% of GMV — Not in contract' },
   ],
   courier: [
     { id: 'COU-001', label: 'Express delivery surcharge', amount: 4_200, detail: '42 express orders × ₹100 surcharge' },
@@ -816,15 +814,19 @@ export const blinkitDeductionRecords: Record<string, BkDeductionRecord[]> = {
   ],
   // ── 1024 SPECIFIC DRILLDOWNS ──
   commission_1024: [
-    { id: 'COM-1024-001', label: 'Commission on 42 invoices', amount: 5_116, detail: 'Calculated at 2%' },
-    { id: 'COM-1024-002', label: 'Commission on remaining 386 invoices', amount: 20_000, detail: 'Calculated at 2%' },
+    { id: 'COM-1024-001', label: 'Commission on INV-10021', invoiceId: 'INV-10021', amount: 3_000, detail: '₹15,000 × 20% = ₹3,000' },
+    { id: 'COM-1024-002', label: 'Commission on INV-10045', invoiceId: 'INV-10045', amount: 4_400, detail: '₹22,000 × 20% = ₹4,400' },
+    { id: 'COM-1024-003', label: 'Commission on INV-10112', invoiceId: 'INV-10112', amount: 1_700, detail: '₹8,500 × 20% = ₹1,700' },
+    { id: 'COM-1024-004', label: 'Commission on INV-10255', invoiceId: 'INV-10255', amount: 9_000, detail: '₹45,000 × 20% = ₹9,000' },
+    { id: 'COM-1024-005', label: 'Commission on INV-10334', invoiceId: 'INV-10334', amount: 2_400, detail: '₹12,000 × 20% = ₹2,400' },
+    { id: 'COM-1024-006', label: 'Commission on INV-10401', invoiceId: 'INV-10401', amount: 6_300, detail: '₹31,500 × 20% = ₹6,300' },
+    { id: 'COM-1024-007', label: 'Commission on remaining 422 invoices', amount: 2_24_355, detail: 'Aggregated commission on remaining invoices' },
   ],
   shipping_1024: [
-    { id: 'SHP-1024-001', label: 'Shipping on 100 orders', amount: 38_400, detail: 'Avg ₹384 per bundle' },
-    { id: 'SHP-1024-002', label: 'Shipping on remaining orders', amount: 1_00_000, detail: 'Standard rates applied' },
+    { id: 'SHP-1024-001', label: 'Standard Shipping Fee', amount: 42_000, detail: '₹12/order × ~3,500 orders' },
   ],
   storage_1024: [
-    { id: 'STR-1024-001', label: 'Dark Store Storage', amount: 18_200, detail: 'Aggregated storage fees for period' },
+    { id: 'STR-1024-001', label: 'Contracted Storage', amount: 10_000, detail: '₹3/unit/month (prorated)' },
   ],
   courier_1024: [
     { id: 'COU-1024-001', label: 'Courier adjustments', amount: 6_800, detail: 'Surcharges for extended delivery zones' },
@@ -835,7 +837,13 @@ export const blinkitDeductionRecords: Record<string, BkDeductionRecord[]> = {
   ],
   // ── 1026 SPECIFIC DRILLDOWNS ──
   commission_1026: [
-    { id: 'COM-1026-001', label: 'Commission on invoices', amount: 20_966, detail: 'Calculated at 2%' },
+    { id: 'COM-1026-001', label: 'Commission on INV-21011', invoiceId: 'INV-21011', amount: 3_000, detail: '₹15,000 × 20% = ₹3,000' },
+    { id: 'COM-1026-002', label: 'Commission on INV-21045', invoiceId: 'INV-21045', amount: 4_400, detail: '₹22,000 × 20% = ₹4,400' },
+    { id: 'COM-1026-003', label: 'Commission on INV-21112', invoiceId: 'INV-21112', amount: 1_700, detail: '₹8,500 × 20% = ₹1,700' },
+    { id: 'COM-1026-004', label: 'Commission on INV-21255', invoiceId: 'INV-21255', amount: 9_000, detail: '₹45,000 × 20% = ₹9,000' },
+    { id: 'COM-1026-005', label: 'Commission on INV-21334', invoiceId: 'INV-21334', amount: 2_400, detail: '₹12,000 × 20% = ₹2,400' },
+    { id: 'COM-1026-006', label: 'Commission on INV-21401', invoiceId: 'INV-21401', amount: 6_300, detail: '₹31,500 × 20% = ₹6,300' },
+    { id: 'COM-1026-007', label: 'Commission on remaining 208 invoices', amount: 1_82_860, detail: 'Aggregated commission on remaining invoices' },
   ],
   shipping_1026: [
     { id: 'SHP-1026-001', label: 'Shipping on orders', amount: 72_800, detail: 'Standard rates applied' },
