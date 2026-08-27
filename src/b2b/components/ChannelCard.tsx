@@ -9,9 +9,9 @@ import type { ChannelName } from '../mock/types';
 interface ChannelCardProps {
   channel: ChannelName;
   model: string;
-  expected: number;
+  expectedPayout: number;
   received: number;
-  unresolved: number;
+  unsettled: number;
   issueCount: number;
   followUpCount: number;
   onClick: () => void;
@@ -20,9 +20,9 @@ interface ChannelCardProps {
 export const ChannelCard: React.FC<ChannelCardProps> = ({
   channel,
   model,
-  expected,
+  expectedPayout,
   received,
-  unresolved,
+  unsettled,
   issueCount,
   followUpCount,
   onClick,
@@ -49,17 +49,17 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px', mb: `${space.lg}px`, flex: 1 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-          <Typography sx={{ fontSize: 13, color: colors.grey700 }}>Expected</Typography>
-          <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, ...tabularNums }}>{formatRupees(expected)}</Typography>
+          <Typography sx={{ fontSize: 13, color: colors.grey700 }}>Expected Payout</Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, ...tabularNums }}>{formatRupees(expectedPayout)}</Typography>
         </Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
           <Typography sx={{ fontSize: 13, color: colors.grey700 }}>Received</Typography>
           <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, ...tabularNums }}>{formatRupees(received)}</Typography>
         </Box>
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${space.lg}px`, p: `${space.lg}px`, borderTop: `1px solid ${colors.grey200}` }}>
-        <Box>  <Typography sx={{ fontSize: 13, fontWeight: 600, color: unresolved > 0 ? '#991B1B' : colors.ink }}>Unresolved</Typography>
-          <Typography sx={{ fontSize: 13, fontWeight: 600, color: unresolved > 0 ? '#991B1B' : colors.ink, ...tabularNums }}>
-            {formatRupees(unresolved)}
+        <Box>  <Typography sx={{ fontSize: 13, fontWeight: 600, color: unsettled > 0 ? '#991B1B' : colors.ink }}>Unsettled</Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: unsettled > 0 ? '#991B1B' : colors.ink, ...tabularNums }}>
+            {formatRupees(unsettled)}
           </Typography>
         </Box>
       </Box>

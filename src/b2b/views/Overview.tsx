@@ -43,7 +43,7 @@ const TypewriterGreeting: React.FC = () => {
     let timeOfDay = 'morning';
     if (hour >= 12 && hour < 17) timeOfDay = 'afternoon';
     else if (hour >= 17) timeOfDay = 'evening';
-    return `Hello Shivam, good ${timeOfDay}!`;
+    return `Hello, good ${timeOfDay}!`;
   });
 
   React.useEffect(() => {
@@ -86,9 +86,12 @@ const Overview: React.FC = () => {
       });
 
   // Calculate scaled metrics for hero
-  const expectedTotal = filteredChannels.reduce((sum, c) => sum + c.expected, 0);
+  const invoiceRaisedTotal = filteredChannels.reduce((sum, c) => sum + c.invoiceRaised, 0);
+  const poGeneratedTotal = filteredChannels.reduce((sum, c) => sum + c.poGenerated, 0);
+  const expectedPayoutTotal = filteredChannels.reduce((sum, c) => sum + c.expectedPayout, 0);
   const receivedTotal = filteredChannels.reduce((sum, c) => sum + c.received, 0);
-  const unresolvedTotal = filteredChannels.reduce((sum, c) => sum + c.unresolved, 0);
+  const unsettledTotal = filteredChannels.reduce((sum, c) => sum + c.unsettled, 0);
+  const wrongDeductionsTotal = filteredChannels.reduce((sum, c) => sum + c.wrongDeductions, 0);
 
   return (
     <Box
@@ -103,26 +106,34 @@ const Overview: React.FC = () => {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
           gap: `${space.xl}px`,
           mb: `${space.xl}px`,
         }}
       >
         <Box sx={cardSx}>
-          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px` }}>Total Expected</Typography>
-          <CountUpMetric value={expectedTotal} format={formatINRShort} />
+          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px` }}>Total Invoice Raised</Typography>
+          <CountUpMetric value={invoiceRaisedTotal} format={formatINRShort} />
+        </Box>
+        <Box sx={cardSx}>
+          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px` }}>Total PO Generated</Typography>
+          <CountUpMetric value={poGeneratedTotal} format={formatINRShort} />
+        </Box>
+        <Box sx={cardSx}>
+          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px` }}>Total Expected Payout</Typography>
+          <CountUpMetric value={expectedPayoutTotal} format={formatINRShort} />
         </Box>
         <Box sx={cardSx}>
           <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px` }}>Total Received</Typography>
-          <Box component="span" sx={{ display: 'block', fontSize: type.metric.fontSize, lineHeight: type.metric.lineHeight, fontWeight: type.metric.fontWeight, color: colors.ink, ...tabularNums }}>
-            {formatINRShort(receivedTotal)}
-          </Box>
+          <CountUpMetric value={receivedTotal} format={formatINRShort} />
         </Box>
         <Box sx={cardSx}>
-          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px`, color: unresolvedTotal > 0 ? '#991B1B' : colors.grey700 }}>Unresolved</Typography>
-          <Box component="span" sx={{ display: 'block', fontSize: type.metric.fontSize, lineHeight: type.metric.lineHeight, fontWeight: type.metric.fontWeight, color: unresolvedTotal > 0 ? '#991B1B' : colors.ink, ...tabularNums }}>
-            {formatINRShort(unresolvedTotal)}
-          </Box>
+          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px`, color: unsettledTotal > 0 ? '#991B1B' : colors.grey700 }}>Unsettled</Typography>
+          <CountUpMetric value={unsettledTotal} format={formatINRShort} color={unsettledTotal > 0 ? '#991B1B' : colors.ink} />
+        </Box>
+        <Box sx={{ ...cardSx, bgcolor: wrongDeductionsTotal > 0 ? '#FFFBEB' : undefined, borderColor: wrongDeductionsTotal > 0 ? '#FEF3C7' : undefined }}>
+          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px`, color: wrongDeductionsTotal > 0 ? '#B45309' : colors.grey700 }}>Wrong Deductions</Typography>
+          <CountUpMetric value={wrongDeductionsTotal} format={formatINRShort} color={wrongDeductionsTotal > 0 ? '#B45309' : colors.ink} />
         </Box>
       </Box>
 
@@ -223,9 +234,9 @@ const Overview: React.FC = () => {
                 key={c.channel}
                 channel={c.channel}
                 model={c.channel.includes('Blinkit') || c.channel.includes('Zepto') ? 'Quick-commerce (SOR)' : 'Modern Trade'}
-                expected={c.expected}
+                expectedPayout={c.expectedPayout}
                 received={c.received}
-                unresolved={c.unresolved}
+                unsettled={c.unsettled}
                 issueCount={channelIssues.length}
                 followUpCount={followUps.length}
                 onClick={() => navigate(`${RECON_ROUTE}?channel=${encodeURIComponent(c.channel)}`)}

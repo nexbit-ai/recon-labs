@@ -3,6 +3,7 @@ import {
   DashboardOutlined,
   ReceiptLongOutlined,
   GavelOutlined,
+  AccountBalanceOutlined,
 } from '@mui/icons-material';
 import type { SvgIconComponent } from '@mui/icons-material';
 
@@ -21,4 +22,5 @@ export const SECTIONS: SectionDef[] = [
   { key: 'overview', label: 'Dashboard', title: 'Receivables Dashboard', path: 'overview', icon: DashboardOutlined },
   { key: 'ledger', label: 'Channel Ledger', title: 'Channel Ledger', path: 'ledger', icon: ReceiptLongOutlined },
   { key: 'actions', label: 'Action Centre', title: 'Action Centre', path: 'actions', icon: GavelOutlined },
+  { key: 'accounting', label: 'Accounting', title: 'ERP Sync', path: 'accounting', icon: AccountBalanceOutlined },
 ];

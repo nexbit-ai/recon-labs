@@ -7,7 +7,7 @@ interface StatusBadgeProps {
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
-  const isMatched = status === 'Matched' || status === 'Resolved' || status === 'Clean';
+  const isMatched = status === 'Matched' || status === 'Resolved' || status === 'Clean' || status === 'Received correctly';
   const isException = 
     status === 'Exception' || 
     status === 'Needs Review' || 

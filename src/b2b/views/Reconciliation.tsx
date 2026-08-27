@@ -5,7 +5,7 @@ import { SearchOutlined, InfoOutlined } from '@mui/icons-material';
 import { motion, useReducedMotion } from 'framer-motion';
 import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
 import { cardSx, ChannelTag, ColumnLabel, Pressable, StatTile } from '../components/primitives';
-import { formatRupees, formatCompactINR } from '../lib/format';
+import { formatRupees, formatINRShort } from '../lib/format';
 import { StatusBadge } from '../components/StatusBadge';
 import { SettlementDrawer, type DrawerView } from '../components/SettlementDrawer';
 import {
@@ -19,12 +19,27 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'exceptions', label: 'Exceptions' },
 ];
 
-type Filter = 'all' | 'matched' | 'needs_review' | 'unreconciled';
+type Filter = 'all' | 'po_raised' | 'invoices_raised';
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'matched', label: 'Matched' },
-  { key: 'needs_review', label: 'Needs Review' },
-  { key: 'unreconciled', label: 'Unreconciled' },
+  { key: 'po_raised', label: 'PO Raised' },
+  { key: 'invoices_raised', label: 'Invoices Raised' },
+];
+
+const MOCK_POS = [
+  { id: 'PO-2026-08-001', vendor: 'Blinkit', date: 'Aug 1, 2026', amount: 450000, status: 'Sent to Vendor' },
+  { id: 'PO-2026-08-002', vendor: 'Zepto', date: 'Aug 5, 2026', amount: 320000, status: 'Approved' },
+  { id: 'PO-2026-08-003', vendor: 'Instamart', date: 'Aug 12, 2026', amount: 125000, status: 'Sent to Vendor' },
+  { id: 'PO-2026-08-004', vendor: 'Reliance', date: 'Aug 15, 2026', amount: 550000, status: 'Approved' },
+  { id: 'PO-2026-08-005', vendor: 'Cafe', date: 'Aug 18, 2026', amount: 80000, status: 'Sent to Vendor' },
+];
+
+const MOCK_INVOICES = [
+  { id: 'INV-2026-08-101', client: 'Blinkit', date: 'Aug 2, 2026', amount: 450000, status: 'Payment Pending', poRef: 'PO-2026-08-001' },
+  { id: 'INV-2026-08-102', client: 'Zepto', date: 'Aug 6, 2026', amount: 320000, status: 'Payment Pending', poRef: 'PO-2026-08-002' },
+  { id: 'INV-2026-08-103', client: 'Instamart', date: 'Aug 13, 2026', amount: 125000, status: 'Payment Pending', poRef: 'PO-2026-08-003' },
+  { id: 'INV-2026-08-104', client: 'Reliance', date: 'Aug 16, 2026', amount: 550000, status: 'Payment Pending', poRef: 'PO-2026-08-004' },
+  { id: 'INV-2026-08-105', client: 'Cafe', date: 'Aug 19, 2026', amount: 80000, status: 'Payment Pending', poRef: 'PO-2026-08-005' },
 ];
 
 const Reconciliation: React.FC = () => {
@@ -48,10 +63,7 @@ const Reconciliation: React.FC = () => {
     const raw = s.channel.toLowerCase().replace(/\s+/g, '').replace('–', '');
     const fRaw = platformFilter.toLowerCase().replace(/\s+/g, '').replace('–', '');
     const matchPlatform = platformFilter === 'all' || raw.includes(fRaw) || fRaw.includes(raw);
-    const matchFilter = filter === 'all' ? true
-      : filter === 'matched' ? s.status === 'Matched'
-      : filter === 'needs_review' ? (s.status === 'Exception' || s.status === 'Needs Review')
-      : s.status === 'Unreconciled';
+    const matchFilter = filter === 'all';
     const matchSearch = search === '' || s.id.toLowerCase().includes(search.toLowerCase()) || s.period.toLowerCase().includes(search.toLowerCase());
     return matchPlatform && matchFilter && matchSearch;
   });
@@ -96,10 +108,9 @@ const Reconciliation: React.FC = () => {
         </Box>
       </Box>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: `${space.lg}px`, mb: `${space.xl}px` }}>
-        <StatTile label="Expected Payout" value={formatCompactINR(totalExpected)} />
-        <StatTile label="Actual Payout" value={formatCompactINR(totalActual)} />
-        <StatTile label="Matched" value={`${matchedCount} / ${summarySettlements.length}`} />
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: `${space.lg}px`, mb: `${space.xl}px` }}>
+        <StatTile label="Expected Payout" value={formatINRShort(totalExpected)} />
+        <StatTile label="Actual Payout" value={formatINRShort(totalActual)} />
         <StatTile label="Exceptions" value={String(exceptionCount)} sx={exceptionCount > 0 ? { borderColor: '#EF4444' } : undefined} />
         <StatTile label="Unreconciled" value={totalDifference === 0 ? '₹0' : formatRupees(totalDifference)} sx={totalDifference > 0 ? { borderColor: '#EF4444' } : undefined} />
       </Box>
@@ -173,50 +184,122 @@ const Reconciliation: React.FC = () => {
       </Box>
 
       {/* ── SETTLEMENTS TAB ── */}
-      {activeTab === 'settlements' && (
+      {activeTab === 'settlements' && filter === 'all' && (
         <Box sx={{ ...cardSx, overflowX: 'auto' }}>
           <Box sx={{ minWidth: 880 }}>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '120px 140px 80px 110px 110px 100px 100px', alignItems: 'center', gap: `${space.lg}px`, px: `${space.xl}px`, py: `${space.md}px`, bgcolor: colors.grey100, borderBottom: hairline }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '120px 140px 110px 140px 140px 100px 1fr', alignItems: 'center', gap: `${space.lg}px`, px: `${space.xl}px`, py: `${space.md}px`, bgcolor: colors.grey100, borderBottom: hairline }}>
               <ColumnLabel>Settlement</ColumnLabel>
               <ColumnLabel>Period</ColumnLabel>
-              <ColumnLabel align="right">Invoices</ColumnLabel>
-              <ColumnLabel align="right">Expected</ColumnLabel>
-              <ColumnLabel align="right">Actual</ColumnLabel>
+              <ColumnLabel align="right">Amount received</ColumnLabel>
+              <ColumnLabel align="right">Expected deductions</ColumnLabel>
+              <ColumnLabel align="right">Actual deductions</ColumnLabel>
               <ColumnLabel align="right">Difference</ColumnLabel>
               <ColumnLabel align="right">Status</ColumnLabel>
             </Box>
-            {settlements.map((s, idx) => (
-              <Pressable
-                key={s.id}
-                onClick={() => pushView({ type: 'settlement', data: s })}
-                sx={{
-                  display: 'grid', gridTemplateColumns: '120px 140px 80px 110px 110px 100px 100px',
-                  alignItems: 'center', gap: `${space.lg}px`, px: `${space.xl}px`, height: 56,
-                  borderBottom: idx < settlements.length - 1 ? hairline : 'none',
-                  '&:hover': { bgcolor: colors.grey100 },
-                }}
-              >
-                <Box>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>{s.id}</Typography>
-                  <ChannelTag name={s.channel} />
-                </Box>
-                <Typography sx={{ fontSize: 13, color: colors.grey700 }}>{s.period}</Typography>
-                <Typography sx={{ fontSize: 13, color: colors.ink, textAlign: 'right', ...tabularNums }}>{s.invoiceCount}</Typography>
-                <Typography sx={{ fontSize: 13, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatCompactINR(s.expected)}</Typography>
-                <Typography sx={{ fontSize: 13, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatCompactINR(s.actual)}</Typography>
-                <Typography sx={{ fontSize: 13, fontWeight: s.difference > 0 ? 600 : 400, color: s.difference > 0 ? '#991B1B' : colors.ink, textAlign: 'right', ...tabularNums }}>
-                  {s.difference === 0 ? '₹0' : formatRupees(s.difference)}
-                </Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <StatusBadge status={s.status} />
-                </Box>
-              </Pressable>
-            ))}
+            {settlements.map((s, idx) => {
+              const actualDeds = s.components?.filter(c => c.type === 'deduction').reduce((acc, c) => acc + Math.abs(c.amount), 0) || 0;
+              const expectedDeds = actualDeds > 0 ? actualDeds - (s.difference > 0 ? s.difference : 0) : 0;
+              return (
+                <Pressable
+                  key={s.id}
+                  onClick={() => pushView({ type: 'settlement', data: s })}
+                  sx={{
+                    display: 'grid', gridTemplateColumns: '120px 140px 110px 140px 140px 100px 1fr',
+                    alignItems: 'center', gap: `${space.lg}px`, px: `${space.xl}px`, height: 56,
+                    borderBottom: idx < settlements.length - 1 ? hairline : 'none',
+                    '&:hover': { bgcolor: colors.grey100 },
+                  }}
+                >
+                  <Box>
+                    <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>{s.id}</Typography>
+                    <ChannelTag name={s.channel} />
+                  </Box>
+                  <Typography sx={{ fontSize: 13, color: colors.grey700 }}>{s.period}</Typography>
+                  <Typography sx={{ fontSize: 13, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatINRShort(s.actual)}</Typography>
+                  <Typography sx={{ fontSize: 13, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatINRShort(expectedDeds)}</Typography>
+                  <Typography sx={{ fontSize: 13, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatINRShort(actualDeds)}</Typography>
+                  <Typography sx={{ fontSize: 13, fontWeight: s.difference > 0 ? 600 : 400, color: s.difference > 0 ? '#991B1B' : colors.ink, textAlign: 'right', ...tabularNums }}>
+                    {s.difference === 0 ? '₹0' : formatRupees(s.difference)}
+                  </Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <StatusBadge status={s.status === 'Matched' ? 'Received correctly' : s.status} />
+                  </Box>
+                </Pressable>
+              );
+            })}
             {settlements.length === 0 && (
               <Box sx={{ p: `${space.xl}px` }}>
                 <Typography sx={{ fontSize: 14, color: colors.grey500 }}>No settlements in this view.</Typography>
               </Box>
             )}
+          </Box>
+        </Box>
+      )}
+
+      {activeTab === 'settlements' && filter === 'po_raised' && (
+        <Box sx={{ ...cardSx, overflowX: 'auto' }}>
+          <Box sx={{ minWidth: 600 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '150px 150px 120px 1fr 120px', alignItems: 'center', gap: `${space.lg}px`, px: `${space.xl}px`, py: `${space.md}px`, bgcolor: colors.grey100, borderBottom: hairline }}>
+              <ColumnLabel>PO Number</ColumnLabel>
+              <ColumnLabel>Vendor</ColumnLabel>
+              <ColumnLabel>Date</ColumnLabel>
+              <ColumnLabel align="right">Amount</ColumnLabel>
+              <ColumnLabel align="right">Status</ColumnLabel>
+            </Box>
+            {MOCK_POS.map((po, idx) => (
+              <Box
+                key={po.id}
+                sx={{
+                  display: 'grid', gridTemplateColumns: '150px 150px 120px 1fr 120px',
+                  alignItems: 'center', gap: `${space.lg}px`, px: `${space.xl}px`, height: 56,
+                  borderBottom: idx < MOCK_POS.length - 1 ? hairline : 'none',
+                  '&:hover': { bgcolor: colors.grey100 },
+                }}
+              >
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>{po.id}</Typography>
+                <Typography sx={{ fontSize: 13, color: colors.grey700 }}>{po.vendor}</Typography>
+                <Typography sx={{ fontSize: 13, color: colors.grey700 }}>{po.date}</Typography>
+                <Typography sx={{ fontSize: 13, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatRupees(po.amount)}</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <StatusBadge status={po.status} />
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      )}
+
+      {activeTab === 'settlements' && filter === 'invoices_raised' && (
+        <Box sx={{ ...cardSx, overflowX: 'auto' }}>
+          <Box sx={{ minWidth: 700 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '150px 150px 150px 120px 1fr 120px', alignItems: 'center', gap: `${space.lg}px`, px: `${space.xl}px`, py: `${space.md}px`, bgcolor: colors.grey100, borderBottom: hairline }}>
+              <ColumnLabel>Invoice Number</ColumnLabel>
+              <ColumnLabel>PO Reference</ColumnLabel>
+              <ColumnLabel>Client</ColumnLabel>
+              <ColumnLabel>Date</ColumnLabel>
+              <ColumnLabel align="right">Amount</ColumnLabel>
+              <ColumnLabel align="right">Status</ColumnLabel>
+            </Box>
+            {MOCK_INVOICES.map((inv, idx) => (
+              <Box
+                key={inv.id}
+                sx={{
+                  display: 'grid', gridTemplateColumns: '150px 150px 150px 120px 1fr 120px',
+                  alignItems: 'center', gap: `${space.lg}px`, px: `${space.xl}px`, height: 56,
+                  borderBottom: idx < MOCK_INVOICES.length - 1 ? hairline : 'none',
+                  '&:hover': { bgcolor: colors.grey100 },
+                }}
+              >
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>{inv.id}</Typography>
+                <Typography sx={{ fontSize: 13, color: colors.grey500 }}>{inv.poRef}</Typography>
+                <Typography sx={{ fontSize: 13, color: colors.grey700 }}>{inv.client}</Typography>
+                <Typography sx={{ fontSize: 13, color: colors.grey700 }}>{inv.date}</Typography>
+                <Typography sx={{ fontSize: 13, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatRupees(inv.amount)}</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <StatusBadge status={inv.status} />
+                </Box>
+              </Box>
+            ))}
           </Box>
         </Box>
       )}
