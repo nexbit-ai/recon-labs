@@ -72,10 +72,9 @@ const RowDetail: React.FC<{ po: ReconPurchaseOrder }> = ({ po }) => {
       }}
     >
       {/* Table Header */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 1fr 1fr', px: `${space.md}px`, pb: `${space.sm}px`, borderBottom: hairline, gap: `${space.sm}px` }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: '2fr 3fr 1fr 1fr 1fr', px: `${space.md}px`, pb: `${space.sm}px`, borderBottom: hairline, gap: `${space.sm}px` }}>
         <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase' }}>Item</Typography>
-        <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase' }}>GRN</Typography>
-        <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase' }}>Invoice</Typography>
+        <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase' }}>Reference</Typography>
         <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase', textAlign: 'right' }}>Expected</Typography>
         <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase', textAlign: 'right' }}>Paid</Typography>
         <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase', textAlign: 'right' }}>Difference</Typography>
@@ -93,7 +92,7 @@ const RowDetail: React.FC<{ po: ReconPurchaseOrder }> = ({ po }) => {
               onClick={() => setExpandedLineId(isExpanded ? null : line.id)}
               sx={{ 
                 display: 'grid', 
-                gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 1fr 1fr', 
+                gridTemplateColumns: '2fr 3fr 1fr 1fr 1fr', 
                 p: `${space.md}px`, 
                 cursor: 'pointer',
                 alignItems: 'center',
@@ -101,8 +100,7 @@ const RowDetail: React.FC<{ po: ReconPurchaseOrder }> = ({ po }) => {
               }}
             >
               <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>{line.skuLabel}</Typography>
-              <Typography sx={{ fontSize: 13, color: colors.grey700, wordBreak: 'break-all' }}>{line.grn}</Typography>
-              <Typography sx={{ fontSize: 13, color: colors.grey700, wordBreak: 'break-all' }}>{line.invoice}</Typography>
+              <Typography sx={{ fontSize: 13, color: colors.grey700, wordBreak: 'break-all' }}>{line.ref}</Typography>
               <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatRupees(line.expected)}</Typography>
               <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, textAlign: 'right', ...tabularNums }}>{formatRupees(line.paid)}</Typography>
               <Typography sx={{ fontSize: 13, fontWeight: 600, color: line.variance < 0 ? colors.accent : colors.ink, textAlign: 'right', ...tabularNums }}>
