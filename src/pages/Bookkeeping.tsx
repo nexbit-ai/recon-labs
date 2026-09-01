@@ -77,25 +77,39 @@ const Bookkeeping: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showErpDialog, setShowErpDialog] = useState(false);
   const [reportsAnchorEl, setReportsAnchorEl] = useState<null | HTMLElement>(null);
 
-  const mockSettlements: Settlement[] = [
-    { id: 'SET-FK-25-01', period: 'Jan 15 - Jan 21, 2025', provider: 'Flipkart', grossAmount: 845000, deductions: 126750, taxWithheld: 16900, netSettlement: 701350, status: 'synced', zohoId: 'ZOHO-1022', paymentDate: '2025-01-22' },
-    { id: 'SET-AMZ-25-01', period: 'Jan 14 - Jan 20, 2025', provider: 'Amazon', grossAmount: 1240000, deductions: 248000, taxWithheld: 24800, netSettlement: 967200, status: 'synced', zohoId: 'ZOHO-1023', paymentDate: '2025-01-21' },
-    { id: 'SET-SH-25-01', period: 'Jan 10 - Jan 17, 2025', provider: 'Shopify', grossAmount: 450000, deductions: 13500, taxWithheld: 9000, netSettlement: 427500, status: 'pending', zohoId: null, paymentDate: '2025-01-18' },
-    { id: 'SET-FK-25-02', period: 'Jan 08 - Jan 14, 2025', provider: 'Flipkart', grossAmount: 670000, deductions: 100500, taxWithheld: 13400, netSettlement: 556100, status: 'synced', zohoId: 'ZOHO-1018', paymentDate: '2025-01-15' },
-    { id: 'SET-AMZ-25-02', period: 'Jan 07 - Jan 13, 2025', provider: 'Amazon', grossAmount: 1100000, deductions: 220000, taxWithheld: 22000, netSettlement: 858000, status: 'synced', zohoId: 'ZOHO-1017', paymentDate: '2025-01-14' },
-    { id: 'SET-MYN-25-01', period: 'Jan 01 - Jan 10, 2025', provider: 'Myntra', grossAmount: 520000, deductions: 78000, taxWithheld: 10400, netSettlement: 431600, status: 'error', zohoId: null, paymentDate: '2025-01-12' },
-    { id: 'SET-SH-25-02', period: 'Jan 01 - Jan 09, 2025', provider: 'Shopify', grossAmount: 380000, deductions: 11400, taxWithheld: 7600, netSettlement: 361000, status: 'synced', zohoId: 'ZOHO-1011', paymentDate: '2025-01-10' },
-    { id: 'SET-FK-25-03', period: 'Jan 01 - Jan 07, 2025', provider: 'Flipkart', grossAmount: 920000, deductions: 138000, taxWithheld: 18400, netSettlement: 763600, status: 'synced', zohoId: 'ZOHO-1008', paymentDate: '2025-01-08' },
-    { id: 'SET-AMZ-25-03', period: 'Dec 24 - Dec 31, 2024', provider: 'Amazon', grossAmount: 1450000, deductions: 290000, taxWithheld: 29000, netSettlement: 1131000, status: 'synced', zohoId: 'ZOHO-0988', paymentDate: '2025-01-01' },
-    { id: 'SET-MYN-25-02', period: 'Dec 20 - Dec 31, 2024', provider: 'Myntra', grossAmount: 410000, deductions: 61500, taxWithheld: 8200, netSettlement: 340300, status: 'synced', zohoId: 'ZOHO-0985', paymentDate: '2025-01-01' }
-  ];
+  const mockSalesEntries = Array.from({ length: 15 }, (_, i) => ({
+    id: `S${i + 1}`,
+    docType: 'Invoice',
+    docNo: `OD${123456789 + i}`,
+    custNo: 'CUST-FLIPKART',
+    postingDate: `2025-01-${String(21 - Math.floor(i / 3)).padStart(2, '0')}`,
+    itemNo: `SKU-ABC-${String(i % 5 + 1).padStart(2, '0')}`,
+    qty: (i + 1) * 1000 + 500 * (i % 3),
+    unitPrice: 1250.00 + i * 50,
+    location: i % 2 === 0 ? 'BLR-WH1' : 'DEL-WH2',
+    taxGroup: i % 3 === 0 ? 'GST-18' : 'GST-12'
+  }));
+
+  const mockReturnEntries = Array.from({ length: 10 }, (_, i) => ({
+    id: `R${i + 1}`,
+    docType: 'Credit Memo',
+    docNo: `RET${987654321 + i}`,
+    custNo: 'CUST-FLIPKART',
+    postingDate: `2025-01-${String(23 - Math.floor(i / 2)).padStart(2, '0')}`,
+    itemNo: `SKU-DEF-${String(i % 5 + 1).padStart(2, '0')}`,
+    qty: -((i + 1) * 1000 + 500 * (i % 2)),
+    unitPrice: 1500.00 + i * 75,
+    location: i % 2 === 0 ? 'BOM-WH3' : 'BLR-WH1',
+    taxGroup: i % 2 === 0 ? 'GST-18' : 'GST-12'
+  }));
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
-      style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0,
-    }).format(Math.abs(amount));
+      style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(amount); // Removed absolute value to show negatives for returns
   };
 
   const handleSync = async () => {
@@ -104,26 +118,6 @@ const Bookkeeping: React.FC = () => {
       setSyncStatus('success');
       setTimeout(() => setSyncStatus('idle'), 3000);
     }, 2000);
-  };
-
-  const getStatusChip = (status: string) => {
-    const colors = { synced: '#14B8A6', pending: '#F59E0B', error: '#EF4444' };
-    const color = colors[status as keyof typeof colors] || '#64748b';
-    return (
-      <Chip
-        label={status.toUpperCase()}
-        size="small"
-        sx={{
-          bgcolor: 'transparent',
-          color: color,
-          fontWeight: 800,
-          fontSize: '10px',
-          border: `1px solid ${color}`,
-          borderRadius: '2px',
-          height: '18px'
-        }}
-      />
-    );
   };
 
   return (
@@ -151,15 +145,15 @@ const Bookkeeping: React.FC = () => {
             sx={{ borderRadius: '4px', borderColor: '#e2e8f0', color: '#475569', textTransform: 'none', fontWeight: 600, py: 0.5 }}>
             New Entry
           </Button>
-          <Button variant="outlined" size="small" onClick={handleSync} disabled={syncStatus === 'syncing'}
+          <Button variant="outlined" size="small" onClick={() => setShowErpDialog(true)}
             sx={{ 
               borderRadius: '4px', 
-              borderColor: syncStatus === 'syncing' ? '#e2e8f0' : '#22c55e', 
-              color: syncStatus === 'syncing' ? '#94a3b8' : '#22c55e', 
+              borderColor: '#111827', 
+              color: '#111827', 
               textTransform: 'none', fontWeight: 700, py: 0.5, px: 2,
-              '&:hover': { borderColor: '#16a34a', color: '#16a34a', bgcolor: 'transparent' }
+              '&:hover': { borderColor: '#000000', backgroundColor: '#f9fafb' }
             }}>
-            {syncStatus === 'syncing' ? 'Syncing...' : 'Sync to Zoho'}
+            Sync
           </Button>
         </Box>
       </Box>
@@ -168,7 +162,8 @@ const Bookkeeping: React.FC = () => {
         {syncStatus === 'success' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <Alert severity="success" sx={{ mb: 2, py: 0, borderRadius: '4px', border: '1px solid #bbf7d0', bgcolor: '#f0fdf4', color: '#166534', fontWeight: 600, fontSize: '12px' }} onClose={() => setSyncStatus('idle')}>
-              Settlements pushed to Zoho Books.
+              Dynamics ERP template generated successfully.
+
             </Alert>
           </motion.div>
         )}
@@ -185,44 +180,43 @@ const Bookkeeping: React.FC = () => {
             },
             '& .MuiTabs-indicator': { height: 2, bgcolor: '#111' }
           }}>
-          <Tab label="Settlement Batches" />
+          <Tab label="Sales Entries" />
+          <Tab label="Return Entries" />
           <Tab label="Chart of Accounts" />
           <Tab label="Audit Logs" />
+
         </Tabs>
       </Box>
 
       {/* Content Area - Minimal Spacing */}
       <TabPanel value={tabValue} index={0}>
         <TableContainer sx={{ mb: 4 }}>
-          <Table size="small">
+          <Table size="small" sx={{ tableLayout: 'fixed' }}>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', py: 1.5, px: 0 }}>Period</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase' }}>Provider</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase' }}>Gross</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase' }}>Fees</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase' }}>Tax</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase' }}>Net Payout</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase' }}>Status</TableCell>
-                <TableCell align="right" sx={{ px: 0 }}></TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', py: 1.5, px: 0, width: '120px' }}>Document Type</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '150px' }}>Document No.</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '150px' }}>Customer No.</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '100px' }}>Posting Date</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '150px' }}>Item No.</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '80px', textAlign: 'right' }}>Quantity</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '120px', textAlign: 'right' }}>Unit Price</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '120px' }}>Location Code</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '120px' }}>Tax Group</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {mockSettlements.map((settlement) => (
-                <TableRow key={settlement.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
-                  <TableCell sx={{ px: 0, py: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#111', fontSize: '13px' }}>{settlement.period}</Typography>
-                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '10px' }}>ID: {settlement.id}</Typography>
-                  </TableCell>
-                  <TableCell><Typography variant="body2" sx={{ color: '#111', fontWeight: 600, fontSize: '13px' }}>{settlement.provider}</Typography></TableCell>
-                  <TableCell><Typography variant="body2" sx={{ fontWeight: 600, color: '#111', fontSize: '13px' }}>{formatCurrency(settlement.grossAmount)}</Typography></TableCell>
-                  <TableCell><Typography variant="body2" sx={{ color: '#ef4444', fontSize: '12px', fontWeight: 500 }}>-{formatCurrency(settlement.deductions)}</Typography></TableCell>
-                  <TableCell><Typography variant="body2" sx={{ color: '#64748b', fontSize: '12px', fontWeight: 500 }}>-{formatCurrency(settlement.taxWithheld)}</Typography></TableCell>
-                  <TableCell><Typography variant="body2" sx={{ fontWeight: 800, color: '#111', fontSize: '13px' }}>{formatCurrency(settlement.netSettlement)}</Typography></TableCell>
-                  <TableCell>{getStatusChip(settlement.status)}</TableCell>
-                  <TableCell align="right" sx={{ px: 0 }}>
-                    <IconButton size="small"><MoreIcon sx={{ fontSize: 16, color: '#cbd5e1' }} /></IconButton>
-                  </TableCell>
+              {mockSalesEntries.map((entry) => (
+                <TableRow key={entry.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
+                  <TableCell sx={{ px: 0, py: 1 }}><Typography variant="body2" sx={{ fontWeight: 600, color: '#111', fontSize: '13px' }}>{entry.docType}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ color: '#111', fontSize: '13px' }}>{entry.docNo}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ color: '#111', fontSize: '13px' }}>{entry.custNo}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ color: '#64748b', fontSize: '13px' }}>{entry.postingDate}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ color: '#111', fontWeight: 600, fontSize: '13px' }}>{entry.itemNo}</Typography></TableCell>
+                  <TableCell align="right"><Typography variant="body2" sx={{ color: '#111', fontWeight: 700, fontSize: '13px' }}>{entry.qty}</Typography></TableCell>
+                  <TableCell align="right"><Typography variant="body2" sx={{ color: '#111', fontWeight: 600, fontSize: '13px' }}>{formatCurrency(entry.unitPrice)}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ color: '#111', fontSize: '13px' }}>{entry.location}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ color: '#64748b', fontSize: '13px' }}>{entry.taxGroup}</Typography></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -231,6 +225,41 @@ const Bookkeeping: React.FC = () => {
       </TabPanel>
 
       <TabPanel value={tabValue} index={1}>
+        <TableContainer sx={{ mb: 4 }}>
+          <Table size="small" sx={{ tableLayout: 'fixed' }}>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', py: 1.5, px: 0, width: '120px' }}>Document Type</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '150px' }}>Document No.</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '150px' }}>Customer No.</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '100px' }}>Posting Date</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '150px' }}>Item No.</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '80px', textAlign: 'right' }}>Quantity</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '120px', textAlign: 'right' }}>Unit Price</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '120px' }}>Location Code</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', width: '120px' }}>Tax Group</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {mockReturnEntries.map((entry) => (
+                <TableRow key={entry.id} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
+                  <TableCell sx={{ px: 0, py: 1 }}><Typography variant="body2" sx={{ fontWeight: 600, color: '#111', fontSize: '13px' }}>{entry.docType}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ color: '#111', fontSize: '13px' }}>{entry.docNo}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ color: '#111', fontSize: '13px' }}>{entry.custNo}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ color: '#64748b', fontSize: '13px' }}>{entry.postingDate}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ color: '#111', fontWeight: 600, fontSize: '13px' }}>{entry.itemNo}</Typography></TableCell>
+                  <TableCell align="right"><Typography variant="body2" sx={{ color: '#ef4444', fontWeight: 700, fontSize: '13px' }}>{entry.qty}</Typography></TableCell>
+                  <TableCell align="right"><Typography variant="body2" sx={{ color: '#111', fontWeight: 600, fontSize: '13px' }}>{formatCurrency(entry.unitPrice)}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ color: '#111', fontSize: '13px' }}>{entry.location}</Typography></TableCell>
+                  <TableCell><Typography variant="body2" sx={{ color: '#64748b', fontSize: '13px' }}>{entry.taxGroup}</Typography></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </TabPanel>
+
+      <TabPanel value={tabValue} index={2}>
         <Grid container spacing={4} sx={{ pt: 1 }}>
           {[
             { title: 'Income', items: ['Marketplace Sales', 'Shipping Revenue'] },
@@ -291,6 +320,35 @@ const Bookkeeping: React.FC = () => {
           <Button onClick={() => setShowAddDialog(false)} size="small" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'none' }}>Cancel</Button>
           <Button variant="outlined" size="small" onClick={() => setShowAddDialog(false)} sx={{ borderColor: '#111', color: '#111', borderRadius: '4px', px: 2, fontWeight: 700, textTransform: 'none' }}>Create</Button>
         </DialogActions>
+      </Dialog>
+
+      <Dialog open={showErpDialog} onClose={() => setShowErpDialog(false)} PaperProps={{ sx: { borderRadius: '4px', p: 0, minWidth: 320 } }}>
+        <DialogTitle sx={{ fontWeight: 800, fontSize: '16px', pb: 1, borderBottom: '1px solid #f1f5f9' }}>Connect ERP</DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          <List sx={{ p: 0 }}>
+            {['Zoho Books', 'SAP ERP', 'Tally Prime', 'Microsoft Dynamics 365'].map((erp, idx) => (
+              <ListItem key={erp} sx={{ py: 2, px: 3, borderBottom: idx < 3 ? '1px solid #f1f5f9' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: '#111827' }}>{erp}</Typography>
+                <Button 
+                  variant="outlined" 
+                  size="small" 
+                  onClick={() => setShowErpDialog(false)} 
+                  sx={{ 
+                    borderColor: '#e5e7eb', 
+                    color: '#111827', 
+                    borderRadius: '4px', 
+                    px: 2, 
+                    fontWeight: 600, 
+                    textTransform: 'none',
+                    '&:hover': { borderColor: '#d1d5db', backgroundColor: '#f9fafb' }
+                  }}
+                >
+                  Connect
+                </Button>
+              </ListItem>
+            ))}
+          </List>
+        </DialogContent>
       </Dialog>
     </Box>
   );

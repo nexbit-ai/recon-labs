@@ -60,7 +60,7 @@ const drawerWidth = 168;
 const menuItems = [
   { text: 'Actions', icon: <ChecklistIcon />, path: '/checklist', upcoming: false },
   { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation', upcoming: false },
-  { text: 'Claims', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
+  { text: 'Alerts', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false, badge: 2 },
   { text: 'Logistics', icon: <StorageIcon />, path: '/logistics', upcoming: false },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping', upcoming: false },
   { text: 'AI-Powered MIS', icon: <InsightsIcon />, path: '/mis', upcoming: false },
@@ -76,7 +76,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // const { user, logout } = useAuth(); // Authentication disabled
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
+  const [alertsCount, setAlertsCount] = React.useState(2);
 
+  React.useEffect(() => {
+    const updateBadge = () => {
+      const stored = localStorage.getItem('operations_badge_count');
+      if (stored) setAlertsCount(parseInt(stored, 10));
+    };
+    updateBadge();
+    window.addEventListener('badgeCountChanged', updateBadge);
+    return () => window.removeEventListener('badgeCountChanged', updateBadge);
+  }, []);
   
   const [settingsAnchorEl, setSettingsAnchorEl] = React.useState<null | HTMLElement>(null);
 
@@ -238,6 +248,26 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       : 'inherit',
                 }}
               />
+              {(item.text === 'Alerts' ? alertsCount > 0 : item.badge) && (
+                <Box
+                  sx={{
+                    bgcolor: '#111111',
+                    color: 'white',
+                    borderRadius: '10px',
+                    minWidth: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.7rem',
+                    fontWeight: 'bold',
+                    px: 0.5,
+                    ml: 1,
+                  }}
+                >
+                  {item.text === 'Alerts' ? alertsCount : item.badge}
+                </Box>
+              )}
             </ListItemButton>
           </ListItem>
         ))}

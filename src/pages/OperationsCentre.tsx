@@ -2106,6 +2106,96 @@ const OperationsCentrePage: React.FC = () => {
     const amazonReasons = ['FBA Loss', 'Fee Adjustment', 'SAFE-T Claim'];
     const d2cReasons = ['Short Collection', 'Gateway Error', 'Missing Settlement'];
     const reasons = selectedPlatform === 'amazon' ? amazonReasons : d2cReasons;
+
+    if (selectedPlatform === 'flipkart') {
+      const flipkartBatches = [
+        {
+          id: 'batch-fk-1',
+          raisedTime: new Date().toISOString().split('T')[0],
+          totalOrders: Math.floor(unreconciledCount * 0.7) || 125,
+          totalGap: 450000,
+          status: statuses[0],
+          activeStep: statuses[0].step,
+          reason: 'payment is due beyond contract time'
+        },
+        {
+          id: 'batch-fk-2',
+          raisedTime: new Date(Date.now() - 86400000).toISOString().split('T')[0],
+          totalOrders: Math.ceil(unreconciledCount * 0.3) || 84,
+          totalGap: -125000,
+          status: statuses[1],
+          activeStep: statuses[1].step,
+          reason: 'contract breached, wrong deductions'
+        }
+      ];
+      return { batches: flipkartBatches, metrics: { totalDisputedRaised: 45, totalApproved: 18, totalInProgress: 27 } };
+    }
+
+    if (selectedPlatform === 'd2c') {
+      const d2cBatches = [
+        {
+          id: 'batch-d2c-1',
+          entity: 'Bluedart',
+          raisedTime: new Date().toISOString().split('T')[0],
+          totalOrders: Math.floor(unreconciledCount * 0.15) || 45,
+          totalGap: 120000,
+          status: statuses[0],
+          activeStep: statuses[0].step,
+          reason: 'payment not received'
+        },
+        {
+          id: 'batch-d2c-2',
+          entity: 'Delhivery',
+          raisedTime: new Date(Date.now() - 86400000).toISOString().split('T')[0],
+          totalOrders: Math.floor(unreconciledCount * 0.2) || 60,
+          totalGap: 245000,
+          status: statuses[1],
+          activeStep: statuses[1].step,
+          reason: 'payment not received'
+        },
+        {
+          id: 'batch-d2c-3',
+          entity: 'Paytm',
+          raisedTime: new Date(Date.now() - 172800000).toISOString().split('T')[0],
+          totalOrders: Math.floor(unreconciledCount * 0.1) || 30,
+          totalGap: 85000,
+          status: statuses[2],
+          activeStep: statuses[2].step,
+          reason: 'payment not received'
+        },
+        {
+          id: 'batch-d2c-4',
+          entity: 'PayU',
+          raisedTime: new Date(Date.now() - 259200000).toISOString().split('T')[0],
+          totalOrders: Math.floor(unreconciledCount * 0.25) || 75,
+          totalGap: 320000,
+          status: statuses[0],
+          activeStep: statuses[0].step,
+          reason: 'payment not received'
+        },
+        {
+          id: 'batch-d2c-5',
+          entity: 'Razorpay',
+          raisedTime: new Date(Date.now() - 345600000).toISOString().split('T')[0],
+          totalOrders: Math.floor(unreconciledCount * 0.15) || 45,
+          totalGap: 110000,
+          status: statuses[3],
+          activeStep: statuses[3].step,
+          reason: 'extra comission charged'
+        },
+        {
+          id: 'batch-d2c-6',
+          entity: 'Shiprocket',
+          raisedTime: new Date(Date.now() - 432000000).toISOString().split('T')[0],
+          totalOrders: Math.floor(unreconciledCount * 0.15) || 45,
+          totalGap: 180000,
+          status: statuses[4],
+          activeStep: statuses[4].step,
+          reason: 'extra comission charged'
+        }
+      ];
+      return { batches: d2cBatches, metrics: { totalDisputedRaised: 6, totalApproved: 1, totalInProgress: 5 } };
+    }
     
     // Synthesize realistic batches from unreconciled data
     let batches: any[] = [];
@@ -2191,41 +2281,16 @@ const OperationsCentrePage: React.FC = () => {
     return { batches, metrics: { totalDisputedRaised, totalApproved, totalInProgress } };
   }, [unreconciledRows, unreconciledCount, selectedPlatform]);
 
+  useEffect(() => {
+    localStorage.setItem('operations_badge_count', String(disputeBatchesData.batches.length));
+    window.dispatchEvent(new Event('badgeCountChanged'));
+  }, [disputeBatchesData.batches.length]);
+
   const renderDisputedTiles = () => {
     const { batches, metrics } = disputeBatchesData;
     const { totalDisputedRaised, totalApproved, totalInProgress } = metrics;
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, mt: 3 }}>
-        {/* High-Level Metrics */}
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 3 }}>
-          {[
-            { label: 'Total Disputed Raised', value: totalDisputedRaised, color: '#111827', bg: '#ffffff', border: '#e5e7eb' },
-            { label: 'Total Approved', value: totalApproved, color: '#4b5563', bg: '#f9fafb', border: '#e5e7eb' },
-            { label: 'Total In Progress', value: totalInProgress, color: '#7A5DBF', bg: 'rgba(122, 93, 191, 0.05)', border: 'rgba(122, 93, 191, 0.2)' }
-          ].map((metric, idx) => (
-            <Card key={idx} sx={{ 
-              borderRadius: '12px', 
-              border: `1px solid ${metric.border}`,
-              backgroundColor: metric.bg,
-              boxShadow: 'none',
-              transition: 'transform 0.2s',
-              height: '100px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              '&:hover': { transform: 'translateY(-2px)' }
-            }}>
-              <CardContent sx={{ p: 3, py: 2 }}>
-                <Typography variant="body2" sx={{ color: '#4b5563', fontWeight: 600, mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.75rem' }}>
-                  {metric.label}
-                </Typography>
-                <Typography variant="h4" sx={{ color: metric.color, fontWeight: 700 }}>
-                  {metric.value}
-                </Typography>
-              </CardContent>
-            </Card>
-          ))}
-        </Box>
 
         {/* Dispute Batches Grid */}
         <Typography variant="h6" sx={{ fontWeight: 600, color: '#111827', mt: 1 }}>
@@ -2259,10 +2324,15 @@ const OperationsCentrePage: React.FC = () => {
                 <CardContent sx={{ p: 3, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <Box>
+                      {batch.entity && (
+                        <Typography variant="h6" sx={{ color: '#111827', fontWeight: 700, mb: 1 }}>
+                          {batch.entity}
+                        </Typography>
+                      )}
                       <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         Raised Time
                       </Typography>
-                      <Typography variant="subtitle1" sx={{ color: '#111827', fontWeight: 600 }}>
+                      <Typography variant="subtitle2" sx={{ color: '#111827', fontWeight: 600 }}>
                         {formatDate(batch.raisedTime)}
                       </Typography>
                       <Typography variant="body2" sx={{ color: '#4b5563', mt: 0.5 }}>
@@ -2287,7 +2357,7 @@ const OperationsCentrePage: React.FC = () => {
                       <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500, display: 'block', mb: 0.5 }}>
                         Total Gap
                       </Typography>
-                      <Typography variant="body1" sx={{ color: batch.totalGap > 0 ? '#dc2626' : '#d97706', fontWeight: 700 }}>
+                      <Typography variant="body1" sx={{ color: '#111827', fontWeight: 700 }}>
                         ₹{Math.abs(batch.totalGap).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </Typography>
                     </Box>
@@ -2300,27 +2370,81 @@ const OperationsCentrePage: React.FC = () => {
                       </Typography>
                     </Box>
                   </Box>
-                  <Button 
-                    variant="outlined" 
-                    size="small" 
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent popup from opening
-                      setDisputeSubTab(1); // Navigate to mismatched tab
-                    }}
-                    sx={{ 
-                      mt: 'auto',
-                      textTransform: 'none', 
-                      fontWeight: 600, 
-                      color: '#4b5563', 
-                      borderColor: '#d1d5db',
-                      '&:hover': {
-                        backgroundColor: '#f3f4f6',
-                        borderColor: '#9ca3af'
-                      }
-                    }}
-                  >
-                    Open transactions
-                  </Button>
+                  <Box sx={{ display: 'flex', gap: 1, mt: 'auto', flexWrap: 'wrap' }}>
+                    <Button 
+                      variant="outlined" 
+                      size="small" 
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent popup from opening
+                        setDisputeSubTab(1); // Navigate to mismatched tab
+                      }}
+                      sx={{ 
+                        textTransform: 'none', 
+                        fontWeight: 600, 
+                        color: '#111827', 
+                        borderColor: '#e5e7eb',
+                        flex: 1,
+                        '&:hover': {
+                          backgroundColor: '#f9fafb',
+                          borderColor: '#d1d5db'
+                        }
+                      }}
+                    >
+                      Open
+                    </Button>
+                    <Button 
+                      variant="outlined" 
+                      size="small" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Dummy download logic
+                        const csvContent = "data:text/csv;charset=utf-8,Order ID,Amount,Date\n";
+                        const encodedUri = encodeURI(csvContent);
+                        const link = document.createElement("a");
+                        link.setAttribute("href", encodedUri);
+                        link.setAttribute("download", `orders_${batch.id}.csv`);
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }}
+                      sx={{ 
+                        textTransform: 'none', 
+                        fontWeight: 600,
+                        color: '#111827',
+                        borderColor: '#e5e7eb',
+                        flex: 1,
+                        '&:hover': {
+                          backgroundColor: '#f9fafb',
+                          borderColor: '#d1d5db'
+                        }
+                      }}
+                    >
+                      Download CSV
+                    </Button>
+                    <Button 
+                      variant="outlined" 
+                      size="small" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSnackbarMsg('Dispute marked as raised');
+                        setSnackbarOpen(true);
+                      }}
+                      sx={{ 
+                        textTransform: 'none', 
+                        fontWeight: 600,
+                        color: '#111827',
+                        borderColor: '#e5e7eb',
+                        flex: 1,
+                        '&:hover': {
+                          backgroundColor: '#f9fafb',
+                          borderColor: '#d1d5db'
+                        },
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Mark it raised
+                    </Button>
+                  </Box>
                 </CardContent>
               </Card>
             ))}
@@ -2337,7 +2461,7 @@ const OperationsCentrePage: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Tabs value={disputeSubTab} onChange={(_, v) => { setDisputeSubTab(v); setPage(0); }} sx={{ '& .MuiTab-root': { textTransform: 'none', minHeight: 32 } }}>
               <Tab label="Home" />
-              <Tab label={`Mismatched Orders (${getUnreconciledTotalCount()})`} />
+              <Tab label={`Unsettled Orders (${getUnreconciledTotalCount()})`} />
             </Tabs>
             {/* Right controls: applied filter chips + filter + platform + send button */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
