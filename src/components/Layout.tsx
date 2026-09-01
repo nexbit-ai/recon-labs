@@ -4,6 +4,7 @@ import { useStytchMemberSession } from '@stytch/react/b2b';
 import { StytchB2BUIClient } from '@stytch/vanilla-js/b2b';
 import { tokenManager } from '../services/api/tokenManager';
 import { useUser } from '../contexts/UserContext';
+import ProductToggle from '../b2b/components/ProductToggle';
 import {
   Box,
   Drawer,
@@ -128,6 +129,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           decoding="sync"
           style={{ width: 48, height: 48, marginBottom: 16, display: 'block' }}
         />
+        <Box sx={{ width: '100%', display: 'flex', mb: 2 }}>
+          <ProductToggle />
+        </Box>
       </Toolbar>
       <List sx={{ flex: 1 }}>
         {menuItems.map((item) => (
