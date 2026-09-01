@@ -305,7 +305,8 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
 };
 
 const OperationsCentrePage: React.FC = () => {
-  const [disputeSubTab, setDisputeSubTab] = useState<number>(0); // 0: disputed, 1: unreconciled
+  const [disputeSubTab, setDisputeSubTab] = useState<number>(0); // 0: to be raised, 1: raised
+  const [raisedBatchIds, setRaisedBatchIds] = useState<string[]>([]);
   const [trackerPopupOpen, setTrackerPopupOpen] = useState(false);
   const [selectedTrackerBatch, setSelectedTrackerBatch] = useState<any>(null);
 
@@ -391,11 +392,11 @@ const OperationsCentrePage: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
-    // Set tab from URL parameter if provided (0: unreconciled, 1: manually reconciled, 2: disputed)
+    // Set tab from URL parameter if provided (0: to be raised, 1: raised)
     const tabParam = params.get('tab');
     if (tabParam) {
       const tabIndex = parseInt(tabParam, 10);
-      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 2) {
+      if (!isNaN(tabIndex) && tabIndex >= 0 && tabIndex <= 1) {
         setDisputeSubTab(tabIndex);
       }
     }
@@ -2095,40 +2096,33 @@ const OperationsCentrePage: React.FC = () => {
   };
 
   const disputeBatchesData = useMemo(() => {
-    const statuses = [
-      { label: 'Action Required', color: '#111827', bg: '#f3f4f6', step: 2 },
-      { label: 'Followup Required', color: '#4b5563', bg: '#f9fafb', step: 3 },
-      { label: 'In Progress', color: '#7A5DBF', bg: 'rgba(122, 93, 191, 0.05)', step: 1 },
-      { label: 'Under Review', color: '#6b7280', bg: '#f3f4f6', step: 1 },
-      { label: 'Approved', color: '#111827', bg: '#e5e7eb', step: 4 }
-    ];
-    
-    const amazonReasons = ['FBA Loss', 'Fee Adjustment', 'SAFE-T Claim'];
-    const d2cReasons = ['Short Collection', 'Gateway Error', 'Missing Settlement'];
-    const reasons = selectedPlatform === 'amazon' ? amazonReasons : d2cReasons;
+    // Helper to generate a TAT expired date (a few days ago) and "due by X days"
+    const generateTatInfo = (daysAgo: number) => {
+      const tatDate = new Date();
+      tatDate.setDate(tatDate.getDate() - daysAgo);
+      return {
+        tatExpiredOn: tatDate.toISOString().split('T')[0],
+        dueByDays: daysAgo
+      };
+    };
 
     if (selectedPlatform === 'flipkart') {
       const flipkartBatches = [
         {
           id: 'batch-fk-1',
-          raisedTime: new Date().toISOString().split('T')[0],
           totalOrders: Math.floor(unreconciledCount * 0.7) || 125,
           totalGap: 450000,
-          status: statuses[0],
-          activeStep: statuses[0].step,
-          reason: 'payment is due beyond contract time'
+          reason: 'Settlement Pending',
+          ...generateTatInfo(2)
         },
         {
           id: 'batch-fk-2',
-          raisedTime: new Date(Date.now() - 86400000).toISOString().split('T')[0],
           totalOrders: Math.ceil(unreconciledCount * 0.3) || 84,
           totalGap: -125000,
-          status: statuses[1],
-          activeStep: statuses[1].step,
-          reason: 'contract breached, wrong deductions'
+          reason: 'Extra Commission Charged'
         }
       ];
-      return { batches: flipkartBatches, metrics: { totalDisputedRaised: 45, totalApproved: 18, totalInProgress: 27 } };
+      return { batches: flipkartBatches };
     }
 
     if (selectedPlatform === 'd2c') {
@@ -2136,122 +2130,112 @@ const OperationsCentrePage: React.FC = () => {
         {
           id: 'batch-d2c-1',
           entity: 'Bluedart',
-          raisedTime: new Date().toISOString().split('T')[0],
           totalOrders: Math.floor(unreconciledCount * 0.15) || 45,
           totalGap: 120000,
-          status: statuses[0],
-          activeStep: statuses[0].step,
-          reason: 'payment not received'
+          reason: 'Settlement Pending',
+          ...generateTatInfo(2)
         },
         {
           id: 'batch-d2c-2',
           entity: 'Delhivery',
-          raisedTime: new Date(Date.now() - 86400000).toISOString().split('T')[0],
           totalOrders: Math.floor(unreconciledCount * 0.2) || 60,
           totalGap: 245000,
-          status: statuses[1],
-          activeStep: statuses[1].step,
-          reason: 'payment not received'
+          reason: 'Settlement Pending',
+          ...generateTatInfo(3)
         },
         {
           id: 'batch-d2c-3',
           entity: 'Paytm',
-          raisedTime: new Date(Date.now() - 172800000).toISOString().split('T')[0],
           totalOrders: Math.floor(unreconciledCount * 0.1) || 30,
           totalGap: 85000,
-          status: statuses[2],
-          activeStep: statuses[2].step,
-          reason: 'payment not received'
+          reason: 'Settlement Pending',
+          ...generateTatInfo(1)
         },
         {
           id: 'batch-d2c-4',
           entity: 'PayU',
-          raisedTime: new Date(Date.now() - 259200000).toISOString().split('T')[0],
           totalOrders: Math.floor(unreconciledCount * 0.25) || 75,
           totalGap: 320000,
-          status: statuses[0],
-          activeStep: statuses[0].step,
-          reason: 'payment not received'
+          reason: 'Settlement Pending',
+          ...generateTatInfo(4)
         },
         {
           id: 'batch-d2c-5',
           entity: 'Razorpay',
-          raisedTime: new Date(Date.now() - 345600000).toISOString().split('T')[0],
           totalOrders: Math.floor(unreconciledCount * 0.15) || 45,
           totalGap: 110000,
-          status: statuses[3],
-          activeStep: statuses[3].step,
-          reason: 'extra comission charged'
+          reason: 'Extra Commission Charged'
         },
         {
           id: 'batch-d2c-6',
           entity: 'Shiprocket',
-          raisedTime: new Date(Date.now() - 432000000).toISOString().split('T')[0],
           totalOrders: Math.floor(unreconciledCount * 0.15) || 45,
           totalGap: 180000,
-          status: statuses[4],
-          activeStep: statuses[4].step,
-          reason: 'extra comission charged'
+          reason: 'Extra Commission Charged'
         }
       ];
-      return { batches: d2cBatches, metrics: { totalDisputedRaised: 6, totalApproved: 1, totalInProgress: 5 } };
+      return { batches: d2cBatches };
     }
     
     // Synthesize realistic batches from unreconciled data
+    const twoReasons = ['Settlement Pending', 'Extra Commission Charged'];
     let batches: any[] = [];
     const sourceRows = Array.isArray(unreconciledRows) && unreconciledRows.length > 0 ? unreconciledRows : [];
 
     if (sourceRows.length > 0) {
       const batchesMap = sourceRows.reduce((acc: Record<string, { totalOrders: number; totalGap: number }>, row: any) => {
         // Find a relevant date field to group by
-        const raisedTime = row['Invoice Date'] || row['Order Date'] || row['date'] || '2024-03-15';
-        if (!acc[raisedTime]) acc[raisedTime] = { totalOrders: 0, totalGap: 0 };
+        const groupDate = row['Invoice Date'] || row['Order Date'] || row['date'] || '2024-03-15';
+        if (!acc[groupDate]) acc[groupDate] = { totalOrders: 0, totalGap: 0 };
         
         // Handle both grouped data (D2C) and flat data (Amazon)
         if (row.count !== undefined) {
-          acc[raisedTime].totalOrders += row.count;
-          acc[raisedTime].totalGap += row.total_difference || 0;
+          acc[groupDate].totalOrders += row.count;
+          acc[groupDate].totalGap += row.total_difference || 0;
         } else {
-          acc[raisedTime].totalOrders += 1;
+          acc[groupDate].totalOrders += 1;
           const diff = row['Difference'] || row['difference'] || row['Difference Amount'] || 0;
-          acc[raisedTime].totalGap += (typeof diff === 'string' ? parseFloat(diff.replace(/,/g, '')) : diff) || 0;
+          acc[groupDate].totalGap += (typeof diff === 'string' ? parseFloat(diff.replace(/,/g, '')) : diff) || 0;
         }
         return acc;
       }, {});
 
-      batches = Object.entries(batchesMap).map(([raisedTime, data], i) => {
-        const status = statuses[i % statuses.length];
-        return {
+      batches = Object.entries(batchesMap).map(([groupDate, data], i) => {
+        const reason = twoReasons[i % twoReasons.length];
+        const base: any = {
           id: `batch-${i}`,
-          raisedTime,
           totalOrders: data.totalOrders < 500 ? data.totalOrders * 50 + Math.floor(Math.random() * 200) : data.totalOrders,
           totalGap: Math.abs(data.totalGap) < 100000 ? (Math.floor(Math.random() * 150000) + 350000) * (data.totalGap >= 0 ? 1 : -1) : data.totalGap,
-          status,
-          activeStep: status.step,
-          reason: reasons[i % reasons.length]
+          reason
         };
+        if (reason === 'Settlement Pending') {
+          const tatInfo = generateTatInfo(i + 1);
+          base.tatExpiredOn = tatInfo.tatExpiredOn;
+          base.dueByDays = tatInfo.dueByDays;
+        }
+        return base;
       }).sort((a, b) => {
-        const timeA = new Date(a.raisedTime).getTime();
-        const timeB = new Date(b.raisedTime).getTime();
-        return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+        // Sort by totalGap descending for consistent ordering
+        return Math.abs(b.totalGap) - Math.abs(a.totalGap);
       });
     }
 
     // Add dummy padding if less than 5 batches
     if (batches.length < 5) {
       for (let i = batches.length; i < 5; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() - (i * 2 + Math.floor(Math.random() * 2)));
-        const status = statuses[i % statuses.length];
-        batches.push({
+        const reason = twoReasons[i % twoReasons.length];
+        const base: any = {
           id: `batch-mock-${i}`,
-          raisedTime: date.toISOString().split('T')[0],
           totalOrders: Math.floor(Math.random() * 500) + 1200,
           totalGap: (Math.floor(Math.random() * 150000) + 350000) * (Math.random() > 0.5 ? 1 : -1),
-          status,
-          activeStep: status.step,
-          reason: reasons[i % reasons.length]
-        });
+          reason
+        };
+        if (reason === 'Settlement Pending') {
+          const tatInfo = generateTatInfo(i + 1);
+          base.tatExpiredOn = tatInfo.tatExpiredOn;
+          base.dueByDays = tatInfo.dueByDays;
+        }
+        batches.push(base);
       }
     }
 
@@ -2272,13 +2256,7 @@ const OperationsCentrePage: React.FC = () => {
       }
     }
 
-    // Top-level metrics represent the number of *Disputes* (batches), not individual orders.
-    // Setting to ~45 as a realistic historical aggregate volume.
-    const totalDisputedRaised = 45 + (batches.length % 3); 
-    const totalApproved = Math.floor(totalDisputedRaised * 0.4);
-    const totalInProgress = totalDisputedRaised - totalApproved;
-
-    return { batches, metrics: { totalDisputedRaised, totalApproved, totalInProgress } };
+    return { batches };
   }, [unreconciledRows, unreconciledCount, selectedPlatform]);
 
   useEffect(() => {
@@ -2286,26 +2264,26 @@ const OperationsCentrePage: React.FC = () => {
     window.dispatchEvent(new Event('badgeCountChanged'));
   }, [disputeBatchesData.batches.length]);
 
+
   const renderDisputedTiles = () => {
-    const { batches, metrics } = disputeBatchesData;
-    const { totalDisputedRaised, totalApproved, totalInProgress } = metrics;
+    const { batches } = disputeBatchesData;
+    // Filter batches based on active tab
+    const filteredBatches = disputeSubTab === 0
+      ? batches.filter(b => !raisedBatchIds.includes(b.id))  // To Be Raised
+      : batches.filter(b => raisedBatchIds.includes(b.id));   // Raised
+    const emptyMessage = disputeSubTab === 0 ? 'No disputes to be raised.' : 'No raised disputes yet.';
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, mt: 3 }}>
 
-        {/* Dispute Batches Grid */}
-        <Typography variant="h6" sx={{ fontWeight: 600, color: '#111827', mt: 1 }}>
-          Disputed Orders
-        </Typography>
-        
-        {batches.length === 0 ? (
+        {filteredBatches.length === 0 ? (
           <Box sx={{ py: 6, textAlign: 'center', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
-            <Typography variant="body1" sx={{ color: '#6b7280' }}>No disputed orders available.</Typography>
+            <Typography variant="body1" sx={{ color: '#6b7280' }}>{emptyMessage}</Typography>
           </Box>
         ) : (
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 3 }}>
-            {batches.map((batch, idx) => (
+            {filteredBatches.map((batch, idx) => (
               <Card 
-                key={idx} 
+                key={batch.id} 
                 onClick={() => handleOpenTracker(batch)}
                 sx={{
                   borderRadius: '12px',
@@ -2322,35 +2300,20 @@ const OperationsCentrePage: React.FC = () => {
                   }
               }}>
                 <CardContent sx={{ p: 3, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <Box>
-                      {batch.entity && (
-                        <Typography variant="h6" sx={{ color: '#111827', fontWeight: 700, mb: 1 }}>
-                          {batch.entity}
-                        </Typography>
-                      )}
-                      <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Raised Time
+                  <Box>
+                    {batch.entity && (
+                      <Typography variant="h6" sx={{ color: '#111827', fontWeight: 700, mb: 1 }}>
+                        {batch.entity}
                       </Typography>
-                      <Typography variant="subtitle2" sx={{ color: '#111827', fontWeight: 600 }}>
-                        {formatDate(batch.raisedTime)}
+                    )}
+                    <Typography variant="body2" sx={{ color: '#4b5563' }}>
+                      Reason: <span style={{ fontWeight: 600 }}>{batch.reason}</span>
+                    </Typography>
+                    {batch.reason === 'Settlement Pending' && batch.tatExpiredOn && (
+                      <Typography variant="body2" sx={{ color: '#dc2626', mt: 0.5, fontWeight: 500 }}>
+                        TAT expired on: {formatDate(batch.tatExpiredOn)} <span style={{ color: '#6b7280', fontWeight: 400 }}>(due by {batch.dueByDays} {batch.dueByDays === 1 ? 'day' : 'days'})</span>
                       </Typography>
-                      <Typography variant="body2" sx={{ color: '#4b5563', mt: 0.5 }}>
-                        Reason: <span style={{ fontWeight: 600 }}>{batch.reason}</span>
-                      </Typography>
-                    </Box>
-                    <Chip 
-                      label={batch.status.label} 
-                      size="small" 
-                      sx={{ 
-                        backgroundColor: batch.status.bg, 
-                        color: batch.status.color, 
-                        fontWeight: 600,
-                        fontSize: '0.7rem',
-                        height: 24,
-                        borderRadius: '4px'
-                      }} 
-                    />
+                    )}
                   </Box>
                   <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                     <Box sx={{ p: 1.5, backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #f3f4f6', flex: 1 }}>
@@ -2375,8 +2338,7 @@ const OperationsCentrePage: React.FC = () => {
                       variant="outlined" 
                       size="small" 
                       onClick={(e) => {
-                        e.stopPropagation(); // Prevent popup from opening
-                        setDisputeSubTab(1); // Navigate to mismatched tab
+                        e.stopPropagation();
                       }}
                       sx={{ 
                         textTransform: 'none', 
@@ -2421,29 +2383,32 @@ const OperationsCentrePage: React.FC = () => {
                     >
                       Download CSV
                     </Button>
-                    <Button 
-                      variant="outlined" 
-                      size="small" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSnackbarMsg('Dispute marked as raised');
-                        setSnackbarOpen(true);
-                      }}
-                      sx={{ 
-                        textTransform: 'none', 
-                        fontWeight: 600,
-                        color: '#111827',
-                        borderColor: '#e5e7eb',
-                        flex: 1,
-                        '&:hover': {
-                          backgroundColor: '#f9fafb',
-                          borderColor: '#d1d5db'
-                        },
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      Mark it raised
-                    </Button>
+                    {disputeSubTab === 0 && (
+                      <Button 
+                        variant="outlined" 
+                        size="small" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRaisedBatchIds(prev => [...prev, batch.id]);
+                          setSnackbarMsg('Dispute marked as raised');
+                          setSnackbarOpen(true);
+                        }}
+                        sx={{ 
+                          textTransform: 'none', 
+                          fontWeight: 600,
+                          color: '#111827',
+                          borderColor: '#e5e7eb',
+                          flex: 1,
+                          '&:hover': {
+                            backgroundColor: '#f9fafb',
+                            borderColor: '#d1d5db'
+                          },
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Mark As Raised
+                      </Button>
+                    )}
                   </Box>
                 </CardContent>
               </Card>
@@ -2460,8 +2425,8 @@ const OperationsCentrePage: React.FC = () => {
         <CardContent sx={{ p: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Tabs value={disputeSubTab} onChange={(_, v) => { setDisputeSubTab(v); setPage(0); }} sx={{ '& .MuiTab-root': { textTransform: 'none', minHeight: 32 } }}>
-              <Tab label="Home" />
-              <Tab label={`Unsettled Orders (${getUnreconciledTotalCount()})`} />
+              <Tab label="To Be Raised" />
+              <Tab label="Raised" />
             </Tabs>
             {/* Right controls: applied filter chips + filter + platform + send button */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -2726,671 +2691,8 @@ const OperationsCentrePage: React.FC = () => {
 
 
 
-      {disputeSubTab === 0 ? (
-        renderDisputedTiles()
-      ) : (
-        <Card sx={{
-          background: '#ffffff',
-          borderRadius: '12px',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-          overflow: 'hidden',
-        }}>
-        <CardContent sx={{ p: 0 }}>
-          <TableContainer sx={{
-            maxHeight: 'calc(100vh - 200px)',
-            overflowX: 'auto',
-          }}>
-            <Table stickyHeader sx={{
-              borderCollapse: 'separate',
-              borderSpacing: 0,
-              '& .MuiTableCell-root': {
-                border: 'none !important',
-              },
-              '& .MuiTableCell-head': {
-                border: 'none !important',
-                borderBottom: '0.5px solid #e5e7eb !important',
-              },
-              '& .MuiTableCell-body': {
-                border: 'none !important',
-                borderBottom: '0.5px solid #e5e7eb !important',
-              }
-            }}>
-              <TableHead sx={{ '& .MuiTableCell-root': { border: 'none !important' } }}>
-                <TableRow>
-                  {disputeSubTab === 1 ? (
-                    <>
-                      {/* Unreconciled Orders tab - show all detail columns directly */}
-                      <TableCell padding="checkbox" sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 60, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Checkbox
-                          checked={allSelectedInView}
-                          indeterminate={someSelectedInView}
-                          onChange={toggleSelectAllInView}
-                          sx={{
-                            color: '#6b7280',
-                            '&.Mui-checked': { color: '#1f2937' },
-                            '&.MuiCheckbox-indeterminate': { color: '#1f2937' },
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Dispute Required</Typography>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order ID</Typography>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setShowOrderIdSearch(!showOrderIdSearch);
-                            }}
-                            sx={{
-                              ml: 0.5,
-                              color: showOrderIdSearch ? '#1f2937' : '#6b7280',
-                              background: showOrderIdSearch ? '#e5e7eb' : 'transparent',
-                              '&:hover': { background: '#f3f4f6' },
-                            }}
-                            aria-label="Toggle search"
-                          >
-                            <SearchIcon sx={{ fontSize: '1rem' }} />
-                          </IconButton>
-                        </Box>
-                        {showOrderIdSearch && (
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              mt: 0.5
-                            }}
-                          >
-                            <TextField
-                              size="small"
-                              value={orderIdSearch}
-                              onChange={handleOrderIdSearchChange}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleOrderIdSearchClick();
-                                }
-                              }}
-                              InputProps={{
-                                endAdornment: (
-                                  <InputAdornment position="end">
-                                    <IconButton
-                                      size="small"
-                                      onClick={handleOrderIdSearchClick}
-                                      sx={{ p: 0.5 }}
-                                    >
-                                      <SearchIcon sx={{ fontSize: '1rem', color: '#3b82f6' }} />
-                                    </IconButton>
-                                  </InputAdornment>
-                                ),
-                              }}
-                              sx={{
-                                width: '280px',
-                                '& .MuiOutlinedInput-root': {
-                                  height: '32px',
-                                  fontSize: '0.75rem',
-                                  background: 'white',
-                                }
-                              }}
-                            />
-                          </Box>
-                        )}
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Value</Typography>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleSort('Order Value');
-                            }}
-                            sx={{
-                              ml: 0.5,
-                              color: sortConfig?.key === 'Order Value' ? '#1f2937' : '#6b7280',
-                              background: sortConfig?.key === 'Order Value' ? '#e5e7eb' : 'transparent',
-                              '&:hover': { background: '#f3f4f6' },
-                            }}
-                            disabled={!COLUMN_TO_SORT_BY_MAP['Order Value']}
-                            aria-label="Sort Order Value"
-                          >
-                            {getSortIcon('Order Value')}
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Value</Typography>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleSort('Settlement Value');
-                            }}
-                            sx={{
-                              ml: 0.5,
-                              color: sortConfig?.key === 'Settlement Value' ? '#1f2937' : '#6b7280',
-                              background: sortConfig?.key === 'Settlement Value' ? '#e5e7eb' : 'transparent',
-                              '&:hover': { background: '#f3f4f6' },
-                            }}
-                            disabled={!COLUMN_TO_SORT_BY_MAP['Settlement Value']}
-                            aria-label="Sort Settlement Value"
-                          >
-                            {getSortIcon('Settlement Value')}
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>
-                            {selectedPlatform === 'd2c' ? 'Order Date' : 'Invoice Date'}
-                          </Typography>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleSort('Invoice Date');
-                            }}
-                            sx={{
-                              ml: 0.5,
-                              color: sortConfig?.key === 'Invoice Date' ? '#1f2937' : '#6b7280',
-                              background: sortConfig?.key === 'Invoice Date' ? '#e5e7eb' : 'transparent',
-                              '&:hover': { background: '#f3f4f6' },
-                            }}
-                            disabled={!COLUMN_TO_SORT_BY_MAP['Invoice Date']}
-                            aria-label="Sort Invoice Date"
-                          >
-                            {getSortIcon('Invoice Date')}
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Date</Typography>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleSort('Settlement Date');
-                            }}
-                            sx={{
-                              ml: 0.5,
-                              color: sortConfig?.key === 'Settlement Date' ? '#1f2937' : '#6b7280',
-                              background: sortConfig?.key === 'Settlement Date' ? '#e5e7eb' : 'transparent',
-                              '&:hover': { background: '#f3f4f6' },
-                            }}
-                            disabled={!COLUMN_TO_SORT_BY_MAP['Settlement Date']}
-                            aria-label="Sort Settlement Date"
-                          >
-                            {getSortIcon('Settlement Date')}
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 120, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Difference</Typography>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleSort('Difference');
-                            }}
-                            sx={{
-                              ml: 0.5,
-                              color: sortConfig?.key === 'Difference' ? '#1f2937' : '#6b7280',
-                              background: sortConfig?.key === 'Difference' ? '#e5e7eb' : 'transparent',
-                              '&:hover': { background: '#f3f4f6' },
-                            }}
-                            disabled={!COLUMN_TO_SORT_BY_MAP['Difference']}
-                            aria-label="Sort Difference"
-                          >
-                            {getSortIcon('Difference')}
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Reason</Typography>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Provider</Typography>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 120, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Status</Typography>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleSort('Status');
-                            }}
-                            sx={{
-                              ml: 0.5,
-                              color: sortConfig?.key === 'Status' ? '#1f2937' : '#6b7280',
-                              background: sortConfig?.key === 'Status' ? '#e5e7eb' : 'transparent',
-                              '&:hover': { background: '#f3f4f6' },
-                            }}
-                            disabled={!COLUMN_TO_SORT_BY_MAP['Status']}
-                            aria-label="Sort Status"
-                          >
-                            {getSortIcon('Status')}
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 200, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>Action</TableCell>
-                    </>
-                  ) : (
-                    <>
-                      {/* Headers for Disputed and Manually Reconciled tabs (no checkbox, no actions) */}
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order ID</Typography>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Value</Typography>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleSort('Order Value');
-                            }}
-                            sx={{
-                              ml: 0.5,
-                              color: sortConfig?.key === 'Order Value' ? '#1f2937' : '#6b7280',
-                              background: sortConfig?.key === 'Order Value' ? '#e5e7eb' : 'transparent',
-                              '&:hover': { background: '#f3f4f6' },
-                            }}
-                            disabled={!COLUMN_TO_SORT_BY_MAP['Order Value']}
-                            aria-label="Sort Order Value"
-                          >
-                            {getSortIcon('Order Value')}
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Value</Typography>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleSort('Settlement Value');
-                            }}
-                            sx={{
-                              ml: 0.5,
-                              color: sortConfig?.key === 'Settlement Value' ? '#1f2937' : '#6b7280',
-                              background: sortConfig?.key === 'Settlement Value' ? '#e5e7eb' : 'transparent',
-                              '&:hover': { background: '#f3f4f6' },
-                            }}
-                            disabled={!COLUMN_TO_SORT_BY_MAP['Settlement Value']}
-                            aria-label="Sort Settlement Value"
-                          >
-                            {getSortIcon('Settlement Value')}
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Order Date</Typography>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 140, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Date</Typography>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 120, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Difference</Typography>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleSort('Difference');
-                            }}
-                            sx={{
-                              ml: 0.5,
-                              color: sortConfig?.key === 'Difference' ? '#1f2937' : '#6b7280',
-                              background: sortConfig?.key === 'Difference' ? '#e5e7eb' : 'transparent',
-                              '&:hover': { background: '#f3f4f6' },
-                            }}
-                            disabled={!COLUMN_TO_SORT_BY_MAP['Difference']}
-                            aria-label="Sort Difference"
-                          >
-                            {getSortIcon('Difference')}
-                          </IconButton>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Settlement Provider</Typography>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Status</Typography>
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#111827', background: '#f9fafb', textAlign: 'center', minWidth: 160, transition: 'all 0.3s ease', position: 'relative', py: 1 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.875rem' }}>Remark</Typography>
-                      </TableCell>
-                    </>
-                  )}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {apiLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={disputeSubTab === 1 ? 12 : 9} sx={{ textAlign: 'center', py: 8 }}>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                        <CircularProgress size={40} sx={{ color: '#3b82f6' }} />
-                        <Typography variant="body1" sx={{ color: '#6b7280', fontWeight: 500 }}>
-                          Loading data...
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ) : (disputeSubTab === 1 ? paginatedCurrent : current).map((row: any, index: number) => {
-                  if (disputeSubTab === 1) {
-                    // Flat detailed row for unreconciled orders
-                    const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || '';
-                    const amount = row["Amount"] || row["Order Value"] || 0;
-                    const settlementValue = row["Settlement Value"] || 0;
-                    const invoiceDate = row["Invoice Date"] || row["Order Date"] || '';
-                    const settlementDate = row["Settlement Date"] || '';
-                    const difference = row["Difference"] || 0;
-                    const remark = row["Remark"] || 'Not Available';
-                    const eventType = row["Event Type"] || 'Sale';
-                    // Show reason from mismatch_reason metadata
-                    let reason = (row.originalData?.metadata?.mismatch_reason || '').trim();
-                    if (reason) {
-                      reason = reason.charAt(0).toUpperCase() + reason.slice(1);
-                    } else {
-                      reason = '';
-                    }
-                    const status = row.originalData?.breakups?.recon_status || 'less_payment_received';
+      {renderDisputedTiles()}
 
-                    return (
-                      <TableRow key={`flat-${index}`} sx={{ '&:hover': { background: '#f3f4f6' }, transition: 'all 0.3s ease' }}>
-                        <TableCell padding="checkbox">
-                          <Checkbox
-                            checked={selectedIds.includes(orderId)}
-                            onChange={() => toggleRow(orderId)}
-                            sx={{
-                              color: '#6b7280',
-                              '&.Mui-checked': { color: '#1f2937' },
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          {(() => {
-                            const info = getDisputeRequiredInfo(orderId);
-                            return (
-                              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-                                <Chip
-                                  label={info.value}
-                                  size="small"
-                                  sx={{
-                                    background: info.bgColor,
-                                    color: info.color,
-                                    fontWeight: 700,
-                                    fontSize: '0.75rem',
-                                    height: 24,
-                                    '& .MuiChip-label': { px: 1.5 },
-                                  }}
-                                />
-                                <Tooltip title={info.reason} arrow placement="top">
-                                  <IconButton
-                                    size="small"
-                                    sx={{
-                                      p: 0.25,
-                                      color: '#6b7280',
-                                      '&:hover': {
-                                        color: '#111827',
-                                        background: '#f3f4f6',
-                                      },
-                                    }}
-                                    aria-label="Dispute reasoning info"
-                                  >
-                                    <InfoIcon fontSize="small" sx={{ fontSize: '0.875rem' }} />
-                                  </IconButton>
-                                </Tooltip>
-                              </Box>
-                            );
-                          })()}
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>{orderId}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle', fontWeight: 500 }}>₹{settlementValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{formatDate(invoiceDate)}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>{formatDate(settlementDate)}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>₹{difference.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Chip label={reason} size="small" sx={{ fontWeight: 600, color: '#1f2937', backgroundColor: '#e5e7eb', '& .MuiChip-label': { px: 1 } }} />
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Typography variant="body2" sx={{ color: '#111827', fontWeight: 500 }}>
-                            {row["Settlement Provider"] || row.originalData?.settlement_provider ? formatSettlementProvider(row["Settlement Provider"] || row.originalData?.settlement_provider) : 'N/A'}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                            {(() => {
-                              const reconStatus = (row as any).recon_status || row.originalData?.recon_status || row.originalData?.breakups?.recon_status || status;
-                              let displayText = '';
-                              let backgroundColor = '';
-                              let textColor = '';
-                              switch (reconStatus) {
-                                case 'settlement_matched':
-                                  displayText = 'Settlement Matched';
-                                  backgroundColor = '#dcfce7';
-                                  textColor = '#059669';
-                                  break;
-                                case 'less_payment_received':
-                                  displayText = 'Less Payment Received';
-                                  backgroundColor = '#fef3c7';
-                                  textColor = '#d97706';
-                                  break;
-                                case 'more_payment_received':
-                                  displayText = 'More Payment Received';
-                                  backgroundColor = '#fef3c7';
-                                  textColor = '#d97706';
-                                  break;
-                                default:
-                                  displayText = 'Unsettled';
-                                  backgroundColor = '#fee2e2';
-                                  textColor = '#dc2626';
-                              }
-                              return (
-                                <Chip
-                                  label={displayText}
-                                  size="small"
-                                  sx={{
-                                    background: backgroundColor,
-                                    color: textColor,
-                                    fontWeight: 600,
-                                    fontSize: '0.75rem',
-                                    height: 24,
-                                    '& .MuiChip-label': { px: 1 },
-                                  }}
-                                />
-                              );
-                            })()}
-                            {(() => {
-                              const eventType = (row as any).event_type || row["Event Type"] || row.originalData?.event_type || 'Sale';
-                              const isSale = String(eventType || '').toLowerCase() === 'sale';
-                              return (
-                                <Chip
-                                  label={eventType}
-                                  size="small"
-                                  sx={{
-                                    background: isSale ? '#dcfce7' : '#fee2e2',
-                                    color: isSale ? '#059669' : '#dc2626',
-                                    fontWeight: 600,
-                                    fontSize: '0.75rem',
-                                    height: 24,
-                                    '& .MuiChip-label': { px: 1 },
-                                  }}
-                                />
-                              );
-                            })()}
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleHistoryOpen(e, row)}
-                              sx={{
-                                p: 0.25,
-                                color: '#6b7280',
-                                '&:hover': {
-                                  color: '#111827',
-                                  background: '#f3f4f6',
-                                },
-                              }}
-                              aria-label="View transaction history"
-                            >
-                              <InfoIcon fontSize="small" sx={{ fontSize: '0.875rem' }} />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                            <Button size="small" variant="outlined" onClick={() => handleMarkReconciled(orderId)} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#10b981', color: '#10b981', '&:hover': { borderColor: '#059669', backgroundColor: 'rgba(16, 185, 129, 0.04)' } }}>Mark Reconciled</Button>
-                            <Button size="small" variant="outlined" onClick={() => handleRaiseDispute(orderId)} sx={{ fontSize: '0.75rem', py: 0.5, px: 1, minHeight: 28, borderColor: '#6b7280', color: '#6b7280', '&:hover': { borderColor: '#4b5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' } }}>Raise Dispute</Button>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  } else if (disputeSubTab === 0) {
-                    // Flat detailed row for Manually Reconciled or Disputed tabs
-                    const orderId = row["Order ID"] || row.originalData?.order_item_id || row.originalData?.order_id || '';
-                    const amount = row["Amount"] || row["Order Value"] || 0;
-                    const settlementValue = row["Settlement Value"] || 0;
-                    const invoiceDate = row["Invoice Date"] || row["Order Date"] || '';
-                    const settlementDate = row["Settlement Date"] || '';
-                    const difference = row["Difference"] || 0;
-                    const remark = row["Remark"] || 'Not Available';
-                    const eventType = row["Event Type"] || 'Sale';
-                    const status = row.originalData?.breakups?.recon_status || row.originalData?.status || 'settlement_matched';
-
-                    return (
-                      <TableRow key={`flat-${index}`} sx={{ '&:hover': { background: '#f3f4f6' }, transition: 'all 0.3s ease' }}>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Typography variant="body2" sx={{ color: '#111827', fontWeight: 500 }}>{orderId}</Typography>
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Typography variant="body2" sx={{ color: '#111827', fontWeight: 500 }}>₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Typography variant="body2" sx={{ color: '#111827', fontWeight: 500 }}>₹{settlementValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Typography variant="body2" sx={{ color: '#111827' }}>{invoiceDate}</Typography>
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Typography variant="body2" sx={{ color: '#111827' }}>{settlementDate || 'N/A'}</Typography>
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Typography variant="body2" sx={{ color: difference === 0 ? '#059669' : difference > 0 ? '#dc2626' : '#d97706', fontWeight: 600 }}>
-                            ₹{difference.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Typography variant="body2" sx={{ color: '#111827', fontWeight: 500 }}>
-                            {row["Settlement Provider"] || row.originalData?.settlement_provider ? formatSettlementProvider(row["Settlement Provider"] || row.originalData?.settlement_provider) : 'N/A'}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <Chip
-                              label={"Disputed"}
-                              size="small"
-                              sx={{
-                                background: '#fee2e2',
-                                color: '#dc2626',
-                                fontWeight: 600,
-                                fontSize: '0.75rem',
-                                height: 24,
-                                '& .MuiChip-label': { px: 1 },
-                              }}
-                            />
-                            {(() => {
-                              const isSale = String(eventType || '').toLowerCase() === 'sale';
-                              return (
-                                <Chip
-                                  label={eventType}
-                                  size="small"
-                                  sx={{
-                                    background: isSale ? '#dcfce7' : '#fee2e2',
-                                    color: isSale ? '#059669' : '#dc2626',
-                                    fontWeight: 600,
-                                    fontSize: '0.75rem',
-                                    height: 24,
-                                    '& .MuiChip-label': { px: 1 },
-                                  }}
-                                />
-                              );
-                            })()}
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleHistoryOpen(e, row)}
-                              sx={{
-                                p: 0.25,
-                                color: '#6b7280',
-                                '&:hover': {
-                                  color: '#111827',
-                                  background: '#f3f4f6',
-                                },
-                              }}
-                              aria-label="View transaction history"
-                            >
-                              <InfoIcon fontSize="small" sx={{ fontSize: '0.875rem' }} />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>{remark}</Typography>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  }
-                  return null;
-                })}
-                {!apiLoading && (disputeSubTab === 1 ? paginatedCurrent : current).length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={disputeSubTab === 1 ? 12 : 9} align="center" sx={{ py: 4, color: '#6b7280' }}>No transactions</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          {disputeSubTab === 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', p: 2 }}>
-              <TablePagination
-                component="div"
-                count={getUnreconciledTotalCount()}
-                page={page}
-                onPageChange={(_, newPage) => {
-                  setPage(newPage);
-                  fetchAllTabsData(undefined, undefined, undefined, undefined, newPage);
-                }}
-                rowsPerPage={rowsPerPage}
-                onRowsPerPageChange={(e) => { 
-                  const newRows = parseInt(e.target.value, 10);
-                  setRowsPerPage(newRows); 
-                  setPage(0);
-                  fetchAllTabsData(undefined, undefined, undefined, undefined, 0, newRows);
-                }}
-                rowsPerPageOptions={[10, 25, 50, 100]}
-              />
-            </Box>
-          )}
-        </CardContent>
-      </Card>
-      )}
 
       {/* Minimal Raise Dispute Dialog */}
       <Dialog open={raiseDialogOpen} onClose={closeRaiseDispute} PaperProps={{ sx: { borderRadius: 1, minWidth: 420 } }}>

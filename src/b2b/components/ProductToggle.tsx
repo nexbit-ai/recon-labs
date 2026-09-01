@@ -22,7 +22,8 @@ const ProductToggle: React.FC = () => {
       selected={active}
       onClick={active ? undefined : onClick}
       sx={{
-        px: 1.5,
+        flex: 1,
+        px: 0.5,
         height: 26,
         display: 'flex',
         alignItems: 'center',
@@ -45,7 +46,7 @@ const ProductToggle: React.FC = () => {
   return (
     <Box
       sx={{
-        display: 'inline-flex',
+        display: 'flex',
         border: `1px solid ${colors.grey200}`,
         overflow: 'hidden',
         bgcolor: colors.paper,
