@@ -16,8 +16,6 @@ import Disputes from './views/Disputes';
 import Channels from './views/Channels';
 import Contracts from './views/Contracts';
 import AskNex from './views/AskNex';
-// AP (Accounts Payable) sub-module — isolated shell + routing under /b2b/payable/*
-import PayableApp from './payable/PayableApp';
 // Reuse the exact same Integrations module from the B2C app.
 import Integrations from '../pages/Integrations';
 
@@ -36,8 +34,6 @@ const B2BApp: React.FC = () => (
   <ThemeProvider theme={b2bTheme}>
     <ScopedCssBaseline>
       <Routes>
-        {/* AP payable — standalone shell, must be BEFORE the B2BShell catch-all */}
-        <Route path="payable/*" element={<PayableApp />} />
         <Route element={<B2BShell />}>
           <Route index element={<Navigate to="overview" replace />} />
           {SECTIONS.map((s) => (

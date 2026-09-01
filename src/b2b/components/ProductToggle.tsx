@@ -13,8 +13,7 @@ import { Pressable } from './primitives';
 const ProductToggle: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isPayable = location.pathname.startsWith('/b2b/payable');
-  const isB2B = location.pathname.startsWith('/b2b') && !isPayable;
+  const isB2B = location.pathname.startsWith('/b2b');
 
   const segment = (label: string, active: boolean, onClick: () => void) => (
     <Pressable
@@ -51,11 +50,9 @@ const ProductToggle: React.FC = () => {
         bgcolor: colors.paper,
       }}
     >
-      {segment('B2C', !isB2B && !isPayable, () => navigate('/'))}
+      {segment('B2C', !isB2B, () => navigate('/'))}
       <Box sx={{ width: '1px', bgcolor: colors.grey200 }} />
       {segment('B2B', isB2B, () => navigate('/b2b'))}
-      <Box sx={{ width: '1px', bgcolor: colors.grey200 }} />
-      {segment('Payable', isPayable, () => navigate('/b2b/payable/overview'))}
     </Box>
   );
 };
