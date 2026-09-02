@@ -13,7 +13,9 @@ export type BkExceptionType =
   | 'Partial invoice'
   | 'Unlinked debit note'
   | 'Commission mismatch'
-  | 'Storage overcharge';
+  | 'Storage overcharge'
+  | 'Commission Overcharge'
+  | 'Unauthorized Deduction';
 
 export interface BkSettlementComponent {
   label: string;
