@@ -4515,6 +4515,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         }
 
         exportParams = {
+          export_type: 'sales',
           platform: selectedPlatform,
           order_date_from: dateRange.start,
           order_date_to: dateRange.end,
