@@ -133,7 +133,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 5_46_000,
     paid: 2_60_800,
     variance: 2_85_200,
-    status: 'Unpaid',
+    status: 'Missing Debit Note',
     matchNote:
       'Composite-key match (SKU + GRN qty + cycle). Goods accepted on the GRN but no settlement line was raised — flagged as unpaid.',
     varianceBreakdown: [
@@ -151,7 +151,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 7_18_000,
     paid: 5_76_000,
     variance: 1_42_000,
-    status: 'Over-deducted',
+    status: 'Loss booked',
     matchNote:
       'Exact reference match on STL-AMZ-8841. FBA fee reconciled to weight band — billed band (2kg) ≠ catalog weight (1kg).',
     varianceBreakdown: [
@@ -169,7 +169,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 4_12_000,
     paid: 3_28_600,
     variance: 83_400,
-    status: 'Over-deducted',
+    status: 'Loss booked',
     matchNote:
       "Exact reference match on STL-BLK-7732. An extra deduction line — 'Storage Fee v2' — has no counterpart in the signed rate card.",
     varianceBreakdown: [
@@ -187,7 +187,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 3_61_500,
     paid: 2_97_000,
     variance: 64_500,
-    status: 'Rate variance',
+    status: 'Loss booked',
     matchNote:
       'Exact reference match on STL-NB-5519. Margin recomputed at the contracted 18% — settlement applied 22%.',
     varianceBreakdown: [
@@ -205,7 +205,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 2_88_000,
     paid: 2_46_800,
     variance: 41_200,
-    status: 'Disputed',
+    status: 'Loss booked',
     matchNote:
       'FIFO match across W24 cycles. The visibility-fee line appears twice for the same campaign — duplicate deduction.',
     varianceBreakdown: [
@@ -223,7 +223,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 6_04_000,
     paid: 6_04_000,
     variance: 0,
-    status: 'Matched',
+    status: 'Invoice Matched',
     matchNote: 'Exact reference match — GRN ↔ settlement ID, amount within ±₹1 tolerance.',
     varianceBreakdown: [
       { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
@@ -240,7 +240,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 3_92_000,
     paid: 3_92_000,
     variance: 0,
-    status: 'Matched',
+    status: 'Invoice Matched',
     matchNote: 'Exact reference match — settlement ID resolved on first pass, amount within ±₹1 tolerance.',
     varianceBreakdown: [
       { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
@@ -257,7 +257,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 2_15_000,
     paid: 2_15_000,
     variance: 0,
-    status: 'Matched',
+    status: 'Invoice Matched',
     matchNote: 'Composite-key match (SKU + cycle); all deduction lines reconcile to the rate card within ±₹1.',
     varianceBreakdown: [
       { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
@@ -274,7 +274,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 4_80_000,
     paid: 4_05_300,
     variance: 74_700,
-    status: 'Over-deducted',
+    status: 'Loss booked',
     matchNote:
       "Exact reference match on STL-ZEP-6627. A 'Platform Support' line was deducted at twice the contracted slab for the cycle.",
     varianceBreakdown: [
@@ -292,7 +292,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 3_36_000,
     paid: 2_84_700,
     variance: 51_300,
-    status: 'Rate variance',
+    status: 'Loss booked',
     matchNote:
       'Exact reference match on STL-IM-2048. Commission recomputed at the contracted 16% — settlement applied 20%.',
     varianceBreakdown: [
@@ -310,7 +310,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 4_25_000,
     paid: 1_98_400,
     variance: 2_26_600,
-    status: 'Unpaid',
+    status: 'Missing Debit Note',
     matchNote:
       'Composite-key match (SKU + GRN qty + cycle). 820 units accepted on the GRN remain unsettled — partial payment only.',
     varianceBreakdown: [
@@ -328,7 +328,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 5_52_000,
     paid: 5_10_700,
     variance: 41_300,
-    status: 'Disputed',
+    status: 'Loss booked',
     matchNote:
       'FIFO match across the cycle. A returns-recovery line was charged for orders already credited under a prior RTO claim — duplicate deduction.',
     varianceBreakdown: [
@@ -346,7 +346,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 3_74_000,
     paid: 3_15_500,
     variance: 58_500,
-    status: 'Over-deducted',
+    status: 'Loss booked',
     matchNote:
       "Exact reference match on STL-BLK-3958. A 'Dark Store Placement' charge has no counterpart in the signed rate card.",
     varianceBreakdown: [
@@ -364,7 +364,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 2_68_000,
     paid: 2_68_000,
     variance: 0,
-    status: 'Matched',
+    status: 'Invoice Matched',
     matchNote: 'Exact reference match — settlement ID resolved on first pass, amount within ±₹1 tolerance.',
     varianceBreakdown: [
       { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
@@ -381,7 +381,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 3_05_000,
     paid: 3_05_000,
     variance: 0,
-    status: 'Matched',
+    status: 'Invoice Matched',
     matchNote: 'Composite-key match (SKU + cycle); all deduction lines reconcile to the rate card within ±₹1.',
     varianceBreakdown: [
       { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
@@ -398,7 +398,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 4_92_000,
     paid: 4_92_000,
     variance: 0,
-    status: 'Matched',
+    status: 'Invoice Matched',
     matchNote: 'Exact reference match — GRN ↔ settlement ID, amount within ±₹1 tolerance.',
     varianceBreakdown: [
       { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
@@ -415,7 +415,7 @@ export const reconLineItems: ReconLineItem[] = [
     expected: 1_88_000,
     paid: 1_88_000,
     variance: 0,
-    status: 'Matched',
+    status: 'Invoice Matched',
     matchNote: 'Composite-key match (SKU + cycle); all deduction lines reconcile to the rate card within ±₹1.',
     varianceBreakdown: [
       { label: 'Quantity variance', amount: 0, why: 'Units settled match units accepted' },
@@ -434,10 +434,10 @@ export const reconPurchaseOrders: ReconPurchaseOrder[] = (() => {
     const paid = items.reduce((t, li) => t + li.paid, 0);
     const variance = expected - paid;
 
-    let status: ReconStatus = 'Matched';
+    let status: ReconStatus = 'Invoice Matched';
     if (variance > 0) {
-      const errorStatuses = items.map((li) => li.status).filter((s) => s !== 'Matched');
-      status = (errorStatuses.length > 0 ? errorStatuses[0] : 'Unpaid') as ReconStatus;
+      const errorStatuses = items.map((li) => li.status).filter((s) => s !== 'Invoice Matched');
+      status = (errorStatuses.length > 0 ? errorStatuses[0] : 'Missing Debit Note') as ReconStatus;
     }
 
     return {

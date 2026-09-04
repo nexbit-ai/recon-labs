@@ -1,167 +1,153 @@
-// B2B Overview — the settlement command screen. Every figure is read from the
-// mock barrel (src/b2b/mock); nothing is hardcoded here. Monochrome + one accent
-// (#7A5DBF), square corners, hairline borders, tabular figures. Channels and
-// issue types are NEVER colour-coded — they are uppercase labels / hairline
-// chips. Accent appears only on: Recovered YTD, "File dispute" links, and the
-// single most-urgent deadline.
-import React from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Box, Typography, Button } from '@mui/material';
-import { motion, useReducedMotion } from 'framer-motion';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer
-} from 'recharts';
-import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
-import CountUpMetric from '../components/CountUpMetric';
-import { cardSx as cardBase, ChannelTag, SectionTitle, PageTitle, Pressable } from '../components/primitives';
-import { formatRupees, formatCompactINR, formatINRShort, formatPercent } from '../lib/format';
-import {
-  headlineByKey,
-  channelReceived,
-  totalReceived,
-  pctReceivedOverall,
-  flaggedIssues,
-  flaggedIssuesTotal,
-  netRealisationAssumptionPct,
-  marketingSpends,
-} from '../mock';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, InputBase } from '@mui/material';
+import { motion, useReducedMotion, AnimatePresence } from 'framer-motion';
+import { colors, hairline, tabularNums, space } from '../theme/b2bTokens';
 
-const DISPUTES_ROUTE = '/b2b/disputes';
+// ── PRIMITIVES ──────────────────────────────────────────────────────────────
 
-// Padded card (shared surface + section padding) and the caption helper.
-const cardSx = { ...cardBase, p: `${space.xl}px` } as const;
-const labelSx = { ...type.label, color: colors.grey700 } as const;
-
-const Caption: React.FC<{ children: React.ReactNode; sx?: object }> = ({ children, sx }) => (
-  <Typography sx={{ fontSize: type.body.fontSize, color: colors.grey700, ...sx }}>{children}</Typography>
-);
-
-// Square hairline-bordered label for issue type — grey/ink, never a colour badge.
-const TypeChip: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <Box
-    component="span"
-    sx={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      border: hairline,
-      color: colors.grey700,
-      px: `${space.sm}px`,
-      py: '2px',
-      fontSize: 11,
-      fontWeight: 500,
-      letterSpacing: '0.04em',
-      textTransform: 'uppercase',
-    }}
-  >
+const Shortcut: React.FC<{ children: React.ReactNode, onClick?: () => void }> = ({ children, onClick }) => (
+  <Box component="span" onClick={onClick} sx={{
+    fontSize: 12,
+    color: colors.grey600,
+    cursor: 'pointer',
+    px: '12px',
+    py: '6px',
+    borderRadius: 9999,
+    border: hairline,
+    bgcolor: '#fafafa',
+    transition: 'all 0.15s',
+    '&:hover': { bgcolor: colors.grey100, color: colors.ink },
+    display: 'inline-flex',
+    alignItems: 'center',
+  }}>
     {children}
   </Box>
 );
 
-const FileDisputeLink: React.FC<{ onClick: () => void }> = ({ onClick }) => (
-  <Pressable
-    ariaLabel="File dispute"
-    onClick={onClick}
-    sx={{
-      mt: `${space.sm}px`,
-      display: 'inline-block',
-      fontSize: 13,
-      fontWeight: 500,
-      color: colors.accent,
-      '&:hover': { color: colors.accentHover },
-    }}
-  >
-    View reconciliation →
-  </Pressable>
+const HistoryItem: React.FC<{ time: string, title: string, isActive?: boolean, onClick?: () => void }> = ({ time, title, isActive, onClick }) => (
+  <Box onClick={onClick} sx={{ 
+    display: 'flex', 
+    gap: '12px', 
+    alignItems: 'flex-start', 
+    cursor: 'pointer',
+    py: '6px',
+    px: '8px',
+    mx: '-8px',
+    borderRadius: '8px',
+    transition: 'background-color 0.15s',
+    bgcolor: isActive ? colors.grey100 : 'transparent',
+    '&:hover': { bgcolor: colors.grey100 }
+  }}>
+    <Typography sx={{ fontSize: 12, color: colors.grey400, minWidth: '42px', ...tabularNums, mt: '1px' }}>{time}</Typography>
+    <Typography sx={{ fontSize: 13, color: isActive ? colors.ink : colors.grey700, fontWeight: isActive ? 500 : 400, lineHeight: 1.4 }}>{title}</Typography>
+  </Box>
 );
 
-// ── Historical 6-Month Data for Graphs ──
-// Values in Crores for plotting
-const historicalDataMap: Record<string, any[]> = {
-  all: [
-    { name: 'Jan', PO: 3.8, GRN: 3.6, Settlement: 3.4 },
-    { name: 'Feb', PO: 4.2, GRN: 3.9, Settlement: 3.6 },
-    { name: 'Mar', PO: 3.9, GRN: 3.7, Settlement: 3.5 },
-    { name: 'Apr', PO: 4.6, GRN: 4.3, Settlement: 4.0 },
-    { name: 'May', PO: 4.1, GRN: 3.8, Settlement: 3.6 },
-    { name: 'Jun', PO: 4.5, GRN: 4.1, Settlement: 3.8 },
-  ],
-  blinkit: [
-    { name: 'Jan', PO: 1.0, GRN: 0.9, Settlement: 0.8 },
-    { name: 'Feb', PO: 1.1, GRN: 1.0, Settlement: 0.9 },
-    { name: 'Mar', PO: 1.05, GRN: 0.95, Settlement: 0.85 },
-    { name: 'Apr', PO: 1.25, GRN: 1.15, Settlement: 1.0 },
-    { name: 'May', PO: 1.15, GRN: 1.05, Settlement: 0.9 },
-    { name: 'Jun', PO: 1.2, GRN: 1.1, Settlement: 0.95 },
-  ],
-  zepto: [
-    { name: 'Jan', PO: 0.8, GRN: 0.7, Settlement: 0.6 },
-    { name: 'Feb', PO: 0.9, GRN: 0.8, Settlement: 0.7 },
-    { name: 'Mar', PO: 0.85, GRN: 0.75, Settlement: 0.65 },
-    { name: 'Apr', PO: 1.15, GRN: 1.05, Settlement: 0.9 },
-    { name: 'May', PO: 1.0, GRN: 0.9, Settlement: 0.8 },
-    { name: 'Jun', PO: 1.1, GRN: 1.0, Settlement: 0.85 },
-  ],
-  entitya: [
-    { name: 'Jan', PO: 1.3, GRN: 1.2, Settlement: 1.1 },
-    { name: 'Feb', PO: 1.4, GRN: 1.3, Settlement: 1.2 },
-    { name: 'Mar', PO: 1.35, GRN: 1.25, Settlement: 1.15 },
-    { name: 'Apr', PO: 1.55, GRN: 1.45, Settlement: 1.35 },
-    { name: 'May', PO: 1.45, GRN: 1.35, Settlement: 1.25 },
-    { name: 'Jun', PO: 1.5, GRN: 1.4, Settlement: 1.3 },
-  ],
-  entityb: [
-    { name: 'Jan', PO: 0.6, GRN: 0.5, Settlement: 0.5 },
-    { name: 'Feb', PO: 0.65, GRN: 0.55, Settlement: 0.55 },
-    { name: 'Mar', PO: 0.6, GRN: 0.55, Settlement: 0.5 },
-    { name: 'Apr', PO: 0.75, GRN: 0.65, Settlement: 0.65 },
-    { name: 'May', PO: 0.65, GRN: 0.6, Settlement: 0.6 },
-    { name: 'Jun', PO: 0.7, GRN: 0.6, Settlement: 0.7 },
-  ]
+const LogEntry: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return (
+    <Box sx={{ display: 'flex', gap: '8px', alignItems: 'flex-start', py: '6px', fontFamily: 'monospace', fontSize: 11, lineHeight: 1.5 }}>
+      <Typography component="span" sx={{ color: colors.grey600, fontFamily: 'inherit' }}>
+        {children}
+      </Typography>
+    </Box>
+  );
 };
 
+// ── COMPONENT ───────────────────────────────────────────────────────────────
+
 const Overview: React.FC = () => {
-  const navigate = useNavigate();
   const reduce = useReducedMotion();
+  const [isChatActive, setIsChatActive] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  
+  // Fake typing state for delay
+  const [messages, setMessages] = useState<any[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
 
-  const { platformFilter } = useOutletContext<{ platformFilter: string }>();
-  const historicalData = historicalDataMap[platformFilter] || historicalDataMap.all;
+  const handleAction = (prompt?: string) => {
+    const text = prompt || inputValue;
+    if (!text.trim()) return;
 
-  // ── Apply platform filter to existing mock data ──
-  const filterKey = platformFilter.toLowerCase().replace(/\s+/g, '');
-  const isAll = filterKey === 'all';
+    if (prompt) {
+      setInputValue(''); // Clear input if prompt is provided directly
+    } else {
+      setInputValue(''); // clear after sending
+    }
 
-  const filteredIssues = isAll
-    ? [...flaggedIssues]
-    : flaggedIssues.filter(i => i.channel.toLowerCase().replace(/\s+/g, '') === filterKey);
+    if (!isChatActive) {
+      setIsChatActive(true);
+    }
 
-  const issues = filteredIssues.sort((a, b) => b.amount - a.amount);
+    // Add user message immediately
+    setMessages(prev => [...prev, { role: 'user', text }]);
+    
+    // Fake agent typing delay
+    setIsTyping(true);
+    setTimeout(() => {
+      setIsTyping(false);
+      setMessages(prev => [...prev, { 
+        role: 'agent', 
+        text: `I've prepared the details for "${text}". The discrepancy centers around an unnotified 8.2% trade promotion fee, which exceeds our MSA clause 4.2 cap of 5.0%.`,
+        hasArtifact: true
+      }]);
+    }, 1500); // 1.5s delay
+  };
 
-  const filteredChannelReceived = isAll
-    ? channelReceived
-    : channelReceived.filter((c) => c.channel.toLowerCase().replace(/\s+/g, '') === filterKey);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && inputValue.trim()) {
+      handleAction();
+    }
+  };
 
-  const mSpend = marketingSpends[filterKey] || { performanceAds: 0, tradePromos: 0, roas: 0 };
-  const totalSpend = mSpend.performanceAds + mSpend.tradePromos;
-  const adsPct = totalSpend > 0 ? Math.round((mSpend.performanceAds / totalSpend) * 100) : 0;
-  const promoPct = totalSpend > 0 ? 100 - adsPct : 0;
-
-  // Scale hero metrics down if a specific platform is selected
-  const scale = isAll ? 1 :
-    platformFilter === 'blinkit' ? 0.35 :
-      platformFilter === 'zepto' ? 0.30 : 0.15;
-
-  const rawReceivable = headlineByKey('receivable').value * scale;
-  const rawRecoverable = headlineByKey('recoverable').value * scale;
-  const rawShortfall = headlineByKey('leakage').value * scale;
-  const netRealisation = headlineByKey('netRealisation');
-  const netGap = (netRealisationAssumptionPct - netRealisation.value).toFixed(1);
+  // Reusable Input Bar
+  const InputComponent = () => (
+    <Box sx={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      border: hairline, 
+      borderRadius: '24px', 
+      px: '16px', 
+      py: '12px', 
+      bgcolor: colors.paper, 
+      boxShadow: isChatActive ? '0 -4px 20px rgba(0,0,0,0.02)' : '0 4px 24px rgba(0,0,0,0.03)', 
+      transition: 'border-color 0.2s, box-shadow 0.2s',
+      '&:focus-within': { borderColor: colors.grey400, boxShadow: isChatActive ? '0 -4px 24px rgba(0,0,0,0.04)' : '0 4px 24px rgba(0,0,0,0.06)' } 
+    }}>
+      <Box component="span" sx={{ color: colors.grey400, mr: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+        </svg>
+      </Box>
+      <InputBase 
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="Ask Nex to reconcile, audit, or draft dispute notices..." 
+        sx={{ flex: 1, fontSize: 15, color: colors.ink, '& input::placeholder': { color: colors.grey400, opacity: 1 } }}
+        disabled={isTyping}
+      />
+      <Box onClick={() => inputValue.trim() && handleAction()} sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        width: 32, 
+        height: 32, 
+        borderRadius: '50%', 
+        border: inputValue.trim() ? `1px solid ${colors.ink}` : hairline, 
+        bgcolor: colors.paper, 
+        color: inputValue.trim() ? colors.ink : colors.grey300, 
+        ml: '12px', 
+        cursor: inputValue.trim() ? 'pointer' : 'default', 
+        transition: 'opacity 0.15s, background-color 0.15s', 
+        '&:hover': { opacity: inputValue.trim() ? 0.6 : 1 } 
+      }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="19" x2="12" y2="5"></line>
+          <polyline points="5 12 12 5 19 12"></polyline>
+        </svg>
+      </Box>
+    </Box>
+  );
 
   return (
     <Box
@@ -169,245 +155,219 @@ const Overview: React.FC = () => {
       initial={reduce ? false : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
+      sx={{ 
+        height: '100%',
+        width: '100%', 
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden', // Make page fixed
+      }}
     >
-
-      {/* ── HERO ROW ─────────────────────────────────────────── */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' },
-          gap: `${space.xl}px`,
-          mb: `${space.xl}px`,
-        }}
-      >
-        {/* 1. Total Gross Revenue */}
-        <Box sx={cardSx}>
-          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px` }}>Total Gross Revenue</Typography>
-          <CountUpMetric value={rawReceivable} format={formatINRShort} />
-        </Box>
-
-        {/* 2. Total Received */}
-        <Box sx={cardSx}>
-          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px` }}>Total Received</Typography>
-          <Box component="span" sx={{ display: 'block', fontSize: type.metric.fontSize, lineHeight: type.metric.lineHeight, fontWeight: type.metric.fontWeight, color: colors.ink, ...tabularNums }}>
-            {formatINRShort(totalReceived * scale)}
-          </Box>
-          <Caption sx={{ mt: `${space.md}px` }}>
-            {formatPercent(pctReceivedOverall)} of gross revenue
-          </Caption>
-        </Box>
-
-        {/* 3. Total Due (Pending) */}
-        <Box sx={cardSx}>
-          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px` }}>Total Due</Typography>
-          <Box component="span" sx={{ display: 'block', fontSize: type.metric.fontSize, lineHeight: type.metric.lineHeight, fontWeight: type.metric.fontWeight, color: colors.accent, ...tabularNums }}>
-            {formatINRShort(rawReceivable - (totalReceived * scale))}
-          </Box>
-          <Caption sx={{ mt: `${space.md}px` }}>
-            Pending collection
-          </Caption>
-          <Button
-            disableElevation
-            onClick={() => navigate(DISPUTES_ROUTE)}
-            sx={{
-              mt: `${space.lg}px`,
-              borderRadius: 0,
-              bgcolor: colors.ink,
-              color: colors.paper,
-              fontSize: 13,
-              fontWeight: 600,
-              px: `${space.lg}px`,
-              py: `${space.md}px`,
-              '&:hover': { bgcolor: colors.inkHover },
-            }}
-          >
-            Review what's pending →
-          </Button>
-        </Box>
-
-        {/* 4. Difference */}
-        <Box sx={cardSx}>
-          <Typography sx={{ ...labelSx, display: 'block', mb: `${space.md}px` }}>Difference</Typography>
-          <Box component="span" sx={{ display: 'block', fontSize: type.metric.fontSize, lineHeight: type.metric.lineHeight, fontWeight: type.metric.fontWeight, color: colors.ink, ...tabularNums }}>
-            {formatINRShort(rawShortfall)}
-          </Box>
-          <Caption sx={{ mt: `${space.md}px` }}>
-            Leakage / Deductions
-          </Caption>
-        </Box>
-      </Box>
-
-      {/* ── FINANCIAL TREND GRAPH ────────────────────────────── */}
-      <Box sx={{ ...cardSx, mb: `${space.xl}px` }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: `${space.xl}px` }}>
-          <SectionTitle>Financial Trend</SectionTitle>
-        </Box>
-        <Box sx={{ width: '100%', height: 320 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={historicalData}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={colors.grey100} />
-              <XAxis dataKey="name" tick={{ fontSize: 12, fill: colors.grey500 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: colors.grey500 }} axisLine={false} tickLine={false} tickFormatter={(value) => `₹${value}Cr`} />
-              <Tooltip
-                contentStyle={{ borderRadius: 0, border: hairline, borderColor: colors.grey100, fontSize: 13 }}
-                itemStyle={{ fontWeight: 500 }}
-                formatter={(value: number) => [`₹${value} Cr`, undefined]}
-              />
-              <Legend wrapperStyle={{ fontSize: 13 }} />
-              <Line type="monotone" dataKey="PO" stroke={colors.ink} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-              <Line type="monotone" dataKey="GRN" stroke={colors.accent} strokeWidth={2} dot={{ r: 4 }} />
-              <Line type="monotone" dataKey="Settlement" stroke={colors.grey500} strokeWidth={2} dot={{ r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </Box>
-      </Box>
-
-      {/* ── MAIN ROW ─────────────────────────────────────────── */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 2fr) minmax(0, 1fr)' },
-          gap: `${space.xl}px`,
-          alignItems: 'start',
-        }}
-      >
-        {/* LEFT — Open Receivables */}
-        <Box sx={{ ...cardSx, p: 0 }}>
+      <AnimatePresence mode="wait">
+        {/* ── STATE A: INITIAL HERO VIEW ── */}
+        {!isChatActive && (
           <Box
-            sx={{
-              p: `${space.xl}px`,
-              borderBottom: hairline,
-              display: 'flex',
-              alignItems: 'baseline',
-              justifyContent: 'space-between',
-              gap: `${space.md}px`,
-            }}
+            component={motion.div}
+            key="initial-state"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
+            transition={{ duration: 0.3 }}
+            sx={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '1000px', mx: 'auto', p: `${space.xl}px`, width: '100%' }}
           >
-            <SectionTitle>Open Receivables</SectionTitle>
-            <Caption sx={{ ...type.label, color: colors.grey500, ...tabularNums }}>
-              {issues.length} of {isAll ? flaggedIssuesTotal : issues.length} open receivables
-            </Caption>
-          </Box>
-
-          {issues.map((issue, i) => (
-            <Box
-              key={issue.id}
-              sx={{
-                display: 'flex',
-                gap: `${space.lg}px`,
-                p: `${space.xl}px`,
-                borderBottom: i < issues.length - 1 ? hairline : 'none',
-                transition: 'background-color 0.12s ease',
-                '&:hover': { bgcolor: colors.grey100 },
-              }}
-            >
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.md}px`, mb: `${space.sm}px` }}>
-                  <ChannelTag name={issue.channel} />
-                  <TypeChip>{issue.type}</TypeChip>
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', mt: '8vh', mb: '12vh' }}>
+              <Typography sx={{ fontSize: 28, fontWeight: 600, color: colors.ink, mb: '32px', letterSpacing: '-0.02em' }}>
+                How can Nex assist you today?
+              </Typography>
+              
+              <Box sx={{ width: '100%', maxWidth: '680px' }}>
+                <InputComponent />
+                <Box sx={{ display: 'flex', justifyContent: 'center', gap: `${space.md}px`, mt: '24px', flexWrap: 'wrap' }}>
+                  <Shortcut onClick={() => handleAction('Draft dispute for Zepto PO-445')}>Draft dispute for Zepto PO-445</Shortcut>
+                  <Shortcut onClick={() => handleAction('Run Q1 TDS reconciliation')}>Run Q1 TDS reconciliation</Shortcut>
+                  <Shortcut onClick={() => handleAction('Check overdue Blinkit payments')}>Check overdue Blinkit payments</Shortcut>
                 </Box>
-                <Typography sx={{ fontSize: type.body.fontSize, fontWeight: 600, color: colors.ink }}>
-                  {issue.title}
-                </Typography>
-                <Caption sx={{ mt: '2px' }}>{issue.detail}</Caption>
-              </Box>
-              <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                <Typography sx={{ fontSize: type.body.fontSize, fontWeight: 600, color: colors.ink, ...tabularNums }}>
-                  {formatRupees(issue.amount)}
-                </Typography>
-                <FileDisputeLink onClick={() => navigate(DISPUTES_ROUTE)} />
               </Box>
             </Box>
-          ))}
-          {issues.length === 0 && (
-            <Box sx={{ p: `${space.xl}px` }}>
-              <Typography sx={{ fontSize: type.body.fontSize, color: colors.grey500 }}>No open exceptions for this platform.</Typography>
-            </Box>
-          )}
-        </Box>
 
-        {/* RIGHT — stacked */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${space.xl}px` }}>
-          <Box sx={cardSx}>
-            <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: `${space.lg}px` }}>
-              <SectionTitle>Received by portal</SectionTitle>
-              <Caption sx={{ ...type.label, color: colors.grey500, ...tabularNums }}>
-                {formatPercent(pctReceivedOverall)} received
-              </Caption>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: '64px', alignItems: 'start', pb: '32px' }}>
+              {/* Live Executions */}
+              <Box>
+                <Typography sx={{ fontSize: 12, fontWeight: 600, color: colors.grey400, textTransform: 'uppercase', letterSpacing: '0.04em', mb: '16px' }}>
+                  Live Executions
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                  <HistoryItem onClick={() => handleAction('Review Blinkit settlement JE-9042')} time="3m ago" title="Matched & settled 138 invoices for Blinkit (JE-9042)" />
+                  <HistoryItem onClick={() => handleAction('Review Adret portal credit notes')} time="14m ago" title="Auto-reconciled 11 credit notes with Adret portal" />
+                  <HistoryItem onClick={() => handleAction('Review MSA trade promo variance')} time="1h ago" title="Flagged ₹8.4L trade promo variance against MSA" />
+                </Box>
+              </Box>
+
+              {/* Logs */}
+              <Box>
+                <Typography sx={{ fontSize: 12, fontWeight: 600, color: colors.grey400, textTransform: 'uppercase', letterSpacing: '0.04em', mb: '16px' }}>
+                  Logs
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                  <LogEntry>Zepto applied 8.2% trade promotion fee on PO-445 (Exceeds MSA Clause 4.2 cap of 5.0%).</LogEntry>
+                  <LogEntry>Zepto Settlement Report (Line #124) matched with MSA_Agreement_v2.pdf.</LogEntry>
+                  <LogEntry>Drafted dispute memo #DISP-082.</LogEntry>
+                </Box>
+              </Box>
             </Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${space.lg}px` }}>
-              {filteredChannelReceived.map((c) => (
-                <Box key={c.channel}>
-                  <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: `${space.xs}px` }}>
-                    <ChannelTag name={c.channel} />
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: `${space.sm}px` }}>
-                      <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, ...tabularNums }}>
-                        {formatCompactINR(c.received)}
-                      </Typography>
-                      <Typography sx={{ fontSize: 11, color: colors.grey500, ...tabularNums }}>
-                        {formatPercent(c.pctReceived)}
-                      </Typography>
+          </Box>
+        )}
+
+        {/* ── STATE B: ACTIVE CHAT VIEW ── */}
+        {isChatActive && (
+          <Box
+            component={motion.div}
+            key="chat-state"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            sx={{ display: 'flex', height: 'calc(100vh - 64px)', width: '100%', overflow: 'hidden' }}
+          >
+            
+            {/* Main Center Area (75%) */}
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', bgcolor: colors.paper, position: 'relative' }}>
+              
+              {/* Scrollable Chat Stream */}
+              <Box sx={{ flex: 1, overflowY: 'auto', p: `${space.xl}px`, display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                <Box sx={{ maxWidth: '800px', mx: 'auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                  
+                  {/* Dummy Conversation 1: User */}
+                  <Box sx={{ alignSelf: 'flex-end', maxWidth: '85%' }}>
+                    <Box sx={{ bgcolor: colors.grey100, color: colors.ink, px: '16px', py: '12px', borderRadius: '16px', borderBottomRightRadius: '4px', fontSize: 14, lineHeight: 1.5 }}>
+                      Can you check if there are any overdue payments from Blinkit?
                     </Box>
                   </Box>
-                  <Box sx={{ height: 6, bgcolor: colors.grey100 }}>
-                    <Box sx={{ height: '100%', width: `${c.pctReceived}%`, bgcolor: colors.ink }} />
-                  </Box>
-                </Box>
-              ))}
-              {filteredChannelReceived.length === 0 && (
-                <Typography sx={{ fontSize: 13, color: colors.grey500 }}>No receive data for this platform.</Typography>
-              )}
-            </Box>
-          </Box>
 
-          <Box sx={{ ...cardSx, display: 'flex', flexDirection: 'column' }}>
-            <SectionTitle>Trade & Ad Spends (Deducted)</SectionTitle>
-            <Box sx={{ mt: `${space.lg}px`, flex: 1, display: 'flex', flexDirection: 'column', gap: `${space.md}px` }}>
-              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: `${space.sm}px` }}>
-                <Typography sx={{ fontSize: 24, fontWeight: 600, color: colors.ink, ...tabularNums }}>
-                  {formatINRShort(totalSpend)}
+                  {/* Dummy Conversation 1: Agent */}
+                  <Box sx={{ alignSelf: 'flex-start', maxWidth: '90%' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '8px' }}>
+                      <Box sx={{ width: 20, height: 20, borderRadius: '4px', bgcolor: colors.ink, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Typography sx={{ color: colors.paper, fontSize: 11, fontWeight: 700 }}>N</Typography>
+                      </Box>
+                      <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>Nex Agent</Typography>
+                    </Box>
+                    <Typography sx={{ fontSize: 14, color: colors.grey700, lineHeight: 1.6 }}>
+                      Yes, there are currently 2 overdue invoices from Blinkit totaling ₹4,12,000. They are both overdue by 4 days. Would you like me to send a collection notice?
+                    </Typography>
+                  </Box>
+
+                  {/* Dynamic Messages */}
+                  <AnimatePresence>
+                    {messages.map((msg, i) => (
+                      <Box
+                        component={motion.div}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        key={i}
+                        sx={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: msg.role === 'user' ? '85%' : '90%' }}
+                      >
+                        {msg.role === 'user' ? (
+                          <Box sx={{ bgcolor: colors.grey100, color: colors.ink, px: '16px', py: '12px', borderRadius: '16px', borderBottomRightRadius: '4px', fontSize: 14, lineHeight: 1.5 }}>
+                            {msg.text}
+                          </Box>
+                        ) : (
+                          <>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mb: '8px' }}>
+                              <Box sx={{ width: 20, height: 20, borderRadius: '4px', bgcolor: colors.ink, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Typography sx={{ color: colors.paper, fontSize: 11, fontWeight: 700 }}>N</Typography>
+                              </Box>
+                              <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>Nex Agent</Typography>
+                            </Box>
+                            <Typography sx={{ fontSize: 14, color: colors.grey700, mb: msg.hasArtifact ? '16px' : 0, lineHeight: 1.6 }}>
+                              {msg.text}
+                            </Typography>
+                            
+                            {/* Rich Artifact Card (Mock) */}
+                            {msg.hasArtifact && (
+                              <Box sx={{ border: hairline, borderRadius: '12px', p: '16px', bgcolor: '#fafafa', mb: '16px' }}>
+                                <Typography sx={{ fontSize: 12, fontWeight: 600, color: colors.ink, mb: '8px' }}>Draft Memo: #DISP-082</Typography>
+                                <Typography sx={{ fontSize: 13, color: colors.grey600, fontFamily: 'monospace', mb: '16px' }}>
+                                  To: Zepto Accounts Payable<br/>
+                                  Subject: Dispute on Settlement PO-445<br/>
+                                  ...
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: '8px' }}>
+                                  <Box component="button" sx={{ all: 'unset', cursor: 'pointer', borderRadius: 9999, border: `1px solid ${colors.ink}`, color: colors.ink, fontSize: 12, fontWeight: 600, px: '14px', py: '6px', '&:hover': { bgcolor: colors.grey100 } }}>Approve & Send</Box>
+                                  <Box component="button" sx={{ all: 'unset', cursor: 'pointer', borderRadius: 9999, border: hairline, bgcolor: colors.paper, color: colors.ink, fontSize: 12, fontWeight: 600, px: '14px', py: '6px', '&:hover': { bgcolor: '#fafafa' } }}>Edit Draft</Box>
+                                </Box>
+                              </Box>
+                            )}
+                          </>
+                        )}
+                      </Box>
+                    ))}
+
+                    {isTyping && (
+                      <Box
+                        component={motion.div}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        sx={{ alignSelf: 'flex-start' }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Box sx={{ width: 20, height: 20, borderRadius: '4px', bgcolor: colors.ink, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Typography sx={{ color: colors.paper, fontSize: 11, fontWeight: 700 }}>N</Typography>
+                          </Box>
+                          <Typography sx={{ fontSize: 13, color: colors.grey500 }}>Nex Agent is thinking...</Typography>
+                        </Box>
+                      </Box>
+                    )}
+                  </AnimatePresence>
+                  
+                </Box>
+              </Box>
+
+              {/* Bottom Fixed Prompt Input (Removed top border) */}
+              <Box sx={{ p: '24px', pb: '32px', bgcolor: colors.paper }}>
+                <Box sx={{ maxWidth: '800px', mx: 'auto', width: '100%' }}>
+                  <InputComponent />
+                </Box>
+              </Box>
+
+            </Box>
+
+            {/* Right Sidebar (25%) */}
+            <Box sx={{ 
+              width: '280px', 
+              borderLeft: hairline, 
+              bgcolor: '#fafafa',
+              display: { xs: 'none', md: 'flex' },
+              flexDirection: 'column',
+              overflowY: 'auto'
+            }}>
+              <Box sx={{ p: '24px' }}>
+                <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey500, textTransform: 'uppercase', letterSpacing: '0.04em', mb: '16px' }}>
+                  Chat History & Executions
                 </Typography>
-                <Typography sx={{ fontSize: 13, color: colors.grey500 }}>total deductions</Typography>
-              </Box>
-
-              <Box sx={{ mt: `${space.sm}px`, display: 'flex', flexDirection: 'column', gap: `${space.sm}px` }}>
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: '4px' }}>
-                    <Typography sx={{ fontSize: 13, color: colors.ink }}>Performance Ads</Typography>
-                    <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, ...tabularNums }}>
-                      {formatINRShort(mSpend.performanceAds)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ height: 6, bgcolor: colors.grey100 }}>
-                    <Box sx={{ height: '100%', width: `${adsPct}%`, bgcolor: colors.ink }} />
-                  </Box>
+                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                  <HistoryItem isActive time="Now" title="Current Session" />
+                  <HistoryItem onClick={() => setInputValue('Review Blinkit settlement JE-9042')} time="3m ago" title="Matched & settled 138 invoices for Blinkit (JE-9042)" />
+                  <HistoryItem onClick={() => setInputValue('Review Adret portal credit notes')} time="14m ago" title="Auto-reconciled 11 credit notes with Adret portal" />
+                  <HistoryItem onClick={() => setInputValue('Review MSA trade promo variance')} time="1h ago" title="Flagged ₹8.4L trade promo variance against MSA" />
                 </Box>
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: '4px' }}>
-                    <Typography sx={{ fontSize: 13, color: colors.ink }}>Trade Promos</Typography>
-                    <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink, ...tabularNums }}>
-                      {formatINRShort(mSpend.tradePromos)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ height: 6, bgcolor: colors.grey100 }}>
-                    <Box sx={{ height: '100%', width: `${promoPct}%`, bgcolor: colors.accent }} />
-                  </Box>
+              </Box>
+              
+              <Box sx={{ p: '24px', borderTop: hairline, flex: 1 }}>
+                <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey500, textTransform: 'uppercase', letterSpacing: '0.04em', mb: '16px' }}>
+                  Agent Logs
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                  <LogEntry>Zepto applied 8.2% trade promo on PO-445 (Exceeds MSA Cap).</LogEntry>
+                  <LogEntry>Zepto Settlement Report matched with MSA.</LogEntry>
+                  <LogEntry>Drafted dispute memo #DISP-082.</LogEntry>
                 </Box>
               </Box>
             </Box>
 
-            <Box sx={{ mt: `${space.xl}px`, borderTop: hairline, pt: `${space.md}px`, display: 'flex', justifyContent: 'space-between' }}>
-              <Typography sx={{ fontSize: 13, color: colors.grey700 }}>Estimated ROAS</Typography>
-              <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.ink, ...tabularNums }}>
-                {mSpend.roas}x
-              </Typography>
-            </Box>
           </Box>
-        </Box>
-      </Box>
+        )}
+      </AnimatePresence>
     </Box>
   );
 };

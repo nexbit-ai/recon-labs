@@ -7,6 +7,7 @@ export * from './receivables';
 export * from './rateCard';
 export * from './contracts';
 export * from './askNex';
+export * from './exceptions';
 
 import { headlineByKey, channelPerformance, reconLineItems, reconPurchaseOrders } from './settlements';
 import { expiringSoonDisputes, sumAmount } from './receivables';

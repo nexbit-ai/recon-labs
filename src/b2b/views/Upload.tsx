@@ -4,8 +4,8 @@
 // accent (#7A5DBF). Status and low-confidence exceptions are NEVER colour-coded
 // — they are expressed through type weight and hairline-bordered labels. The
 // accent appears only on the single primary action (Sync) and the modal CTA.
-import React, { useState } from 'react';
-import { Box, Typography, Button, IconButton } from '@mui/material';
+import React, { useState, useRef } from 'react';
+import { Box, Typography, Button, IconButton, Tabs, Tab } from '@mui/material';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
   CloudUploadOutlined,
@@ -16,6 +16,8 @@ import {
 import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
 import { cardSx, PageTitle, SectionTitle, ColumnLabel } from '../components/primitives';
 import UploadSettlementModal from '../components/UploadSettlementModal';
+import { pendingFromCounterparty } from '../mock';
+import { formatRupees } from '../lib/format';
 
 const INBOX = 'inbox-kp@usenexbit.com';
 
@@ -45,6 +47,15 @@ interface ReceivedFile {
   note?: string; // why confidence is low / what needs attention
 }
 
+const TABS = [
+  'Purchase Order',
+  'Tax invoice',
+  'Debit note',
+  'Credit note',
+  'GRN',
+  'Other'
+];
+
 const RECEIVED_FILES: ReceivedFile[] = [
   {
     name: 'PO_Zepto_48291.pdf',
@@ -57,7 +68,7 @@ const RECEIVED_FILES: ReceivedFile[] = [
   },
   {
     name: 'Invoice_BlinkitFMCG_Q2.xlsx',
-    docType: 'Invoice',
+    docType: 'Tax invoice',
     source: 'Email forwarding',
     time: '24 mins ago',
     confidence: 96,
@@ -76,7 +87,7 @@ const RECEIVED_FILES: ReceivedFile[] = [
   },
   {
     name: 'Settlement_Swiggy_May.csv',
-    docType: 'Settlement',
+    docType: 'Other',
     source: 'Auto-fetch',
     time: '1 hour ago',
     confidence: 92,
@@ -85,7 +96,7 @@ const RECEIVED_FILES: ReceivedFile[] = [
   },
   {
     name: 'DebitNote_Reliance_unknown.pdf',
-    docType: 'Debit / Credit Note',
+    docType: 'Debit note',
     source: 'Email forwarding',
     time: '2 hours ago',
     confidence: 43,
@@ -95,7 +106,7 @@ const RECEIVED_FILES: ReceivedFile[] = [
   },
   {
     name: 'BankStatement_HDFC_Apr.pdf',
-    docType: 'Bank Statement',
+    docType: 'Other',
     source: 'Upload',
     time: '3 hours ago',
     confidence: 88,
@@ -111,6 +122,15 @@ const RECEIVED_FILES: ReceivedFile[] = [
     amount: '₹76 K',
     status: 'Exception',
     note: 'Handwritten fields — vendor & SKU mapping uncertain',
+  },
+  {
+    name: 'CreditNote_Amazon_Q1.pdf',
+    docType: 'Credit note',
+    source: 'Email forwarding',
+    time: '5 hours ago',
+    confidence: 100,
+    amount: '₹3.4 L',
+    status: 'Processed',
   },
 ];
 
@@ -146,6 +166,19 @@ const Upload: React.FC = () => {
   const reduce = useReducedMotion();
   const [uploadOpen, setUploadOpen] = useState(false);
   const openModal = () => setUploadOpen(true);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      openModal();
+      e.target.value = '';
+    }
+  };
+
+  const [activeTab, setActiveTab] = useState(TABS[0]);
+  const filteredFiles = RECEIVED_FILES.filter(file => file.docType === activeTab);
+  const getCountForTab = (tab: string) => RECEIVED_FILES.filter(file => file.docType === tab).length;
 
   return (
     <Box
@@ -199,15 +232,22 @@ const Upload: React.FC = () => {
           mb: `${space.xxl}px`,
         }}
       >
+        <input 
+          type="file" 
+          multiple
+          hidden 
+          ref={fileInputRef} 
+          onChange={handleFileChange} 
+        />
         {/* Drop zone */}
         <Box
           role="button"
           tabIndex={0}
-          onClick={openModal}
+          onClick={() => fileInputRef.current?.click()}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              openModal();
+              fileInputRef.current?.click();
             }
           }}
           sx={{
@@ -233,7 +273,7 @@ const Upload: React.FC = () => {
           <Button
             onClick={(e) => {
               e.stopPropagation();
-              openModal();
+              fileInputRef.current?.click();
             }}
             sx={{
               bgcolor: colors.ink,
@@ -316,10 +356,44 @@ const Upload: React.FC = () => {
         </Box>
       </Box>
 
-      {/* ── Recently received ────────────────────────────────────── */}
-      <SectionTitle sx={{ mb: `${space.lg}px` }}>Recently received</SectionTitle>
+      {/* ── Documents by Tab ────────────────────────────────────── */}
+      <Box sx={{ borderBottom: hairline, mb: `${space.lg}px`, mt: `${space.xxl}px` }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, newVal) => setActiveTab(newVal)}
+          variant="scrollable"
+          scrollButtons="auto"
+          TabIndicatorProps={{ style: { backgroundColor: colors.ink } }}
+          sx={{
+            minHeight: 40,
+            '& .MuiTab-root': {
+              minHeight: 40,
+              textTransform: 'none',
+              fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+              fontSize: 14,
+              fontWeight: 500,
+              color: colors.grey500,
+              '&.Mui-selected': {
+                color: colors.ink,
+              },
+            }
+          }}
+        >
+          {TABS.map(tab => (
+            <Tab
+              key={tab}
+              value={tab}
+              label={`${tab} (${getCountForTab(tab)})`}
+            />
+          ))}
+        </Tabs>
+      </Box>
       <Box sx={{ ...cardSx }}>
-        {RECEIVED_FILES.map((file, idx) => {
+        {filteredFiles.length === 0 ? (
+          <Box sx={{ py: 6, textAlign: 'center' }}>
+            <Typography sx={{ color: colors.grey500, fontSize: 14 }}>No documents found.</Typography>
+          </Box>
+        ) : filteredFiles.map((file, idx) => {
           const lowConfidence = file.status !== 'Processed';
           return (
             <Box
@@ -398,6 +472,86 @@ const Upload: React.FC = () => {
             </Box>
           );
         })}
+      </Box>
+
+      {/* ── Awaiting from New Welcome ─────────────────────────────── */}
+      <SectionTitle sx={{ mt: `${space.xxl}px`, mb: `${space.lg}px` }}>Awaiting from New Welcome</SectionTitle>
+      <Box sx={{ cardSx, border: hairline, mb: `${space.xxl}px` }}>
+        {/* Header */}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 160px 120px 110px',
+            gap: `${space.lg}px`,
+            px: `${space.xl}px`,
+            py: `${space.md}px`,
+            bgcolor: colors.grey100,
+            borderBottom: hairline,
+          }}
+        >
+          <ColumnLabel>What we expect</ColumnLabel>
+          <ColumnLabel>Reference</ColumnLabel>
+          <ColumnLabel>Due since</ColumnLabel>
+          <ColumnLabel align="right">Amount</ColumnLabel>
+        </Box>
+        {pendingFromCounterparty.map((doc, idx) => (
+          <Box
+            key={doc.id}
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 160px 120px 110px',
+              gap: `${space.lg}px`,
+              px: `${space.xl}px`,
+              py: `${space.lg}px`,
+              borderBottom: idx < pendingFromCounterparty.length - 1 ? hairline : 'none',
+              borderLeft: doc.overdue ? `3px solid ${colors.ink}` : '3px solid transparent',
+              '&:hover': { bgcolor: colors.grey100 },
+            }}
+          >
+            <Box>
+              <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink }}>
+                {doc.what}
+              </Typography>
+            </Box>
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+                color: colors.grey700,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {doc.reference}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px` }}>
+              <Typography sx={{ fontSize: 12, color: colors.grey700, ...tabularNums }}>
+                {doc.dueSince}
+              </Typography>
+              {doc.overdue && (
+                <Box
+                  sx={{
+                    display: 'inline-flex',
+                    border: hairline,
+                    px: `${space.sm}px`,
+                    py: '2px',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: colors.ink,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  OVERDUE
+                </Box>
+              )}
+            </Box>
+            <Typography sx={{ textAlign: 'right', fontSize: 13, fontWeight: 600, color: doc.amount !== null ? colors.ink : colors.grey500, ...tabularNums }}>
+              {doc.amount !== null ? formatRupees(Math.abs(doc.amount)) : '—'}
+            </Typography>
+          </Box>
+        ))}
       </Box>
 
       <UploadSettlementModal open={uploadOpen} onClose={() => setUploadOpen(false)} />

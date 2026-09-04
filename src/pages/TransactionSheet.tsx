@@ -4660,7 +4660,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     if (activeTab === 5) {
       return [
         'SKU', 'Category', 'Sales', 'RTO / Cancellations', 'Customer Returns', 'Net Sales', 
-        'Listing Price', 'GT Charges', 'Gross Amount', 'Platform Disc', 'Taxable Value', 'Output GST', 'Net Invoice', 
+        'Listing Price', 'GT Charges', 'Gross Amount (Price before discount)', 'Platform Discount', 'Taxable Value', 'Output GST', 'Net Invoice', 
         'Commission', 'Shipping', 'Fixed Fees', 'Collection Fees', 'Pick & Pack Fees', 'Total MP Commission', 
         'Return Shipping', 'Reverse Shipping', 'Return Fixed Fees', 'Return Collection Fees', 'Return Pick & Pack', 'Total Cost of Returns', 
         'Total Cost Incl GT', 'Tax/TDS/TCS', 'MP Fee Rebate', 'SPF Received', 'Bank Settlement', 
@@ -6742,8 +6742,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       'Listing Price': 'list_price',
                                       'List Price': 'list_price',
                                       'GT Charges': 'gt_charges',
-                                      'Gross Amount': 'gross_amount',
-                                      'Platform Disc': 'platform_discount',
+                                      'Gross Amount (Price before discount)': 'gross_amount',
                                       'Platform Discount': 'platform_discount',
                                       'Taxable Value': 'taxable_value',
                                       'Output GST': 'output_gst',

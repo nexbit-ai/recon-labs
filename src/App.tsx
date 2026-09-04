@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box, Paper, Typography, CircularProgress } from '@mui/material';
 import { apiUtils } from './services/api';
@@ -19,6 +19,7 @@ import Dashboard from './pages/Dashboard';
 import Checklist from './pages/Checklist';
 import RecentActivities from './pages/RecentActivities';
 import MarketplaceReconciliation from './pages/MarketplaceReconciliation';
+import PODashboard from './pages/PODashboard';
 import OperationsCentrePage from './pages/OperationsCentre';
 import Reports from './pages/Reports';
 // import ConnectDataSources from './pages/ConnectDataSources'; // Deprecated
@@ -425,6 +426,9 @@ function App() {
               <ProtectedRoute>
                 <Layout><MarketplaceReconciliation /></Layout>
               </ProtectedRoute>
+            } />
+            <Route path="/po-dashboard" element={
+              <Navigate to="/b2b/po-dashboard" replace />
             } />
             <Route path="/operations-centre" element={
               <ProtectedRoute>

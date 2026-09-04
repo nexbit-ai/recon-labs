@@ -41,6 +41,7 @@ import {
   PersonOutlined as PersonIcon,
   MoreVert as MoreVertIcon,
   LinkOutlined as IntegrationsIcon,
+  AssignmentOutlined as AssignmentIcon,
 } from '@mui/icons-material';
 // import { useAuth } from '../contexts/AuthContext'; // Authentication disabled
 // @ts-ignore
@@ -50,6 +51,7 @@ const drawerWidth = 168;
 
 const menuItems = [
   { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation', upcoming: false },
+  { text: 'Orders', icon: <AssignmentIcon />, path: '/b2b/po-dashboard', upcoming: false },
   { text: 'Claims', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
   { text: 'Logistics', icon: <StorageIcon />, path: '/logistics', upcoming: false },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping', upcoming: true },
@@ -292,7 +294,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       {/* Logout overlay with blur effect */}
       {isLoggingOut && (
         <Box
@@ -373,7 +375,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         sx={{
           flexGrow: 1,
           width: { sm: `calc(100% - ${drawerWidth}px)` },
-          minHeight: '100vh',
+          height: '100vh',
+          overflowY: 'auto',
           backgroundColor: 'background.default',
           pt: 2,
         }}

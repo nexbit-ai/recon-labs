@@ -7,6 +7,8 @@ import {
   DescriptionOutlined,
   AutoAwesomeOutlined,
   FileUploadOutlined,
+  AssignmentOutlined,
+  WarningAmberOutlined,
 } from '@mui/icons-material';
 import type { SvgIconComponent } from '@mui/icons-material';
 
@@ -22,10 +24,10 @@ export interface SectionDef {
 }
 
 export const SECTIONS: SectionDef[] = [
-  { key: 'overview', label: 'Overview', title: 'Settlement overview', path: 'overview', icon: DashboardOutlined },
-  { key: 'reconciliation', label: 'Reconciliation', title: 'Reconciliation', path: 'reconciliation', icon: ReceiptLongOutlined },
-  { key: 'disputes', label: 'Disputes', title: 'Disputes & recovery', path: 'disputes', icon: GavelOutlined },
-  { key: 'channels', label: 'Channels', title: 'Channels', path: 'channels', icon: StorefrontOutlined },
-  { key: 'contracts', label: 'Contracts', title: 'Contracts & rate cards', path: 'contracts', icon: DescriptionOutlined },
-  { key: 'ask', label: 'Ask Nex', title: 'Ask Nex', path: 'ask', icon: AutoAwesomeOutlined },
+  { key: 'overview', label: 'Agent', title: '', path: 'overview', icon: DashboardOutlined },
+  { key: 'reconciliation', label: 'Reconciliation', title: '', path: 'reconciliation', icon: ReceiptLongOutlined },
+  { key: 'po-dashboard', label: 'Orders', title: '', path: 'po-dashboard', icon: AssignmentOutlined },
+  { key: 'payments', label: 'Payments', title: '', path: 'payments', icon: ReceiptLongOutlined },
+  { key: 'contracts', label: 'Contracts', title: '', path: 'contracts', icon: DescriptionOutlined },
+  { key: 'exceptions', label: 'Exceptions', title: '', path: 'exceptions', icon: WarningAmberOutlined },
 ];

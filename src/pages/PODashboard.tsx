@@ -486,7 +486,7 @@ export const PODashboard: React.FC = () => {
               color: '#64748b',
             }}
           >
-            SUMMARY
+
           </Typography>
         </Box>
 

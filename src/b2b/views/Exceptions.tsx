@@ -65,10 +65,10 @@ const totalOpen = (
 
 // ── Status label ──────────────────────────────────────────────────────────────
 const statusMeta: Record<ExceptionStatus, { label: string; weight: 500 | 600 }> = {
-  OPEN:          { label: 'OPEN',          weight: 600 },
-  RESOLVED:      { label: 'RESOLVED',      weight: 500 },
-  DISPUTE_RAISED:{ label: 'DISPUTE RAISED',weight: 600 },
-  FOLLOW_UP:     { label: 'FOLLOW UP',     weight: 600 },
+  OPEN: { label: 'OPEN', weight: 600 },
+  RESOLVED: { label: 'RESOLVED', weight: 500 },
+  DISPUTE_RAISED: { label: 'DISPUTE RAISED', weight: 600 },
+  FOLLOW_UP: { label: 'FOLLOW UP', weight: 600 },
 };
 
 const StatusChip: React.FC<{ status: ExceptionStatus }> = ({ status }) => {
@@ -257,32 +257,6 @@ const Exceptions: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
     >
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <Box sx={{ mb: `${space.xl}px` }}>
-        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: `${space.lg}px` }}>
-          <Typography sx={{ fontSize: 20, fontWeight: 600, color: colors.ink }}>
-            Exception Centre
-          </Typography>
-          <Box
-            sx={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              border: hairline,
-              px: `${space.md}px`,
-              py: '3px',
-              fontSize: 12,
-              fontWeight: 600,
-              color: totalStillOpen > 0 ? colors.ink : colors.grey500,
-              bgcolor: totalStillOpen > 0 ? colors.paper : colors.grey100,
-            }}
-          >
-            {totalStillOpen} open of {totalOpen} total
-          </Box>
-        </Box>
-        <Typography sx={{ fontSize: 13, color: colors.grey700, mt: '4px' }}>
-          Kapiva (Adret) ↔ New Welcome Pharma · FY 2025–26
-        </Typography>
-      </Box>
 
       {/* ── Sub-tab bar ────────────────────────────────────────────── */}
       <Box sx={{ display: 'flex', borderBottom: hairline, mb: `${space.xl}px` }}>

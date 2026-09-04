@@ -15,7 +15,10 @@ import Reconciliation from './views/Reconciliation';
 import Disputes from './views/Disputes';
 import Channels from './views/Channels';
 import Contracts from './views/Contracts';
-import AskNex from './views/AskNex';
+import Exceptions from './views/Exceptions';
+import PODashboard from '../pages/PODashboard';
+import PODetailsPage from '../pages/PODetailsPage';
+import B2BPaymentsDashboard from '../pages/B2BPaymentsDashboard';
 // Reuse the exact same Integrations module from the B2C app.
 import Integrations from '../pages/Integrations';
 
@@ -24,10 +27,10 @@ const VIEWS: Record<string, React.ReactNode> = {
   upload: <Upload />,
   overview: <Overview />,
   reconciliation: <Reconciliation />,
-  disputes: <Disputes />,
-  channels: <Channels />,
+  'po-dashboard': <PODashboard />,
+  payments: <B2BPaymentsDashboard />,
   contracts: <Contracts />,
-  ask: <AskNex />,
+  exceptions: <Exceptions />,
 };
 
 const B2BApp: React.FC = () => (
@@ -40,6 +43,7 @@ const B2BApp: React.FC = () => (
             <Route key={s.key} path={s.path} element={VIEWS[s.key] ?? <Placeholder title={s.title} />} />
           ))}
           <Route path="upload" element={<Upload />} />
+          <Route path="po-dashboard/:poId" element={<PODetailsPage />} />
           <Route path="integrations" element={<Integrations />} />
           <Route path="*" element={<Navigate to="overview" replace />} />
         </Route>

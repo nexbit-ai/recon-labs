@@ -94,35 +94,6 @@ export default function B2BPaymentsDashboard() {
 
   return (
     <Box sx={{ width: '100%', backgroundColor: '#ffffff' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography sx={{ fontSize: '12px', fontWeight: 500, color: '#71717a' }}>
-          UTR reconciliation • 7 payments • MTD
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<TuneIcon sx={{ fontSize: 16 }} />}
-            sx={{ borderRadius: '9999px', textTransform: 'none', fontSize: '12px', fontWeight: 600, borderColor: '#eaecf0', color: '#334155', boxShadow: '0 1px 2px rgba(16,24,40,0.04)' }}
-          >
-            Filters
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<FileDownloadOutlinedIcon sx={{ fontSize: 16 }} />}
-            sx={{ borderRadius: '9999px', textTransform: 'none', fontSize: '12px', fontWeight: 600, borderColor: '#eaecf0', color: '#334155', boxShadow: '0 1px 2px rgba(16,24,40,0.04)' }}
-          >
-            Export
-          </Button>
-        </Box>
-      </Box>
-
-      {/* SUMMARY */}
-      <Typography sx={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#71717a', mb: 1.5 }}>
-        Summary
-      </Typography>
-
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1.5, mb: 3 }}>
         {/* Card 1 */}
         <Paper elevation={0} sx={{ p: 2, borderRadius: '12px', border: '1px solid #eaecf0', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', gap: 1, '&:hover': { boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' } }}>

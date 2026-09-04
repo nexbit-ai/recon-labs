@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Box, Button, Typography } from '@mui/material';
-import { FileUploadOutlined, ExtensionOutlined } from '@mui/icons-material';
+import { FileUploadOutlined, ExtensionOutlined, Tune as TuneIcon, FileDownloadOutlined as FileDownloadOutlinedIcon } from '@mui/icons-material';
 import { colors, hairline, shell, type, space } from '../theme/b2bTokens';
 import { SECTIONS, type SectionDef } from './sections';
 import { workspace, fiscalPeriod } from '../mock';
@@ -69,13 +69,22 @@ const B2BShell: React.FC = () => {
   const location = useLocation();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [platformFilter, setPlatformFilter] = useState('all');
+  const [poFilterCount, setPoFilterCount] = useState(0);
+
+  React.useEffect(() => {
+    const handleCount = (e: any) => {
+      setPoFilterCount(e.detail?.count || 0);
+    };
+    window.addEventListener('po-filter-count-changed', handleCount);
+    return () => window.removeEventListener('po-filter-count-changed', handleCount);
+  }, []);
 
   const active =
     SECTIONS.find((s) => location.pathname.startsWith(`/b2b/${s.path}`)) ?? SECTIONS[0];
   const isIntegrationsPage = location.pathname.includes('/integrations');
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: colors.paper, color: colors.ink }}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', bgcolor: colors.paper, color: colors.ink }}>
       {/* ── SIDEBAR ─────────────────────────────────────────────── */}
       <Box
         component="nav"
@@ -116,44 +125,17 @@ const B2BShell: React.FC = () => {
         </Box>
 
         {/* Upload (opens the /b2b/upload view) + Integrations + workspace badge */}
-        <Box sx={{ p: `${space.lg}px`, display: 'flex', flexDirection: 'column', gap: `${space.md}px` }}>
-          <Button
-            fullWidth
-            disableElevation
+        <Box sx={{ py: `${space.sm}px`, display: 'flex', flexDirection: 'column' }}>
+          <NavItem
+            section={{ key: 'upload', label: 'Upload', title: 'Upload', path: 'upload', icon: FileUploadOutlined }}
+            active={location.pathname.includes('/upload')}
             onClick={() => navigate('/b2b/upload')}
-            startIcon={<FileUploadOutlined sx={{ fontSize: 20 }} />}
-            sx={{
-              borderRadius: 0,
-              bgcolor: colors.paper,
-              color: colors.ink,
-              border: hairline,
-              fontSize: 13,
-              fontWeight: 600,
-              py: `${space.md}px`,
-              '&:hover': { bgcolor: colors.grey100 },
-            }}
-          >
-            Upload
-          </Button>
-          <Button
-            fullWidth
-            disableElevation
+          />
+          <NavItem
+            section={{ key: 'integrations', label: 'Integrations', title: 'Integrations', path: 'integrations', icon: ExtensionOutlined }}
+            active={isIntegrationsPage}
             onClick={() => navigate('/b2b/integrations')}
-            startIcon={<ExtensionOutlined sx={{ fontSize: 20 }} />}
-            sx={{
-              borderRadius: 0,
-              bgcolor: colors.paper,
-              color: colors.ink,
-              border: hairline,
-              fontSize: 13,
-              fontWeight: 600,
-              py: `${space.md}px`,
-              '&:hover': { bgcolor: colors.grey100 },
-            }}
-          >
-            Integrations
-          </Button>
-
+          />
         </Box>
       </Box>
 
@@ -165,7 +147,7 @@ const B2BShell: React.FC = () => {
             sx={{
               height: shell.topBarHeight,
               flexShrink: 0,
-              borderBottom: hairline,
+              borderBottom: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -178,49 +160,126 @@ const B2BShell: React.FC = () => {
             }}
           >
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ ...type.label, color: colors.grey500, display: 'block' }}>
-                {active.label}
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  lineHeight: '18px',
-                  color: colors.ink,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                {active.title}
-              </Typography>
+              {active.key !== 'overview' && (
+                <>
+                  <Typography sx={{ ...type.label, color: colors.grey500, display: 'block' }}>
+                    {active.label}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      lineHeight: '18px',
+                      color: colors.ink,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {active.title}
+                  </Typography>
+                </>
+              )}
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px`, flexShrink: 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px` }}>
-                <Typography sx={{ ...type.label, color: colors.grey700 }}>PLATFORM:</Typography>
-                <select 
-                  value={platformFilter} 
-                  onChange={(e) => setPlatformFilter(e.target.value)}
-                  style={{
-                    padding: '6px 12px',
-                    border: hairline,
-                    backgroundColor: colors.paper,
-                    color: colors.ink,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    outline: 'none',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit'
-                  }}
-                >
-                  <option value="all">All Channels</option>
-                  <option value="blinkit">Blinkit</option>
-                  <option value="zepto">Zepto</option>
-                  <option value="entitya">Entity A</option>
-                  <option value="entityb">Entity B</option>
-                </select>
-              </Box>
-              <Pill>{fiscalPeriod.pill}</Pill>
+              {active.key !== 'overview' && (
+                <>
+                  {active.key === 'po-dashboard' && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mr: 1 }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<TuneIcon sx={{ fontSize: 15 }} />}
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-po-filters'))}
+                        sx={{
+                          borderRadius: '9999px',
+                          textTransform: 'none',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          borderColor: '#eaecf0',
+                          backgroundColor: '#ffffff',
+                          color: '#334155',
+                          height: 32,
+                          px: 2,
+                          boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
+                          '&:hover': {
+                            borderColor: '#d0d5dd',
+                            backgroundColor: '#f4f4f5',
+                          },
+                        }}
+                      >
+                        Filters
+                        {poFilterCount > 0 && (
+                          <Box
+                            component="span"
+                            sx={{
+                              ml: 0.75,
+                              px: '6px',
+                              py: '1px',
+                              borderRadius: '9999px',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              backgroundColor: '#059669',
+                              color: '#ffffff',
+                            }}
+                          >
+                            {poFilterCount}
+                          </Box>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<FileDownloadOutlinedIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => window.dispatchEvent(new CustomEvent('export-po-data'))}
+                        sx={{
+                          borderRadius: '9999px',
+                          textTransform: 'none',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          borderColor: '#eaecf0',
+                          backgroundColor: '#ffffff',
+                          color: '#334155',
+                          height: 32,
+                          px: 2,
+                          boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
+                          '&:hover': {
+                            borderColor: '#d0d5dd',
+                            backgroundColor: '#f4f4f5',
+                          },
+                        }}
+                      >
+                        Export
+                      </Button>
+                    </Box>
+                  )}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px` }}>
+                    <Typography sx={{ ...type.label, color: colors.grey700 }}>ENTITY:</Typography>
+                    <select 
+                      value={platformFilter} 
+                      onChange={(e) => setPlatformFilter(e.target.value)}
+                      style={{
+                        padding: '6px 14px',
+                        border: '1px solid #eaecf0',
+                        borderRadius: '9999px',
+                        backgroundColor: colors.paper,
+                        color: colors.ink,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        outline: 'none',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit'
+                      }}
+                    >
+                      <option value="all">All Entities</option>
+                      <option value="nexbit">Nexbit</option>
+                      <option value="kapiva">Kapiva</option>
+                      <option value="medkart">Medkart</option>
+                    </select>
+                  </Box>
+                  <Pill>{fiscalPeriod.pill}</Pill>
+                </>
+              )}
             </Box>
           </Box>
         )}
@@ -230,7 +289,7 @@ const B2BShell: React.FC = () => {
           <Box
             sx={{
               px: `${shell.canvasPaddingX}px`,
-              pt: `${shell.canvasPaddingTop}px`,
+              pt: active.key === 'upload' ? 0 : `${shell.canvasPaddingTop}px`,
               pb: `${space.xxxl}px`,
             }}
           >

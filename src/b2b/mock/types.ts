@@ -50,7 +50,7 @@ export interface FlaggedIssue {
   confidence: Confidence;
 }
 
-export type ReconStatus = 'Matched' | 'Unpaid' | 'Over-deducted' | 'Rate variance' | 'Disputed';
+export type ReconStatus = 'Invoice Matched' | 'Missing Debit Note' | 'Loss booked';
 
 export interface VariancePart {
   label: string;
