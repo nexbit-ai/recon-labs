@@ -2,18 +2,28 @@
 // Mirrors docs/B2B_DESIGN_SYSTEM.md exactly. Do not add colours or rounded corners.
 import { createTheme } from '@mui/material/styles';
 
-// ── COLOUR (monochrome + exactly one accent) ───────────────────────────────
+// ── COLOUR (Strict 5-Color Palette: Black, White, Greys, Green, Yellow/Amber) ──
 export const colors = {
-  ink: '#111111',
-  paper: '#FFFFFF',
-  grey700: '#6B7280',
-  grey500: '#9CA3AF',
-  grey200: '#E5E7EB', // hairline — all borders / dividers / rules
-  grey100: '#F5F5F5', // subtle fills
-  accent: '#7A5DBF',
-  accentHover: '#6A4FB0',
-  accentWash: 'rgba(122, 93, 191, 0.06)',
-  inkHover: '#000000', // primary-button hover only (spec §6: ink → #000)
+  ink: '#09090b',
+  inkHover: '#27272a',
+  paper: '#ffffff',
+  grey700: '#71717a',
+  grey600: '#71717a',
+  grey500: '#a1a1aa',
+  grey400: '#a1a1aa',
+  grey300: '#d4d4d8',
+  grey200: '#eaecf0', // hairline — all borders / dividers / rules
+  grey100: '#f4f4f5', // subtle fills / hover
+  grey50: '#fafafa',
+  green: '#16a34a',
+  greenTint: '#f0fdf4',
+  greenBorder: '#bbf7d0',
+  amber: '#ca8a04',
+  amberTint: '#fefce8',
+  amberBorder: '#fef08a',
+  accent: '#09090b', // compliant monochrome accent
+  accentHover: '#27272a',
+  accentWash: 'rgba(9, 9, 11, 0.04)',
 } as const;
 
 // Semantic aliases

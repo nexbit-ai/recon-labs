@@ -111,6 +111,8 @@ export const PODashboard: React.FC = () => {
   const [poIdSearch, setPoIdSearch] = useState('');
 
   // Expanded rows state
+  const [, setExpandedRows] = useState<Record<string, boolean>>({});
+  const handleToggleRow = (id: string) => setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
 
   // Pagination state
   const [page, setPage] = useState(0);
