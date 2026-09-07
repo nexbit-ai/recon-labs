@@ -424,12 +424,25 @@ const MarketplaceReconciliation: React.FC = () => {
     if (from && to) {
       return { start: from, end: to, kind: kindParam || 'custom' } as const;
     }
+    
+    const isTargetOrg = organizationId && ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'].includes(organizationId);
+    
     try {
       const lsFrom = localStorage.getItem('recon_selected_date_from') || '';
       const lsTo = localStorage.getItem('recon_selected_date_to') || '';
       const lsKind = localStorage.getItem('recon_selected_date_kind') || '';
-      if (lsFrom && lsTo) return { start: lsFrom, end: lsTo, kind: (lsKind || 'custom') } as const;
+      if (lsFrom && lsTo) {
+        if (isTargetOrg && lsFrom === '2025-04-01' && lsTo === '2025-04-30') {
+          return { start: '2026-06-01', end: '2026-06-30', kind: 'custom' } as const;
+        }
+        return { start: lsFrom, end: lsTo, kind: (lsKind || 'custom') } as const;
+      }
     } catch { }
+    
+    if (isTargetOrg) {
+      return { start: '2026-06-01', end: '2026-06-30', kind: 'custom' } as const;
+    }
+    
     // Fallback to current month if desired, but keep April 2025 to match mock defaults
     return { start: '2025-04-01', end: '2025-04-30', kind: 'custom' } as const;
   })();
@@ -497,6 +510,24 @@ const MarketplaceReconciliation: React.FC = () => {
     { value: 'last-fiscal-year', label: 'Last Fiscal Year', dates: 'Last Fiscal Year' },
     { value: 'custom', label: 'Custom date range', dates: 'Custom' }
   ];
+
+  // Handle case where organizationId is loaded asynchronously
+  useEffect(() => {
+    if (organizationId && ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'].includes(organizationId)) {
+      const params = new URLSearchParams(window.location.search);
+      const urlFrom = params.get('from');
+      
+      // If user hasn't explicitly set a date in URL
+      if (!urlFrom) {
+        // If the current state is the general default, override it
+        if (customStartDate === '2025-04-01' && customEndDate === '2025-04-30') {
+          setSelectedDateRange('custom');
+          setCustomStartDate('2026-06-01');
+          setCustomEndDate('2026-06-30');
+        }
+      }
+    }
+  }, [organizationId, customStartDate, customEndDate]);
 
   // Persist date selection to URL and localStorage whenever it changes
   useEffect(() => {
