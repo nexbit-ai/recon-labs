@@ -216,6 +216,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const { hasValidCredentials, isInitialized, organizationId } = useOrganization();
   const allowedSubPlatformOrgs = ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'];
   const hasFlipkartSubPlatforms = organizationId ? allowedSubPlatformOrgs.some(id => organizationId.includes(id)) : false;
+  const isPrestigeOrg = organizationId ? allowedSubPlatformOrgs.some(id => organizationId.includes(id)) : false;
   const [showTransactionSheet, setShowTransactionSheet] = useState(false);
   const [feeInvoiceSummary, setFeeInvoiceSummary] = useState<{
     total_invoiced: number;
@@ -680,7 +681,7 @@ const MarketplaceReconciliation: React.FC = () => {
         total_tds_amount?: number;
         total_tcs_amount?: number;
       }> | undefined;
-      if (commissionArray && commissionArray.length > 0) {
+      if (!isPrestigeOrg && commissionArray && commissionArray.length > 0) {
         rows.push(['', '', '']);
         rows.push(['Commission & Charges', 'Platform', 'Value']);
         commissionArray.forEach((item) => {
@@ -5070,6 +5071,7 @@ const MarketplaceReconciliation: React.FC = () => {
         </Grid>
 
         {/* Commission & Charges Summary (replaces Settlement/Unsettled section) */}
+        {!isPrestigeOrg && (
         <Card sx={{
           mb: 6,
           background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
@@ -5401,6 +5403,7 @@ const MarketplaceReconciliation: React.FC = () => {
             })()}
           </CardContent>
         </Card>
+        )}
 
         {/* Sub-Platform Breakdown */}
         {hasFlipkartSubPlatforms && mainSummary?.subPlatformBreakdown && mainSummary.subPlatformBreakdown.length > 0 && (
