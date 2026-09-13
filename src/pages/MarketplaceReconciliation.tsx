@@ -423,7 +423,7 @@ const MarketplaceReconciliation: React.FC = () => {
     const to = params.get('to');
     const kindParam = params.get('dateRange');
     if (from && to) {
-      return { start: from, end: to, kind: kindParam || 'custom' } as const;
+      return { start: from, end: to, kind: 'custom' } as const;
     }
     
     const isTargetOrg = organizationId && ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'].includes(organizationId);
@@ -538,7 +538,7 @@ const MarketplaceReconciliation: React.FC = () => {
       if (selectedDateRange) localStorage.setItem('recon_selected_date_kind', selectedDateRange);
     } catch { }
     const params = new URLSearchParams(window.location.search);
-    if (customStartDate && customEndDate) {
+    if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
       params.set('from', customStartDate);
       params.set('to', customEndDate);
     } else {
