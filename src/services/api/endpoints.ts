@@ -142,10 +142,14 @@ export const manualActionsAPI = {
 // Claims API
 export const claimsAPI = {
   // Evaluate aged claims
-  evaluateAgedClaims: (platform?: string) =>
-    apiService.post<{ success: boolean; message: string; data: { newly_eligible_orders: number } }>(
-      platform ? `/claims/evaluate?platform=${platform}` : '/claims/evaluate'
-    ),
+  evaluateAgedClaims: (platform?: string, params?: { order_date_from?: string; order_date_to?: string }) => {
+    let url = platform ? `/claims/evaluate?platform=${platform}` : '/claims/evaluate';
+    if (params?.order_date_from && params?.order_date_to) {
+      const sep = url.includes('?') ? '&' : '?';
+      url += `${sep}order_date_from=${params.order_date_from}&order_date_to=${params.order_date_to}`;
+    }
+    return apiService.post<{ success: boolean; message: string; data: { newly_eligible_orders: number } }>(url);
+  },
 
   markClaimFiled: (orderId: string, payload: { ticket_id: string; platform: string }) =>
     apiService.put<{ success: boolean; message: string }>(
@@ -157,8 +161,8 @@ export const claimsAPI = {
       `/claims/batches/file`,
       payload
     ),
-  getClaimBatches: () =>
-    apiService.get<{ success: boolean; data: any[] }>('/claims/batches'),
+  getClaimBatches: (params?: { order_date_from?: string; order_date_to?: string }) =>
+    apiService.get<{ success: boolean; data: any[] }>('/claims/batches', params),
 };
 
 // Orders API

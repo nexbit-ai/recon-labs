@@ -41,7 +41,9 @@ import {
   DialogContent,
   DialogActions,
   Fab,
-  Drawer
+  Drawer,
+  Alert,
+  Tooltip
 } from '@mui/material';
 import {
   CalendarToday as CalendarTodayIcon,
@@ -54,7 +56,8 @@ import {
   ArrowDownward as ArrowDownwardIcon,
   UnfoldMore as UnfoldMoreIcon,
   Info as InfoIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  Sync as SyncIcon
 } from '@mui/icons-material';
 import DateRangeSelector from '../components/DateRangeSelector';
 import FeeAuditsTab from './FeeAuditsTab';
@@ -451,8 +454,76 @@ const OperationsCentrePage: React.FC = () => {
   const filteredBatches = claimBatches.filter(b => b.platform === selectedPlatform);
   const [activeClaimTag, setActiveClaimTag] = useState<string>('All');
 
+  const getDateParams = () => {
+    let order_date_from = '';
+    let order_date_to = '';
+    if (selectedDateRange === 'this-month') {
+      const now = new Date();
+      const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+      const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0));
+      order_date_from = firstDay.toISOString().split('T')[0];
+      order_date_to = lastDay.toISOString().split('T')[0];
+    } else if (selectedDateRange === 'last-month') {
+      const now = new Date();
+      const firstDay = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1));
+      const lastDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 0));
+      order_date_from = firstDay.toISOString().split('T')[0];
+      order_date_to = lastDay.toISOString().split('T')[0];
+    } else if (selectedDateRange === 'this-year') {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+      if (currentMonth >= 3) {
+        order_date_from = `${currentYear}-04-01`;
+        order_date_to = `${currentYear + 1}-03-31`;
+      } else {
+        order_date_from = `${currentYear - 1}-04-01`;
+        order_date_to = `${currentYear}-03-31`;
+      }
+    } else if (selectedDateRange === 'last-fiscal-year') {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+      if (currentMonth >= 3) {
+        order_date_from = `${currentYear - 1}-04-01`;
+        order_date_to = `${currentYear}-03-31`;
+      } else {
+        order_date_from = `${currentYear - 2}-04-01`;
+        order_date_to = `${currentYear - 1}-03-31`;
+      }
+    } else if (selectedDateRange === 'custom' && customStartDate && customEndDate) {
+      order_date_from = customStartDate;
+      order_date_to = customEndDate;
+    }
+    return { order_date_from, order_date_to };
+  };
+
   // Fee Audit State
   const [feeAuditData, setFeeAuditData] = useState<any>(null);
+
+  // Sync state
+  const [isSyncing, setIsSyncing] = useState(false);
+  const handleSyncClaims = async () => {
+    try {
+      setIsSyncing(true);
+      const response = await api.claims.evaluateAgedClaims(selectedPlatform, getDateParams());
+      if (response && response.success) {
+        setSnackbarMsg(`Sync completed successfully`);
+        setSnackbarOpen(true);
+        // Refresh the claims batch data
+        fetchClaimBatchesData();
+      } else {
+        setSnackbarMsg('Failed to sync claims');
+        setSnackbarOpen(true);
+      }
+    } catch (error) {
+      console.error('Error syncing claims:', error);
+      setSnackbarMsg('Error syncing claims');
+      setSnackbarOpen(true);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Claims UI states
   const [claimDialogOpen, setClaimDialogOpen] = useState(false);
@@ -1177,7 +1248,7 @@ const OperationsCentrePage: React.FC = () => {
 
   const fetchClaimBatchesData = async () => {
     try {
-      const response = await api.claims.getClaimBatches();
+      const response = await api.claims.getClaimBatches(getDateParams());
       if (response && response.data) {
         setClaimBatches(response.data.data || []);
       }
@@ -2584,6 +2655,31 @@ const OperationsCentrePage: React.FC = () => {
             )}
             </Box>
 
+            {/* Sync Claims Button */}
+            <Tooltip title="Evaluates claims for mismatched orders and unsettled orders beyond payment terms" placement="top">
+              <Box>
+                <Button
+                  variant="outlined"
+                  onClick={handleSyncClaims}
+                  disabled={isSyncing}
+                  startIcon={isSyncing ? <CircularProgress size={16} color="inherit" /> : <SyncIcon />}
+                  sx={{
+                    borderColor: '#6B7280',
+                    color: '#6B7280',
+                    textTransform: 'none',
+                    minWidth: 90,
+                    minHeight: 36,
+                    px: 1.5,
+                    fontSize: '0.7875rem',
+                    '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' },
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {isSyncing ? 'Syncing...' : 'Sync'}
+                </Button>
+              </Box>
+            </Tooltip>
+
             {/* Filter Button */}
             <Button variant="outlined" startIcon={<FilterIcon />} onClick={(event) => openFilterPopover(activeFilterColumn || 'Order ID', event.currentTarget)} sx={{ borderColor: '#6B7280', color: '#6B7280', textTransform: 'none', minWidth: 120, minHeight: 36, px: 1.5, fontSize: '0.7875rem', '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107, 114, 128, 0.04)' } }}>
               Filter
@@ -3654,7 +3750,11 @@ const OperationsCentrePage: React.FC = () => {
         </Box>
       )}
 
-      <Snackbar anchorOrigin={{ vertical: 'top', horizontal: 'right' }} open={snackbarOpen} autoHideDuration={2500} onClose={() => setSnackbarOpen(false)} message={snackbarMsg || 'Done'} />
+      <Snackbar anchorOrigin={{ vertical: 'top', horizontal: 'right' }} open={snackbarOpen} autoHideDuration={2500} onClose={() => setSnackbarOpen(false)}>
+        <Alert severity={snackbarMsg && (snackbarMsg.includes('Failed') || snackbarMsg.includes('Error')) ? 'error' : 'success'} variant="outlined" onClose={() => setSnackbarOpen(false)} sx={{ bgcolor: 'background.paper', fontWeight: 500 }}>
+          {snackbarMsg || 'Done'}
+        </Alert>
+      </Snackbar>
 
       {/* Note Dialog for Manual Action */}
       <Dialog open={noteDialogOpen} onClose={closeNoteDialog} PaperProps={{ sx: { borderRadius: 1, minWidth: 420 } }}>

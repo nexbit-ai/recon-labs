@@ -3439,16 +3439,6 @@ const MarketplaceReconciliation: React.FC = () => {
                 flexDirection: 'column',
                 justifyContent: 'center'
               }}>
-                <Typography variant="h3" sx={{
-                  fontWeight: 600,
-                  mb: 2,
-                  color: '#1f2937',
-                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  letterSpacing: '-0.025em',
-                  textAlign: 'center'
-                }}>
-                  Reconciliation Status
-                </Typography>
 
                 <Box sx={{
                   display: 'flex',
@@ -3457,72 +3447,76 @@ const MarketplaceReconciliation: React.FC = () => {
                   justifyContent: 'center',
                   gap: 2,
                 }}>
-                  {/* Gauge Chart with Numerator and Denominator */}
+                  {/* Gauge Chart with Minimalistic List */}
                   {(() => {
                     const s = mainSummary?.summary as any;
+                    const totalOrders = Number(s?.total_transaction_orders || 0);
                     const reconciledCount = Number(s?.total_reconciled_count || 0);
                     const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
-                    const totalReconciledCount = reconciledCount + manuallyReconciledCount;
-                    const unreconciledCount = Number(s?.total_unreconciled_count || 0);
-                    const totalCount = totalReconciledCount + unreconciledCount;
-                    const matchedPct = totalCount === 0 ? 100 : Math.max(0, Math.min(100, (totalReconciledCount / totalCount) * 100));
+                    const matchedCount = reconciledCount + manuallyReconciledCount;
+                    const mismatchedCount = Number(s?.total_unreconciled_count || 0);
+                    const unsettledObj = (mainSummary as any)?.Unsettled as any;
+                    const unsettledCount = Number(unsettledObj?.summary?.total_order_count || 0);
+
+                    const totalCount = matchedCount + mismatchedCount;
+                    const matchedPct = totalCount === 0 ? 100 : Math.max(0, Math.min(100, (matchedCount / totalCount) * 100));
                     const matchedDeg = (matchedPct / 100) * 360;
-                    const pct = totalCount === 0 ? 100 : Math.max(0, (totalReconciledCount / totalCount) * 100);
 
                     return (
-                      <Box sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 3,
-                        width: '100%',
-                      }}>
-                        {/* Numerator on Left */}
-                        <Box sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'flex-end',
-                          flex: 1,
-                          pr: 2,
-                        }}>
-                          <Typography sx={{
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            color: '#111827',
-                            letterSpacing: '0.05em',
-                            textTransform: 'uppercase',
-                            mb: 0.5,
-                            textAlign: 'right',
-                          }}>
-                            Matched Transactions
-                          </Typography>
-                          <Typography sx={{
-                            fontSize: '1rem',
-                            fontWeight: 300,
-                            color: '#111827',
-                            fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
-                            letterSpacing: '-0.02em',
-                            mb: 0.25,
-                            textAlign: 'right',
-                          }}>
-                            {totalReconciledCount.toLocaleString()}
-                          </Typography>
-                          <Typography sx={{
-                            fontSize: '0.75rem',
-                            fontWeight: 300,
-                            color: '#111827',
-                            letterSpacing: '0.025em',
-                            textAlign: 'right',
-                          }}>
-
-                          </Typography>
+                      <Box sx={{ width: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, py: 3 }}>
+                        {/* Minimalistic Column on the Left */}
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3.5, alignItems: 'center' }}>
+                          <Box
+                            onClick={() => {
+                              setInitialTsFilters(undefined);
+                              setInitialTsTab(3);
+                              setShowTransactionSheet(true);
+                            }}
+                            sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+                          >
+                            <Typography sx={{ fontSize: '0.625rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25, textAlign: 'center' }}>Total Orders</Typography>
+                            <Typography sx={{ fontSize: '1.2rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>{totalOrders.toLocaleString()}</Typography>
+                          </Box>
+                          <Box
+                            onClick={() => {
+                              setInitialTsFilters(undefined);
+                              setInitialTsTab(0);
+                              setShowTransactionSheet(true);
+                            }}
+                            sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+                          >
+                            <Typography sx={{ fontSize: '0.625rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25, textAlign: 'center' }}>Matched</Typography>
+                            <Typography sx={{ fontSize: '1.2rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>{matchedCount.toLocaleString()}</Typography>
+                          </Box>
+                          <Box
+                            onClick={() => {
+                              setInitialTsFilters(undefined);
+                              setInitialTsTab(1);
+                              setShowTransactionSheet(true);
+                            }}
+                            sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+                          >
+                            <Typography sx={{ fontSize: '0.625rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25, textAlign: 'center' }}>Mismatched</Typography>
+                            <Typography sx={{ fontSize: '1.2rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>{mismatchedCount.toLocaleString()}</Typography>
+                          </Box>
+                          <Box
+                            onClick={() => {
+                              setInitialTsFilters(undefined);
+                              setInitialTsTab(2);
+                              setShowTransactionSheet(true);
+                            }}
+                            sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+                          >
+                            <Typography sx={{ fontSize: '0.625rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25, textAlign: 'center' }}>Unsettled</Typography>
+                            <Typography sx={{ fontSize: '1.2rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>{unsettledCount.toLocaleString()}</Typography>
+                          </Box>
                         </Box>
 
-                        {/* Gauge Chart in Center */}
+                        {/* Gauge Chart on the Right */}
                         <Box sx={{ position: 'relative', flexShrink: 0 }}>
                           <Box sx={{
-                            width: 140,
-                            height: 140,
+                            width: 240,
+                            height: 240,
                             borderRadius: '100%',
                             background: `conic-gradient(#10b981 0deg, #10b981 ${matchedDeg}deg, #ef4444 ${matchedDeg}deg, #ef4444 360deg)`,
                             display: 'flex',
@@ -3531,8 +3525,8 @@ const MarketplaceReconciliation: React.FC = () => {
                             position: 'relative',
                           }}>
                             <Box sx={{
-                              width: 120,
-                              height: 120,
+                              width: 228,
+                              height: 228,
                               borderRadius: '50%',
                               background: 'white',
                               display: 'flex',
@@ -3543,141 +3537,24 @@ const MarketplaceReconciliation: React.FC = () => {
                             }}>
                               <Typography variant="h4" sx={{
                                 fontWeight: 500,
-                                color: getReconciliationColor(pct),
+                                color: getReconciliationColor(matchedPct),
                                 fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                                mb: 0.5,
-                                fontSize: '1.5rem',
-                                letterSpacing: '-0.02em'
+                                mb: 0.25,
+                                fontSize: '2rem',
+                                letterSpacing: '-0.02em',
+                                lineHeight: 1
                               }}>
-                                {`${pct.toFixed(1)}%`}
+                                {`${matchedPct.toFixed(1)}%`}
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                                Matched
                               </Typography>
                             </Box>
                           </Box>
                         </Box>
-
-                        {/* Denominator on Right */}
-                        <Box sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'flex-start',
-                          flex: 1,
-                          pl: 2,
-                        }}>
-                          <Typography sx={{
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            color: '#111827',
-                            letterSpacing: '0.05em',
-                            textTransform: 'uppercase',
-                            mb: 0.5,
-                            textAlign: 'left',
-                          }}>
-                            Settled Transactions
-                          </Typography>
-                          <Typography sx={{
-                            fontSize: '1rem',
-                            fontWeight: 300,
-                            color: '#111827',
-                            fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
-                            letterSpacing: '-0.02em',
-                            mb: 0.25,
-                            textAlign: 'left',
-                          }}>
-                            {totalCount.toLocaleString()}
-                          </Typography>
-                          <Typography sx={{
-                            fontSize: '0.75rem',
-                            fontWeight: 300,
-                            color: '#111827',
-                            letterSpacing: '0.025em',
-                            textAlign: 'left',
-                          }}>
-                          </Typography>
-                        </Box>
                       </Box>
                     );
                   })()}
-
-                  {/* Action Buttons */}
-                  <Box sx={{
-                    width: '100%',
-                    display: 'flex',
-                    gap: 1.5,
-                    justifyContent: 'center',
-                  }}>
-                    <Button
-                      variant="text"
-                      onClick={() => {
-                        setInitialTsFilters(undefined);
-                        setInitialTsTab(1);
-                        setShowTransactionSheet(true);
-                      }}
-                      sx={{
-                        flex: 1,
-                        py: 1.5,
-                        px: 2,
-                        border: '1px solid #e5e7eb',
-                        color: '#374151',
-                        backgroundColor: '#ffffff',
-                        fontWeight: 500,
-                        textTransform: 'none',
-                        borderRadius: '8px',
-                        '&:hover': {
-                          backgroundColor: '#f9fafb',
-                          borderColor: '#d1d5db',
-                        }
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.125rem', color: '#111827' }}>
-                          {Number(mainSummary?.summary?.total_unreconciled_count || 0).toLocaleString()}
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: '#6b7280', fontWeight: 400 }}>
-                          Mismatched
-                        </Typography>
-                      </Box>
-                    </Button>
-
-                    <Button
-                      variant="text"
-                      onClick={() => {
-                        const platformsParam = selectedPlatform || '';
-                        const urlParams = new URLSearchParams({
-                          from: effectiveDateRangeForTs.start,
-                          to: effectiveDateRangeForTs.end,
-                          tab: '1'
-                        });
-                        if (platformsParam) {
-                          urlParams.set('platforms', platformsParam);
-                        }
-                        navigate(`/operations-centre?${urlParams.toString()}`);
-                      }}
-                      sx={{
-                        flex: 1,
-                        py: 1.5,
-                        px: 2,
-                        border: '1px solid #e5e7eb',
-                        color: '#374151',
-                        backgroundColor: '#ffffff',
-                        fontWeight: 500,
-                        textTransform: 'none',
-                        borderRadius: '8px',
-                        '&:hover': {
-                          backgroundColor: '#f9fafb',
-                          borderColor: '#d1d5db',
-                        }
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.125rem', color: '#111827' }}>
-                          {Number((mainSummary?.summary as any)?.total_manually_reconciled_or_disputed_count || 0).toLocaleString()}
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontSize: '0.8125rem', color: '#6b7280', fontWeight: 400 }}>
-                          Manually Reconciled
-                        </Typography>
-                      </Box>
-                    </Button>
-                  </Box>
                 </Box>
               </CardContent>
             </Card>
