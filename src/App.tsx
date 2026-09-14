@@ -112,6 +112,9 @@ const theme = createTheme({
       },
     },
     MuiButton: {
+      defaultProps: {
+        variant: 'outlined',
+      },
       styleOverrides: {
         root: {
           borderRadius: 8,

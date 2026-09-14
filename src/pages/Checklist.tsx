@@ -569,7 +569,7 @@ const Checklist: React.FC = () => {
                             </Typography>
                             <Box sx={{ display: 'flex', gap: 1 }}>
                               <Button variant="outlined" color="inherit">Reject</Button>
-                              <Button variant="contained" color="primary" sx={{ boxShadow: 'none' }}>Approve</Button>
+                              <Button variant="outlined" color="primary" sx={{ boxShadow: 'none' }}>Approve</Button>
                               <Button variant="outlined" color="secondary" onClick={() => handleAskAI(task)}>
                                 AskAI
                               </Button>
@@ -629,7 +629,7 @@ const Checklist: React.FC = () => {
                                 size="small"
                               />
                               <Button
-                                variant="contained"
+                                variant="outlined"
                                 sx={{ minWidth: 0, px: 2, py: 1, borderRadius: 2 }}
                                 disabled={!(newComment[task.id] && newComment[task.id].trim())}
                                 onClick={() => handleAddComment(task.id)}
@@ -738,7 +738,7 @@ const Checklist: React.FC = () => {
                                 size="small"
                               />
                               <Button
-                                variant="contained"
+                                variant="outlined"
                                 sx={{ minWidth: 0, px: 2, py: 1, borderRadius: 2 }}
                                 disabled={!(newComment[task.id] && newComment[task.id].trim())}
                                 onClick={() => handleAddComment(task.id)}
@@ -919,12 +919,12 @@ const Checklist: React.FC = () => {
             )}
             <Box sx={{ flex: 1 }} />
             {!aiPanel.generated ? (
-              <Button variant="contained" onClick={handleGenerateAIAnswer} sx={{ mt: 2 }} disabled={aiPanel.loading || !aiPanel.prompt.trim()}>
+              <Button variant="outlined" onClick={handleGenerateAIAnswer} sx={{ mt: 2 }} disabled={aiPanel.loading || !aiPanel.prompt.trim()}>
                 Just Ask
               </Button>
             ) : (
               <>
-                <Button variant="contained" color="success" sx={{ mb: 1 }}>
+                <Button variant="outlined" color="success" sx={{ mb: 1 }}>
                   Execute
                 </Button>
                 <Button variant="outlined" onClick={handleCloseAIPanel} sx={{ mt: 0 }}>Close</Button>
@@ -951,7 +951,7 @@ const Checklist: React.FC = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Button onClick={() => setCreateOpen(false)} color="inherit">Cancel</Button>
               <Button
-                variant="contained"
+                variant="outlined"
                 onClick={handleCreateTasks}
                 disabled={(taskType === 'manual_recon' && (!assignee || !dueDate))}
               >

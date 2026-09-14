@@ -276,7 +276,7 @@ const MarketplaceReconciliationWithAPI: React.FC = () => {
             Refresh
           </Button>
           <Button
-            variant="contained"
+            variant="outlined"
             onClick={handleRunReconciliation}
             disabled={reconciliationRunning}
             startIcon={reconciliationRunning ? <CircularProgress size={16} /> : <AssessmentIcon />}

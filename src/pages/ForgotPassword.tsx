@@ -116,7 +116,7 @@ const ForgotPassword: React.FC = () => {
           <Button
             type="submit"
             fullWidth
-            variant="contained"
+            variant="outlined"
             size="large"
             disabled={isLoading}
             sx={{

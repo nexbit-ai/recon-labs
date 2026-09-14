@@ -102,8 +102,8 @@ export const transactionsAPI = {
   // Get sales transactions
   getSalesTransactions: (params?: { 
     platform?: string; 
-    order_date_from?: string; 
-    order_date_to?: string; 
+    invoice_date_from?: string; 
+    invoice_date_to?: string; 
     limit?: number;
     page?: number;
     sort_by?: string;
@@ -114,7 +114,7 @@ export const transactionsAPI = {
     apiService.get<SalesTransactionsResponse>(API_CONFIG.ENDPOINTS.SALES_TRANSACTIONS, params),
 
   // Request export for transactions
-  requestExport: (params?: FilterParams & { order_date_from?: string; order_date_to?: string; platform?: string }) =>
+  requestExport: (params?: FilterParams & { invoice_date_from?: string; invoice_date_to?: string; platform?: string }) =>
     apiService.request<{ job_id: string; status: string }>({
       method: 'POST',
       url: API_CONFIG.ENDPOINTS.EXPORT_TRANSACTIONS,

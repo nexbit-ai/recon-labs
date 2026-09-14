@@ -264,7 +264,7 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({
                   Cancel
                 </Button>
                 <Button
-                  variant="contained"
+                  variant="outlined"
                   size="small"
                   onClick={handleCustomDateApply}
                   disabled={!tempStartDate || !tempEndDate}

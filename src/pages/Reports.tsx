@@ -134,7 +134,7 @@ const Reports: React.FC = () => {
             }}
           />
           <Button
-            variant="contained"
+            variant="outlined"
             disabled={!customPrompt || customLoading}
             onClick={handleCustomReport}
             sx={{ minWidth: 140, borderRadius: 2 }}
@@ -197,7 +197,7 @@ const Reports: React.FC = () => {
           </Grid>
           <Grid item xs={12} sm={3}>
             <Button
-              variant="contained"
+              variant="outlined"
               color="primary"
               startIcon={<AutoAwesomeIcon />}
               fullWidth
@@ -424,7 +424,7 @@ const Reports: React.FC = () => {
               setSlackDialogOpen(false);
               // Show success message or handle the integration
             }}
-            variant="contained"
+            variant="outlined"
             disabled={!slackEnabled || !slackChannel}
             sx={{ borderRadius: 2 }}
           >

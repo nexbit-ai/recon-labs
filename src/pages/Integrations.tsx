@@ -1411,7 +1411,7 @@ const Integrations: React.FC = () => {
             </Alert>
             <Button
               fullWidth
-              variant="contained"
+              variant="outlined"
               onClick={() => setTestResult(null)}
               sx={{ mt: 4, borderRadius: 3, py: 1.5, fontWeight: 800 }}
             >

@@ -294,7 +294,7 @@ const Assistant: React.FC = () => {
           </Button>
           <Button
             startIcon={<AddIcon />}
-            variant="contained"
+            variant="outlined"
             size="small"
             onClick={startNewChat}
             sx={{ 

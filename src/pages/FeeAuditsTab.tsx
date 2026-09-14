@@ -72,7 +72,7 @@ const FeeAuditsTab: React.FC<FeeAuditsTabProps> = ({ data, loading, onDownloadCS
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb' }}>
           <Typography variant="h6" fontWeight="600">Overcharges by SKU</Typography>
           <Button 
-            variant="contained" 
+            variant="outlined" 
             color="primary" 
             startIcon={<DownloadIcon />}
             onClick={onDownloadCSV}

@@ -339,7 +339,7 @@ const ConnectDataSources: React.FC = () => {
               </Box>
             </Box>
             <Button
-              variant="contained"
+              variant="outlined"
               sx={{
                 background: '#111111',
                 color: '#ffffff',
@@ -526,7 +526,7 @@ const ConnectDataSources: React.FC = () => {
                       <Grid item xs={12}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Button
-                            variant="contained"
+                            variant="outlined"
                             onClick={() => uploadMarketplaceReports(vendorId)}
                             disabled={!canUpload}
                             startIcon={status?.state === 'uploading' ? <CircularProgress size={16} sx={{ color: '#ffffff' }} /> : undefined}
@@ -750,7 +750,7 @@ const ConnectDataSources: React.FC = () => {
 
             <Box mt={3} textAlign="center">
               <Button
-                variant="contained"
+                variant="outlined"
                 onClick={handleSubmit}
                 disabled={isSubmitDisabled}
                 size="large"

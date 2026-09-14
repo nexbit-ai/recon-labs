@@ -272,7 +272,7 @@ const Bookkeeping: React.FC = () => {
               Download Excel Sheet
             </Button>
             <Button
-              variant="contained"
+              variant="outlined"
               startIcon={<SyncIcon />}
               onClick={handleSync}
               disabled={syncStatus === 'syncing'}
@@ -601,7 +601,7 @@ const Bookkeeping: React.FC = () => {
         <DialogActions sx={{ borderTop: '1px solid #e0e0e0', pt: 2, px: 3, pb: 3 }}>
           <Button onClick={() => setShowSettings(false)}>Cancel</Button>
           <Button
-            variant="contained"
+            variant="outlined"
             onClick={() => setShowSettings(false)}
             sx={{
               background: '#1a1a1a',

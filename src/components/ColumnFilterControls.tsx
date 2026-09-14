@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography, TextField, Button, FormGroup, FormControlLabel, Checkbox, Autocomplete, Chip } from '@mui/material';
+import CustomCalendar from './CustomCalendar';
 
 export interface ColumnMetaMap {
   [column: string]: { type: 'string' | 'number' | 'date' | 'enum' };
@@ -70,7 +71,7 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
           />
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
             <Button size="small" onClick={() => onClear(activeColumn)}>Clear</Button>
-            <Button size="small" variant="contained" onClick={onApply}>Apply</Button>
+            <Button size="small" variant="outlined" onClick={onApply}>Apply</Button>
           </Box>
         </>
       )}
@@ -117,7 +118,7 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
               setOrderIdChips([]);
               onClear(activeColumn);
             }}>Clear</Button>
-            <Button size="small" variant="contained" onClick={onApply}>Apply</Button>
+            <Button size="small" variant="outlined" onClick={onApply}>Apply</Button>
           </Box>
         </>
       )}
@@ -131,39 +132,49 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
             <Button size="small" onClick={() => onClear(activeColumn)}>Clear</Button>
-            <Button size="small" variant="contained" onClick={onApply}>Apply</Button>
+            <Button size="small" variant="outlined" onClick={onApply}>Apply</Button>
           </Box>
         </>
       )}
 
       {activeColumn && metaType === 'date' && (
-        <>
-          <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>Between dates</Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <TextField
+        <Box sx={{ p: 1, mt: 1 }}>
+          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: '#1e293b', textAlign: 'center' }}>
+            Select Date Range
+          </Typography>
+          
+          <CustomCalendar 
+            startDate={(pendingFilters[activeColumn]?.from ?? '') as string}
+            endDate={(pendingFilters[activeColumn]?.to ?? '') as string}
+            onDateRangeChange={(start, end) => {
+              const startEvent = { target: { value: start } } as React.ChangeEvent<HTMLInputElement>;
+              handleDateRangeChange(activeColumn, 'from')(startEvent);
+              
+              const endEvent = { target: { value: end } } as React.ChangeEvent<HTMLInputElement>;
+              handleDateRangeChange(activeColumn, 'to')(endEvent);
+            }}
+          />
+
+          <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+            <Button
+              variant="outlined"
               size="small"
-              type="date"
-              value={(pendingFilters[activeColumn]?.from ?? '') as string}
-              onChange={handleDateRangeChange(activeColumn, 'from')}
-              onClick={(e: any) => e.target?.showPicker && e.target.showPicker()}
-              InputLabelProps={{ shrink: true }}
-              sx={{ width: '60%', padding: '2px', '& .MuiOutlinedInput-root fieldset': { borderColor: '#111' }, '& .MuiOutlinedInput-root:hover fieldset': { borderColor: '#111' }, '& .MuiOutlinedInput-root.Mui-focused fieldset': { borderColor: '#111' }, '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 38, padding: '2px' } }}
-            />
-            <TextField
+              onClick={() => onClear(activeColumn)}
+              sx={{ flex: 1 }}
+            >
+              Clear
+            </Button>
+            <Button
+              variant="outlined"
               size="small"
-              type="date"
-              value={(pendingFilters[activeColumn]?.to ?? '') as string}
-              onChange={handleDateRangeChange(activeColumn, 'to')}
-              onClick={(e: any) => e.target?.showPicker && e.target.showPicker()}
-              InputLabelProps={{ shrink: true }}
-              sx={{ width: '60%', '& .MuiOutlinedInput-root fieldset': { borderColor: '#111' }, '& .MuiOutlinedInput-root:hover fieldset': { borderColor: '#111' }, '& .MuiOutlinedInput-root.Mui-focused fieldset': { borderColor: '#111' }, '& .MuiOutlinedInput-root': { fontSize: '0.8rem', height: 38, borderRadius: '40px', padding: '2px' } }}
-            />
+              onClick={onApply}
+              disabled={!pendingFilters[activeColumn]?.from || !pendingFilters[activeColumn]?.to}
+              sx={{ flex: 1 }}
+            >
+              Apply
+            </Button>
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-            <Button size="small" onClick={() => onClear(activeColumn)}>Clear</Button>
-            <Button size="small" variant="contained" onClick={onApply}>Apply</Button>
-          </Box>
-        </>
+        </Box>
       )}
 
       {activeColumn && (metaType === 'enum' || ['Shipping Courier', 'Recon Status', 'Settlement Provider'].includes(activeColumn)) && (
@@ -227,7 +238,7 @@ const ColumnFilterControls: React.FC<ColumnFilterControlsProps> = ({
           
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
             <Button size="small" onClick={() => onClear(activeColumn)}>Clear</Button>
-            <Button size="small" variant="contained" onClick={onApply}>Apply</Button>
+            <Button size="small" variant="outlined" onClick={onApply}>Apply</Button>
           </Box>
         </>
       )}

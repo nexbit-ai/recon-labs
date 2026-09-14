@@ -151,7 +151,7 @@ const JWTTest: React.FC = () => {
         </Typography>
         
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-          <Button variant="contained" onClick={generateJWT}>
+          <Button variant="outlined" onClick={generateJWT}>
             Generate JWT
           </Button>
           <Button variant="outlined" onClick={verifyJWT} disabled={!jwtToken}>

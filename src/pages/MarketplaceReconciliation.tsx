@@ -3218,7 +3218,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       <Box sx={{ display: 'flex', gap: 1, mt: 1, justifyContent: 'flex-end' }}>
                         <Button variant="outlined" onClick={() => setPlatformMenuAnchorEl(null)} sx={{ textTransform: 'none', color: '#6b7280', borderColor: '#e5e7eb' }}>Cancel</Button>
                         <Button
-                          variant="contained"
+                          variant="outlined"
                           disabled={!tempSelectedPlatform}
                           onClick={() => {
                             const next = tempSelectedPlatform!;

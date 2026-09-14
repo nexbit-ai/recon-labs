@@ -158,8 +158,8 @@ interface TransactionQueryParams {
   limit?: number;
   status?: string;
   status_in?: string;
-  order_date_from?: string;
-  order_date_to?: string;
+  invoice_date_from?: string;
+  invoice_date_to?: string;
   invoice_date_from?: string;
   invoice_date_to?: string;
   diff_min?: number;
@@ -1800,7 +1800,7 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   'Order ID': { apiParam: 'order_id', type: 'string' }, // Special: chips input
   'Status': { apiParam: 'status_in', type: 'enum', usesInSuffix: true },
   'Event Type': { apiParam: 'event_type', type: 'enum' },
-  'Order Date': { apiParam: 'order_date', type: 'date' }, // → order_date_from/to
+  'Invoice Date': { apiParam: 'invoice_date', type: 'date' }, // → invoice_date_from/to
   'Settlement Date': { apiParam: 'settlement_date', type: 'date' },
   'Order Value': { apiParam: 'order_value', type: 'number' },
   'Settlement Value': { apiParam: 'settlement_value', type: 'number' },
@@ -1816,7 +1816,6 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
 
 // Mapping of sortable UI columns to backend sort_by values
 const COLUMN_TO_SORT_BY_MAP: Record<string, string> = {
-  'Order Date': 'order_date',
   'Invoice Date': 'invoice_date',
   'Settlement Date': 'settlement_date',
   'Order Value': 'order_value',
@@ -1864,16 +1863,32 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [dateRange, setDateRange] = useState<{ start: string, end: string }>(
     propDateRange || { start: '', end: '' }
   );
+  // Helper to construct initial filters including the date range if present
+  const getInitialFilters = () => {
+    const baseFilters = propsInitialFilters ? { ...propsInitialFilters } : {};
+    
+    // Always include Invoice Date filter if dateRange is provided 
+    // so it shows up as a chip next to tabs
+    if (propDateRange && propDateRange.start && propDateRange.end) {
+      baseFilters['Invoice Date'] = {
+        from: propDateRange.start,
+        to: propDateRange.end
+      };
+    }
+    
+    return baseFilters;
+  };
+
   // Column filters can be string (contains), number range {min,max}, date range {from,to}, or enum string[]
-  const [columnFilters, setColumnFilters] = useState<{ [key: string]: any }>(propsInitialFilters || {});
+  const [columnFilters, setColumnFilters] = useState<{ [key: string]: any }>(getInitialFilters());
   // Pending filters that haven't been applied yet
-  const [pendingColumnFilters, setPendingColumnFilters] = useState<{ [key: string]: any }>(propsInitialFilters || {});
+  const [pendingColumnFilters, setPendingColumnFilters] = useState<{ [key: string]: any }>(getInitialFilters());
   const [pendingDateRange, setPendingDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   // Header date range state - for the date selector in the header next to platform selector
   const [headerDateRange, setHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   // Platform filter state - single selection only
-  const availablePlatforms = ['flipkart', 'amazon', 'amazon_uk', 'd2c', 'other'] as const;
+  const availablePlatforms = ['flipkart', 'amazon', 'amazon_uk', 'd2c'] as const;
   type Platform = typeof availablePlatforms[number];
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Default: flipkart only
   const [pendingSelectedPlatform, setPendingSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Pending platform before apply
@@ -2825,8 +2840,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // ALWAYS add invoice date range - this is required for all API calls
     const dateRangeToUse = overrideDateRange || dateRange;
     if (dateRangeToUse.start && dateRangeToUse.end) {
-      params.order_date_from = dateRangeToUse.start;
-      params.order_date_to = dateRangeToUse.end;
+      params.invoice_date_from = dateRangeToUse.start;
+      params.invoice_date_to = dateRangeToUse.end;
 
     } else {
       console.warn('[buildQueryParams] No date range provided - API call may fail');
@@ -2843,7 +2858,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Only add additional parameters if filters are explicitly applied
     if (overrideFilters || Object.keys(columnFilters).some(key => columnFilters[key])) {
       // Add sorting
-      params.sort_by = 'order_date';
+      params.sort_by = 'invoice_date';
       params.sort_order = 'desc';
 
       // Apply column filters (use override filters if provided, otherwise use current state)
@@ -2942,7 +2957,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
 
       // Example query string that would be sent to API:
-      // status_in=unsettled&order_date_from=2025-04-01&order_date_to=2025-04-30&diff_min=-500&diff_max=0&sort_by=order_date&sort_order=desc&order_item_id=333981993553920100
+      // status_in=unsettled&invoice_date_from=2025-04-01&invoice_date_to=2025-04-30&diff_min=-500&diff_max=0&sort_by=order_date&sort_order=desc&order_item_id=333981993553920100
       const queryString = Object.entries(queryParams)
         .filter(([_, value]) => value !== undefined && value !== null && value !== '')
         .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
@@ -3073,7 +3088,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
 
       // Example query string that would be sent to API:
-      // status_in=unsettled&order_date_from=2025-04-01&order_date_to=2025-04-30&diff_min=-500&diff_max=0&sort_by=order_date&sort_order=desc&order_item_id=333981993553920100
+      // status_in=unsettled&invoice_date_from=2025-04-01&invoice_date_to=2025-04-30&diff_min=-500&diff_max=0&sort_by=order_date&sort_order=desc&order_item_id=333981993553920100
       const queryString = Object.entries(queryParams)
         .filter(([_, value]) => value !== undefined && value !== null && value !== '')
         .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
@@ -3293,18 +3308,34 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
   // Apply filters function - called when Apply button is clicked
   const applyFilters = () => {
+    // Sync 'Invoice Date' sidebar filter to global date range if it exists
+    let finalDateRange = { ...pendingDateRange };
+    let finalColumnFilters = { ...pendingColumnFilters };
+    
+    if (pendingColumnFilters['Invoice Date']?.from && pendingColumnFilters['Invoice Date']?.to) {
+      finalDateRange = {
+        start: pendingColumnFilters['Invoice Date'].from,
+        end: pendingColumnFilters['Invoice Date'].to,
+        label: 'Custom Range',
+      };
+      // Keep it in column filters so it shows up as a chip
+      
+      // Update the pending states too so next time we open it's correct
+      setPendingDateRange(finalDateRange);
+    }
+
     // Copy pending filters to active filters
-    setColumnFilters(pendingColumnFilters);
-    setDateRange(pendingDateRange);
+    setColumnFilters(finalColumnFilters);
+    setDateRange(finalDateRange);
     setSelectedPlatform(pendingSelectedPlatform);
 
     // Use dual API with filters and pending platform
     if (activeTab === 4) {
-      fetchSalesTransactions(pendingDateRange, pendingSelectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
+      fetchSalesTransactions(finalDateRange, pendingSelectedPlatform, { page: 1, limit: rowsPerPage, force: true }, salesReportSortConfig, salesReportSearch || null);
     } else if (activeTab === 5) {
-      fetchProfitabilityData(pendingDateRange, pendingSelectedPlatform);
+      fetchProfitabilityData(finalDateRange, pendingSelectedPlatform);
     } else {
-      fetchQuadTransactions(1, pendingColumnFilters, pendingDateRange, pendingSelectedPlatform);
+      fetchQuadTransactions(1, finalColumnFilters, finalDateRange, pendingSelectedPlatform);
     }
 
     // Close the filter popover
@@ -3591,8 +3622,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
     // Add date range parameters with correct keys
     if (dateRangeToUse?.start && dateRangeToUse?.end) {
-      baseParams.order_date_from = dateRangeToUse.start;
-      baseParams.order_date_to = dateRangeToUse.end;
+      baseParams.invoice_date_from = dateRangeToUse.start;
+      baseParams.invoice_date_to = dateRangeToUse.end;
     }
 
     // Add platform parameter
@@ -3662,8 +3693,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       const salesReportParams: any = {
         platform: platformToUse,
-        order_date_from: dateRangeToUse.start,
-        order_date_to: dateRangeToUse.end,
+        invoice_date_from: dateRangeToUse.start,
+        invoice_date_to: dateRangeToUse.end,
         limit: 100,
         page: 1,
         count_only: 'true',
@@ -3846,8 +3877,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     try {
       const params: any = {
         platform: platformToUse,
-        order_date_from: currentDateRange.start,
-        order_date_to: currentDateRange.end,
+        invoice_date_from: currentDateRange.start,
+        invoice_date_to: currentDateRange.end,
         limit: requestedLimit,
         page: requestedPage,
       };
@@ -4074,8 +4105,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
       // Apply date range filter if provided
       if (dateRangeFilter?.start && dateRangeFilter?.end) {
-        params.order_date_from = dateRangeFilter.start;
-        params.order_date_to = dateRangeFilter.end;
+        params.invoice_date_from = dateRangeFilter.start;
+        params.invoice_date_to = dateRangeFilter.end;
       }
 
 
@@ -4517,8 +4548,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         exportParams = {
           export_type: 'sales',
           platform: selectedPlatform,
-          order_date_from: dateRange.start,
-          order_date_to: dateRange.end,
+          invoice_date_from: dateRange.start,
+          invoice_date_to: dateRange.end,
         };
 
         // Add business mode for Amazon
@@ -4548,8 +4579,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         exportParams = {
           export_type: 'profitability',
           platform: selectedPlatform,
-          order_date_from: dateRange.start,
-          order_date_to: dateRange.end,
+          invoice_date_from: dateRange.start,
+          invoice_date_to: dateRange.end,
         };
 
         if (profitabilitySearch && profitabilitySearch.trim()) {
@@ -4904,12 +4935,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                               sx={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                cursor: 'pointer',
-                                '&:hover': {
-                                  '& .MuiTypography-root': {
-                                    color: '#0ea5e9'
-                                  }
-                                }
+                                cursor: 'pointer'
                               }}
                               onClick={() => {
                                 setPendingSelectedPlatform(platform);
@@ -4932,9 +4958,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     ? 'Amazon'
                                     : platform === 'amazon_uk'
                                       ? 'Amazon UK'
-                                      : platform === 'd2c'
-                                        ? 'D2C'
-                                        : 'Other'}
+                                      : 'D2C'}
                               </Typography>
                             </Box>
                           ))}
@@ -4962,7 +4986,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       }}>
                         {/* Apply Button */}
                         <Button
-                          variant="contained"
+                          variant="outlined"
                           size="small"
                           onClick={applyPlatformFilter}
                           disabled={pendingSelectedPlatform === selectedPlatform}
@@ -4971,161 +4995,21 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             fontSize: { xs: '0.65rem', sm: '0.7rem' },
                             padding: { xs: '4px 8px', sm: '3px 10px' },
                             minWidth: 'auto',
-                            backgroundColor: '#1f2937',
+                            color: '#1f2937',
+                            borderColor: '#1f2937',
                             flexShrink: 0,
                             whiteSpace: 'nowrap',
-                            '&:hover': { backgroundColor: '#374151' },
+                            '&:hover': { backgroundColor: '#f1f5f9', borderColor: '#1f2937' },
                             '&:disabled': {
-                              backgroundColor: '#9ca3af',
-                              color: '#ffffff',
+                              backgroundColor: 'transparent',
+                              borderColor: '#d4d4d8',
+                              color: '#a1a1aa',
                             },
                           }}
                         >
                           Apply
                         </Button>
                       </Box>
-                    </Box>
-
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 0.75, sm: 0.75 }, width: { xs: '100%', sm: 'auto' }, minWidth: 0 }}>
-                      {/* Date Range Selector - Fully Responsive */}
-                      <Box sx={{
-                        display: 'flex',
-                        alignItems: { xs: 'flex-start', sm: 'center' },
-                        flexDirection: { xs: 'column', sm: 'row' },
-                        gap: { xs: 0.75, sm: 0.5 },
-                        padding: { xs: '8px', sm: '6px 8px' },
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        backgroundColor: '#f9fafb',
-                        width: { xs: '100%', sm: 'auto' },
-                        minWidth: 0,
-                        maxWidth: { xs: '100%', sm: '420px', lg: '480px' },
-                        flexWrap: { xs: 'wrap', sm: 'nowrap' },
-                        rowGap: { xs: 0.75, sm: 0 },
-                      }}>
-                        {/* Date label */}
-                        <Typography variant="body2" sx={{
-                          fontWeight: 600,
-                          color: '#1f2937',
-                          fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0,
-                          width: { xs: '100%', sm: 'auto' }
-                        }}>
-                          Date Range:
-                        </Typography>
-
-                        {/* Date inputs - Responsive */}
-                        <Box sx={{
-                          display: 'flex',
-                          gap: { xs: 0.75, sm: 0.5 },
-                          alignItems: 'center',
-                          flex: { xs: '1 1 100%', sm: '1 1 auto' },
-                          minWidth: 0,
-                          width: { xs: '100%', sm: 'auto' },
-                          flexWrap: { xs: 'wrap', sm: 'nowrap' }
-                        }}>
-                          <TextField
-                            label="From"
-                            type="date"
-                            size="small"
-                            value={pendingHeaderDateRange.start}
-                            onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, start: e.target.value }))}
-                            InputLabelProps={{ shrink: true }}
-                            sx={{
-                              flex: { xs: '1 1 100%', sm: '1 1 0' },
-                              minWidth: { xs: '100%', sm: 0 },
-                              maxWidth: { xs: '100%', sm: '110px' },
-                              '& .MuiOutlinedInput-root': {
-                                backgroundColor: '#ffffff',
-                                fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                                padding: { xs: '4px 6px', sm: '4px 8px' },
-                              },
-                              '& .MuiInputLabel-root': {
-                                fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                              },
-                              '& input': {
-                                padding: { xs: '5px 3px', sm: '6px 4px' },
-                                fontSize: { xs: '0.7rem', sm: '0.7rem' }
-                              }
-                            }}
-                          />
-                          <Typography variant="body2" sx={{
-                            color: '#6b7280',
-                            fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                            flexShrink: 0,
-                            display: { xs: 'none', sm: 'block' }
-                          }}>
-                            to
-                          </Typography>
-                          <TextField
-                            label="To"
-                            type="date"
-                            size="small"
-                            value={pendingHeaderDateRange.end}
-                            onChange={(e) => setPendingHeaderDateRange(prev => ({ ...prev, end: e.target.value }))}
-                            InputLabelProps={{ shrink: true }}
-                            sx={{
-                              flex: { xs: '1 1 100%', sm: '1 1 0' },
-                              minWidth: { xs: '100%', sm: 0 },
-                              maxWidth: { xs: '100%', sm: '110px' },
-                              '& .MuiOutlinedInput-root': {
-                                backgroundColor: '#ffffff',
-                                fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                                padding: { xs: '4px 6px', sm: '4px 8px' },
-                              },
-                              '& .MuiInputLabel-root': {
-                                fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                              },
-                              '& input': {
-                                padding: { xs: '5px 3px', sm: '6px 4px' },
-                                fontSize: { xs: '0.7rem', sm: '0.7rem' }
-                              }
-                            }}
-                          />
-                        </Box>
-
-                        {/* Divider - Hidden on mobile */}
-                        <Box sx={{
-                          display: { xs: 'none', sm: 'block' },
-                          width: '1px',
-                          height: '18px',
-                          backgroundColor: '#d1d5db',
-                          mx: 0.25,
-                          flexShrink: 0
-                        }} />
-
-                        {/* Apply Button */}
-                        <Button
-                          variant="contained"
-                          size="small"
-                          onClick={applyHeaderDateRange}
-                          disabled={
-                            !pendingHeaderDateRange.start ||
-                            !pendingHeaderDateRange.end ||
-                            (pendingHeaderDateRange.start === headerDateRange.start &&
-                              pendingHeaderDateRange.end === headerDateRange.end)
-                          }
-                          sx={{
-                            textTransform: 'none',
-                            fontSize: { xs: '0.65rem', sm: '0.7rem' },
-                            padding: { xs: '4px 8px', sm: '3px 10px' },
-                            minWidth: 'auto',
-                            backgroundColor: '#1f2937',
-                            flexShrink: 0,
-                            whiteSpace: 'nowrap',
-                            width: { xs: '100%', sm: 'auto' },
-                            '&:hover': { backgroundColor: '#374151' },
-                            '&:disabled': {
-                              backgroundColor: '#9ca3af',
-                              color: '#ffffff',
-                            },
-                          }}
-                        >
-                          Apply
-                        </Button>
-                      </Box>
-
                     </Box>
 
                   </Box>
@@ -5273,8 +5157,19 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                 delete p[key as any];
                                 return p;
                               });
+                              
+                              // If they delete Invoice Date, also clear the global date ranges
+                              let nextDateRange = pendingDateRange;
+                              if (key === 'Invoice Date') {
+                                nextDateRange = { start: '', end: '', label: '' } as any;
+                                setDateRange(nextDateRange);
+                                setPendingDateRange(nextDateRange);
+                                setHeaderDateRange(nextDateRange);
+                                setPendingHeaderDateRange(nextDateRange);
+                              }
+
                               // Re-apply after deletion
-                              fetchQuadTransactions(1, next, pendingDateRange, selectedPlatform);
+                              fetchQuadTransactions(1, next, nextDateRange, selectedPlatform);
                             }}
                             sx={{ flexShrink: 0 }}
                           />
@@ -5284,7 +5179,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                   </Box>
 
                   <Button
-                    variant="contained"
+                    variant="outlined"
                     size="small"
                     onClick={openExportDrawer}
                     sx={{
@@ -5295,17 +5190,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                       minWidth: 'auto',
                       borderRadius: '8px',
                       alignSelf: { xs: 'stretch', lg: 'center' },
-                      backgroundColor: '#0f172a',
+                      color: '#0f172a',
+                      borderColor: '#0f172a',
                       boxShadow: '0 2px 8px rgba(15,23,42,0.1)',
-                      '&:hover': { backgroundColor: '#1a1a1a' },
+                      '&:hover': { backgroundColor: '#f1f5f9', borderColor: '#0f172a' },
                       '&:disabled': {
-                        backgroundColor: '#fafafa',
-                        color: '#757575',
+                        backgroundColor: 'transparent',
+                        borderColor: '#d4d4d8',
+                        color: '#a1a1aa',
                         cursor: 'not-allowed',
-                      },
-                      '&:disabled:hover': {
-                        backgroundColor: '#fafafa',
-                        color: '#757575',
                       },
                     }}
                   >
@@ -5375,14 +5268,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           width: 52,
                           height: 28,
                           borderRadius: 999,
-                          backgroundColor: '#111827',
+                          backgroundColor: 'transparent',
+                          border: '1px solid #d1d5db',
                           position: 'relative',
                           px: 0.5,
                           display: 'flex',
                           alignItems: 'center',
                           cursor: quadApiLoading ? 'not-allowed' : 'pointer',
                           opacity: quadApiLoading ? 0.5 : 1,
-                          transition: 'background-color 0.2s ease',
+                          transition: 'background-color 0.2s ease, border-color 0.2s ease',
                         }}
                       >
                         <Box
@@ -5390,7 +5284,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             width: 22,
                             height: 22,
                             borderRadius: '50%',
-                            backgroundColor: '#fff',
+                            backgroundColor: '#111827',
                             boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                             transform: mismatchedSubTab === 'more_received' ? 'translateX(22px)' : 'translateX(0)',
                             transition: 'transform 0.2s ease',
@@ -5474,14 +5368,15 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                           width: 52,
                           height: 28,
                           borderRadius: 999,
-                          backgroundColor: '#111827',
+                          backgroundColor: 'transparent',
+                          border: '1px solid #d1d5db',
                           position: 'relative',
                           px: 0.5,
                           display: 'flex',
                           alignItems: 'center',
                           cursor: salesReportLoading ? 'not-allowed' : 'pointer',
                           opacity: salesReportLoading ? 0.5 : 1,
-                          transition: 'background-color 0.2s ease',
+                          transition: 'background-color 0.2s ease, border-color 0.2s ease',
                         }}
                       >
                         <Box
@@ -5489,7 +5384,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             width: 22,
                             height: 22,
                             borderRadius: '50%',
-                            backgroundColor: '#fff',
+                            backgroundColor: '#111827',
                             boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                             transform: amazonBusinessMode === 'B2B' ? 'translateX(22px)' : 'translateX(0)',
                             transition: 'transform 0.2s ease',
@@ -7236,7 +7131,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     </Box>
 
                     <Button
-                      variant="contained"
+                      variant="outlined"
                       color="primary"
                       disabled={exportLoading}
                       sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '10px' }}
@@ -7457,7 +7352,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                     Go back
                   </Button>
                   <Button
-                    variant="contained"
+                    variant="outlined"
                     color="primary"
                     onClick={handleConfirmExportRequest}
                     disabled={exportLoading}
@@ -7546,8 +7441,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                         .filter((col) => {
                           // Exclude Order ID from filter sidebar
                           if (col === 'Order ID') return false;
-                          // Exclude Invoice Date from filter sidebar (date filter is available outside)
-                          if (col === 'Invoice Date') return false;
+                          // Allow Invoice Date in filter sidebar if user wants to specifically filter it
+                          // if (col === 'Invoice Date') return false;
                           // Exclude Platform from filter sidebar (platform filter is available in header)
                           if (col === 'Platform') return false;
                           // Filter columns based on selected platform

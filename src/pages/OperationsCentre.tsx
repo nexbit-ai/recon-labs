@@ -2890,11 +2890,10 @@ const OperationsCentrePage: React.FC = () => {
                     ) : selectedPlatform === 'flipkart' ? (
                       <Button 
                         fullWidth 
-                        variant="contained" 
+                        variant="outlined" 
                         sx={{ 
-                          background: '#7A5DBF', 
-                          color: 'white', 
-                          textTransform: 'none', fontWeight: 600, py: 0.75, fontSize: '0.8125rem', boxShadow: 'none', '&:hover': { background: '#624a9e', boxShadow: 'none' } 
+                           
+                          textTransform: 'none', fontWeight: 600, py: 0.75, fontSize: '0.8125rem', boxShadow: 'none',  
                         }}
                         onClick={() => openFlipkartDisputeDialog(batch)}
                       >
@@ -2903,11 +2902,10 @@ const OperationsCentrePage: React.FC = () => {
                     ) : (
                       <Button 
                         fullWidth 
-                        variant="contained" 
+                        variant="outlined" 
                         sx={{ 
-                          background: '#7A5DBF', 
-                          color: 'white', 
-                          textTransform: 'none', fontWeight: 600, py: 0.75, fontSize: '0.8125rem', boxShadow: 'none', '&:hover': { background: '#624a9e', boxShadow: 'none' } 
+                           
+                          textTransform: 'none', fontWeight: 600, py: 0.75, fontSize: '0.8125rem', boxShadow: 'none',  
                         }}
                         onClick={() => openBatchClaimDialog(batch)}
                       >
@@ -3539,7 +3537,7 @@ const OperationsCentrePage: React.FC = () => {
                             </TableCell>
                             <TableCell sx={{ textAlign: 'center', verticalAlign: 'middle' }}>
                               {claimStatus !== 'FILED' ? (
-                                <Button size="small" variant="contained" onClick={() => openClaimDialog(orderId, platform)} sx={{ background: '#7A5DBF', color: 'white', textTransform: 'none', fontSize: '0.75rem', py: 0.5, minHeight: 28, '&:hover': { background: '#624a9e' } }}>
+                                <Button size="small" variant="outlined" onClick={() => openClaimDialog(orderId, platform)} sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0.5, minHeight: 28,  }}>
                                   File Claim
                                 </Button>
                               ) : (
@@ -3654,7 +3652,7 @@ const OperationsCentrePage: React.FC = () => {
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2 }}>
           <Button variant="text" onClick={closeRaiseDispute} sx={{ color: '#111827' }}>Cancel</Button>
-          <Button variant="contained" onClick={sendRaiseDispute} sx={{ boxShadow: 'none', background: '#7A5DBF', '&:hover': { background: '#624a9e' } }}>Send</Button>
+          <Button variant="outlined" onClick={sendRaiseDispute} sx={{ boxShadow: 'none',  }}>Send</Button>
         </DialogActions>
       </Dialog>
 
@@ -3774,7 +3772,7 @@ const OperationsCentrePage: React.FC = () => {
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2 }}>
           <Button variant="text" onClick={closeNoteDialog} sx={{ color: '#111827' }}>Cancel</Button>
-          <Button variant="contained" onClick={confirmManualAction} sx={{ boxShadow: 'none', background: '#7A5DBF', '&:hover': { background: '#624a9e' } }}>Submit</Button>
+          <Button variant="outlined" onClick={confirmManualAction} sx={{ boxShadow: 'none',  }}>Submit</Button>
         </DialogActions>
       </Dialog>
 
@@ -3796,7 +3794,7 @@ const OperationsCentrePage: React.FC = () => {
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2 }}>
           <Button variant="text" onClick={closeClaimDialog} sx={{ color: '#111827' }}>Cancel</Button>
-          <Button variant="contained" onClick={handleMarkClaimFiled} sx={{ boxShadow: 'none', background: '#7A5DBF', '&:hover': { background: '#624a9e' } }}>Submit</Button>
+          <Button variant="outlined" onClick={handleMarkClaimFiled} sx={{ boxShadow: 'none',  }}>Submit</Button>
         </DialogActions>
       </Dialog>
 
@@ -3818,7 +3816,7 @@ const OperationsCentrePage: React.FC = () => {
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2 }}>
           <Button variant="text" onClick={closeBatchClaimDialog} sx={{ color: '#111827' }}>Cancel</Button>
-          <Button variant="contained" onClick={handleMarkBatchFiledSubmit} disabled={!claimTicketInput} sx={{ background: '#7A5DBF', color: 'white', '&:hover': { background: '#624a9e' } }}>
+          <Button variant="outlined" onClick={handleMarkBatchFiledSubmit} disabled={!claimTicketInput} sx={{  }}>
             Confirm File
           </Button>
         </DialogActions>
@@ -3908,7 +3906,7 @@ const OperationsCentrePage: React.FC = () => {
           <Button onClick={closeTrackClaimDialog} variant="outlined" sx={{ textTransform: 'none', fontWeight: 600, borderColor: '#e5e7eb', color: '#374151' }}>
             Close
           </Button>
-          <Button onClick={closeTrackClaimDialog} variant="contained" sx={{ textTransform: 'none', fontWeight: 600, background: '#7A5DBF', '&:hover': { background: '#624a9e' }, boxShadow: 'none' }}>
+          <Button onClick={closeTrackClaimDialog} variant="outlined" sx={{ textTransform: 'none', fontWeight: 600,  boxShadow: 'none' }}>
             View Full Log
           </Button>
         </DialogActions>

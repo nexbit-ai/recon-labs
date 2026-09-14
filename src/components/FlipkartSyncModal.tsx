@@ -94,7 +94,7 @@ const FlipkartSyncModal: React.FC<FlipkartSyncModalProps> = ({ open, onClose }) 
 
         <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
           <Button
-            variant="contained"
+            variant="outlined"
             color="primary"
             startIcon={<PlayArrowIcon />}
             onClick={handleStart}

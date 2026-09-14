@@ -37,7 +37,7 @@ const AIReconciliation: React.FC = () => {
           <Box sx={{ flex: 1 }}>
             <Button
               fullWidth
-              variant="contained"
+              variant="outlined"
               startIcon={<AddIcon />}
               onClick={handleAddSource}
             >

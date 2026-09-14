@@ -935,7 +935,7 @@ const Logistics: React.FC = () => {
                 <Typography variant="h6" fontWeight="700" color="#0f172a">Amazon FBA Weight Order Level Discrepancies</Typography>
               </Box>
               <Button
-                variant="contained"
+                variant="outlined"
                 color="primary"
                 startIcon={<DownloadIcon />}
                 onClick={() => {
@@ -1608,7 +1608,7 @@ const Logistics: React.FC = () => {
         <DialogActions sx={{ px: 3, py: 1.5 }}>
           <Button onClick={() => setSelectedCalcOrder(null)} color="inherit">Close</Button>
           <Button
-            variant="contained"
+            variant="outlined"
             color="primary"
             startIcon={<SearchIcon />}
             onClick={() => {
@@ -1681,7 +1681,7 @@ const Logistics: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfigOpen(false)}>Cancel</Button>
-          <Button variant="contained" disableElevation onClick={saveRateCardConfig} sx={{ bgcolor: '#0f172a' }}>Save Changes</Button>
+          <Button variant="outlined" disableElevation onClick={saveRateCardConfig} >Save Changes</Button>
         </DialogActions>
       </Dialog>
     </Box>
