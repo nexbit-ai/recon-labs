@@ -160,8 +160,6 @@ interface TransactionQueryParams {
   status_in?: string;
   invoice_date_from?: string;
   invoice_date_to?: string;
-  invoice_date_from?: string;
-  invoice_date_to?: string;
   diff_min?: number;
   diff_max?: number;
   sort_by?: string;
@@ -1890,8 +1888,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   // Platform filter state - single selection only
   const availablePlatforms = ['flipkart', 'amazon', 'amazon_uk', 'd2c'] as const;
   type Platform = typeof availablePlatforms[number];
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Default: flipkart only
-  const [pendingSelectedPlatform, setPendingSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] : 'flipkart'); // Pending platform before apply
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] as Platform : 'flipkart'); // Default: flipkart only
+  const [pendingSelectedPlatform, setPendingSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] as Platform : 'flipkart'); // Pending platform before apply
   // Order ID chips state
   const [orderIdChips, setOrderIdChips] = useState<string[]>([]);
   // Order ID search in header
@@ -3316,7 +3314,6 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
       finalDateRange = {
         start: pendingColumnFilters['Invoice Date'].from,
         end: pendingColumnFilters['Invoice Date'].to,
-        label: 'Custom Range',
       };
       // Keep it in column filters so it shows up as a chip
       
