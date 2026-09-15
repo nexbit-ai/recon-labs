@@ -3400,19 +3400,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           <Metric label="Cancellations" amount={cancellationsAmount} count={cancellationsCount} />
                         </Box>
 
-                        {/* Previous Return/Cancellations below equation */}
-                        {(prevReturnOrCancelledAmount > 0 || prevReturnOrCancelledCount > 0) && (
-                          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-                            <Box sx={{ textAlign: 'center' }}>
-                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25 }}>
-                                Previous Return/Cancellations
-                              </Typography>
-                              <Typography sx={{ fontSize: '1rem', fontWeight: 400, color: '#111827' }}>
-                                {getCurrencySymbol()}{Math.round(prevReturnOrCancelledAmount).toLocaleString(getCurrencyLocale())} • {Number(prevReturnOrCancelledCount || 0).toLocaleString('en-IN')} orders
-                              </Typography>
-                            </Box>
-                          </Box>
-                        )}
+
                       </Box>
                     );
                   })()}
