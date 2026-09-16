@@ -243,7 +243,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [showInvoicesDialog, setShowInvoicesDialog] = useState(false);
   const [initialTsFilters, setInitialTsFilters] = useState<{ [key: string]: any } | undefined>(undefined);
   const [initialTsTab, setInitialTsTab] = useState<number>(0);
-  const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other' | undefined>(undefined);
+  const [selectedProviderPlatform, setSelectedProviderPlatform] = useState<'flipkart' | 'amazon' | 'amazon_uk' | 'myntra' | 'd2c' | 'other' | undefined>(undefined);
   const location = useLocation();
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState('2025-04');
@@ -307,9 +307,12 @@ const MarketplaceReconciliation: React.FC = () => {
       setShowTransactionSheet(true);
     }
   };
-  const getPlatformForProvider = (providerKey: string, providerName: string): 'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other' => {
+  const getPlatformForProvider = (providerKey: string, providerName: string): 'flipkart' | 'amazon' | 'amazon_uk' | 'myntra' | 'd2c' | 'other' => {
     const key = providerKey?.toLowerCase?.() || '';
     const name = providerName?.toLowerCase?.() || '';
+    if (key === 'myntra' || name.includes('myntra')) {
+      return 'myntra';
+    }
     if (key === 'amazon_uk' || name.includes('amazon uk') || name.includes('amazon_uk')) {
       return 'amazon_uk';
     }
@@ -977,6 +980,7 @@ const MarketplaceReconciliation: React.FC = () => {
     payu: 'PayU',
     cashfree: 'Cashfree',
     flipkart: 'Flipkart',
+    myntra: 'Myntra',
     grow_simple: 'Grow Simple',
     shiprocket: 'Shiprocket',
     delhivery: 'Delhivery',
@@ -1014,10 +1018,11 @@ const MarketplaceReconciliation: React.FC = () => {
     pushOne(providers.payU);
     pushOne(providers.cashfree);
     pushOne(providers.flipkart);
+    pushOne(providers.myntra);
     if (Array.isArray(providers.cod)) providers.cod.forEach(pushOne);
     // Any other dynamic providers
     Object.keys(providers).forEach((k) => {
-      if (k === 'paytm' || k === 'payU' || k === 'cashfree' || k === 'flipkart' || k === 'cod') return;
+      if (k === 'paytm' || k === 'payU' || k === 'cashfree' || k === 'flipkart' || k === 'myntra' || k === 'cod') return;
       const val = providers[k];
       if (Array.isArray(val)) val.forEach(pushOne); else pushOne(val);
     });
@@ -1432,7 +1437,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const fetchMonthOnMonthGrowth = async () => {
     if (
       !selectedPlatform ||
-      (selectedPlatform !== 'amazon' && selectedPlatform !== 'flipkart' && selectedPlatform !== 'amazon_uk' && selectedPlatform !== 'd2c' && selectedPlatform !== 'other')
+      (selectedPlatform !== 'amazon' && selectedPlatform !== 'flipkart' && selectedPlatform !== 'amazon_uk' && selectedPlatform !== 'myntra' && selectedPlatform !== 'd2c' && selectedPlatform !== 'other')
     ) {
       console.log('[MonthOnMonthGrowth] Skipping fetch - invalid platform:', selectedPlatform);
       return;
@@ -1495,8 +1500,8 @@ const MarketplaceReconciliation: React.FC = () => {
         const data = response.data;
 
         try {
-          if (fetchedForPlatform === 'amazon' || fetchedForPlatform === 'flipkart' || fetchedForPlatform === 'amazon_uk' || fetchedForPlatform === 'other') {
-            // For Amazon/Flipkart/Other (CRED): expect { data: [{ month, sales, settlement }, ...] }
+          if (fetchedForPlatform === 'amazon' || fetchedForPlatform === 'flipkart' || fetchedForPlatform === 'amazon_uk' || fetchedForPlatform === 'myntra' || fetchedForPlatform === 'other') {
+            // For Amazon/Flipkart/Myntra/Other (CRED): expect { data: [{ month, sales, settlement }, ...] }
             const marketplaceData = data.data || data || [];
 
             if (Array.isArray(marketplaceData)) {
@@ -1569,7 +1574,7 @@ const MarketplaceReconciliation: React.FC = () => {
         // Handle both old array format and new single value format
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed[0] as Platform;
-        } else if (typeof parsed === 'string' && ['flipkart', 'amazon', 'd2c', 'other'].includes(parsed)) {
+        } else if (typeof parsed === 'string' && ['flipkart', 'amazon', 'amazon_uk', 'myntra', 'd2c', 'other'].includes(parsed)) {
           return parsed as Platform;
         }
       }
@@ -1591,6 +1596,8 @@ const MarketplaceReconciliation: React.FC = () => {
         'd2c': 'D2C',
         'flipkart': 'Flipkart',
         'amazon': 'Amazon',
+        'amazon_uk': 'Amazon UK',
+        'myntra': 'Myntra',
         'other': 'Other',
       };
       const platformParam = selectedPlatform ? platformMap[selectedPlatform] : undefined;
@@ -1667,6 +1674,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const availablePlatforms = [
     { value: 'flipkart' as Platform, label: 'Flipkart' },
     { value: 'amazon' as Platform, label: 'Amazon' },
+    { value: 'myntra' as Platform, label: 'Myntra' },
     { value: 'amazon_uk' as Platform, label: 'Amazon UK' },
     { value: 'd2c' as Platform, label: 'D2C' },
     { value: 'other' as Platform, label: 'Other (CRED)' },
@@ -2174,7 +2182,7 @@ const MarketplaceReconciliation: React.FC = () => {
       }
     }
     // Fetch month on month growth data when platform is selected
-    if (selectedPlatform && (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || selectedPlatform === 'other')) {
+    if (selectedPlatform && (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'myntra' || selectedPlatform === 'd2c' || selectedPlatform === 'other')) {
       fetchMonthOnMonthGrowth();
     }
     // Fetch SKU profitability for Flipkart when relevant
@@ -5863,12 +5871,12 @@ const MarketplaceReconciliation: React.FC = () => {
             Month on Month Growth
           </Typography>
 
-          {selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'other' ? (
-            // Amazon/Flipkart/Other (CRED): Sales vs Settlement (and Commission for Amazon/Flipkart) Table
+          {selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'myntra' || selectedPlatform === 'other' ? (
+            // Amazon/Flipkart/Myntra/Other (CRED): Sales vs Settlement (and Commission for Amazon/Flipkart/Myntra) Table
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h5" sx={{ color: '#374151', fontWeight: 600 }}>
-                  {selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : selectedPlatform === 'flipkart' ? 'Flipkart' : 'Other (CRED)'} - Sales vs Settlement
+                  {selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : selectedPlatform === 'myntra' ? 'Myntra' : selectedPlatform === 'flipkart' ? 'Flipkart' : 'Other (CRED)'} - Sales vs Settlement
                 </Typography>
                 {marketplaceGrowthData.length > 0 && (
                   <Button
@@ -5876,7 +5884,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     size="small"
                     startIcon={<DownloadIcon />}
                     onClick={() => {
-                      const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk';
+                      const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'myntra';
                         const tableData = marketplaceGrowthData.map(row => ({
                           month: row.month,
                           sales: row.sales,
@@ -5976,7 +5984,7 @@ const MarketplaceReconciliation: React.FC = () => {
                         >
                           Settlement (Settlement Date)
                         </TableCell>
-                        {(selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk') && (
+                        {(selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'myntra') && (
                           <TableCell
                             align="right"
                             sx={{
@@ -5993,7 +6001,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     </TableHead>
                     <TableBody>
                       {marketplaceGrowthData.map((row, index) => {
-                        const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk';
+                        const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'myntra';
                         const commissionValue = showCommissionColumn ? (row.comissionData ?? 0) : 0;
                         return (
                           <TableRow
@@ -6036,7 +6044,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             marketplaceGrowthData.reduce((sum, r) => sum + r.settlement, 0),
                           )}
                         </TableCell>
-                        {(selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk') && (
+                        {(selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'myntra') && (
                           <TableCell
                             align="right"
                             sx={{ fontWeight: 700, color: '#f97316', borderTop: '2px solid #e5e7eb' }}
@@ -6910,8 +6918,8 @@ const MarketplaceReconciliation: React.FC = () => {
           dateRange={effectiveDateRangeForTs}
           initialPlatforms={
             selectedPlatform &&
-            (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || selectedPlatform === 'other')
-              ? [selectedPlatform as 'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other']
+            (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'myntra' || selectedPlatform === 'd2c' || selectedPlatform === 'other')
+              ? [selectedPlatform as 'flipkart' | 'amazon' | 'amazon_uk' | 'myntra' | 'd2c' | 'other']
               : undefined
           }
           initialFilters={initialTsFilters}
