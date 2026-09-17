@@ -45,7 +45,7 @@ const Integrations: React.FC = () => {
   const [loading, setLoading] = useState<string | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [shopifyDialogOpen, setShopifyDialogOpen] = useState(false);
-  const [configType, setConfigType] = useState<'amazon' | 'shopify' | 'razorpay' | 'clickpost' | 'payu' | 'paytm' | 'shiprocket' | 'unicommerce' | 'flipkart' | null>(null);
+  const [configType, setConfigType] = useState<'amazon' | 'shopify' | 'razorpay' | 'clickpost' | 'payu' | 'paytm' | 'shiprocket' | 'unicommerce' | 'flipkart' | 'zoho' | 'sap' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [infoDialogOpen, setInfoDialogOpen] = useState(false);
@@ -701,9 +701,41 @@ const Integrations: React.FC = () => {
         setInfoDialogOpen(true);
       }
     },
+    {
+      id: 'zoho',
+      name: 'Zoho ERP',
+      category: 'ERP',
+      description: 'Sync your inventory, accounting, and sales data with Zoho ERP automatically.',
+      logo: 'https://cdn.worldvectorlogo.com/logos/zoho-1.svg',
+      status: 'Available',
+      onConnect: () => {
+        setConfigType('zoho');
+        setConfigOpen(true);
+      },
+      onConfig: () => {
+        setConfigType('zoho');
+        setConfigOpen(true);
+      },
+    },
+    {
+      id: 'sap',
+      name: 'SAP ERP',
+      category: 'ERP',
+      description: 'Enterprise resource planning integration for seamless end-to-end data reconciliation.',
+      logo: 'https://cdn.worldvectorlogo.com/logos/sap-1.svg',
+      status: 'Available',
+      onConnect: () => {
+        setConfigType('sap');
+        setConfigOpen(true);
+      },
+      onConfig: () => {
+        setConfigType('sap');
+        setConfigOpen(true);
+      },
+    },
   ];
 
-  const categories = ['Marketplaces', 'OMS', 'Logistic Providers', 'Payment Providers'];
+  const categories = ['Marketplaces', 'OMS', 'ERP', 'Logistic Providers', 'Payment Providers'];
 
   return (
     <Box sx={{ p: 4, width: '100%', minHeight: '100vh' }}>

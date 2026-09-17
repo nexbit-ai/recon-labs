@@ -8,6 +8,7 @@ import { FileUploadOutlined, ExtensionOutlined, Tune as TuneIcon, FileDownloadOu
 import { colors, hairline, shell, type, space } from '../theme/b2bTokens';
 import { SECTIONS, type SectionDef } from './sections';
 import { workspace, fiscalPeriod } from '../mock';
+import { KAPIVA_CLIENTS } from '../mock/b2bReconData';
 import ProductToggle from '../components/ProductToggle';
 import UploadSettlementModal from '../components/UploadSettlementModal';
 import { Pressable } from '../components/primitives';
@@ -184,100 +185,36 @@ const B2BShell: React.FC = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px`, flexShrink: 0 }}>
               {active.key !== 'overview' && (
                 <>
-                  {active.key === 'po-dashboard' && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px', mr: 1 }}>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<TuneIcon sx={{ fontSize: 15 }} />}
-                        onClick={() => window.dispatchEvent(new CustomEvent('open-po-filters'))}
-                        sx={{
-                          borderRadius: '9999px',
-                          textTransform: 'none',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          borderColor: '#eaecf0',
-                          backgroundColor: '#ffffff',
-                          color: '#334155',
-                          height: 32,
-                          px: 2,
-                          boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
-                          '&:hover': {
-                            borderColor: '#d0d5dd',
-                            backgroundColor: '#f4f4f5',
-                          },
-                        }}
-                      >
-                        Filters
-                        {poFilterCount > 0 && (
-                          <Box
-                            component="span"
-                            sx={{
-                              ml: 0.75,
-                              px: '6px',
-                              py: '1px',
-                              borderRadius: '9999px',
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              backgroundColor: '#059669',
-                              color: '#ffffff',
-                            }}
-                          >
-                            {poFilterCount}
-                          </Box>
-                        )}
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<FileDownloadOutlinedIcon sx={{ fontSize: 16 }} />}
-                        onClick={() => window.dispatchEvent(new CustomEvent('export-po-data'))}
-                        sx={{
-                          borderRadius: '9999px',
-                          textTransform: 'none',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          borderColor: '#eaecf0',
-                          backgroundColor: '#ffffff',
-                          color: '#334155',
-                          height: 32,
-                          px: 2,
-                          boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)',
-                          '&:hover': {
-                            borderColor: '#d0d5dd',
-                            backgroundColor: '#f4f4f5',
-                          },
-                        }}
-                      >
-                        Export
-                      </Button>
-                    </Box>
+
+                  {active.key !== 'vendors' && (
+                    <>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px` }}>
+                        <Typography sx={{ ...type.label, color: colors.grey700 }}>CLIENT:</Typography>
+                        <select 
+                          value={platformFilter} 
+                          onChange={(e) => setPlatformFilter(e.target.value)}
+                          style={{
+                            padding: '6px 14px',
+                            border: '1px solid #eaecf0',
+                            borderRadius: '9999px',
+                            backgroundColor: colors.paper,
+                            color: colors.ink,
+                            fontSize: 13,
+                            fontWeight: 500,
+                            outline: 'none',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit'
+                          }}
+                        >
+                          <option value="all">All 20 Clients</option>
+                          {KAPIVA_CLIENTS.map((c) => (
+                            <option key={c.id} value={c.name}>{c.name} ({c.code})</option>
+                          ))}
+                        </select>
+                      </Box>
+                      <Pill>{fiscalPeriod.pill}</Pill>
+                    </>
                   )}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px` }}>
-                    <Typography sx={{ ...type.label, color: colors.grey700 }}>ENTITY:</Typography>
-                    <select 
-                      value={platformFilter} 
-                      onChange={(e) => setPlatformFilter(e.target.value)}
-                      style={{
-                        padding: '6px 14px',
-                        border: '1px solid #eaecf0',
-                        borderRadius: '9999px',
-                        backgroundColor: colors.paper,
-                        color: colors.ink,
-                        fontSize: 13,
-                        fontWeight: 500,
-                        outline: 'none',
-                        cursor: 'pointer',
-                        fontFamily: 'inherit'
-                      }}
-                    >
-                      <option value="all">All Entities</option>
-                      <option value="nexbit">Nexbit</option>
-                      <option value="kapiva">Kapiva</option>
-                      <option value="medkart">Medkart</option>
-                    </select>
-                  </Box>
-                  <Pill>{fiscalPeriod.pill}</Pill>
                 </>
               )}
             </Box>
@@ -293,7 +230,7 @@ const B2BShell: React.FC = () => {
               pb: `${space.xxxl}px`,
             }}
           >
-            <Outlet context={{ platformFilter }} />
+            <Outlet context={{ platformFilter, clientFilter: platformFilter }} />
           </Box>
         </Box>
       </Box>

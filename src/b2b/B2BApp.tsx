@@ -14,9 +14,9 @@ import Overview from './views/Overview';
 import Reconciliation from './views/Reconciliation';
 import Disputes from './views/Disputes';
 import Channels from './views/Channels';
-import Contracts from './views/Contracts';
+import Vendors from './views/Vendors';
 import Exceptions from './views/Exceptions';
-import PODashboard from '../pages/PODashboard';
+import B2BInvoicesView from './views/B2BInvoicesView';
 import PODetailsPage from '../pages/PODetailsPage';
 import B2BPaymentsDashboard from '../pages/B2BPaymentsDashboard';
 // Reuse the exact same Integrations module from the B2C app.
@@ -27,9 +27,9 @@ const VIEWS: Record<string, React.ReactNode> = {
   upload: <Upload />,
   overview: <Overview />,
   reconciliation: <Reconciliation />,
-  'po-dashboard': <PODashboard />,
+  'po-dashboard': <B2BInvoicesView />,
   payments: <B2BPaymentsDashboard />,
-  contracts: <Contracts />,
+  vendors: <Vendors />,
   exceptions: <Exceptions />,
 };
 

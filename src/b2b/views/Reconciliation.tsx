@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
 import CountUpMetric from '../components/CountUpMetric';
+import ClientAgeingBarChart from '../components/ClientAgeingBarChart';
 import { cardSx, cardSx as cardBase, ColumnLabel, Pressable, SectionTitle } from '../components/primitives';
 import { formatRupees, formatINRShort, formatPercent } from '../lib/format';
 import {
@@ -37,12 +38,12 @@ const Caption: React.FC<{ children: React.ReactNode; sx?: object }> = ({ childre
 // ── Historical 6-Month Data for Graphs ──
 const historicalDataMap: Record<string, any[]> = {
   all: [
-    { name: 'Jan', PO: 3.8, GRN: 3.6, Settlement: 3.4 },
-    { name: 'Feb', PO: 4.2, GRN: 3.9, Settlement: 3.6 },
-    { name: 'Mar', PO: 3.9, GRN: 3.7, Settlement: 3.5 },
-    { name: 'Apr', PO: 4.6, GRN: 4.3, Settlement: 4.0 },
-    { name: 'May', PO: 4.1, GRN: 3.8, Settlement: 3.6 },
-    { name: 'Jun', PO: 4.5, GRN: 4.1, Settlement: 3.8 },
+    { name: 'Jan', Sales: 3.8, Settlement: 3.4 },
+    { name: 'Feb', Sales: 4.2, Settlement: 3.6 },
+    { name: 'Mar', Sales: 3.9, Settlement: 3.5 },
+    { name: 'Apr', Sales: 4.6, Settlement: 4.0 },
+    { name: 'May', Sales: 4.1, Settlement: 3.6 },
+    { name: 'Jun', Sales: 4.5, Settlement: 3.8 },
   ],
 };
 
@@ -646,7 +647,7 @@ const Reconciliation: React.FC = () => {
           />
           <Button
             size="small"
-            onClick={() => {}}
+            onClick={() => { }}
             sx={{
               borderRadius: '9999px',
               bgcolor: colors.ink,
@@ -723,205 +724,6 @@ const Reconciliation: React.FC = () => {
           <Box component="span" sx={{ display: 'block', fontSize: type.metric.fontSize, lineHeight: type.metric.lineHeight, fontWeight: type.metric.fontWeight, color: colors.ink, ...tabularNums }}>
             {formatINRShort(rawShortfall)}
           </Box>
-          <Caption sx={{ mt: `${space.md}px` }}>
-            Leakage / Deductions
-          </Caption>
-        </Box>
-      </Box>
-
-      {/* ── UPGRADED RECONCILIATION STATUS STRIP ───────────────────── */}
-      <Box sx={{ mb: `${space.xl}px` }}>
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: `${space.md}px`, flexWrap: 'wrap', gap: 1 }}>
-          <Box>
-            <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.ink, letterSpacing: '-0.01em' }}>
-              Reconciliation status by category
-            </Typography>
-            <Typography sx={{ fontSize: 12, color: colors.grey700, mt: '2px' }}>
-              Kapiva (Zoho Books ERP) ↔ New Welcome Agencies (Tally ERP) · Live dual-ledger reconciliation
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px` }}>
-            <Typography sx={{ fontSize: 11, color: colors.grey500, ...tabularNums }}>
-              Updated just now
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* 5-Category Cards Strip with Rupee Amounts + Counts */}
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(5, 1fr)' },
-            gap: `${space.md}px`,
-          }}
-        >
-          {activeCategoryMetrics.map((item) => {
-            const hasDiscrepancy = item.unmatchedCount > 0;
-            const totalCategoryAmount = item.matchedAmount + item.unmatchedAmount;
-            const matchPct = totalCategoryAmount > 0 ? (item.matchedAmount / totalCategoryAmount) * 100 : (item.unmatchedCount === 0 ? 100 : 0);
-
-            return (
-              <Box
-                key={item.key}
-                onClick={() => {
-                  setTxnFilter(item.docType);
-                  setDrawerOpen(true);
-                }}
-                sx={{
-                  bgcolor: colors.paper,
-                  border: hairline,
-                  borderRadius: '12px',
-                  p: `${space.lg}px`,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  '&:hover': {
-                    borderColor: '#d0d5dd',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                    transform: 'translateY(-1px)',
-                  },
-                }}
-              >
-                {/* Header: Label + Status Tag */}
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: `${space.sm}px` }}>
-                  <Typography sx={{ fontSize: 12.5, fontWeight: 500, color: colors.grey700 }}>
-                    {item.label}
-                  </Typography>
-
-                  {hasDiscrepancy ? (
-                    <Box
-                      sx={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        bgcolor: colors.amberTint,
-                        border: `1px solid ${colors.amberBorder}`,
-                        color: colors.amber,
-                        borderRadius: '9999px',
-                        px: '8px',
-                        py: '2px',
-                        fontSize: 11,
-                        fontWeight: 600,
-                        ...tabularNums,
-                      }}
-                    >
-                      {item.unmatchedCount} open
-                    </Box>
-                  ) : (
-                    <Box
-                      sx={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        bgcolor: colors.greenTint,
-                        border: `1px solid ${colors.greenBorder}`,
-                        color: colors.green,
-                        borderRadius: '9999px',
-                        px: '8px',
-                        py: '2px',
-                        fontSize: 11,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Reconciled
-                    </Box>
-                  )}
-                </Box>
-
-                {/* Primary Metric: Matched Rupee Amount */}
-                <Box sx={{ my: '4px' }}>
-                  <Typography
-                    sx={{
-                      fontSize: 22,
-                      fontWeight: 700,
-                      color: colors.ink,
-                      lineHeight: 1.2,
-                      ...tabularNums,
-                    }}
-                  >
-                    {item.matchedAmount > 0 ? formatRupees(item.matchedAmount) : '₹0'}
-                  </Typography>
-                  <Typography sx={{ fontSize: 12, color: colors.grey700, mt: '3px', ...tabularNums }}>
-                    {item.matchedCount} matched records
-                  </Typography>
-                </Box>
-
-                {/* Divider */}
-                <Box sx={{ borderTop: hairline, my: `${space.sm}px` }} />
-
-                {/* Secondary Metric: Unmatched Gap Rupee Amount */}
-                <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                  <Typography sx={{ fontSize: 11.5, color: colors.grey700 }}>
-                    Unmatched gap
-                  </Typography>
-                  {hasDiscrepancy ? (
-                    <Typography
-                      sx={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: colors.amber,
-                        ...tabularNums,
-                      }}
-                    >
-                      {formatRupees(item.unmatchedAmount)} ({item.unmatchedCount})
-                    </Typography>
-                  ) : (
-                    <Typography
-                      sx={{
-                        fontSize: 12,
-                        fontWeight: 500,
-                        color: colors.green,
-                        ...tabularNums,
-                      }}
-                    >
-                      ₹0 · 0 open
-                    </Typography>
-                  )}
-                </Box>
-
-                {/* 3px Minimalist Progress Bar (Rule 2.4) */}
-                <Box sx={{ mt: `${space.sm}px` }}>
-                  <Box sx={{ width: '100%', height: '3px', bgcolor: colors.grey200, borderRadius: '2px', overflow: 'hidden' }}>
-                    <Box
-                      sx={{
-                        width: `${Math.min(100, Math.max(0, matchPct))}%`,
-                        height: '100%',
-                        bgcolor: matchPct >= 95 ? colors.ink : colors.amber,
-                        transition: 'width 0.3s ease',
-                      }}
-                    />
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: '4px' }}>
-                    <Typography sx={{ fontSize: 11, color: colors.grey700, ...tabularNums }}>
-                      {matchPct.toFixed(1)}% matched
-                    </Typography>
-                    <Typography sx={{ fontSize: 10.5, color: colors.grey500 }}>
-                      target 100%
-                    </Typography>
-                  </Box>
-                </Box>
-
-                {/* Footnote Ledger Source (Rule 2.5) */}
-                <Box
-                  sx={{
-                    mt: `${space.sm}px`,
-                    pt: '6px',
-                    borderTop: `1px dashed ${colors.grey100}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <Typography sx={{ fontSize: 11, color: colors.grey500 }}>
-                    {item.ledgerPair}
-                  </Typography>
-                  <Typography sx={{ fontSize: 11, color: colors.ink, fontWeight: 500 }}>
-                    Inspect →
-                  </Typography>
-                </Box>
-              </Box>
-            );
-          })}
         </Box>
       </Box>
 
@@ -945,131 +747,18 @@ const Reconciliation: React.FC = () => {
                 formatter={(value: number) => [`₹${value} Cr`, undefined]}
               />
               <Legend wrapperStyle={{ fontSize: 13 }} />
-              <Line type="monotone" dataKey="PO" stroke={colors.ink} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-              <Line type="monotone" dataKey="GRN" stroke={colors.green} strokeWidth={2} dot={{ r: 4 }} />
-              <Line type="monotone" dataKey="Settlement" stroke={colors.grey500} strokeWidth={2} dot={{ r: 4 }} />
+              <Line type="monotone" name="Sales (Invoice Raised)" dataKey="Sales" stroke={colors.ink} strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+              <Line type="monotone" name="Settlement" dataKey="Settlement" stroke={colors.grey500} strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
             </LineChart>
           </ResponsiveContainer>
         </Box>
       </Box>
 
-      {/* ── General Overview Cards ───────────────────────────────────────────── */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'repeat(5, 1fr)' },
-          border: hairline,
-          mb: `${space.xl}px`,
-        }}
-      >
-        {/* Total volume */}
-        <Box sx={{ px: `${space.xl}px`, py: `${space.lg}px` }}>
-          <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase', letterSpacing: '0.04em', mb: `${space.xs}px` }}>
-            Total Volume
-          </Typography>
-          <Typography sx={{ fontSize: 20, fontWeight: 600, color: colors.ink, ...tabularNums }}>
-            {formatRupees(summary.totalAmount)}
-          </Typography>
-          <Typography sx={{ fontSize: 12, color: colors.grey500, mt: '2px' }}>
-            {dualReconRows.length} transactions · FY 2025–26
-          </Typography>
-        </Box>
-
-        {/* Matched */}
-        <Box
-          sx={{
-            px: `${space.xl}px`,
-            py: `${space.lg}px`,
-            borderLeft: hairline,
-            cursor: 'pointer',
-            '&:hover': { bgcolor: colors.grey100 },
-          }}
-          onClick={() => { setMatchFilter('matched'); setTxnFilter('all'); }}
-        >
-          <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase', letterSpacing: '0.04em', mb: `${space.xs}px` }}>
-            Matched
-          </Typography>
-          <Typography sx={{ fontSize: 20, fontWeight: 600, color: colors.ink, ...tabularNums }}>
-            {formatRupees(summary.matchedAmount)}
-          </Typography>
-          <Typography sx={{ fontSize: 12, color: colors.grey500, mt: '2px' }}>
-            {summary.matchedCount} transactions reconciled
-          </Typography>
-        </Box>
-
-        {/* Unmatched (exceptions) */}
-        <Box
-          sx={{
-            px: `${space.xl}px`,
-            py: `${space.lg}px`,
-            borderLeft: hairline,
-            cursor: 'pointer',
-            '&:hover': { bgcolor: colors.grey100 },
-          }}
-          onClick={() => { setMatchFilter('exceptions'); setTxnFilter('all'); }}
-        >
-          <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase', letterSpacing: '0.04em', mb: `${space.xs}px` }}>
-            Unmatched
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: `${space.md}px` }}>
-            <Typography sx={{ fontSize: 20, fontWeight: 600, color: colors.ink, ...tabularNums }}>
-              {formatRupees(summary.exceptionAmount)}
-            </Typography>
-            <Box
-              sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                border: hairline,
-                px: `${space.sm}px`,
-                py: '2px',
-                fontSize: 10,
-                fontWeight: 700,
-                color: colors.ink,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-              }}
-            >
-              {summary.exceptionCount} open
-            </Box>
-          </Box>
-          <Typography sx={{ fontSize: 12, color: colors.grey500, mt: '2px' }}>
-            Needs action · click to filter
-          </Typography>
-        </Box>
-
-        {/* Additional Extracted Dashboard Cards */}
-        <Box sx={{ px: `${space.xl}px`, py: `${space.lg}px`, borderTop: { xs: hairline, md: 'none' }, borderLeft: { xs: 'none', md: hairline } }}>
-          <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase', letterSpacing: '0.04em', mb: `${space.xs}px` }}>
-            Dispute Win Rate
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: `${space.md}px` }}>
-            <Typography sx={{ fontSize: 20, fontWeight: 600, color: colors.ink, ...tabularNums }}>
-              82.4%
-            </Typography>
-            <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.green, ...tabularNums }}>
-              ↗ +4.1%
-            </Typography>
-          </Box>
-          <Typography sx={{ fontSize: 12, color: colors.grey500, mt: '2px' }}>
-            Current month performance
-          </Typography>
-        </Box>
-
-        <Box sx={{ px: `${space.xl}px`, py: `${space.lg}px`, borderTop: { xs: hairline, md: 'none' }, borderLeft: { xs: 'none', md: hairline } }}>
-          <Typography sx={{ fontSize: 11, fontWeight: 600, color: colors.grey700, textTransform: 'uppercase', letterSpacing: '0.04em', mb: `${space.xs}px` }}>
-            Recovered Amount
-          </Typography>
-          <Typography sx={{ fontSize: 20, fontWeight: 600, color: colors.ink, ...tabularNums }}>
-            ₹12,45,000
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px`, mt: '8px' }}>
-            <Box sx={{ flex: 1, height: '3px', bgcolor: colors.grey100 }}>
-              <Box sx={{ width: '65%', height: '100%', bgcolor: colors.ink }} />
-            </Box>
-            <Typography sx={{ fontSize: 11, color: colors.grey500, ...tabularNums }}>65% of target</Typography>
-          </Box>
-        </Box>
+      {/* ── CLIENT PAYMENT AGEING ──────────────── */}
+      <Box sx={{ ...cardBase, p: `${space.xl}px`, mb: `${space.xl}px`, borderRadius: '12px' }}>
+        <ClientAgeingBarChart maxVisibleClients={8} />
       </Box>
+
 
       {/* ── Details Drawer ─────────────────────────────────────────────── */}
       <Drawer

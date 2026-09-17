@@ -116,7 +116,7 @@ export const PODetailsPage: React.FC = () => {
         <Box sx={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <Box>
             <Typography sx={{ fontSize: '11px', fontWeight: 700, color: '#71717a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Total PO Amount
+              Total Invoice Amount
             </Typography>
             <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#09090b', fontVariantNumeric: 'tabular-nums' }}>
               ₹{po.poAmount.toLocaleString('en-IN')}
@@ -157,7 +157,7 @@ export const PODetailsPage: React.FC = () => {
           >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
               <Typography sx={{ fontSize: '15px', fontWeight: 700, color: '#09090b' }}>
-                PO Details
+                Invoice Details
               </Typography>
               <Button
                 size="small"
@@ -179,15 +179,15 @@ export const PODetailsPage: React.FC = () => {
               </Button>
             </Box>
             <Grid container spacing={ySpacing}>
-              <DetailItem label="PO ID" value={po.id} />
+              <DetailItem label="INVOICE ID" value={po.id} />
               <DetailItem label="SO NUMBER" value={po.soNumber} />
               <DetailItem label="VENDOR" value={po.vendorName} />
               <DetailItem label="CHANNEL" value={po.channel} />
               <DetailItem label="FACILITY" value={po.facility} />
               <DetailItem label="CITY" value={po.city} />
-              <DetailItem label="PO DATE" value={po.poDate} />
+              <DetailItem label="INVOICE DATE" value={po.poDate} />
               <DetailItem
-                label="PO AMOUNT"
+                label="INVOICE AMOUNT"
                 value={po.poAmount > 0 ? `₹${po.poAmount.toLocaleString('en-IN')}` : '—'}
               />
               <DetailItem label="FILL RATE" value={`${po.fillRatePercent}%`} />
@@ -337,7 +337,7 @@ export const PODetailsPage: React.FC = () => {
               No Invoice Found
             </Typography>
             <Typography sx={{ fontSize: '14px', color: '#71717a', maxWidth: 400, mb: 3 }}>
-              There is currently no invoice associated with this Purchase Order. You can automate the invoice creation process based on the PO details.
+              There is currently no external invoice associated with this Invoice. You can automate the external invoice creation process based on the invoice details.
             </Typography>
           </Box>
         ) : (
@@ -681,7 +681,7 @@ const TimelineSidebar: React.FC<{ po: any }> = ({ po }) => {
       <Box sx={{ position: 'relative' }}>
         <TimelineItem 
           title="Email Received"
-          description="Fetched PO from email contents"
+          description="Fetched Invoice from email contents"
           iconBg="#eff6ff"
           dotColor="#3b82f6"
           tag="PO"

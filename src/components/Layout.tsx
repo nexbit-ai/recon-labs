@@ -51,7 +51,7 @@ const drawerWidth = 168;
 
 const menuItems = [
   { text: 'Reconciliation', icon: <ReceiptIcon />, path: '/marketplace-reconciliation', upcoming: false },
-  { text: 'Orders', icon: <AssignmentIcon />, path: '/b2b/po-dashboard', upcoming: false },
+  { text: 'Invoices', icon: <AssignmentIcon />, path: '/b2b/po-dashboard', upcoming: false },
   { text: 'Claims', icon: <ReportProblemIcon />, path: '/operations-centre', upcoming: false },
   { text: 'Logistics', icon: <StorageIcon />, path: '/logistics', upcoming: false },
   { text: 'Accounting', icon: <AccountBalanceIcon />, path: '/bookkeeping', upcoming: true },
