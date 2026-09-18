@@ -3006,22 +3006,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       }
                     }}
                   >
-                    <Box sx={{ p: 2, pt: 1.5, padding: '10px 14px' }}>
-                      <Typography variant="caption" sx={{ color: '#6b7280', mb: 0.75, display: 'block' }}>Filter by</Typography>
-                      <FormControl size="small" fullWidth >
-                        <Select
-                          labelId="date-field-label"
-                          value={dateField}
-                          onChange={(e) => { setDateField(e.target.value as any); }}
-                          sx={{
-                            padding: '4px 6px',
-                          }}
-                        >
-                          <MenuItem value="settlement">Settlement Date</MenuItem>
-                          <MenuItem value="invoice">Invoice Date</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Box>
+
                     {dateRangeOptions.map((option) => (
                       <MenuItem
                         key={option.value}
