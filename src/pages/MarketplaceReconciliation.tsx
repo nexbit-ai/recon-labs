@@ -396,7 +396,7 @@ const MarketplaceReconciliation: React.FC = () => {
       comissionData?: number; // only populated for amazon/flipkart
     }>;
     // For D2C platform
-    d2cSalesAndSettlement?: Array<{ month: string; sales: number; settlement: number }>;
+    d2cSalesAndSettlement?: Array<{ month: string; sales: number; settlement: number; grossSales?: number }>;
     d2cVendorSettlements?: {
       cod?: Record<string, Array<{ month: string; settlement: number }>>;
       noncod?: Record<string, Array<{ month: string; settlement: number }>>;
