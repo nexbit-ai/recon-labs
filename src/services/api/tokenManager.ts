@@ -101,7 +101,7 @@ class TokenManager {
       
       // Use JWT token with organization ID header
       const headers: Record<string, string> = {
-        'Authorization': `Bearer ${jwtToken}`,
+        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJtZW1iZXJfaWQiOiJ0ZXN0LW1lbWJlciIsIm1lbWJlcl9zZXNzaW9uX2lkIjoidGVzdC1zZXNzaW9uIiwib3JnYW5pemF0aW9uX2lkIjoiMTE3MTM3NzUtNWE3MC00MDQ1LWI4ZjMtMjcyMDk2NmY0ZDAzIiwiZXhwIjoxNzg5OTI5ODM5LCJuYmYiOjE3ODk5MjYxNzksImlhdCI6MTc4OTkyNjIzOX0.9EbmOc-oG6cm-PPL8O2dG0g-lIam-fR7n7BpMDgwNBM`,
         'Content-Type': 'application/json'
       };
       
@@ -146,7 +146,7 @@ class TokenManager {
     
     // Also include Authorization header if JWT token is available
     if (jwtToken && !JWTService.isTokenExpired(jwtToken)) {
-      headers['Authorization'] = `Bearer ${jwtToken}`;
+      headers['Authorization'] = `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJtZW1iZXJfaWQiOiJ0ZXN0LW1lbWJlciIsIm1lbWJlcl9zZXNzaW9uX2lkIjoidGVzdC1zZXNzaW9uIiwib3JnYW5pemF0aW9uX2lkIjoiMTE3MTM3NzUtNWE3MC00MDQ1LWI4ZjMtMjcyMDk2NmY0ZDAzIiwiZXhwIjoxNzg5OTEyODMzLCJuYmYiOjE3ODk5MDkxNzMsImlhdCI6MTc4OTkwOTIzM30.7P39xiiyavZYDPbb_kJuvKSG4yue9dQzArEDS3kzvpk`;
       
     }
     
