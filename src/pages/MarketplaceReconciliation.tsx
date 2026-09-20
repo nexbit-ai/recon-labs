@@ -425,9 +425,9 @@ const MarketplaceReconciliation: React.FC = () => {
     if (from && to) {
       return { start: from, end: to, kind: 'custom' } as const;
     }
-    
+
     const isTargetOrg = organizationId && ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'].includes(organizationId);
-    
+
     try {
       const lsFrom = localStorage.getItem('recon_selected_date_from') || '';
       const lsTo = localStorage.getItem('recon_selected_date_to') || '';
@@ -439,11 +439,11 @@ const MarketplaceReconciliation: React.FC = () => {
         return { start: lsFrom, end: lsTo, kind: (lsKind || 'custom') } as const;
       }
     } catch { }
-    
+
     if (isTargetOrg) {
       return { start: '2026-06-01', end: '2026-06-30', kind: 'custom' } as const;
     }
-    
+
     // Fallback to current month if desired, but keep April 2025 to match mock defaults
     return { start: '2025-04-01', end: '2025-04-30', kind: 'custom' } as const;
   })();
@@ -459,7 +459,7 @@ const MarketplaceReconciliation: React.FC = () => {
   // Ageing summary (Avg TAT across providers) - use real data if available, otherwise dummy
   const overallAvgTAT = ageingData.length > 0
     ? (ageingData.reduce((sum, p) => sum + p.averageDaysToSettle, 0) / ageingData.length).toFixed(1)
-    : usingMockData 
+    : usingMockData
       ? (PROVIDER_AGEING_DATA.reduce((sum, p) => sum + p.averageDaysToSettle, 0) / PROVIDER_AGEING_DATA.length).toFixed(1)
       : "0.0";
 
@@ -517,7 +517,7 @@ const MarketplaceReconciliation: React.FC = () => {
     if (organizationId && ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'].includes(organizationId)) {
       const params = new URLSearchParams(window.location.search);
       const urlFrom = params.get('from');
-      
+
       // If user hasn't explicitly set a date in URL
       if (!urlFrom) {
         // If the current state is the general default, override it
@@ -1256,7 +1256,7 @@ const MarketplaceReconciliation: React.FC = () => {
     if (selectedDateRange === 'custom' && (!customStartDate || !customEndDate)) {
       return;
     }
-    
+
     let startDate: string;
     let endDate: string;
     const today = new Date();
@@ -1283,7 +1283,7 @@ const MarketplaceReconciliation: React.FC = () => {
           end_date: endDate
         }).catch(() => ({ data: [] }))
       ]);
-      
+
       if (summaryRes.data) {
         setFeeInvoiceSummary(summaryRes.data);
       }
@@ -2310,22 +2310,22 @@ const MarketplaceReconciliation: React.FC = () => {
         sort_by: 'order_date',
         sort_order: 'desc',
       };
-      
+
       if (selectedPlatform) {
         params.platform = selectedPlatform;
       }
-      
+
       if (effectiveDateRangeForTs.start && effectiveDateRangeForTs.end) {
-        params.order_date_from = effectiveDateRangeForTs.start;
-        params.order_date_to = effectiveDateRangeForTs.end;
+        params.invoice_date_from = effectiveDateRangeForTs.start;
+        params.invoice_date_to = effectiveDateRangeForTs.end;
       }
 
       console.log('🔄 [Prefetch] Eagerly background fetching TransactionSheet data...');
-      apiService.get(API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS, params, { 
-        useCache: true, 
+      apiService.get(API_CONFIG.ENDPOINTS.TOTAL_TRANSACTIONS, params, {
+        useCache: true,
         cacheTimeMs: 300000 // Cache lives for 5 minutes
       }).catch(() => { /* Ignore errors on background prefetch */ });
-      
+
     }, 1500); // 1.5s debounce wait time
 
     return () => clearTimeout(prefetchTimer);
@@ -2890,67 +2890,67 @@ const MarketplaceReconciliation: React.FC = () => {
       <Box sx={{ p: { xs: 2, md: 3 }, position: 'relative', zIndex: 1 }}>
         {/* Header */}
         <Box sx={{ mb: 2 }}>
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              mb: 2,
-            }}>
-              {/* Date Range Filter */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box sx={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {loading && (
-                    <CircularProgress size={24} sx={{ color: '#1a1a1a' }} />
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            mb: 2,
+          }}>
+            {/* Date Range Filter */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {loading && (
+                  <CircularProgress size={24} sx={{ color: '#1a1a1a' }} />
+                )}
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
+                {/* Last updated timestamp - inline left of date filter */}
+                <Box sx={{
+                  display: 'none',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: 0.5,
+                  mr: 0.5,
+                  minWidth: 210,
+                  opacity: (normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at) ? 1 : 0,
+                  visibility: (normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at) ? 'visible' : 'hidden',
+                  transition: 'opacity 0.3s ease'
+                }}>
+                  {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at && (
+                    <>
+                      <CheckCircleIcon sx={{ fontSize: 13, color: '#16a34a' }} />
+                      <Typography sx={{ fontSize: '0.72rem', color: '#6b7280', fontWeight: 400, whiteSpace: 'nowrap' }}>
+                        Last updated at {formatReconciliationTimestamp(normalizedReconciliationStatus.last_completed_at)}
+                      </Typography>
+                    </>
                   )}
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
-                  {/* Last updated timestamp - inline left of date filter */}
-                  <Box sx={{ 
-                    display: 'none', 
-                    alignItems: 'center', 
-                    justifyContent: 'flex-end',
-                    gap: 0.5, 
-                    mr: 0.5, 
-                    minWidth: 210,
-                    opacity: (normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at) ? 1 : 0,
-                    visibility: (normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at) ? 'visible' : 'hidden',
-                    transition: 'opacity 0.3s ease'
-                  }}>
-                    {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processed' && normalizedReconciliationStatus.last_completed_at && (
-                      <>
-                        <CheckCircleIcon sx={{ fontSize: 13, color: '#16a34a' }} />
-                        <Typography sx={{ fontSize: '0.72rem', color: '#6b7280', fontWeight: 400, whiteSpace: 'nowrap' }}>
-                          Last updated at {formatReconciliationTimestamp(normalizedReconciliationStatus.last_completed_at)}
-                        </Typography>
-                      </>
-                    )}
+                <Button
+                  variant="outlined"
+                  endIcon={<KeyboardArrowDownIcon />}
+                  startIcon={<CalendarTodayIcon />}
+                  onClick={(event) => setDateRangeMenuAnchor(event.currentTarget)}
+                  sx={{
+                    borderColor: '#6B7280',
+                    color: '#6B7280',
+                    textTransform: 'none',
+                    minWidth: 200,
+                    minHeight: 36,
+                    px: 1.5,
+                    fontSize: '0.7875rem',
+                    '&:hover': {
+                      borderColor: '#4B5563',
+                      backgroundColor: 'rgba(107, 114, 128, 0.04)',
+                    },
+                  }}
+                >
+                  <Box sx={{ textAlign: 'left' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
+                      {getCurrentDateRangeText()}
+                    </Typography>
                   </Box>
-                  <Button
-                    variant="outlined"
-                    endIcon={<KeyboardArrowDownIcon />}
-                    startIcon={<CalendarTodayIcon />}
-                    onClick={(event) => setDateRangeMenuAnchor(event.currentTarget)}
-                    sx={{
-                      borderColor: '#6B7280',
-                      color: '#6B7280',
-                      textTransform: 'none',
-                      minWidth: 200,
-                      minHeight: 36,
-                      px: 1.5,
-                      fontSize: '0.7875rem',
-                      '&:hover': {
-                        borderColor: '#4B5563',
-                        backgroundColor: 'rgba(107, 114, 128, 0.04)',
-                      },
-                    }}
-                  >
-                    <Box sx={{ textAlign: 'left' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
-                        {getCurrentDateRangeText()}
-                      </Typography>
-                    </Box>
-                  </Button>
-                  {/* <Button
+                </Button>
+                {/* <Button
                   variant="outlined"
                   startIcon={<SyncIcon sx={{
                     animation: syncLoading ? 'spin 1s linear infinite' : 'none',
@@ -2975,281 +2975,281 @@ const MarketplaceReconciliation: React.FC = () => {
                 >
                   Sync
                 </Button> */}
-                  <Button
-                    variant="outlined"
-                    startIcon={<DownloadIcon />}
-                    onClick={handleDownloadCSV}
-                    sx={{
-                      borderColor: '#6B7280',
-                      color: '#6B7280',
-                      textTransform: 'none',
-                      minHeight: 36,
-                      fontSize: '0.7875rem',
-                      '&:hover': {
-                        borderColor: '#4B5563',
-                        backgroundColor: 'rgba(107, 114, 128, 0.04)',
-                      },
-                    }}
-                  >
-                    Download CSV
-                  </Button>
-                  <Menu
-                    anchorEl={dateRangeMenuAnchor}
-                    open={Boolean(dateRangeMenuAnchor)}
-                    onClose={() => setDateRangeMenuAnchor(null)}
-                    PaperProps={{
-                      sx: {
-                        mt: 1,
-                        minWidth: 250,
-                        borderRadius: 0.5, // Reduced from 2 to 0.5 for less rounded corners
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                        border: '1px solid #e5e7eb'
-                      }
-                    }}
-                  >
+                <Button
+                  variant="outlined"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleDownloadCSV}
+                  sx={{
+                    borderColor: '#6B7280',
+                    color: '#6B7280',
+                    textTransform: 'none',
+                    minHeight: 36,
+                    fontSize: '0.7875rem',
+                    '&:hover': {
+                      borderColor: '#4B5563',
+                      backgroundColor: 'rgba(107, 114, 128, 0.04)',
+                    },
+                  }}
+                >
+                  Download CSV
+                </Button>
+                <Menu
+                  anchorEl={dateRangeMenuAnchor}
+                  open={Boolean(dateRangeMenuAnchor)}
+                  onClose={() => setDateRangeMenuAnchor(null)}
+                  PaperProps={{
+                    sx: {
+                      mt: 1,
+                      minWidth: 250,
+                      borderRadius: 0.5, // Reduced from 2 to 0.5 for less rounded corners
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      border: '1px solid #e5e7eb'
+                    }
+                  }}
+                >
 
-                    {dateRangeOptions.map((option) => (
-                      <MenuItem
-                        key={option.value}
-                        onClick={() => handleDateRangeSelect(option.value)}
-                        sx={{
-                          py: 1.5,
-                          px: 2,
-                          '&:hover': {
-                            backgroundColor: '#f9fafb'
-                          }
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
-                            {option.label}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                            {option.dates}
-                          </Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Menu>
-
-                  {/* Custom Calendar Popup - Appears below date range filter */}
-                  {showCustomDatePicker && (
-                    <Box
-                      ref={calendarPopupRef}
+                  {dateRangeOptions.map((option) => (
+                    <MenuItem
+                      key={option.value}
+                      onClick={() => handleDateRangeSelect(option.value)}
                       sx={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        zIndex: 1000,
-                        mt: 1,
-                        bgcolor: 'white',
-                        borderRadius: 2,
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                        border: '1px solid #e5e7eb',
-                        p: 1.8, // Reduced from 2 to 1.8 (10% reduction)
-                        minWidth: 270 // Reduced from 300 to 270 (10% reduction)
+                        py: 1.5,
+                        px: 2,
+                        '&:hover': {
+                          backgroundColor: '#f9fafb'
+                        }
                       }}
                     >
-                      {/* Calendar Header */}
-                      <Box sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        mb: 1.8, // Reduced from 2 to 1.8 (10% reduction)
-                        px: 0.9 // Reduced from 1 to 0.9 (10% reduction)
-                      }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleCalendarMonthChange(-1)}
-                          sx={{ color: '#6b7280' }}
-                        >
-                          <KeyboardArrowDownIcon sx={{ transform: 'rotate(90deg)' }} />
-                        </IconButton>
-                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f2937', fontSize: '1.0125rem' }}>
-                          {currentCalendarMonth}
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: '#1f2937' }}>
+                          {option.label}
                         </Typography>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleCalendarMonthChange(1)}
-                          sx={{ color: '#6b7280' }}
-                        >
-                          <KeyboardArrowDownIcon sx={{ transform: 'rotate(-90deg)' }} />
-                        </IconButton>
+                        <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                          {option.dates}
+                        </Typography>
                       </Box>
+                    </MenuItem>
+                  ))}
+                </Menu>
 
-                      {/* Days of Week */}
-                      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.9, mb: 0.9 }}>
-                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
-                          <Typography
-                            key={day}
-                            variant="caption"
-                            sx={{
-                              textAlign: 'center',
-                              color: '#6b7280',
-                              fontWeight: 500,
-                              py: 1
-                            }}
-                          >
-                            {day}
-                          </Typography>
-                        ))}
-                      </Box>
-
-                      {/* Calendar Grid */}
-                      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.9 }}>
-                        {getCalendarDays().map((day, index) => (
-                          <Box
-                            key={index}
-                            onClick={() => handleCalendarDateClick(day)}
-                            sx={{
-                              aspectRatio: '1',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: day ? 'pointer' : 'default',
-                              borderRadius: 1,
-                              fontSize: '0.7875rem', // Reduced from 0.875rem (10% reduction)
-                              fontWeight: 500,
-                              color: day ? '#1f2937' : 'transparent',
-                              backgroundColor: day ? 'transparent' : 'transparent',
-                              border: day && isDateInRange(day) ? '1px solid #3b82f6' : 'none',
-                              '&:hover': day ? {
-                                backgroundColor: '#f3f4f6'
-                              } : {},
-                              ...(day && isDateSelected(day) && {
-                                color: '#1d4ed8',
-                                fontWeight: 700
-                              }),
-                              ...(day && isDateInRange(day) && !isDateSelected(day) && {
-                                color: '#3b82f6'
-                              })
-                            }}
-                          >
-                            {day}
-                          </Box>
-                        ))}
-                      </Box>
-
-
-
-
-
-
-                    </Box>
-                  )}
-
-                  {/* Platform Selector */}
-                  <Button
-                    variant="outlined"
-                    endIcon={<KeyboardArrowDownIcon />}
-                    startIcon={<StorefrontIcon />}
-                    onClick={(event) => { setTempSelectedPlatform(selectedPlatform); setPlatformMenuAnchorEl(event.currentTarget); }}
+                {/* Custom Calendar Popup - Appears below date range filter */}
+                {showCustomDatePicker && (
+                  <Box
+                    ref={calendarPopupRef}
                     sx={{
-                      borderColor: '#6B7280',
-                      color: '#6B7280',
-                      textTransform: 'none',
-                      minWidth: 'auto',
-                      minHeight: 36,
-                      px: 1.5,
-                      fontSize: '0.7875rem',
-                      '&:hover': {
-                        borderColor: '#4B5563',
-                        backgroundColor: 'rgba(107, 114, 128, 0.04)',
-                      },
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      zIndex: 1000,
+                      mt: 1,
+                      bgcolor: 'white',
+                      borderRadius: 2,
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      border: '1px solid #e5e7eb',
+                      p: 1.8, // Reduced from 2 to 1.8 (10% reduction)
+                      minWidth: 270 // Reduced from 300 to 270 (10% reduction)
                     }}
                   >
-                    {availablePlatforms.find(ap => ap.value === selectedPlatform)?.label || 'Select Platform'}
-                  </Button>
-                  <Menu
-                    anchorEl={platformMenuAnchorEl}
-                    open={Boolean(platformMenuAnchorEl)}
-                    onClose={() => setPlatformMenuAnchorEl(null)}
-                    MenuListProps={{
-                      'aria-labelledby': 'platform-select-button',
-                    }}
-                    PaperProps={{
-                      sx: {
-                        mt: 1,
-                        minWidth: 260,
-                      }
-                    }}
-                  >
-                    <Box sx={{ p: 1, minWidth: 240 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', mb: 1 }}>Select Platform</Typography>
-                      <RadioGroup
-                        value={tempSelectedPlatform || selectedPlatform}
-                        onChange={(e) => {
-                          const newPlatform = e.target.value as Platform;
-                          setTempSelectedPlatform(newPlatform);
-                        }}
+                    {/* Calendar Header */}
+                    <Box sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      mb: 1.8, // Reduced from 2 to 1.8 (10% reduction)
+                      px: 0.9 // Reduced from 1 to 0.9 (10% reduction)
+                    }}>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleCalendarMonthChange(-1)}
+                        sx={{ color: '#6b7280' }}
                       >
-                        {availablePlatforms.map((p) => (
-                          <MenuItem
-                            key={p.value}
-                            onClick={() => {
-                              setTempSelectedPlatform(p.value);
-                            }}
-                            sx={{ py: 1, px: 1, borderRadius: '8px' }}
-                          >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Radio size="small" checked={(tempSelectedPlatform || selectedPlatform) === p.value} value={p.value} />
-                              <Box>
-                                <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p.label}</Typography>
-                                <Typography variant="caption" sx={{ color: '#6b7280' }}>{p.value === 'd2c' ? 'Website / D2C' : 'E-commerce marketplace'}</Typography>
-                              </Box>
-                            </Box>
-                          </MenuItem>
-                        ))}
-                      </RadioGroup>
-                      <Box sx={{ display: 'flex', gap: 1, mt: 1, justifyContent: 'flex-end' }}>
-                        <Button variant="outlined" onClick={() => setPlatformMenuAnchorEl(null)} sx={{ textTransform: 'none', color: '#6b7280', borderColor: '#e5e7eb' }}>Cancel</Button>
-                        <Button
-                          variant="outlined"
-                          disabled={!tempSelectedPlatform}
-                          onClick={() => {
-                            const next = tempSelectedPlatform!;
-                            setSelectedPlatform(next);
-                            setPlatformMenuAnchorEl(null);
-                          }}
-                          sx={{ textTransform: 'none' }}
-                        >
-                          Apply
-                        </Button>
-                      </Box>
+                        <KeyboardArrowDownIcon sx={{ transform: 'rotate(90deg)' }} />
+                      </IconButton>
+                      <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f2937', fontSize: '1.0125rem' }}>
+                        {currentCalendarMonth}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleCalendarMonthChange(1)}
+                        sx={{ color: '#6b7280' }}
+                      >
+                        <KeyboardArrowDownIcon sx={{ transform: 'rotate(-90deg)' }} />
+                      </IconButton>
                     </Box>
-                  </Menu>
-                </Box>
-              </Box>
-            </Box>
 
-            {/* Error Alert */}
-            {error && (
-              <Alert
-                severity={usingMockData ? "warning" : "error"}
-                sx={{
-                  mb: 3,
-                  borderRadius: '6px',
-                  background: usingMockData ? '#fff3cd' : '#f8d7da',
-                  border: usingMockData ? '1px solid #ffeaa7' : '1px solid #f5c6cb',
-                  '& .MuiAlert-message': {
-                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                  },
-                }}
-              >
-                {error}
-                {usingMockData && (
-                  <Box sx={{ mt: 1, p: 2, borderRadius: '4px', background: 'rgba(255, 255, 255, 0.7)' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#1a1a1a', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                      Mock Data Values:
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#666666', fontSize: '0.875rem', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
-                      Gross Sales: {getCurrencySymbol()}12,00,000 • Orders Delivered: 480 orders ({getCurrencySymbol()}12,30,000) • Returns: 12 orders (-{getCurrencySymbol()}30,000)
-                    </Typography>
+                    {/* Days of Week */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.9, mb: 0.9 }}>
+                      {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
+                        <Typography
+                          key={day}
+                          variant="caption"
+                          sx={{
+                            textAlign: 'center',
+                            color: '#6b7280',
+                            fontWeight: 500,
+                            py: 1
+                          }}
+                        >
+                          {day}
+                        </Typography>
+                      ))}
+                    </Box>
+
+                    {/* Calendar Grid */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.9 }}>
+                      {getCalendarDays().map((day, index) => (
+                        <Box
+                          key={index}
+                          onClick={() => handleCalendarDateClick(day)}
+                          sx={{
+                            aspectRatio: '1',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: day ? 'pointer' : 'default',
+                            borderRadius: 1,
+                            fontSize: '0.7875rem', // Reduced from 0.875rem (10% reduction)
+                            fontWeight: 500,
+                            color: day ? '#1f2937' : 'transparent',
+                            backgroundColor: day ? 'transparent' : 'transparent',
+                            border: day && isDateInRange(day) ? '1px solid #3b82f6' : 'none',
+                            '&:hover': day ? {
+                              backgroundColor: '#f3f4f6'
+                            } : {},
+                            ...(day && isDateSelected(day) && {
+                              color: '#1d4ed8',
+                              fontWeight: 700
+                            }),
+                            ...(day && isDateInRange(day) && !isDateSelected(day) && {
+                              color: '#3b82f6'
+                            })
+                          }}
+                        >
+                          {day}
+                        </Box>
+                      ))}
+                    </Box>
+
+
+
+
+
+
                   </Box>
                 )}
-              </Alert>
-            )}
+
+                {/* Platform Selector */}
+                <Button
+                  variant="outlined"
+                  endIcon={<KeyboardArrowDownIcon />}
+                  startIcon={<StorefrontIcon />}
+                  onClick={(event) => { setTempSelectedPlatform(selectedPlatform); setPlatformMenuAnchorEl(event.currentTarget); }}
+                  sx={{
+                    borderColor: '#6B7280',
+                    color: '#6B7280',
+                    textTransform: 'none',
+                    minWidth: 'auto',
+                    minHeight: 36,
+                    px: 1.5,
+                    fontSize: '0.7875rem',
+                    '&:hover': {
+                      borderColor: '#4B5563',
+                      backgroundColor: 'rgba(107, 114, 128, 0.04)',
+                    },
+                  }}
+                >
+                  {availablePlatforms.find(ap => ap.value === selectedPlatform)?.label || 'Select Platform'}
+                </Button>
+                <Menu
+                  anchorEl={platformMenuAnchorEl}
+                  open={Boolean(platformMenuAnchorEl)}
+                  onClose={() => setPlatformMenuAnchorEl(null)}
+                  MenuListProps={{
+                    'aria-labelledby': 'platform-select-button',
+                  }}
+                  PaperProps={{
+                    sx: {
+                      mt: 1,
+                      minWidth: 260,
+                    }
+                  }}
+                >
+                  <Box sx={{ p: 1, minWidth: 240 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', mb: 1 }}>Select Platform</Typography>
+                    <RadioGroup
+                      value={tempSelectedPlatform || selectedPlatform}
+                      onChange={(e) => {
+                        const newPlatform = e.target.value as Platform;
+                        setTempSelectedPlatform(newPlatform);
+                      }}
+                    >
+                      {availablePlatforms.map((p) => (
+                        <MenuItem
+                          key={p.value}
+                          onClick={() => {
+                            setTempSelectedPlatform(p.value);
+                          }}
+                          sx={{ py: 1, px: 1, borderRadius: '8px' }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Radio size="small" checked={(tempSelectedPlatform || selectedPlatform) === p.value} value={p.value} />
+                            <Box>
+                              <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p.label}</Typography>
+                              <Typography variant="caption" sx={{ color: '#6b7280' }}>{p.value === 'd2c' ? 'Website / D2C' : 'E-commerce marketplace'}</Typography>
+                            </Box>
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </RadioGroup>
+                    <Box sx={{ display: 'flex', gap: 1, mt: 1, justifyContent: 'flex-end' }}>
+                      <Button variant="outlined" onClick={() => setPlatformMenuAnchorEl(null)} sx={{ textTransform: 'none', color: '#6b7280', borderColor: '#e5e7eb' }}>Cancel</Button>
+                      <Button
+                        variant="outlined"
+                        disabled={!tempSelectedPlatform}
+                        onClick={() => {
+                          const next = tempSelectedPlatform!;
+                          setSelectedPlatform(next);
+                          setPlatformMenuAnchorEl(null);
+                        }}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Apply
+                      </Button>
+                    </Box>
+                  </Box>
+                </Menu>
+              </Box>
+            </Box>
           </Box>
+
+          {/* Error Alert */}
+          {error && (
+            <Alert
+              severity={usingMockData ? "warning" : "error"}
+              sx={{
+                mb: 3,
+                borderRadius: '6px',
+                background: usingMockData ? '#fff3cd' : '#f8d7da',
+                border: usingMockData ? '1px solid #ffeaa7' : '1px solid #f5c6cb',
+                '& .MuiAlert-message': {
+                  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                },
+              }}
+            >
+              {error}
+              {usingMockData && (
+                <Box sx={{ mt: 1, p: 2, borderRadius: '4px', background: 'rgba(255, 255, 255, 0.7)' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#1a1a1a', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                    Mock Data Values:
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#666666', fontSize: '0.875rem', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>
+                    Gross Sales: {getCurrencySymbol()}12,00,000 • Orders Delivered: 480 orders ({getCurrencySymbol()}12,30,000) • Returns: 12 orders (-{getCurrencySymbol()}30,000)
+                  </Typography>
+                </Box>
+              )}
+            </Alert>
+          )}
+        </Box>
 
         {/* Status Message - only show when reconciliation_status exists from backend */}
         {normalizedReconciliationStatus && normalizedReconciliationStatus.state === 'processing' && (
@@ -3365,7 +3365,15 @@ const MarketplaceReconciliation: React.FC = () => {
                       </Typography>
                     );
 
-                    return (
+                    return selectedPlatform === 'd2c' ? (
+                      <Box sx={{ p: 3 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, flexWrap: 'wrap' }}>
+                          <Metric label="Sales" amount={grossSalesAmount} count={grossSalesCount} />
+                          <Metric label="Amount Settled" amount={Math.abs(Number(s?.total_settled_amount || 0))} count={Math.abs(Number(s?.total_settled_orders || 0))} />
+                          <Metric label="Payment Due" amount={Math.abs(Number(s?.total_unsettled_amount || 0))} count={Math.abs(Number(s?.total_unsettled_orders || 0))} />
+                        </Box>
+                      </Box>
+                    ) : (
                       <Box sx={{ p: 3 }}>
                         {/* Equation Row: Net Sales = Gross Sales - Returns - Cancellations */}
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap' }}>
@@ -3481,7 +3489,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             }}
                             sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
                           >
-                            <Typography sx={{ fontSize: '0.625rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25, textAlign: 'center' }}>Unsettled</Typography>
+                            <Typography sx={{ fontSize: '0.625rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25, textAlign: 'center' }}>Payment Due</Typography>
                             <Typography sx={{ fontSize: '1.2rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>{unsettledCount.toLocaleString()}</Typography>
                           </Box>
                         </Box>
@@ -3601,54 +3609,9 @@ const MarketplaceReconciliation: React.FC = () => {
                           }}
                         >
                           <Tab label="Settled" />
-                          <Tab label="Unsettled" />
+                          <Tab label="Payment Due" />
                         </Tabs>
-                        {settledUnsettledTab === 0 && transactionsTab === 0 && (
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={() => {
-                              setInitialTsFilters({ Status: ['settlement_matched'] });
-                              setInitialTsTab(0);
-                              setShowTransactionSheet(true);
-                            }}
-                            sx={{
-                              borderColor: '#6366f1',
-                              color: '#6366f1',
-                              textTransform: 'none',
-                              fontWeight: 600,
-                              '&:hover': {
-                                borderColor: '#4f46e5',
-                                backgroundColor: 'rgba(99, 102, 241, 0.04)',
-                              }
-                            }}
-                          >
-                            View Matched Transactions
-                          </Button>
-                        )}
-                        {settledUnsettledTab === 0 && transactionsTab === 1 && (
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={() => {
-                              setInitialTsFilters(undefined);
-                              setInitialTsTab(1);
-                              setShowTransactionSheet(true);
-                            }}
-                            sx={{
-                              borderColor: '#6366f1',
-                              color: '#6366f1',
-                              textTransform: 'none',
-                              fontWeight: 600,
-                              '&:hover': {
-                                borderColor: '#4f46e5',
-                                backgroundColor: 'rgba(99, 102, 241, 0.04)',
-                              }
-                            }}
-                          >
-                            View Mismatched Transactions
-                          </Button>
-                        )}
+
                         {settledUnsettledTab === 1 && (
                           <Button
                             variant="outlined"
@@ -3669,80 +3632,221 @@ const MarketplaceReconciliation: React.FC = () => {
                               }
                             }}
                           >
-                            View Unsettled Transactions
+                            View Payment Due Transactions
                           </Button>
                         )}
                       </Box>
 
-                      {/* Switch for Matched/Mismatched (only when Settled is selected) */}
+                      {/* Prominent Financial Equation Card */}
                       {settledUnsettledTab === 0 && (
-                        <Box
-                          sx={{
+                        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center' }}>
+                          <Box sx={{
+                            p: 3,
+                            borderRadius: '12px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: 2,
-                            mt: 3,
-                            mb: 2
-                          }}
-                        >
-                          <Typography sx={{ fontWeight: 700, color: transactionsTab === 0 ? '#065f46' : '#6b7280' }}>
-                            Matched
-                          </Typography>
+                            gap: { xs: 2, md: 4 },
+                            flexWrap: 'wrap',
+                            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                            border: '1px solid #e5e7eb',
+                            boxShadow: 'none',
+                            width: '100%'
+                          }}>
+
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 160 }}>
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25 }}>
+                                Total Settled
+                              </Typography>
+                              <Typography sx={{ fontSize: '1.5rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1, mb: 0.5 }}>
+                                {formatCurrency((mainSummary as any)?.summary?.total_settled_amount || 0, true)}
+                              </Typography>
+                              <Box sx={{ display: 'flex', width: '100%', alignItems: 'baseline', justifyContent: 'center' }}>
+                                <Typography sx={{ textAlign: 'right', pr: 0.5, fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.025em', fontVariantNumeric: 'tabular-nums' }}>
+                                  {Number((mainSummary as any)?.summary?.total_settled_orders || 0).toLocaleString('en-IN')}
+                                </Typography>
+                                <Typography sx={{ textAlign: 'left', pl: 0, fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
+                                  orders
+                                </Typography>
+                              </Box>
+                            </Box>
+
+                            <Typography sx={{ fontSize: '1.5rem', fontWeight: 600, color: '#6b7280' }}>=</Typography>
+
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 160 }}>
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#10b981', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25 }}>
+                                Matched
+                              </Typography>
+                              <Typography sx={{ fontSize: '1.5rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1, mb: 0.5 }}>
+                                {formatCurrency((mainSummary as any)?.summary?.total_reconciled_amount || 0, true)}
+                              </Typography>
+                              <Box sx={{ display: 'flex', width: '100%', alignItems: 'baseline', justifyContent: 'center' }}>
+                                <Typography sx={{ textAlign: 'right', pr: 0.5, fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.025em', fontVariantNumeric: 'tabular-nums' }}>
+                                  {Number((mainSummary as any)?.summary?.total_reconciled_count || 0).toLocaleString('en-IN')}
+                                </Typography>
+                                <Typography sx={{ textAlign: 'left', pl: 0, fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
+                                  orders
+                                </Typography>
+                              </Box>
+                            </Box>
+
+                            <Typography sx={{ fontSize: '1.5rem', fontWeight: 600, color: '#6b7280' }}>+</Typography>
+
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 160 }}>
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#ef4444', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25 }}>
+                                Variances
+                              </Typography>
+                              <Typography sx={{ fontSize: '1.5rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1, mb: 0.5 }}>
+                                {formatCurrency(Math.abs((mainSummary as any)?.summary?.total_unreconciled_amount || 0), true)}
+                              </Typography>
+                              <Box sx={{ display: 'flex', width: '100%', alignItems: 'baseline', justifyContent: 'center' }}>
+                                <Typography sx={{ textAlign: 'right', pr: 0.5, fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.025em', fontVariantNumeric: 'tabular-nums' }}>
+                                  {Number((mainSummary as any)?.summary?.total_unreconciled_count || 0).toLocaleString('en-IN')}
+                                </Typography>
+                                <Typography sx={{ textAlign: 'left', pl: 0, fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
+                                  orders
+                                </Typography>
+                              </Box>
+                            </Box>
+
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Switch for Matched/Mismatched (only when Settled is selected) */}
+                      {/* Switch for Matched/Mismatched (only when Settled is selected) */}
+                      {settledUnsettledTab === 0 && (
+                        <Box sx={{ mt: 2, mb: 2, display: 'flex', alignItems: 'center', position: 'relative' }}>
+                          
+                          {/* Centered Toggle Container */}
                           <Box
-                            role="switch"
-                            aria-checked={transactionsTab === 1}
-                            tabIndex={0}
-                            onClick={() => setTransactionsTab(transactionsTab === 0 ? 1 : 0)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                setTransactionsTab(transactionsTab === 0 ? 1 : 0);
-                              }
-                            }}
                             sx={{
-                              position: 'relative',
-                              width: 64,
-                              height: 32,
-                              borderRadius: 9999,
-                              cursor: 'pointer',
-                              backgroundColor: transactionsTab === 1 ? '#fee2e2' : '#d1fae5',
-                              transition: 'background-color 150ms ease',
-                              boxShadow: 'inset 0 0 0 1px #e5e7eb',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 2,
+                              flex: 1,
                             }}
                           >
-                            {/* Active track tint */}
+                            <Box sx={{ textAlign: 'right' }}>
+                              <Typography sx={{ fontWeight: 700, color: transactionsTab === 0 ? '#065f46' : '#6b7280' }}>
+                                Matched
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.65rem', color: '#9ca3af', fontWeight: 500, mt: 0.25 }}>
+                                Expected = Actual
+                              </Typography>
+                            </Box>
+                            
                             <Box
+                              role="switch"
+                              aria-checked={transactionsTab === 1}
+                              tabIndex={0}
+                              onClick={() => setTransactionsTab(transactionsTab === 0 ? 1 : 0)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setTransactionsTab(transactionsTab === 0 ? 1 : 0);
+                                }
+                              }}
                               sx={{
-                                position: 'absolute',
-                                top: 4,
-                                bottom: 4,
-                                left: transactionsTab === 1 ? '50%' : 4,
-                                right: transactionsTab === 1 ? 4 : '50%',
+                                position: 'relative',
+                                width: 64,
+                                height: 32,
                                 borderRadius: 9999,
-                                backgroundColor: transactionsTab === 1 ? '#ef4444' : '#10b981',
-                                opacity: 0.25,
-                                transition: 'all 150ms ease',
+                                cursor: 'pointer',
+                                backgroundColor: transactionsTab === 1 ? '#fee2e2' : '#d1fae5',
+                                transition: 'background-color 150ms ease',
+                                boxShadow: 'inset 0 0 0 1px #e5e7eb',
                               }}
-                            />
-                            {/* Knob */}
-                            <Box
-                              sx={{
-                                position: 'absolute',
-                                top: 3,
-                                left: transactionsTab === 1 ? 33 : 3,
-                                width: 26,
-                                height: 26,
-                                borderRadius: '50%',
-                                backgroundColor: '#ffffff',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.1), 0 0 0 1px #e5e7eb',
-                                transition: 'left 150ms ease',
-                              }}
-                            />
+                            >
+                              {/* Active track tint */}
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 4,
+                                  bottom: 4,
+                                  left: transactionsTab === 1 ? '50%' : 4,
+                                  right: transactionsTab === 1 ? 4 : '50%',
+                                  borderRadius: 9999,
+                                  backgroundColor: transactionsTab === 1 ? '#ef4444' : '#10b981',
+                                  opacity: 0.25,
+                                  transition: 'all 150ms ease',
+                                }}
+                              />
+                              {/* Knob */}
+                              <Box
+                                sx={{
+                                  position: 'absolute',
+                                  top: 3,
+                                  left: transactionsTab === 1 ? 33 : 3,
+                                  width: 26,
+                                  height: 26,
+                                  borderRadius: '50%',
+                                  backgroundColor: '#ffffff',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.1), 0 0 0 1px #e5e7eb',
+                                  transition: 'left 150ms ease',
+                                }}
+                              />
+                            </Box>
+                            
+                            <Box sx={{ textAlign: 'left' }}>
+                              <Typography sx={{ fontWeight: 700, color: transactionsTab === 1 ? '#991b1b' : '#6b7280' }}>
+                                Settlement Variances
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.65rem', color: '#9ca3af', fontWeight: 500, mt: 0.25 }}>
+                                Short / Excess payments
+                              </Typography>
+                            </Box>
                           </Box>
-                          <Typography sx={{ fontWeight: 700, color: transactionsTab === 1 ? '#991b1b' : '#6b7280' }}>
-                            Mismatched
-                          </Typography>
+                          
+                          {/* Transaction Sheet Buttons pinned to the right */}
+                          <Box sx={{ position: 'absolute', right: 0 }}>
+                            {transactionsTab === 0 ? (
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => {
+                                  setInitialTsFilters({ Status: ['settlement_matched'] });
+                                  setInitialTsTab(0);
+                                  setShowTransactionSheet(true);
+                                }}
+                                sx={{
+                                  borderColor: '#6366f1',
+                                  color: '#6366f1',
+                                  textTransform: 'none',
+                                  fontWeight: 600,
+                                  '&:hover': {
+                                    borderColor: '#4f46e5',
+                                    backgroundColor: 'rgba(99, 102, 241, 0.04)',
+                                  }
+                                }}
+                              >
+                                View Matched Transactions
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => {
+                                  setInitialTsFilters({ Status: ['less_payment_received', 'more_payment_received'] });
+                                  setInitialTsTab(1);
+                                  setShowTransactionSheet(true);
+                                }}
+                                sx={{
+                                  borderColor: '#6366f1',
+                                  color: '#6366f1',
+                                  textTransform: 'none',
+                                  fontWeight: 600,
+                                  '&:hover': {
+                                    borderColor: '#4f46e5',
+                                    backgroundColor: 'rgba(99, 102, 241, 0.04)',
+                                  }
+                                }}
+                              >
+                                View Variance Transactions
+                              </Button>
+                            )}
+                          </Box>
                         </Box>
                       )}
 
@@ -3827,67 +3931,17 @@ const MarketplaceReconciliation: React.FC = () => {
 
                             return (
                               <>
-                                <Box sx={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  mb: 1,
-                                  p: 3,
-                                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                                  borderRadius: '12px',
-                                  border: '1px solid #e5e7eb'
-                                }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
                                   <Box>
-                                    <Typography variant="h4" sx={{
-                                      fontWeight: 800,
-                                      color: '#1f2937',
-                                      letterSpacing: '-0.02em',
-                                      fontSize: '2rem'
-                                    }}>
-                                      {formatCurrency(settledAmount)}
+                                    <Typography sx={{ fontWeight: 800, color: '#1f2937', letterSpacing: '-0.02em', fontSize: { xs: '1.75rem', md: '2.25rem' }, lineHeight: 1 }}>
+                                      {formatCurrency(matchedAmount, true)}
                                     </Typography>
-                                    <Box sx={{ display: 'flex', alignItems: 'baseline', color: '#6b7280', fontWeight: 500, fontSize: '1.1rem' }}>
-                                      <Typography sx={{ width: 85, textAlign: 'left', fontWeight: 'inherit', fontSize: 'inherit', fontVariantNumeric: 'tabular-nums' }}>
-                                        {(matchedCount).toLocaleString('en-IN')}
-                                      </Typography>
-                                      <Typography sx={{ fontWeight: 'inherit', fontSize: 'inherit' }}>
-                                        Orders Matched
-                                      </Typography>
-                                    </Box>
                                   </Box>
                                   <Box sx={{ textAlign: 'right' }}>
-                                    {/* <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block', mb: 0.75 }}>
-                                      Expected vs Settled
-                                    </Typography> */}
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-                                        <Typography variant="body1" sx={{ color: '#374151', fontWeight: 600, fontSize: '1.1rem' }}>
-                                          Gross Sales
-                                        </Typography>
-                                        <Typography variant="h6" sx={{ color: '#111827', fontWeight: 700, fontSize: '1.2rem' }}>
-                                          {formatCurrency(expectedSalesAmount)}
-                                        </Typography>
-                                      </Box>
-                                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', color: '#6b7280' }}>
-                                        <Typography variant="caption" sx={{ width: 85, textAlign: 'right', pr: 0.5, fontVariantNumeric: 'tabular-nums' }}>
-                                          {(expectedSalesCount).toLocaleString('en-IN')}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ textAlign: 'left', width: 45 }}>
-                                          Orders
-                                        </Typography>
-                                      </Box>
-                                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-                                        {/* <Typography variant="body1" sx={{ color: '#065f46', fontWeight: 600, fontSize: '1.1rem' }}>
-                                          Settled&nbsp;<span style={{ marginLeft: 130 }}>{percentSettled.toFixed(1)}%</span>
-                                        </Typography> */}
-                                        {/* <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 700, fontSize: '1.2rem' }}>
-                                          {formatCurrency(matchedAmount)}
-                                        </Typography> */}
-                                      </Box>
-                                      {/* <Typography variant="caption" sx={{ color: '#6b7280', textAlign: 'right' }}>
-                                        {(matchedCount).toLocaleString('en-IN')} Orders ({percentSettled.toFixed(1)}%)
-                                      </Typography> */}
-                                    </Box>
+                                    <Typography sx={{ fontWeight: 800, color: '#1f2937', letterSpacing: '-0.02em', fontSize: { xs: '1.75rem', md: '2.25rem' }, lineHeight: 1 }}>
+                                      {matchedCount.toLocaleString('en-IN')}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: '#6b7280' }}>Orders Matched</Typography>
                                   </Box>
                                 </Box>
 
@@ -4923,337 +4977,337 @@ const MarketplaceReconciliation: React.FC = () => {
 
         {/* Commission & Charges Summary (replaces Settlement/Unsettled section) */}
         {!isPrestigeOrg && (
-        <Card sx={{
-          mb: 6,
-          background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
-          borderRadius: '16px',
-          border: '1px solid #f1f3f4',
-          boxShadow: 'none',
-          overflow: 'hidden',
-        }}>
-          <CardContent sx={{ p: 5 }}>
-            {(() => {
-              const commissionArray = (mainSummary as any)?.commission as Array<{
-                platform: string;
-                total_amount_settled: number;
-                total_commission: number;
-                total_gst_on_commission: number;
-                total_tds_amount?: number;
-                total_tcs_amount?: number;
-              }> | undefined;
-              if (!commissionArray || commissionArray.length === 0) return null;
+          <Card sx={{
+            mb: 6,
+            background: 'linear-gradient(135deg, #ffffff 0%, #fafbfc 100%)',
+            borderRadius: '16px',
+            border: '1px solid #f1f3f4',
+            boxShadow: 'none',
+            overflow: 'hidden',
+          }}>
+            <CardContent sx={{ p: 5 }}>
+              {(() => {
+                const commissionArray = (mainSummary as any)?.commission as Array<{
+                  platform: string;
+                  total_amount_settled: number;
+                  total_commission: number;
+                  total_gst_on_commission: number;
+                  total_tds_amount?: number;
+                  total_tcs_amount?: number;
+                }> | undefined;
+                if (!commissionArray || commissionArray.length === 0) return null;
 
-              const fmtPct = (commissionPlusGst: number, base: number) => {
-                if (!base || base === 0) return '0.00%';
-                return `${((commissionPlusGst / base) * 100).toFixed(2)}%`;
-              };
+                const fmtPct = (commissionPlusGst: number, base: number) => {
+                  if (!base || base === 0) return '0.00%';
+                  return `${((commissionPlusGst / base) * 100).toFixed(2)}%`;
+                };
 
-              // Platform color mapping (extensible for all platforms)
-              const palette2 = ['#7A5DBF', '#A79CDB', '#10B981', '#F59E0B', '#0EA5E9', '#6366F1', '#EF4444'];
-              const platformColors: Record<string, string> = {
-                'paytm': palette2[0],
-                'payu': palette2[1],
-                'cashfree': palette2[2],
-                'flipkart': palette2[3],
-                'amazon': palette2[3],
-                'myntra': palette2[4],
-                'grow_simple': palette2[4],
-                'shiprocket': palette2[5],
-                'delhivery': palette2[6],
-              };
+                // Platform color mapping (extensible for all platforms)
+                const palette2 = ['#7A5DBF', '#A79CDB', '#10B981', '#F59E0B', '#0EA5E9', '#6366F1', '#EF4444'];
+                const platformColors: Record<string, string> = {
+                  'paytm': palette2[0],
+                  'payu': palette2[1],
+                  'cashfree': palette2[2],
+                  'flipkart': palette2[3],
+                  'amazon': palette2[3],
+                  'myntra': palette2[4],
+                  'grow_simple': palette2[4],
+                  'shiprocket': palette2[5],
+                  'delhivery': palette2[6],
+                };
 
-              // Build providerData dynamically from API data
-              // Commission values are typically negative (charges/deductions), so we use absolute value for display
-              const providerData = commissionArray
-                .map((item, idx) => {
-                  const commissionValue = item.total_commission || 0; // Only show commission, not GST on commission
-                  return {
-                    name: item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1) || `Platform ${idx + 1}`,
-                    value: Math.abs(commissionValue), // Use absolute value for display
-                    originalSignedValue: commissionValue, // Keep original for calculations
-                    color: platformColors[item.platform?.toLowerCase() || ''] || palette2[idx % palette2.length],
-                    originalData: item
-                  };
-                });
+                // Build providerData dynamically from API data
+                // Commission values are typically negative (charges/deductions), so we use absolute value for display
+                const providerData = commissionArray
+                  .map((item, idx) => {
+                    const commissionValue = item.total_commission || 0; // Only show commission, not GST on commission
+                    return {
+                      name: item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1) || `Platform ${idx + 1}`,
+                      value: Math.abs(commissionValue), // Use absolute value for display
+                      originalSignedValue: commissionValue, // Keep original for calculations
+                      color: platformColors[item.platform?.toLowerCase() || ''] || palette2[idx % palette2.length],
+                      originalData: item
+                    };
+                  });
 
-              // Use the number of providers returned from backend (including zero-commission)
-              // to decide between single-provider and multi-provider (pie chart) layouts.
-              const providerCount = commissionArray.length;
+                // Use the number of providers returned from backend (including zero-commission)
+                // to decide between single-provider and multi-provider (pie chart) layouts.
+                const providerCount = commissionArray.length;
 
-              // Calculate totals dynamically from all providers (use absolute values for display)
-              const totalCommissionCharges = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_commission || 0), 0));
-              const totalTds = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_tds_amount || 0), 0));
-              const totalTcs = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_tcs_amount || 0), 0));
-              const totalGstOnCommission = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_gst_on_commission || 0), 0));
+                // Calculate totals dynamically from all providers (use absolute values for display)
+                const totalCommissionCharges = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_commission || 0), 0));
+                const totalTds = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_tds_amount || 0), 0));
+                const totalTcs = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_tcs_amount || 0), 0));
+                const totalGstOnCommission = Math.abs(commissionArray.reduce((sum, item) => sum + (item.total_gst_on_commission || 0), 0));
 
-              return (
-                <>
-                  <Typography variant="h3" sx={{
-                    fontWeight: 600,
-                    mb: 4,
-                    color: '#1f2937',
-                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                    letterSpacing: '-0.025em'
-                  }}>
-                    Commission & Charges Summary
-                  </Typography>
+                return (
+                  <>
+                    <Typography variant="h3" sx={{
+                      fontWeight: 600,
+                      mb: 4,
+                      color: '#1f2937',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+                      letterSpacing: '-0.025em'
+                    }}>
+                      Commission & Charges Summary
+                    </Typography>
 
-                  <Grid container spacing={3}>
-                    {/* Conditional rendering based on provider count */}
-                    <Grid item xs={12} md={8}>
-                      <Box sx={{ height: { xs: 320, sm: 360, md: 420, lg: 480 } }}>
-                        {providerCount === 1 ? (
-                          // Single Provider - Show detailed gradient card
-                          <Box sx={{
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: `linear-gradient(135deg, ${providerData[0].color}22 0%, ${providerData[0].color}11 100%)`,
-                            borderRadius: '20px',
-                            border: `2px solid ${providerData[0].color}`,
-                            position: 'relative',
-                            overflow: 'hidden'
-                          }}>
+                    <Grid container spacing={3}>
+                      {/* Conditional rendering based on provider count */}
+                      <Grid item xs={12} md={8}>
+                        <Box sx={{ height: { xs: 320, sm: 360, md: 420, lg: 480 } }}>
+                          {providerCount === 1 ? (
+                            // Single Provider - Show detailed gradient card
                             <Box sx={{
-                              textAlign: 'center',
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: `linear-gradient(135deg, ${providerData[0].color}22 0%, ${providerData[0].color}11 100%)`,
+                              borderRadius: '20px',
+                              border: `2px solid ${providerData[0].color}`,
                               position: 'relative',
-                              zIndex: 2,
-                              p: 3
+                              overflow: 'hidden'
                             }}>
-                              <Typography variant="h4" sx={{ fontWeight: 700, mb: 1.5, color: '#1f2937' }}>
-                                {providerData[0].name}
-                              </Typography>
-                              <Typography variant="h3" sx={{ fontWeight: 700, mb: 2, color: providerData[0].color }}>
-                                {formatCurrency(providerData[0].value)}
-                              </Typography>
-                              <Tooltip
-                                title={
-                                  <Box>
-                                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                                      <strong>Total Settlement:</strong> {formatCurrency(Math.abs(providerData[0].originalData.total_amount_settled || 0))}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                      <strong>Total Commission:</strong> {formatCurrency(Math.abs(providerData[0].originalData.total_commission || 0))}
-                                    </Typography>
+                              <Box sx={{
+                                textAlign: 'center',
+                                position: 'relative',
+                                zIndex: 2,
+                                p: 3
+                              }}>
+                                <Typography variant="h4" sx={{ fontWeight: 700, mb: 1.5, color: '#1f2937' }}>
+                                  {providerData[0].name}
+                                </Typography>
+                                <Typography variant="h3" sx={{ fontWeight: 700, mb: 2, color: providerData[0].color }}>
+                                  {formatCurrency(providerData[0].value)}
+                                </Typography>
+                                <Tooltip
+                                  title={
+                                    <Box>
+                                      <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                        <strong>Total Settlement:</strong> {formatCurrency(Math.abs(providerData[0].originalData.total_amount_settled || 0))}
+                                      </Typography>
+                                      <Typography variant="body2">
+                                        <strong>Total Commission:</strong> {formatCurrency(Math.abs(providerData[0].originalData.total_commission || 0))}
+                                      </Typography>
+                                    </Box>
+                                  }
+                                  arrow
+                                >
+                                  <Box sx={{
+                                    display: 'inline-block',
+                                    px: 3,
+                                    py: 1.5,
+                                    borderRadius: '20px',
+                                    background: `${providerData[0].color}15`,
+                                    border: `1px solid ${providerData[0].color}`,
+                                    color: providerData[0].color,
+                                    fontWeight: 600,
+                                    cursor: 'help'
+                                  }}>
+                                    {fmtPct(
+                                      providerData[0].value,
+                                      Math.abs(providerData[0].originalData.total_amount_settled || 0) + Math.abs(providerData[0].originalData.total_commission || 0)
+                                    )} of settlement
                                   </Box>
-                                }
-                                arrow
-                              >
-                                <Box sx={{
-                                  display: 'inline-block',
-                                  px: 3,
-                                  py: 1.5,
-                                  borderRadius: '20px',
-                                  background: `${providerData[0].color}15`,
-                                  border: `1px solid ${providerData[0].color}`,
-                                  color: providerData[0].color,
-                                  fontWeight: 600,
-                                  cursor: 'help'
-                                }}>
-                                  {fmtPct(
-                                    providerData[0].value,
-                                    Math.abs(providerData[0].originalData.total_amount_settled || 0) + Math.abs(providerData[0].originalData.total_commission || 0)
-                                  )} of settlement
-                                </Box>
-                              </Tooltip>
+                                </Tooltip>
+                              </Box>
+                            </Box>
+                          ) : providerCount > 1 ? (
+                            // Multiple Providers - Show pie chart
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart margin={{ top: 12, right: 12, bottom: 56, left: 12 }}>
+                                <Pie
+                                  data={providerData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius="78%"
+                                  outerRadius="86%"
+                                  paddingAngle={1}
+                                  cornerRadius={1}
+                                  dataKey="value"
+                                >
+                                  {providerData.map((p, idx) => (
+                                    <Cell key={`prov-${idx}`} fill={p.color} />
+                                  ))}
+                                </Pie>
+                                <RechartsTooltip
+                                  cursor={{ fill: 'transparent' }}
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      const color = payload[0].color || data.color || '#1f2937';
+                                      const settled = Math.abs(data.originalData?.total_amount_settled || 0);
+                                      const comm = Math.abs(data.originalData?.total_commission || 0);
+                                      const gst = Math.abs(data.originalData?.total_gst_on_commission || 0);
+
+                                      return (
+                                        <Box sx={{
+                                          background: 'rgba(255, 255, 255, 0.95)',
+                                          backdropFilter: 'blur(12px)',
+                                          borderRadius: '16px',
+                                          boxShadow: '0 10px 40px -10px rgba(0,0,0,0.12)',
+                                          border: '1px solid rgba(229,231,235,0.7)',
+                                          p: 2.5,
+                                          minWidth: '240px'
+                                        }}>
+                                          <Typography sx={{ fontWeight: 700, color, mb: 2, display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.95rem' }}>
+                                            <Box component="span" sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: color }} />
+                                            {data.name}
+                                          </Typography>
+                                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                              <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>Settlement</Typography>
+                                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 600 }}>{formatCurrency(settled)}</Typography>
+                                            </Box>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                              <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>Commission</Typography>
+                                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 600 }}>{formatCurrency(comm)}</Typography>
+                                            </Box>
+                                            {gst > 0 && (
+                                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>GST</Typography>
+                                                <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 600 }}>{formatCurrency(gst)}</Typography>
+                                              </Box>
+                                            )}
+                                          </Box>
+                                        </Box>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend
+                                  layout="horizontal"
+                                  verticalAlign="bottom"
+                                  align="center"
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: 8 }}
+                                  height={40}
+                                  formatter={(value, entry) => (
+                                    <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>{value}</span>
+                                  )}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          ) : (
+                            // No data - show message
+                            <Box sx={{
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#6b7280',
+                              border: '2px dashed #e5e7eb',
+                              borderRadius: '20px'
+                            }}>
+                              <Typography variant="h6">No commission data available</Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      </Grid>
+                      {/* KPI cards (totals) */}
+                      <Grid item xs={12} md={4}>
+                        {providerCount > 1 ? (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
+                            <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                              <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Commission</Typography>
+                              <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
+                            </Box>
+                            <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                              <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total GST on Commission</Typography>
+                              <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalGstOnCommission)}</Typography>
                             </Box>
                           </Box>
-                        ) : providerCount > 1 ? (
-                          // Multiple Providers - Show pie chart
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart margin={{ top: 12, right: 12, bottom: 56, left: 12 }}>
-                              <Pie
-                                data={providerData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius="78%"
-                                outerRadius="86%"
-                                paddingAngle={1}
-                                cornerRadius={1}
-                                dataKey="value"
-                              >
-                                {providerData.map((p, idx) => (
-                                  <Cell key={`prov-${idx}`} fill={p.color} />
-                                ))}
-                              </Pie>
-                              <RechartsTooltip
-                                cursor={{ fill: 'transparent' }}
-                                content={({ active, payload }) => {
-                                  if (active && payload && payload.length) {
-                                    const data = payload[0].payload;
-                                    const color = payload[0].color || data.color || '#1f2937';
-                                    const settled = Math.abs(data.originalData?.total_amount_settled || 0);
-                                    const comm = Math.abs(data.originalData?.total_commission || 0);
-                                    const gst = Math.abs(data.originalData?.total_gst_on_commission || 0);
-                                    
-                                    return (
-                                      <Box sx={{
-                                        background: 'rgba(255, 255, 255, 0.95)',
-                                        backdropFilter: 'blur(12px)',
-                                        borderRadius: '16px',
-                                        boxShadow: '0 10px 40px -10px rgba(0,0,0,0.12)',
-                                        border: '1px solid rgba(229,231,235,0.7)',
-                                        p: 2.5,
-                                        minWidth: '240px'
-                                      }}>
-                                        <Typography sx={{ fontWeight: 700, color, mb: 2, display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.95rem' }}>
-                                          <Box component="span" sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: color }} />
-                                          {data.name}
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>Settlement</Typography>
-                                            <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 600 }}>{formatCurrency(settled)}</Typography>
-                                          </Box>
-                                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>Commission</Typography>
-                                            <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 600 }}>{formatCurrency(comm)}</Typography>
-                                          </Box>
-                                          {gst > 0 && (
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                              <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>GST</Typography>
-                                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 600 }}>{formatCurrency(gst)}</Typography>
-                                            </Box>
-                                          )}
-                                        </Box>
-                                      </Box>
-                                    );
-                                  }
-                                  return null;
-                                }}
-                              />
-                              <Legend
-                                layout="horizontal"
-                                verticalAlign="bottom"
-                                align="center"
-                                iconType="circle"
-                                wrapperStyle={{ paddingTop: 8 }}
-                                height={40}
-                                formatter={(value, entry) => (
-                                  <span style={{ color: '#1a1a1a', fontSize: '12px', fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' }}>{value}</span>
-                                )}
-                              />
-                            </PieChart>
-                          </ResponsiveContainer>
                         ) : (
-                          // No data - show message
-                          <Box sx={{
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#6b7280',
-                            border: '2px dashed #e5e7eb',
-                            borderRadius: '20px'
-                          }}>
-                            <Typography variant="h6">No commission data available</Typography>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
+                            <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                              <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Commission</Typography>
+                              <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
+                            </Box>
+                            <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                              <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TDS</Typography>
+                              <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTds)}</Typography>
+                            </Box>
+                            <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                              <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TCS</Typography>
+                              <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTcs)}</Typography>
+                            </Box>
                           </Box>
                         )}
-                      </Box>
+                      </Grid>
                     </Grid>
-                    {/* KPI cards (totals) */}
-                    <Grid item xs={12} md={4}>
-                      {providerCount > 1 ? (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
-                          <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                            <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Commission</Typography>
-                            <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
-                          </Box>
-                          <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                            <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total GST on Commission</Typography>
-                            <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalGstOnCommission)}</Typography>
-                          </Box>
-                        </Box>
-                      ) : (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
-                          <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                            <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Commission</Typography>
-                            <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
-                          </Box>
-                          <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                            <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TDS</Typography>
-                            <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTds)}</Typography>
-                          </Box>
-                          <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                            <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TCS</Typography>
-                            <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTcs)}</Typography>
-                          </Box>
-                        </Box>
-                      )}
-                    </Grid>
-                  </Grid>
 
-                  {/* Dynamic provider breakdown */}
-                  <Box sx={{ mt: 4 }}>
-                    <Grid container spacing={2}>
-                      {commissionArray.map((item, idx) => (
-                        <Grid key={idx} item xs={12} md={providerCount === 1 ? 12 : (providerCount === 2 ? 6 : 4)}>
-                          <Box sx={{ p: 3, borderRadius: '14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(229,231,235,0.6)' }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                              <Typography variant="subtitle1" sx={{ color: '#374151', fontWeight: 700 }}>
-                                {item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1) || 'Unknown Platform'}
-                              </Typography>
-                              <Tooltip
-                                title={
-                                  <Box>
-                                    <Typography variant="body2" sx={{ mb: 0.5 }}>
-                                      <strong>Total Settlement:</strong> {formatCurrency(Math.abs(item.total_amount_settled || 0))}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                      <strong>Total Commission:</strong> {formatCurrency(Math.abs(item.total_commission || 0))}
-                                    </Typography>
-                                  </Box>
-                                }
-                                arrow
-                              >
-                                <Typography variant="caption" sx={{ color: '#6b7280', cursor: 'help' }}>
-                                  {fmtPct(
-                                    Math.abs(item.total_commission || 0),
-                                    Math.abs(item.total_amount_settled || 0) + Math.abs(item.total_commission || 0)
-                                  )} of settled
+                    {/* Dynamic provider breakdown */}
+                    <Box sx={{ mt: 4 }}>
+                      <Grid container spacing={2}>
+                        {commissionArray.map((item, idx) => (
+                          <Grid key={idx} item xs={12} md={providerCount === 1 ? 12 : (providerCount === 2 ? 6 : 4)}>
+                            <Box sx={{ p: 3, borderRadius: '14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(229,231,235,0.6)' }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                <Typography variant="subtitle1" sx={{ color: '#374151', fontWeight: 700 }}>
+                                  {item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1) || 'Unknown Platform'}
                                 </Typography>
-                              </Tooltip>
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
-                              <Typography variant="body2" sx={{ color: '#374151' }}>Commission</Typography>
-                              <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                                {formatCurrency(Math.abs(item.total_commission))}
-                              </Typography>
-                            </Box>
-                            {providerData.length > 1 ? (
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                                <Typography variant="body2" sx={{ color: '#374151' }}>GST on Commission</Typography>
+                                <Tooltip
+                                  title={
+                                    <Box>
+                                      <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                        <strong>Total Settlement:</strong> {formatCurrency(Math.abs(item.total_amount_settled || 0))}
+                                      </Typography>
+                                      <Typography variant="body2">
+                                        <strong>Total Commission:</strong> {formatCurrency(Math.abs(item.total_commission || 0))}
+                                      </Typography>
+                                    </Box>
+                                  }
+                                  arrow
+                                >
+                                  <Typography variant="caption" sx={{ color: '#6b7280', cursor: 'help' }}>
+                                    {fmtPct(
+                                      Math.abs(item.total_commission || 0),
+                                      Math.abs(item.total_amount_settled || 0) + Math.abs(item.total_commission || 0)
+                                    )} of settled
+                                  </Typography>
+                                </Tooltip>
+                              </Box>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
+                                <Typography variant="body2" sx={{ color: '#374151' }}>Commission</Typography>
                                 <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                                  {formatCurrency(Math.abs(item.total_gst_on_commission || 0))}
+                                  {formatCurrency(Math.abs(item.total_commission))}
                                 </Typography>
                               </Box>
-                            ) : (
-                              <>
+                              {providerData.length > 1 ? (
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                                  <Typography variant="body2" sx={{ color: '#374151' }}>TDS</Typography>
+                                  <Typography variant="body2" sx={{ color: '#374151' }}>GST on Commission</Typography>
                                   <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                                    {formatCurrency(Math.abs(item.total_tds_amount || 0))}
+                                    {formatCurrency(Math.abs(item.total_gst_on_commission || 0))}
                                   </Typography>
                                 </Box>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                                  <Typography variant="body2" sx={{ color: '#374151' }}>TCS</Typography>
-                                  <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                                    {formatCurrency(Math.abs(item.total_tcs_amount || 0))}
-                                  </Typography>
-                                </Box>
-                              </>
-                            )}
-                          </Box>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  </Box>
-                </>
-              );
-            })()}
-          </CardContent>
-        </Card>
+                              ) : (
+                                <>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                                    <Typography variant="body2" sx={{ color: '#374151' }}>TDS</Typography>
+                                    <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
+                                      {formatCurrency(Math.abs(item.total_tds_amount || 0))}
+                                    </Typography>
+                                  </Box>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                                    <Typography variant="body2" sx={{ color: '#374151' }}>TCS</Typography>
+                                    <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
+                                      {formatCurrency(Math.abs(item.total_tcs_amount || 0))}
+                                    </Typography>
+                                  </Box>
+                                </>
+                              )}
+                            </Box>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </Box>
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
         )}
 
         {/* Sub-Platform Breakdown */}
@@ -5557,7 +5611,7 @@ const MarketplaceReconciliation: React.FC = () => {
 
           // Filter D2C rows
           const d2cRows = partyComposition.rows.filter(row => row.platform === 'd2c');
-          
+
           if (d2cRows.length === 0) {
             return null;
           }
@@ -5667,7 +5721,7 @@ const MarketplaceReconciliation: React.FC = () => {
                           <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.05em', width: 45, textAlign: 'right' }}>SHARE</Typography>
                         </Box>
                       </Box>
-                      
+
                       {courierData.map((courier, idx) => (
                         <Box key={idx} sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 0.5 }}>
@@ -5688,17 +5742,17 @@ const MarketplaceReconciliation: React.FC = () => {
                               </Typography>
                             </Box>
                           </Box>
-                          
+
                           {/* Minimalist Micro-Bar */}
                           <Box sx={{ width: '100%', height: 4, backgroundColor: '#f3f4f6', borderRadius: 2, overflow: 'hidden' }}>
-                            <Box 
-                              sx={{ 
-                                width: `${courier.percentage}%`, 
-                                height: '100%', 
-                                backgroundColor: courier.color, 
-                                borderRadius: 2, 
+                            <Box
+                              sx={{
+                                width: `${courier.percentage}%`,
+                                height: '100%',
+                                backgroundColor: courier.color,
+                                borderRadius: 2,
                                 transition: 'width 1s cubic-bezier(0.4, 0, 0.2, 1)'
-                              }} 
+                              }}
                             />
                           </Box>
                         </Box>
@@ -5805,19 +5859,19 @@ const MarketplaceReconciliation: React.FC = () => {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="provider" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} interval={0} height={60} angle={-25} textAnchor="end" />
                   <YAxis unit="%" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                  <RechartsTooltip 
-                    formatter={(v: any, name: string) => [`${Number(v).toFixed(1)}%`, name]} 
+                  <RechartsTooltip
+                    formatter={(v: any, name: string) => [`${Number(v).toFixed(1)}%`, name]}
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontFamily: '"Inter", sans-serif' }}
                     itemStyle={{ fontSize: '13px', fontWeight: 600 }}
                     labelStyle={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}
                   />
                   {AGE_BUCKETS.map((b, idx) => (
-                    <Bar 
-                      key={b} 
-                      dataKey={b} 
-                      stackId="a" 
-                      fill={BUCKET_COLORS[b]} 
-                      radius={idx === AGE_BUCKETS.length - 1 ? [4, 4, 0, 0] : 0} 
+                    <Bar
+                      key={b}
+                      dataKey={b}
+                      stackId="a"
+                      fill={BUCKET_COLORS[b]}
+                      radius={idx === AGE_BUCKETS.length - 1 ? [4, 4, 0, 0] : 0}
                       barSize={16}
                     >
                       {idx === AGE_BUCKETS.length - 1 && (
@@ -5863,14 +5917,14 @@ const MarketplaceReconciliation: React.FC = () => {
                     startIcon={<DownloadIcon />}
                     onClick={() => {
                       const showCommissionColumn = selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk';
-                        const tableData = marketplaceGrowthData.map(row => ({
-                          month: row.month,
-                          sales: row.sales,
-                          settlement: row.settlement,
-                          ...(showCommissionColumn && {
-                            commission: row.comissionData ?? 0,
-                          }),
-                        }));
+                      const tableData = marketplaceGrowthData.map(row => ({
+                        month: row.month,
+                        sales: row.sales,
+                        settlement: row.settlement,
+                        ...(showCommissionColumn && {
+                          commission: row.comissionData ?? 0,
+                        }),
+                      }));
 
                       const csvColumns: Array<{ key: string; label: string }> = [
                         { key: 'month', label: 'Month' },
@@ -5937,17 +5991,17 @@ const MarketplaceReconciliation: React.FC = () => {
                       <TableRow>
                         <TableCell sx={{
                           backgroundColor: '#ffffff',
-                                fontWeight: 600,
+                          fontWeight: 600,
                           color: '#374151',
-                                borderBottom: '1px solid #f1f3f4'
+                          borderBottom: '1px solid #f1f3f4'
                         }}>
                           Month
                         </TableCell>
                         <TableCell align="right" sx={{
                           backgroundColor: '#ffffff',
-                                fontWeight: 600,
+                          fontWeight: 600,
                           color: '#2563eb',
-                                borderBottom: '1px solid #f1f3f4'
+                          borderBottom: '1px solid #f1f3f4'
                         }}>
                           Sales (Invoice Date)
                         </TableCell>
@@ -5955,9 +6009,9 @@ const MarketplaceReconciliation: React.FC = () => {
                           align="right"
                           sx={{
                             backgroundColor: '#ffffff',
-                                fontWeight: 600,
+                            fontWeight: 600,
                             color: '#10b981',
-                                borderBottom: '1px solid #f1f3f4',
+                            borderBottom: '1px solid #f1f3f4',
                           }}
                         >
                           Settlement (Settlement Date)
@@ -5967,9 +6021,9 @@ const MarketplaceReconciliation: React.FC = () => {
                             align="right"
                             sx={{
                               backgroundColor: '#ffffff',
-                                fontWeight: 600,
+                              fontWeight: 600,
                               color: '#f97316',
-                                borderBottom: '1px solid #f1f3f4',
+                              borderBottom: '1px solid #f1f3f4',
                             }}
                           >
                             Commission (Settlement Date)
@@ -6115,18 +6169,26 @@ const MarketplaceReconciliation: React.FC = () => {
                     <Table stickyHeader size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell sx={{ backgroundColor: '#ffffff',
-                                fontWeight: 600, color: '#374151',
-                                borderBottom: '1px solid #f1f3f4' }}>Month</TableCell>
-                          <TableCell align="right" sx={{ backgroundColor: '#ffffff',
-                                fontWeight: 600, color: '#2563eb',
-                                borderBottom: '1px solid #f1f3f4' }}>{`Imported Sales (${getCurrencySymbol()})`}</TableCell>
-                          <TableCell align="right" sx={{ backgroundColor: '#ffffff',
-                                fontWeight: 600, color: '#0891b2',
-                                borderBottom: '1px solid #f1f3f4' }}>{`Gross Sales (${getCurrencySymbol()})`}</TableCell>
-                          <TableCell align="right" sx={{ backgroundColor: '#ffffff',
-                                fontWeight: 600, color: '#10b981',
-                                borderBottom: '1px solid #f1f3f4' }}>{`Settlement (${getCurrencySymbol()})`}</TableCell>
+                          <TableCell sx={{
+                            backgroundColor: '#ffffff',
+                            fontWeight: 600, color: '#374151',
+                            borderBottom: '1px solid #f1f3f4'
+                          }}>Month</TableCell>
+                          <TableCell align="right" sx={{
+                            backgroundColor: '#ffffff',
+                            fontWeight: 600, color: '#2563eb',
+                            borderBottom: '1px solid #f1f3f4'
+                          }}>{`Imported Sales (${getCurrencySymbol()})`}</TableCell>
+                          <TableCell align="right" sx={{
+                            backgroundColor: '#ffffff',
+                            fontWeight: 600, color: '#0891b2',
+                            borderBottom: '1px solid #f1f3f4'
+                          }}>{`Gross Sales (${getCurrencySymbol()})`}</TableCell>
+                          <TableCell align="right" sx={{
+                            backgroundColor: '#ffffff',
+                            fontWeight: 600, color: '#10b981',
+                            borderBottom: '1px solid #f1f3f4'
+                          }}>{`Settlement (${getCurrencySymbol()})`}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -6293,9 +6355,11 @@ const MarketplaceReconciliation: React.FC = () => {
                               {vendor}
                             </TableCell>
                           ))}
-                          <TableCell align="right" sx={{ backgroundColor: '#ffffff',
-                                fontWeight: 600, color: '#1f2937',
-                                borderBottom: '1px solid #f1f3f4', minWidth: 120 }}>
+                          <TableCell align="right" sx={{
+                            backgroundColor: '#ffffff',
+                            fontWeight: 600, color: '#1f2937',
+                            borderBottom: '1px solid #f1f3f4', minWidth: 120
+                          }}>
                             Total
                           </TableCell>
                         </TableRow>
@@ -6490,9 +6554,11 @@ const MarketplaceReconciliation: React.FC = () => {
                               {vendor}
                             </TableCell>
                           ))}
-                          <TableCell align="right" sx={{ backgroundColor: '#ffffff',
-                                fontWeight: 600, color: '#1f2937',
-                                borderBottom: '1px solid #f1f3f4', minWidth: 120 }}>
+                          <TableCell align="right" sx={{
+                            backgroundColor: '#ffffff',
+                            fontWeight: 600, color: '#1f2937',
+                            borderBottom: '1px solid #f1f3f4', minWidth: 120
+                          }}>
                             Total
                           </TableCell>
                         </TableRow>
@@ -6781,100 +6847,100 @@ const MarketplaceReconciliation: React.FC = () => {
           </Paper>
         )}
 
-      {/* Invoices List Dialog */}
-      <Dialog 
-        open={showInvoicesDialog} 
-        onClose={() => setShowInvoicesDialog(false)}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: { borderRadius: '16px' }
-        }}
-      >
-        <DialogTitle sx={{ 
-          borderBottom: '1px solid #e5e7eb', 
-          pb: 2, 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center' 
-        }}>
-          <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f2937' }}>
-            Ingested Fee Invoices
-          </Typography>
-          <IconButton onClick={() => setShowInvoicesDialog(false)} size="small">
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0 }}>
-          <TableContainer>
-            <Table sx={{ minWidth: 650 }}>
-              <TableHead>
-                <TableRow sx={{ backgroundColor: '#f9fafb' }}>
-                  <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2 }}>Invoice Number</TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2 }}>Type</TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2 }}>Date</TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2 }}>File Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2, textAlign: 'right' }}>Amount</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {feeInvoicesList && feeInvoicesList.length > 0 ? (
-                  feeInvoicesList.map((invoice, index) => (
-                    <TableRow 
-                      key={index}
-                      sx={{ 
-                        '&:last-child td, &:last-child th': { border: 0 },
-                        '&:hover': { backgroundColor: '#f9fafb' }
-                      }}
-                    >
-                      <TableCell sx={{ color: '#111827', fontWeight: 500 }}>
-                        {invoice.invoice_number || 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        <Box sx={{ 
-                          display: 'inline-block',
-                          px: 1.5,
-                          py: 0.5,
-                          borderRadius: '16px',
-                          fontSize: '0.75rem',
-                          fontWeight: 500,
-                          backgroundColor: invoice.type === 'Invoice' ? '#ecfdf5' : '#fff1f2',
-                          color: invoice.type === 'Invoice' ? '#059669' : '#e11d48'
-                        }}>
-                          {invoice.type || 'Unknown'}
+        {/* Invoices List Dialog */}
+        <Dialog
+          open={showInvoicesDialog}
+          onClose={() => setShowInvoicesDialog(false)}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{
+            sx: { borderRadius: '16px' }
+          }}
+        >
+          <DialogTitle sx={{
+            borderBottom: '1px solid #e5e7eb',
+            pb: 2,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#1f2937' }}>
+              Ingested Fee Invoices
+            </Typography>
+            <IconButton onClick={() => setShowInvoicesDialog(false)} size="small">
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent sx={{ p: 0 }}>
+            <TableContainer>
+              <Table sx={{ minWidth: 650 }}>
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: '#f9fafb' }}>
+                    <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2 }}>Invoice Number</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2 }}>Type</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2 }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2 }}>File Name</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: '#4b5563', py: 2, textAlign: 'right' }}>Amount</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {feeInvoicesList && feeInvoicesList.length > 0 ? (
+                    feeInvoicesList.map((invoice, index) => (
+                      <TableRow
+                        key={index}
+                        sx={{
+                          '&:last-child td, &:last-child th': { border: 0 },
+                          '&:hover': { backgroundColor: '#f9fafb' }
+                        }}
+                      >
+                        <TableCell sx={{ color: '#111827', fontWeight: 500 }}>
+                          {invoice.invoice_number || 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{
+                            display: 'inline-block',
+                            px: 1.5,
+                            py: 0.5,
+                            borderRadius: '16px',
+                            fontSize: '0.75rem',
+                            fontWeight: 500,
+                            backgroundColor: invoice.type === 'Invoice' ? '#ecfdf5' : '#fff1f2',
+                            color: invoice.type === 'Invoice' ? '#059669' : '#e11d48'
+                          }}>
+                            {invoice.type || 'Unknown'}
+                          </Box>
+                        </TableCell>
+                        <TableCell sx={{ color: '#4b5563' }}>
+                          {invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString('en-IN', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          }) : 'N/A'}
+                        </TableCell>
+                        <TableCell sx={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                          {invoice.file_name || 'N/A'}
+                        </TableCell>
+                        <TableCell sx={{ color: '#111827', fontWeight: 600, textAlign: 'right' }}>
+                          {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(invoice.total_amount || 0)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} sx={{ textAlign: 'center', py: 6, color: '#6b7280' }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                          <DescriptionOutlinedIcon sx={{ fontSize: 48, color: '#d1d5db' }} />
+                          <Typography variant="body1" sx={{ fontWeight: 500 }}>No invoices found</Typography>
+                          <Typography variant="body2" sx={{ color: '#9ca3af' }}>Try adjusting your date range.</Typography>
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ color: '#4b5563' }}>
-                        {invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString('en-IN', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        }) : 'N/A'}
-                      </TableCell>
-                      <TableCell sx={{ color: '#6b7280', fontSize: '0.875rem' }}>
-                        {invoice.file_name || 'N/A'}
-                      </TableCell>
-                      <TableCell sx={{ color: '#111827', fontWeight: 600, textAlign: 'right' }}>
-                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(invoice.total_amount || 0)}
-                      </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} sx={{ textAlign: 'center', py: 6, color: '#6b7280' }}>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                        <DescriptionOutlinedIcon sx={{ fontSize: 48, color: '#d1d5db' }} />
-                        <Typography variant="body1" sx={{ fontWeight: 500 }}>No invoices found</Typography>
-                        <Typography variant="body2" sx={{ color: '#9ca3af' }}>Try adjusting your date range.</Typography>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </DialogContent>
-      </Dialog>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </DialogContent>
+        </Dialog>
       </Box>
 
       {/* Sync modal removed; animation shown on the button icon itself */}
@@ -6905,7 +6971,7 @@ const MarketplaceReconciliation: React.FC = () => {
           dateRange={effectiveDateRangeForTs}
           initialPlatforms={
             selectedPlatform &&
-            (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || selectedPlatform === 'other')
+              (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || selectedPlatform === 'other')
               ? [selectedPlatform as 'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'other']
               : undefined
           }
