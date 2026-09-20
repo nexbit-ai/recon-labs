@@ -3365,36 +3365,13 @@ const MarketplaceReconciliation: React.FC = () => {
                       </Typography>
                     );
 
-                    return selectedPlatform === 'd2c' ? (
+                    return (
                       <Box sx={{ p: 3 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, flexWrap: 'wrap' }}>
                           <Metric label="Sales" amount={grossSalesAmount} count={grossSalesCount} />
                           <Metric label="Amount Settled" amount={Math.abs(Number(s?.total_settled_amount || 0))} count={Math.abs(Number(s?.total_settled_orders || 0))} />
                           <Metric label="Payment Due" amount={Math.abs(Number(s?.total_unsettled_amount || 0))} count={Math.abs(Number(s?.total_unsettled_orders || 0))} />
                         </Box>
-                      </Box>
-                    ) : (
-                      <Box sx={{ p: 3 }}>
-                        {/* Equation Row: Net Sales = Gross Sales - Returns - Cancellations */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                          <Metric
-                            label="Net Sales"
-                            amount={netSalesAmount}
-                            count={netSalesCount}
-                            onClick={() => {
-                              setInitialTsTab(4); // Open Transaction Sheet with "Sales Report" tab
-                              setShowTransactionSheet(true);
-                            }}
-                          />
-                          <Operator symbol="=" />
-                          <Metric label="Gross Sales" amount={grossSalesAmount} count={grossSalesCount} />
-                          <Operator symbol="-" />
-                          <Metric label="Returns" amount={returnsAmount} count={returnsCount} />
-                          <Operator symbol="-" />
-                          <Metric label="Cancellations" amount={cancellationsAmount} count={cancellationsCount} />
-                        </Box>
-
-
                       </Box>
                     );
                   })()}
@@ -3437,78 +3414,28 @@ const MarketplaceReconciliation: React.FC = () => {
                     const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
                     const matchedCount = reconciledCount + manuallyReconciledCount;
                     const mismatchedCount = Number(s?.total_unreconciled_count || 0);
-                    const unsettledObj = (mainSummary as any)?.Unsettled as any;
-                    const unsettledCount = Number(unsettledObj?.summary?.total_order_count || 0);
-
-                    const totalCount = matchedCount + mismatchedCount;
-                    const matchedPct = totalCount === 0 ? 100 : Math.max(0, Math.min(100, (matchedCount / totalCount) * 100));
-                    const matchedDeg = (matchedPct / 100) * 360;
+                    
+                    const settledCount = matchedCount + mismatchedCount;
+                    const settledPct = totalOrders === 0 ? 0 : Math.max(0, Math.min(100, (settledCount / totalOrders) * 100));
+                    const settledDeg = (settledPct / 100) * 360;
 
                     return (
-                      <Box sx={{ width: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, py: 3 }}>
-                        {/* Minimalistic Column on the Left */}
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3.5, alignItems: 'center' }}>
-                          <Box
-                            onClick={() => {
-                              setInitialTsFilters(undefined);
-                              setInitialTsTab(3);
-                              setShowTransactionSheet(true);
-                            }}
-                            sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-                          >
-                            <Typography sx={{ fontSize: '0.625rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25, textAlign: 'center' }}>Total Orders</Typography>
-                            <Typography sx={{ fontSize: '1.2rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>{totalOrders.toLocaleString()}</Typography>
-                          </Box>
-                          <Box
-                            onClick={() => {
-                              setInitialTsFilters(undefined);
-                              setInitialTsTab(0);
-                              setShowTransactionSheet(true);
-                            }}
-                            sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-                          >
-                            <Typography sx={{ fontSize: '0.625rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25, textAlign: 'center' }}>Matched</Typography>
-                            <Typography sx={{ fontSize: '1.2rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>{matchedCount.toLocaleString()}</Typography>
-                          </Box>
-                          <Box
-                            onClick={() => {
-                              setInitialTsFilters(undefined);
-                              setInitialTsTab(1);
-                              setShowTransactionSheet(true);
-                            }}
-                            sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-                          >
-                            <Typography sx={{ fontSize: '0.625rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25, textAlign: 'center' }}>Mismatched</Typography>
-                            <Typography sx={{ fontSize: '1.2rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>{mismatchedCount.toLocaleString()}</Typography>
-                          </Box>
-                          <Box
-                            onClick={() => {
-                              setInitialTsFilters(undefined);
-                              setInitialTsTab(2);
-                              setShowTransactionSheet(true);
-                            }}
-                            sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-                          >
-                            <Typography sx={{ fontSize: '0.625rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25, textAlign: 'center' }}>Payment Due</Typography>
-                            <Typography sx={{ fontSize: '1.2rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1, textAlign: 'center' }}>{unsettledCount.toLocaleString()}</Typography>
-                          </Box>
-                        </Box>
-
-                        {/* Gauge Chart on the Right */}
+                      <Box sx={{ width: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', py: 3 }}>
+                        {/* Gauge Chart (Settled vs Total Orders) */}
                         <Box sx={{ position: 'relative', flexShrink: 0 }}>
                           <Box sx={{
-                            width: 240,
-                            height: 240,
+                            width: 200,
+                            height: 200,
                             borderRadius: '100%',
-                            background: `conic-gradient(#10b981 0deg, #10b981 ${matchedDeg}deg, #ef4444 ${matchedDeg}deg, #ef4444 360deg)`,
+                            background: `conic-gradient(#10b981 0deg, #10b981 ${settledDeg}deg, #e5e7eb ${settledDeg}deg, #e5e7eb 360deg)`,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             position: 'relative',
                           }}>
                             <Box sx={{
-                              width: 228,
-                              height: 228,
+                              width: 184,
+                              height: 184,
                               borderRadius: '50%',
                               background: 'white',
                               display: 'flex',
@@ -3518,18 +3445,21 @@ const MarketplaceReconciliation: React.FC = () => {
                               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
                             }}>
                               <Typography variant="h4" sx={{
-                                fontWeight: 500,
-                                color: getReconciliationColor(matchedPct),
+                                fontWeight: 600,
+                                color: '#10b981',
                                 fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-                                mb: 0.25,
-                                fontSize: '2rem',
+                                mb: 0.5,
+                                fontSize: '1.75rem',
                                 letterSpacing: '-0.02em',
                                 lineHeight: 1
                               }}>
-                                {`${matchedPct.toFixed(1)}%`}
+                                {`${settledPct.toFixed(1)}%`}
                               </Typography>
-                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                                Matched
+                              <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#111827', mb: 0.25 }}>
+                                {settledCount.toLocaleString()} / {totalOrders.toLocaleString()}
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                                Settled Orders
                               </Typography>
                             </Box>
                           </Box>
