@@ -3368,7 +3368,8 @@ const MarketplaceReconciliation: React.FC = () => {
                     return (
                       <Box sx={{ p: 3 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, flexWrap: 'wrap' }}>
-                          <Metric label="Sales" amount={grossSalesAmount} count={grossSalesCount} />
+                          <Metric label="Gross Sales" amount={grossSalesAmount} count={grossSalesCount} />
+                          <Metric label="Net Sales" amount={netSalesAmount} count={netSalesCount} />
                           <Metric label="Amount Settled" amount={Math.abs(Number(s?.total_settled_amount || 0))} count={Math.abs(Number(s?.total_settled_orders || 0))} />
                           <Metric label="Payment Due" amount={Math.abs(Number(s?.total_unsettled_amount || 0))} count={Math.abs(Number(s?.total_unsettled_orders || 0))} />
                         </Box>
