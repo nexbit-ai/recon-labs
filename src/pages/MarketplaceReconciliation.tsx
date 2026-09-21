@@ -386,6 +386,7 @@ const MarketplaceReconciliation: React.FC = () => {
   const [ageingLoading, setAgeingLoading] = useState(false);
 
   // Month on Month Growth state
+  const lastMonthOnMonthKeyRef = useRef<string | null>(null);
   const [monthOnMonthGrowthData, setMonthOnMonthGrowthData] = useState<{
     // For marketplace platforms (amazon, flipkart, other/cred)
     // Backend now optionally returns `comissionData` (monthly taxes/commissions from marketplace_fee)
@@ -2176,7 +2177,11 @@ const MarketplaceReconciliation: React.FC = () => {
     }
     // Fetch month on month growth data when platform is selected
     if (selectedPlatform && (selectedPlatform === 'amazon' || selectedPlatform === 'flipkart' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c' || selectedPlatform === 'other')) {
-      fetchMonthOnMonthGrowth();
+      const shouldFetchMonthOnMonth = lastMonthOnMonthKeyRef.current !== key;
+      if (shouldFetchMonthOnMonth) {
+        lastMonthOnMonthKeyRef.current = key;
+        fetchMonthOnMonthGrowth();
+      }
     }
     // Fetch SKU profitability for Flipkart when relevant
     if (hasFlipkartSubPlatforms && (selectedPlatform === 'flipkart' || !selectedPlatform)) {
@@ -3602,7 +3607,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               </Box>
                             </Box>
 
-                            <Typography sx={{ fontSize: '1.5rem', fontWeight: 600, color: '#6b7280' }}>=</Typography>
+                            <Box sx={{ width: '1px', height: '40px', backgroundColor: '#e5e7eb', mx: 2 }} />
 
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 160 }}>
                               <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#10b981', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25 }}>
@@ -3621,7 +3626,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               </Box>
                             </Box>
 
-                            <Typography sx={{ fontSize: '1.5rem', fontWeight: 600, color: '#6b7280' }}>+</Typography>
+                            <Box sx={{ width: '1px', height: '40px', backgroundColor: '#e5e7eb', mx: 2 }} />
 
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 160 }}>
                               <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#ef4444', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25 }}>
