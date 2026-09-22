@@ -447,7 +447,31 @@ const OperationsCentrePage: React.FC = () => {
   const [apiResponseData, setApiResponseData] = useState<any>(null);
 
   // Claim Batches State
-  const [claimBatches, setClaimBatches] = useState<any[]>([]);
+  const [claimBatches, setClaimBatches] = useState<any[]>([
+    {
+      platform: 'd2c',
+      status: 'ELIGIBLE',
+      reason: 'Customer return not received',
+      total_orders: 12,
+      total_gap: 15400
+    },
+    {
+      platform: 'd2c',
+      status: 'FILED',
+      reason: 'Damaged item return',
+      total_orders: 5,
+      total_gap: 4500,
+      ticket_id: 'TCK-8921'
+    },
+    {
+      platform: 'd2c',
+      status: 'APPROVED',
+      reason: 'Lost in transit',
+      total_orders: 8,
+      total_gap: 9200,
+      ticket_id: 'TCK-8810'
+    }
+  ]);
   const filteredBatches = claimBatches.filter(b => b.platform === selectedPlatform);
   const [activeClaimTag, setActiveClaimTag] = useState<string>('All');
 
@@ -1176,15 +1200,49 @@ const OperationsCentrePage: React.FC = () => {
   };
 
   const fetchClaimBatchesData = async () => {
-    try {
-      const response = await api.claims.getClaimBatches();
-      if (response && response.data) {
-        setClaimBatches(response.data.data || []);
+    // For Demo branch: always show dummy batches for D2C/B2C, skip API dependency
+    const dummyBatches = [
+      {
+        platform: 'd2c',
+        status: 'ELIGIBLE',
+        reason: 'Customer return not received',
+        total_orders: 12,
+        total_gap: 15400
+      },
+      {
+        platform: 'd2c',
+        status: 'FILED',
+        reason: 'Damaged item return',
+        total_orders: 5,
+        total_gap: 4500,
+        ticket_id: 'TCK-8921'
+      },
+      {
+        platform: 'd2c',
+        status: 'APPROVED',
+        reason: 'Lost in transit',
+        total_orders: 8,
+        total_gap: 9200,
+        ticket_id: 'TCK-8810'
+      },
+      // Adding a few for flipkart/amazon just in case the user navigates there
+      {
+        platform: 'flipkart',
+        status: 'ELIGIBLE',
+        reason: 'Courier Return Mismatch',
+        total_orders: 3,
+        total_gap: 2100
+      },
+      {
+        platform: 'amazon',
+        status: 'FILED',
+        reason: 'FBA Lost Inventory',
+        total_orders: 7,
+        total_gap: 8300,
+        ticket_id: 'AMZ-10293'
       }
-    } catch (err) {
-      console.error('Error fetching claim batches:', err);
-      setClaimBatches([]);
-    }
+    ];
+    setClaimBatches(dummyBatches);
   };
 
   const fetchFeeAuditData = async () => {

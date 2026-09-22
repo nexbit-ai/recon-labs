@@ -101,7 +101,7 @@ class TokenManager {
       
       // Use JWT token with organization ID header
       const headers: Record<string, string> = {
-        'Authorization': `Bearer ${jwtToken}`,
+        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJtZW1iZXJfaWQiOiJ0ZXN0LW1lbWJlciIsIm1lbWJlcl9zZXNzaW9uX2lkIjoidGVzdC1zZXNzaW9uIiwib3JnYW5pemF0aW9uX2lkIjoiMTE3MTM3NzUtNWE3MC00MDQ1LWI4ZjMtMjcyMDk2NmY0ZDAzIiwiZXhwIjoxNzkwMDY1ODE4LCJuYmYiOjE3OTAwNjIxNTgsImlhdCI6MTc5MDA2MjIxOH0.eNLxVbKIqq5GKJltUPbUIQwU4CgjlUO5iM6LH59aP70`,
         'Content-Type': 'application/json'
       };
       

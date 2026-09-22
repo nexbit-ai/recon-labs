@@ -1432,18 +1432,10 @@ const MarketplaceReconciliation: React.FC = () => {
     setMonthOnMonthGrowthError(null);
 
     try {
-      console.log('[MonthOnMonthGrowth] Starting fetch with params:', {
-        platform: fetchedForPlatform,
-        start_date: startDate,
-        end_date: endDate,
-        generation: myGeneration,
-      });
+      console.log('[MonthOnMonthGrowth] Starting fetch with dummy data for platform:', fetchedForPlatform);
 
-      const response = await apiIndex.monthOnMonthGrowth.getMonthOnMonthGrowth({
-        platform: fetchedForPlatform,
-        start_date: startDate,
-        end_date: endDate,
-      });
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 600));
 
       // ---- STALE RESPONSE GUARD ----
       // If a newer fetch has been initiated since this one started, discard this result.
@@ -1452,65 +1444,54 @@ const MarketplaceReconciliation: React.FC = () => {
         return;
       }
 
-      console.log('[MonthOnMonthGrowth] API Response received:', {
-        success: response.success,
-        hasData: !!response.data,
-        dataKeys: response.data ? Object.keys(response.data) : [],
-        platform: fetchedForPlatform,
-      });
-
-      if (response.success && response.data) {
-        const data = response.data;
-
-        try {
-          if (fetchedForPlatform === 'amazon' || fetchedForPlatform === 'flipkart' || fetchedForPlatform === 'amazon_uk' || fetchedForPlatform === 'other') {
-            // For Amazon/Flipkart/Other (CRED): expect { data: [{ month, sales, settlement }, ...] }
-            const marketplaceData = data.data || data || [];
-
-            if (Array.isArray(marketplaceData)) {
-              setMonthOnMonthGrowthData({
-                marketplaceData: marketplaceData,
-              });
-            } else {
-              console.error('[MonthOnMonthGrowth] Invalid marketplace data format - expected array, got:', typeof marketplaceData);
-              setMonthOnMonthGrowthError('Invalid data format received from API');
-              setMonthOnMonthGrowthData(null);
-            }
-          } else if (fetchedForPlatform === 'd2c') {
-            // For D2C: expect { salesAndSettlement: [...], vendorSettlements: { cod: {...}, noncod: {...} } }
-            const salesAndSettlement = data.salesAndSettlement || data.sales_and_settlement || [];
-            const vendorSettlementsRaw = data.vendorSettlements || data.vendor_settlements || {};
-
-            const vendorSettlements: {
-              cod?: Record<string, Array<{ month: string; settlement: number }>>;
-              noncod?: Record<string, Array<{ month: string; settlement: number }>>;
-            } = {};
-
-            if (vendorSettlementsRaw.cod && typeof vendorSettlementsRaw.cod === 'object') {
-              vendorSettlements.cod = vendorSettlementsRaw.cod;
-            }
-            if (vendorSettlementsRaw.noncod && typeof vendorSettlementsRaw.noncod === 'object') {
-              vendorSettlements.noncod = vendorSettlementsRaw.noncod;
-            }
-
-            if (Array.isArray(salesAndSettlement) && typeof vendorSettlementsRaw === 'object') {
-              setMonthOnMonthGrowthData({
-                d2cSalesAndSettlement: salesAndSettlement,
-                d2cVendorSettlements: vendorSettlements,
-              });
-            } else {
-              setMonthOnMonthGrowthError('Invalid data format received from API');
-              setMonthOnMonthGrowthData(null);
+      if (fetchedForPlatform === 'd2c') {
+        setMonthOnMonthGrowthData({
+          d2cSalesAndSettlement: [
+            { month: "Jan 2025", sales: 1200000, settlement: 1100000 },
+            { month: "Feb 2025", sales: 1400000, settlement: 1250000 },
+            { month: "Mar 2025", sales: 1800000, settlement: 1650000 },
+            { month: "Apr 2025", sales: 2100000, settlement: 1950000 },
+          ],
+          d2cVendorSettlements: {
+            cod: {
+              "Delhivery": [
+                { month: "Jan 2025", settlement: 300000 },
+                { month: "Feb 2025", settlement: 350000 },
+                { month: "Mar 2025", settlement: 400000 },
+                { month: "Apr 2025", settlement: 450000 },
+              ],
+              "Blue Dart": [
+                { month: "Jan 2025", settlement: 200000 },
+                { month: "Feb 2025", settlement: 250000 },
+                { month: "Mar 2025", settlement: 300000 },
+                { month: "Apr 2025", settlement: 350000 },
+              ]
+            },
+            noncod: {
+              "Razorpay": [
+                { month: "Jan 2025", settlement: 400000 },
+                { month: "Feb 2025", settlement: 450000 },
+                { month: "Mar 2025", settlement: 500000 },
+                { month: "Apr 2025", settlement: 600000 },
+              ],
+              "PayU": [
+                { month: "Jan 2025", settlement: 200000 },
+                { month: "Feb 2025", settlement: 200000 },
+                { month: "Mar 2025", settlement: 450000 },
+                { month: "Apr 2025", settlement: 550000 },
+              ]
             }
           }
-        } catch (processingError) {
-          console.error('[MonthOnMonthGrowth] Error processing data:', processingError);
-          setMonthOnMonthGrowthError(`Error processing data: ${processingError instanceof Error ? processingError.message : String(processingError)}`);
-          setMonthOnMonthGrowthData(null);
-        }
+        });
       } else {
-        setMonthOnMonthGrowthError('Unexpected response format from API');
-        setMonthOnMonthGrowthData(null);
+        setMonthOnMonthGrowthData({
+          marketplaceData: [
+            { month: "Jan 2025", sales: 2500000, settlement: 2100000, comissionData: 400000 },
+            { month: "Feb 2025", sales: 2800000, settlement: 2300000, comissionData: 500000 },
+            { month: "Mar 2025", sales: 3200000, settlement: 2700000, comissionData: 500000 },
+            { month: "Apr 2025", sales: 3800000, settlement: 3100000, comissionData: 700000 },
+          ]
+        });
       }
     } catch (error) {
       // Only update state if this is still the latest request
