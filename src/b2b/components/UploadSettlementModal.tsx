@@ -14,16 +14,16 @@ const OVERVIEW_ROUTE = '/b2b/overview';
 const STEP_MS = 700;
 
 const STEPS = [
-  'Reading Blinkit_settlement_W24.csv…',
-  'Recognising format (unseen layout) · mapping 11 columns…',
-  'Classifying 9 deduction types · matching 312 lines to GRNs…',
-  'Checking each deduction against your rate card…',
+  'Connecting to Zoho ERP...',
+  'Fetching latest invoices and settlements...',
+  'Mapping 154 transactions...',
+  'Reconciling data against rate card...',
 ];
 
 const STATS = [
-  { value: '312', label: 'Lines matched' },
-  { value: '9', label: 'Fee types' },
-  { value: '3', label: 'Anomalies' },
+  { value: '154', label: 'Transactions synced' },
+  { value: '4', label: 'Discrepancies' },
+  { value: '0', label: 'Errors' },
 ];
 
 interface Props {
@@ -121,7 +121,7 @@ const UploadSettlementModal: React.FC<Props> = ({ open, onClose }) => {
                 <AutoAwesomeOutlined sx={{ fontSize: 18, color: colors.accent }} />
               </Box>
               <Typography sx={{ flex: 1, ...type.sectionTitle, color: colors.ink }}>
-                {done ? 'Analysis complete' : 'Analysing settlement'}
+                {done ? 'Sync complete' : 'Syncing with Zoho ERP'}
               </Typography>
               <Pressable
                 ariaLabel="Close"
@@ -213,10 +213,10 @@ const UploadSettlementModal: React.FC<Props> = ({ open, onClose }) => {
                       <ErrorOutlineOutlined sx={{ fontSize: 18, color: colors.ink, flexShrink: 0, mt: '1px' }} />
                       <Box>
                         <Typography sx={{ fontSize: type.body.fontSize, fontWeight: 600, color: colors.ink, ...tabularNums }}>
-                          ₹1.42L in questionable deductions
+                          4 discrepancies identified
                         </Typography>
                         <Typography sx={{ fontSize: 13, color: colors.grey700, mt: '1px' }}>
-                          incl. a ‘Storage Fee v2’ with no contractual basis
+                          Requires review before finalizing reconciliation.
                         </Typography>
                       </Box>
                     </Box>

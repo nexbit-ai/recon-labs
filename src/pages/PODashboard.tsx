@@ -220,12 +220,12 @@ export const PODashboard: React.FC = () => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Purchase_Orders_MTD_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `Invoices_MTD_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
-    setToastMessage(`Exported ${filteredData.length} purchase order records.`);
+    setToastMessage(`Exported ${filteredData.length} invoice records.`);
   }, [columns, filteredData]);
 
   // Listen for top bar events (Filters & Export)
@@ -546,9 +546,9 @@ export const PODashboard: React.FC = () => {
           mb: 3,
         }}
       >
-        {/* 1. Total purchase orders */}
+        {/* 1. Total invoices */}
         <POSummaryCard
-          label="Total purchase orders"
+          label="Total invoices"
           value={poSummaryMetrics.totalPos[metricMode]}
           trend={poSummaryMetrics.totalPos.trend}
           trendIsPositive={!poSummaryMetrics.totalPos.trendNegative}
@@ -697,7 +697,7 @@ export const PODashboard: React.FC = () => {
                           }}
                         >
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <span>PO ID</span>
+                            <span>Invoice ID</span>
                             <IconButton
                               size="small"
                               onClick={(e) => setSearchAnchor(e.currentTarget)}
@@ -746,7 +746,7 @@ export const PODashboard: React.FC = () => {
                     sx={{ py: 6 }}
                   >
                     <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#64748b' }}>
-                      No purchase orders match your filter criteria.
+                      No invoices match your filter criteria.
                     </Typography>
                     <Button
                       size="small"
@@ -1002,7 +1002,7 @@ export const PODashboard: React.FC = () => {
         <TextField
           autoFocus
           size="small"
-          placeholder="Filter PO ID..."
+          placeholder="Filter Invoice ID..."
           value={poIdSearch}
           onChange={(e) => {
             setPoIdSearch(e.target.value);

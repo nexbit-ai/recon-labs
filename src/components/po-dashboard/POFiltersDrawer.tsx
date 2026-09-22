@@ -108,7 +108,7 @@ export const POFiltersDrawer: React.FC<POFiltersDrawerProps> = ({
             <FilterListIcon sx={{ fontSize: 17 }} />
           </Box>
           <Typography sx={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
-            Filter Purchase Orders
+            Filter Invoices
           </Typography>
           {activeCount > 0 && (
             <Badge
@@ -241,7 +241,7 @@ export const POFiltersDrawer: React.FC<POFiltersDrawerProps> = ({
 
         {/* Date Range */}
         <Typography sx={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b', mb: 1 }}>
-          PO Date Range
+          Invoice Date Range
         </Typography>
         <Stack spacing={1.5} sx={{ mb: 2 }}>
           <TextField

@@ -16,15 +16,12 @@ import {
 import { colors, hairline, type, space, tabularNums } from '../theme/b2bTokens';
 import { cardSx, PageTitle, SectionTitle, ColumnLabel } from '../components/primitives';
 import UploadSettlementModal from '../components/UploadSettlementModal';
-import { pendingFromCounterparty } from '../mock';
 import { formatRupees } from '../lib/format';
 
 const INBOX = 'inbox-kp@usenexbit.com';
 
 // ── Daily processing counts ─────────────────────────────────────────────────
 const PROCESSED_TODAY = [
-  { value: '8', label: 'Purchase Orders' },
-  { value: '14', label: 'GRNs' },
   { value: '22', label: 'Invoices' },
   { value: '6', label: 'Settlements' },
   { value: '1', label: 'Bank Statements' },
@@ -48,11 +45,9 @@ interface ReceivedFile {
 }
 
 const TABS = [
-  'Purchase Order',
   'Tax invoice',
   'Debit note',
   'Credit note',
-  'GRN',
   'Other'
 ];
 
@@ -191,14 +186,12 @@ const Upload: React.FC = () => {
       <Box
         sx={{
           display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: `${space.lg}px`,
-          flexWrap: 'wrap',
+          justifyContent: 'flex-end',
+          mb: `${space.lg}px`,
         }}
       >
-        <PageTitle>Upload</PageTitle>
         <Button
+          variant="outlined"
           onClick={openModal}
           startIcon={
             <SyncOutlined
@@ -210,13 +203,13 @@ const Upload: React.FC = () => {
             />
           }
           sx={{
-            bgcolor: colors.accent,
-            color: colors.paper,
+            borderColor: colors.accent,
+            color: colors.accent,
             fontSize: 13,
             fontWeight: 600,
             px: `${space.xl}px`,
             py: `${space.md}px`,
-            '&:hover': { bgcolor: colors.accentHover },
+            '&:hover': { borderColor: colors.accentHover, bgcolor: 'transparent' },
           }}
         >
           Sync
@@ -474,85 +467,6 @@ const Upload: React.FC = () => {
         })}
       </Box>
 
-      {/* ── Awaiting from New Welcome ─────────────────────────────── */}
-      <SectionTitle sx={{ mt: `${space.xxl}px`, mb: `${space.lg}px` }}>Awaiting from New Welcome</SectionTitle>
-      <Box sx={{ cardSx, border: hairline, mb: `${space.xxl}px` }}>
-        {/* Header */}
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 160px 120px 110px',
-            gap: `${space.lg}px`,
-            px: `${space.xl}px`,
-            py: `${space.md}px`,
-            bgcolor: colors.grey100,
-            borderBottom: hairline,
-          }}
-        >
-          <ColumnLabel>What we expect</ColumnLabel>
-          <ColumnLabel>Reference</ColumnLabel>
-          <ColumnLabel>Due since</ColumnLabel>
-          <ColumnLabel align="right">Amount</ColumnLabel>
-        </Box>
-        {pendingFromCounterparty.map((doc, idx) => (
-          <Box
-            key={doc.id}
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 160px 120px 110px',
-              gap: `${space.lg}px`,
-              px: `${space.xl}px`,
-              py: `${space.lg}px`,
-              borderBottom: idx < pendingFromCounterparty.length - 1 ? hairline : 'none',
-              borderLeft: doc.overdue ? `3px solid ${colors.ink}` : '3px solid transparent',
-              '&:hover': { bgcolor: colors.grey100 },
-            }}
-          >
-            <Box>
-              <Typography sx={{ fontSize: 13, fontWeight: 500, color: colors.ink }}>
-                {doc.what}
-              </Typography>
-            </Box>
-            <Typography
-              sx={{
-                fontSize: 12,
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-                color: colors.grey700,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {doc.reference}
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: `${space.sm}px` }}>
-              <Typography sx={{ fontSize: 12, color: colors.grey700, ...tabularNums }}>
-                {doc.dueSince}
-              </Typography>
-              {doc.overdue && (
-                <Box
-                  sx={{
-                    display: 'inline-flex',
-                    border: hairline,
-                    px: `${space.sm}px`,
-                    py: '2px',
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: colors.ink,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  OVERDUE
-                </Box>
-              )}
-            </Box>
-            <Typography sx={{ textAlign: 'right', fontSize: 13, fontWeight: 600, color: doc.amount !== null ? colors.ink : colors.grey500, ...tabularNums }}>
-              {doc.amount !== null ? formatRupees(Math.abs(doc.amount)) : '—'}
-            </Typography>
-          </Box>
-        ))}
-      </Box>
 
       <UploadSettlementModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
     </Box>

@@ -8,6 +8,8 @@ export * from './rateCard';
 export * from './contracts';
 export * from './askNex';
 export * from './exceptions';
+export * from './vendors';
+export * from './b2bReconData';
 
 import { headlineByKey, channelPerformance, reconLineItems, reconPurchaseOrders } from './settlements';
 import { expiringSoonDisputes, sumAmount } from './receivables';

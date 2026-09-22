@@ -36,7 +36,7 @@ export const POExpandedRow: React.FC<POExpandedRowProps> = ({ po }) => {
 
     return [
       {
-        title: 'PO Created',
+        title: 'Invoice Created',
         date: po.poDate,
         state: 'done',
         description: `Issued to ${po.vendorName}`,
@@ -85,7 +85,7 @@ export const POExpandedRow: React.FC<POExpandedRowProps> = ({ po }) => {
         borderBottom: '1px solid #eaecf0',
       }}
     >
-      {/* Vero AI Intelligence Banner for the PO */}
+      {/* Vero AI Intelligence Banner for the Invoice */}
       <Box
         sx={{
           backgroundColor: '#ffffff',
@@ -120,7 +120,7 @@ export const POExpandedRow: React.FC<POExpandedRowProps> = ({ po }) => {
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                PO Fulfillment Health Score: {healthScore}/100
+                Invoice Fulfillment Health Score: {healthScore}/100
               </Typography>
               <Chip
                 label={healthScore >= 90 ? 'Optimal' : healthScore >= 70 ? 'Moderate' : 'At Risk'}
@@ -322,7 +322,7 @@ export const POExpandedRow: React.FC<POExpandedRowProps> = ({ po }) => {
           ) : (
             <Box sx={{ py: 2, textAlign: 'center' }}>
               <Typography sx={{ fontSize: '12px', color: '#64748b' }}>
-                {po.skusCount} SKU item(s) in this purchase order ({po.ordQty.toLocaleString()} total units ordered).
+                {po.skusCount} SKU item(s) in this invoice ({po.ordQty.toLocaleString()} total units ordered).
               </Typography>
             </Box>
           )}

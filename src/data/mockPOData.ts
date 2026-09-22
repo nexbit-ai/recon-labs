@@ -15,7 +15,7 @@ export interface POSkuItem {
 }
 
 export interface POItem {
-  id: string; // e.g. "PO-09124"
+  id: string; // e.g. "INV-09124"
   entity?: 'Nexbit' | 'Kapiva' | 'Medkart';
   status: 'Open' | 'Discrepancy' | 'Dispatched' | 'Closed' | 'Expired' | 'Cancelled' | 'Invoiced' | 'Other';
   soNumber: string;
@@ -141,9 +141,9 @@ export const poSummaryMetrics: POSummaryMetrics = {
 
 // Exact 37 PO items matching screenshot (5 Open, 8 Dispatched, 17 Closed, 7 Expired)
 export const mockPOItems: POItem[] = [
-  // 1. PO-09124
+  // 1. INV-09124
   {
-    id: 'PO-09124',
+    id: 'INV-09124',
     status: 'Dispatched',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -208,9 +208,9 @@ export const mockPOItems: POItem[] = [
       },
     ],
   },
-  // 2. PO-09118
+  // 2. INV-09118
   {
-    id: 'PO-09118',
+    id: 'INV-09118',
     status: 'Open',
     soNumber: '—',
     vendorName: 'Flipkart Seller Hub',
@@ -260,9 +260,9 @@ export const mockPOItems: POItem[] = [
       },
     ],
   },
-  // 3. PO-09105
+  // 3. INV-09105
   {
-    id: 'PO-09105',
+    id: 'INV-09105',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Blinkit',
@@ -312,9 +312,9 @@ export const mockPOItems: POItem[] = [
       },
     ],
   },
-  // 4. PO-09092
+  // 4. INV-09092
   {
-    id: 'PO-09092',
+    id: 'INV-09092',
     status: 'Expired',
     soNumber: '—',
     vendorName: 'Meesho Supplier Panel',
@@ -379,9 +379,9 @@ export const mockPOItems: POItem[] = [
       },
     ],
   },
-  // 5. PO-09081
+  // 5. INV-09081
   {
-    id: 'PO-09081',
+    id: 'INV-09081',
     status: 'Dispatched',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -431,9 +431,9 @@ export const mockPOItems: POItem[] = [
       },
     ],
   },
-  // 6. PO-09074
+  // 6. INV-09074
   {
-    id: 'PO-09074',
+    id: 'INV-09074',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Flipkart Seller Hub',
@@ -483,9 +483,9 @@ export const mockPOItems: POItem[] = [
       },
     ],
   },
-  // 7. PO-09061
+  // 7. INV-09061
   {
-    id: 'PO-09061',
+    id: 'INV-09061',
     status: 'Open',
     soNumber: '—',
     vendorName: 'Nykaa Seller Portal',
@@ -535,9 +535,9 @@ export const mockPOItems: POItem[] = [
       },
     ],
   },
-  // 8. PO-09055
+  // 8. INV-09055
   {
-    id: 'PO-09055',
+    id: 'INV-09055',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -602,9 +602,9 @@ export const mockPOItems: POItem[] = [
       },
     ],
   },
-  // 9. PO-09048 (Dispatched)
+  // 9. INV-09048 (Dispatched)
   {
-    id: 'PO-09048',
+    id: 'INV-09048',
     status: 'Dispatched',
     soNumber: '—',
     vendorName: 'Blinkit',
@@ -654,9 +654,9 @@ export const mockPOItems: POItem[] = [
       },
     ],
   },
-  // 10. PO-09042 (Closed)
+  // 10. INV-09042 (Closed)
   {
-    id: 'PO-09042',
+    id: 'INV-09042',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -706,9 +706,9 @@ export const mockPOItems: POItem[] = [
       },
     ],
   },
-  // 11. PO-09035 (Open)
+  // 11. INV-09035 (Open)
   {
-    id: 'PO-09035',
+    id: 'INV-09035',
     status: 'Open',
     soNumber: '—',
     vendorName: 'Flipkart Seller Hub',
@@ -742,9 +742,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'CCU-WH-02',
     skus: [],
   },
-  // 12. PO-09028 (Open)
+  // 12. INV-09028 (Open)
   {
-    id: 'PO-09028',
+    id: 'INV-09028',
     status: 'Open',
     soNumber: '—',
     vendorName: 'Nykaa Seller Portal',
@@ -778,9 +778,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'DEL-BH-01',
     skus: [],
   },
-  // 13. PO-09022 (Dispatched)
+  // 13. INV-09022 (Dispatched)
   {
-    id: 'PO-09022',
+    id: 'INV-09022',
     status: 'Dispatched',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -814,9 +814,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'DEL-FC-01',
     skus: [],
   },
-  // 14. PO-09015 (Dispatched)
+  // 14. INV-09015 (Dispatched)
   {
-    id: 'PO-09015',
+    id: 'INV-09015',
     status: 'Dispatched',
     soNumber: '—',
     vendorName: 'Flipkart Seller Hub',
@@ -850,9 +850,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'BLR-MW-01',
     skus: [],
   },
-  // 15. PO-09009 (Dispatched)
+  // 15. INV-09009 (Dispatched)
   {
-    id: 'PO-09009',
+    id: 'INV-09009',
     status: 'Dispatched',
     soNumber: '—',
     vendorName: 'Blinkit',
@@ -886,9 +886,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'NOI-DH-01',
     skus: [],
   },
-  // 16. PO-09003 (Dispatched)
+  // 16. INV-09003 (Dispatched)
   {
-    id: 'PO-09003',
+    id: 'INV-09003',
     status: 'Dispatched',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -922,9 +922,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'BOM-FC-01',
     skus: [],
   },
-  // 17. PO-08998 (Dispatched)
+  // 17. INV-08998 (Dispatched)
   {
-    id: 'PO-08998',
+    id: 'INV-08998',
     status: 'Dispatched',
     soNumber: '—',
     vendorName: 'Flipkart Seller Hub',
@@ -958,9 +958,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'PNQ-WH-02',
     skus: [],
   },
-  // 18. PO-08991 (Closed)
+  // 18. INV-08991 (Closed)
   {
-    id: 'PO-08991',
+    id: 'INV-08991',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Blinkit',
@@ -994,9 +994,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'HYD-DS-01',
     skus: [],
   },
-  // 19. PO-08985 (Closed)
+  // 19. INV-08985 (Closed)
   {
-    id: 'PO-08985',
+    id: 'INV-08985',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -1030,9 +1030,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'HYD-FC-01',
     skus: [],
   },
-  // 20. PO-08980 (Closed)
+  // 20. INV-08980 (Closed)
   {
-    id: 'PO-08980',
+    id: 'INV-08980',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Flipkart Seller Hub',
@@ -1066,9 +1066,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'AMD-FC-01',
     skus: [],
   },
-  // 21. PO-08974 (Closed)
+  // 21. INV-08974 (Closed)
   {
-    id: 'PO-08974',
+    id: 'INV-08974',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -1102,9 +1102,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'DEL-FC-01',
     skus: [],
   },
-  // 22. PO-08968 (Closed)
+  // 22. INV-08968 (Closed)
   {
-    id: 'PO-08968',
+    id: 'INV-08968',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Blinkit',
@@ -1138,9 +1138,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'BLR-DS-01',
     skus: [],
   },
-  // 23. PO-08961 (Closed)
+  // 23. INV-08961 (Closed)
   {
-    id: 'PO-08961',
+    id: 'INV-08961',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Flipkart Seller Hub',
@@ -1174,9 +1174,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'MAA-WH-01',
     skus: [],
   },
-  // 24. PO-08955 (Closed)
+  // 24. INV-08955 (Closed)
   {
-    id: 'PO-08955',
+    id: 'INV-08955',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -1210,9 +1210,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'PNQ-FC-01',
     skus: [],
   },
-  // 25. PO-08949 (Closed)
+  // 25. INV-08949 (Closed)
   {
-    id: 'PO-08949',
+    id: 'INV-08949',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Nykaa Seller Portal',
@@ -1246,9 +1246,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'BLR-BH-01',
     skus: [],
   },
-  // 26. PO-08942 (Closed)
+  // 26. INV-08942 (Closed)
   {
-    id: 'PO-08942',
+    id: 'INV-08942',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Blinkit',
@@ -1282,9 +1282,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'BOM-DH-02',
     skus: [],
   },
-  // 27. PO-08936 (Closed)
+  // 27. INV-08936 (Closed)
   {
-    id: 'PO-08936',
+    id: 'INV-08936',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -1318,9 +1318,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'DEL-FC-01',
     skus: [],
   },
-  // 28. PO-08930 (Closed)
+  // 28. INV-08930 (Closed)
   {
-    id: 'PO-08930',
+    id: 'INV-08930',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Flipkart Seller Hub',
@@ -1354,9 +1354,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'DEL-MW-01',
     skus: [],
   },
-  // 29. PO-08924 (Closed)
+  // 29. INV-08924 (Closed)
   {
-    id: 'PO-08924',
+    id: 'INV-08924',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -1390,9 +1390,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'BLR-FC-02',
     skus: [],
   },
-  // 30. PO-08918 (Closed)
+  // 30. INV-08918 (Closed)
   {
-    id: 'PO-08918',
+    id: 'INV-08918',
     status: 'Closed',
     soNumber: '—',
     vendorName: 'Blinkit',
@@ -1426,9 +1426,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'CCU-DS-01',
     skus: [],
   },
-  // 31. PO-08912 (Expired)
+  // 31. INV-08912 (Expired)
   {
-    id: 'PO-08912',
+    id: 'INV-08912',
     status: 'Expired',
     soNumber: '—',
     vendorName: 'Meesho Supplier Panel',
@@ -1462,9 +1462,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'JAI-HB-01',
     skus: [],
   },
-  // 32. PO-08906 (Expired)
+  // 32. INV-08906 (Expired)
   {
-    id: 'PO-08906',
+    id: 'INV-08906',
     status: 'Expired',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -1498,9 +1498,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'AMD-FC-02',
     skus: [],
   },
-  // 33. PO-08900 (Expired)
+  // 33. INV-08900 (Expired)
   {
-    id: 'PO-08900',
+    id: 'INV-08900',
     status: 'Expired',
     soNumber: '—',
     vendorName: 'Flipkart Seller Hub',
@@ -1534,9 +1534,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'LKO-HB-01',
     skus: [],
   },
-  // 34. PO-08894 (Expired)
+  // 34. INV-08894 (Expired)
   {
-    id: 'PO-08894',
+    id: 'INV-08894',
     status: 'Expired',
     soNumber: '—',
     vendorName: 'Blinkit',
@@ -1570,9 +1570,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'IXC-DS-01',
     skus: [],
   },
-  // 35. PO-08888 (Expired)
+  // 35. INV-08888 (Expired)
   {
-    id: 'PO-08888',
+    id: 'INV-08888',
     status: 'Expired',
     soNumber: '—',
     vendorName: 'Nykaa Seller Portal',
@@ -1606,9 +1606,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'CCU-BH-01',
     skus: [],
   },
-  // 36. PO-08882 (Expired)
+  // 36. INV-08882 (Expired)
   {
-    id: 'PO-08882',
+    id: 'INV-08882',
     status: 'Expired',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -1642,9 +1642,9 @@ export const mockPOItems: POItem[] = [
     facilityCode: 'IDR-FC-01',
     skus: [],
   },
-  // 37. PO-08876 (Open)
+  // 37. INV-08876 (Open)
   {
-    id: 'PO-08876',
+    id: 'INV-08876',
     status: 'Open',
     soNumber: '—',
     vendorName: 'Amazon Vendor Central',
@@ -1693,12 +1693,12 @@ export interface ColumnDefinition {
 }
 
 export const ALL_PO_COLUMNS: ColumnDefinition[] = [
-  { key: 'id', label: 'PO ID', width: 120, fixed: true, visible: true, canHide: false, align: 'left', category: 'core' },
+  { key: 'id', label: 'Invoice ID', width: 120, fixed: true, visible: true, canHide: false, align: 'left', category: 'core' },
   { key: 'status', label: 'STATUS', width: 120, visible: true, canHide: false, align: 'left', category: 'core' },
   { key: 'vendorName', label: 'VENDOR', width: 240, visible: true, canHide: true, align: 'left', category: 'core' },
-  { key: 'poDate', label: 'PO DATE', width: 130, visible: true, canHide: true, align: 'left', category: 'dates' },
+  { key: 'poDate', label: 'INVOICE DATE', width: 130, visible: true, canHide: true, align: 'left', category: 'dates' },
   { key: 'expiryDate', label: 'EXPIRY DATE', width: 130, visible: true, canHide: true, align: 'left', category: 'dates' },
-  { key: 'poAmount', label: 'PO AMOUNT', width: 135, visible: true, canHide: true, align: 'right', category: 'financials' },
+  { key: 'poAmount', label: 'INVOICE AMOUNT', width: 135, visible: true, canHide: true, align: 'right', category: 'financials' },
   { key: 'invoicedAmount', label: 'INVOICE AMOUNT', width: 150, visible: true, canHide: true, align: 'right', category: 'financials' },
   { key: 'paymentStatus', label: 'PAYMENT STATUS', width: 140, visible: true, canHide: true, align: 'center', category: 'financials' },
   { key: 'settledAmount', label: 'SETTLED AMOUNT', width: 140, visible: true, canHide: true, align: 'right', category: 'financials' },

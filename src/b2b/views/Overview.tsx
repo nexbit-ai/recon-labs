@@ -183,9 +183,8 @@ const Overview: React.FC = () => {
               <Box sx={{ width: '100%', maxWidth: '680px' }}>
                 <InputComponent />
                 <Box sx={{ display: 'flex', justifyContent: 'center', gap: `${space.md}px`, mt: '24px', flexWrap: 'wrap' }}>
-                  <Shortcut onClick={() => handleAction('Draft dispute for Zepto PO-445')}>Draft dispute for Zepto PO-445</Shortcut>
-                  <Shortcut onClick={() => handleAction('Run Q1 TDS reconciliation')}>Run Q1 TDS reconciliation</Shortcut>
-                  <Shortcut onClick={() => handleAction('Check overdue Blinkit payments')}>Check overdue Blinkit payments</Shortcut>
+                  <Shortcut onClick={() => handleAction('how much is outstanding for client A')}>how much is outstanding for client A</Shortcut>
+                  <Shortcut onClick={() => handleAction('show ageing of outstanding balance for all clients for last month')}>show ageing of outstanding balance for all clients for last month</Shortcut>
                 </Box>
               </Box>
             </Box>
