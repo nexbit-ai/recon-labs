@@ -681,6 +681,7 @@ const MarketplaceReconciliation: React.FC = () => {
         total_gst_on_commission: number;
         total_tds_amount?: number;
         total_tcs_amount?: number;
+        total_platform_fees?: number;
       }> | undefined;
       if (!isPrestigeOrg && commissionArray && commissionArray.length > 0) {
         rows.push(['', '', '']);
@@ -4930,6 +4931,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   total_gst_on_commission: number;
                   total_tds_amount?: number;
                   total_tcs_amount?: number;
+                  total_platform_fees?: number;
                 }> | undefined;
                 if (!commissionArray || commissionArray.length === 0) return null;
 
@@ -5026,6 +5028,9 @@ const MarketplaceReconciliation: React.FC = () => {
                                       <Typography variant="body2">
                                         <strong>Total Commission:</strong> {formatCurrency(Math.abs(providerData[0].originalData.total_commission || 0))}
                                       </Typography>
+                                      <Typography variant="body2">
+                                        <strong>Total Platform Fees:</strong> {formatCurrency(Math.abs(providerData[0].originalData.total_platform_fees || 0))}
+                                      </Typography>
                                     </Box>
                                   }
                                   arrow
@@ -5076,6 +5081,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                       const settled = Math.abs(data.originalData?.total_amount_settled || 0);
                                       const comm = Math.abs(data.originalData?.total_commission || 0);
                                       const gst = Math.abs(data.originalData?.total_gst_on_commission || 0);
+                                      const platformFees = Math.abs(data.originalData?.total_platform_fees || 0);
 
                                       return (
                                         <Box sx={{
@@ -5104,6 +5110,12 @@ const MarketplaceReconciliation: React.FC = () => {
                                               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>GST</Typography>
                                                 <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 600 }}>{formatCurrency(gst)}</Typography>
+                                              </Box>
+                                            )}
+                                            {platformFees > 0 && (
+                                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Typography variant="body2" sx={{ color: '#6b7280', fontWeight: 500 }}>Platform Fees</Typography>
+                                                <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 600 }}>{formatCurrency(platformFees)}</Typography>
                                               </Box>
                                             )}
                                           </Box>
@@ -5193,6 +5205,9 @@ const MarketplaceReconciliation: React.FC = () => {
                                       <Typography variant="body2">
                                         <strong>Total Commission:</strong> {formatCurrency(Math.abs(item.total_commission || 0))}
                                       </Typography>
+                                      <Typography variant="body2">
+                                        <strong>Total Platform Fees:</strong> {formatCurrency(Math.abs(item.total_platform_fees || 0))}
+                                      </Typography>
                                     </Box>
                                   }
                                   arrow
@@ -5233,6 +5248,14 @@ const MarketplaceReconciliation: React.FC = () => {
                                     </Typography>
                                   </Box>
                                 </>
+                              )}
+                              {(item.total_platform_fees || 0) > 0 && (
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                                  <Typography variant="body2" sx={{ color: '#374151' }}>Platform Fees</Typography>
+                                  <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
+                                    {formatCurrency(Math.abs(item.total_platform_fees || 0))}
+                                  </Typography>
+                                </Box>
                               )}
                             </Box>
                           </Grid>

@@ -108,6 +108,7 @@ export interface MainSummaryResponse {
     total_amount_settled: number;
     total_commission: number;
     total_gst_on_commission: number;
+    total_platform_fees?: number;
   }>;
   Reconcile: {
     providers: {
