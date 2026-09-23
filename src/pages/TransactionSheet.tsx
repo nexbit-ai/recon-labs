@@ -6415,8 +6415,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
                                 {column === 'Status' ? 'Status' : 
-                                 (selectedPlatform === 'myntra' && column === 'Order ID' ? 'Order Item ID' : 
-                                 (selectedPlatform === 'myntra' && column === 'Invoice Date' ? 'Order Date' : column))}
+                                 (selectedPlatform === 'myntra' && column === 'Invoice Date' ? 'Order Date' : column)}
                               </Typography>
                               {/* Sorting button - different handlers for Sales Report vs other tabs */}
                               {activeTab === 4 ? (
