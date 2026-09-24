@@ -96,6 +96,7 @@ export interface MainSummaryResponse {
     total_cancellations_amount: number;
     total_cancellations_orders: number;
     total_reconciled_amount: number;
+    total_settled_matched_amount: number;
     total_reconciled_count: number;
     total_unreconciled_amount: number;
     total_unreconciled_count: number;
