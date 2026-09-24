@@ -3640,7 +3640,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                 Matched
                               </Typography>
                               <Typography sx={{ fontSize: '1.5rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1, mb: 0.5 }}>
-                                {formatCurrency((mainSummary as any)?.summary?.total_reconciled_amount || 0, true)}
+                                {formatCurrency((mainSummary as any)?.summary?.total_settled_matched_amount || 0, true)}
                               </Typography>
                               <Box sx={{ display: 'flex', width: '100%', alignItems: 'baseline', justifyContent: 'center' }}>
                                 <Typography sx={{ textAlign: 'right', pr: 0.5, fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.025em', fontVariantNumeric: 'tabular-nums' }}>
