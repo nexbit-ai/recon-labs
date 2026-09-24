@@ -1373,8 +1373,14 @@ const BreakupsModal: React.FC<{
   const myntraCustomerPaidAmount = orderValue?.customer_paid_amount || 0;
   const myntraSellerProductAmount = orderValue?.seller_product_amount || 0;
   const myntraSellerDiscount = orderValue?.seller_discount || 0;
-  const myntraCharges = settlementValue?.charges || 0;
+  const myntraCommission = settlementValue?.commission || 0;
+  const myntraFixedFee = settlementValue?.fixed_fee || 0;
+  const myntraLogisticsFee = settlementValue?.logistics_fee || 0;
+  const myntraPickAndPackFee = settlementValue?.pick_and_pack_fee || 0;
   const myntraTaxes = settlementValue?.taxes_tds_tcs || 0;
+  const myntraExpectedSettled = settlementValue?.expected_settled_amount || 0;
+  const myntraSjitIncentive = settlementValue?.sjit_incentive || 0;
+  const myntraCommissionDiscount = settlementValue?.commission_discount || 0;
   const myntraSettledAmount = settlementValue?.settled_amount || 0;
 
   // Calculate smart positioning similar to TransactionDetailsPopup
@@ -1699,36 +1705,51 @@ const BreakupsModal: React.FC<{
             {/* Settlement Value Section */}
             {platform === 'myntra' ? (
               <>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    p: 1.5,
-                    pl: 3,
-                    background: '#f9fafb',
-                    borderRadius: '6px',
-                    border: '1px solid #e5e7eb',
-                  }}
-                >
-                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#374151', fontSize: '0.75rem' }}>Charges</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.75rem' }}>{formatCurrency(myntraCharges)}</Typography>
+                <Box sx={{ px: 3, py: 1.5, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', mb: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', fontSize: '0.75rem', mb: 1 }}>Other Fees (For Info Only - Not Deducted from Payout)</Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>Fixed Fee</Typography>
+                    <Typography variant="body2" sx={{ color: '#374151', fontSize: '0.75rem' }}>{formatCurrency(myntraFixedFee)}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>Pick & Pack Fee</Typography>
+                    <Typography variant="body2" sx={{ color: '#374151', fontSize: '0.75rem' }}>{formatCurrency(myntraPickAndPackFee)}</Typography>
+                  </Box>
                 </Box>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    p: 1.5,
-                    pl: 3,
-                    background: '#f9fafb',
-                    borderRadius: '6px',
-                    border: '1px solid #e5e7eb',
-                  }}
-                >
-                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#374151', fontSize: '0.75rem' }}>Taxes (TDS, TCS)</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.75rem' }}>{formatCurrency(myntraTaxes)}</Typography>
+
+                <Box sx={{ px: 3, py: 1.5, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', mb: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#166534', fontSize: '0.75rem', mb: 1 }}>Myntra Payout Calculation</Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#15803d', fontSize: '0.75rem' }}>Seller Product Amount</Typography>
+                    <Typography variant="body2" sx={{ color: '#15803d', fontSize: '0.75rem' }}>{formatCurrency(myntraSellerProductAmount)}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#dc2626', fontSize: '0.75rem' }}>- Commission</Typography>
+                    <Typography variant="body2" sx={{ color: '#dc2626', fontSize: '0.75rem' }}>{formatCurrency(Math.abs(myntraCommission))}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#dc2626', fontSize: '0.75rem' }}>- Logistics Cost</Typography>
+                    <Typography variant="body2" sx={{ color: '#dc2626', fontSize: '0.75rem' }}>{formatCurrency(myntraLogisticsFee)}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#dc2626', fontSize: '0.75rem' }}>- Taxes (TDS, TCS)</Typography>
+                    <Typography variant="body2" sx={{ color: '#dc2626', fontSize: '0.75rem' }}>{formatCurrency(myntraTaxes)}</Typography>
+                  </Box>
+                  <Box sx={{ borderTop: '1px solid #bbf7d0', my: 1 }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#166534', fontSize: '0.75rem' }}>= Expected Settled Amount</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#166534', fontSize: '0.75rem' }}>{formatCurrency(myntraExpectedSettled)}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#15803d', fontSize: '0.75rem' }}>+ SJIT Incentive</Typography>
+                    <Typography variant="body2" sx={{ color: '#15803d', fontSize: '0.75rem' }}>{formatCurrency(myntraSjitIncentive)}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#15803d', fontSize: '0.75rem' }}>+ Commission Discount</Typography>
+                    <Typography variant="body2" sx={{ color: '#15803d', fontSize: '0.75rem' }}>{formatCurrency(myntraCommissionDiscount)}</Typography>
+                  </Box>
                 </Box>
+
                 <Box
                   sx={{
                     display: 'flex',
@@ -1740,7 +1761,7 @@ const BreakupsModal: React.FC<{
                     border: '1px solid #fecaca',
                   }}
                 >
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#991b1b', fontSize: '0.875rem' }}>Settled Amount</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#991b1b', fontSize: '0.875rem' }}>Final Settled Amount</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 700, color: '#991b1b', fontSize: '0.875rem' }}>{formatCurrency(myntraSettledAmount)}</Typography>
                 </Box>
               </>

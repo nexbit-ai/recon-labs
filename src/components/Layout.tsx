@@ -135,7 +135,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           if (item.text === 'Accounting') {
              console.log('Layout evaluation for Accounting. Current orgId:', orgId);
           }
-          const isAccountingEnabled = item.text === 'Accounting' && orgId.includes('4381e181-cda5-4c94-8a02-7d3092065949');
+          const isAccountingEnabled = item.text === 'Accounting' && (orgId.includes('4381e181-cda5-4c94-8a02-7d3092065949') || orgId.includes('d9306d0f-40f4-412c-abe2-64c0714fd8a1'));
           const isUpcoming = isAccountingEnabled ? false : item.upcoming;
 
           return (
