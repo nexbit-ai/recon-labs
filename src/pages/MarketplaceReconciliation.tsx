@@ -3824,7 +3824,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             const expectedSalesCount = Number(s?.total_transaction_orders || 0);
 
                             // Matched totals from API response (reconciled)
-                            const matchedAmount = Number(s?.total_reconciled_amount || 0);
+                            const matchedAmount = Number(s?.total_settled_matched_amount || 0);
                             const matchedCount = Number(s?.total_reconciled_count || 0);
                             const settledCount = Number(s?.total_reconciled_count + s?.total_unreconciled_count || 0);
                             const percentSettled = expectedSalesCount === 0 ? 0 : Math.min(100, (settledCount / expectedSalesCount) * 100);
