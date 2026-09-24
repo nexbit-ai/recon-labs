@@ -74,6 +74,7 @@ const vendors: Vendor[] = [
   { id: 'cred', name: 'CRED' },
   { id: 'elastic_logistics', name: 'Elastic Logistics' },
   { id: 'amazon_uk', name: 'Amazon_UK' },
+  { id: 'myntra', name: 'Myntra' },
 ];
 
 const months = [
@@ -85,13 +86,21 @@ const years = [2025, 2026];
 
 const CSV_ONLY_EXTENSIONS = ['.csv'];
 const FLIPKART_EXTENSIONS = ['.csv', '.xlsx', '.xls'];
+const MYNTRA_EXTENSIONS = ['.xlsx', '.xls'];
 
 const isFlipkartVendor = (vendorId?: string | null) => vendorId?.toLowerCase() === 'flipkart';
-const getExtensionsForVendor = (vendorId?: string | null) =>
-  isFlipkartVendor(vendorId) ? FLIPKART_EXTENSIONS : CSV_ONLY_EXTENSIONS;
+const isMyntraVendor = (vendorId?: string | null) => vendorId?.toLowerCase() === 'myntra';
+const getExtensionsForVendor = (vendorId?: string | null) => {
+  if (isFlipkartVendor(vendorId)) return FLIPKART_EXTENSIONS;
+  if (isMyntraVendor(vendorId)) return MYNTRA_EXTENSIONS;
+  return CSV_ONLY_EXTENSIONS;
+};
 const getAcceptForVendor = (vendorId?: string | null) => getExtensionsForVendor(vendorId).join(',');
-const getFormatLabelForVendor = (vendorId?: string | null) =>
-  isFlipkartVendor(vendorId) ? 'CSV/XLSX' : 'CSV only';
+const getFormatLabelForVendor = (vendorId?: string | null) => {
+  if (isFlipkartVendor(vendorId)) return 'CSV/XLSX';
+  if (isMyntraVendor(vendorId)) return 'XLSX only';
+  return 'CSV only';
+};
 
 type ViewType = 'years' | 'marketplace' | 'd2c' | 'logistic';
 
@@ -107,6 +116,8 @@ const UploadDocuments: React.FC = () => {
   const [marketplaceFiles, setMarketplaceFiles] = useState<Record<string, { sales: File | null; sales_b2b?: File | null; settlement: File | null }>>({
     amazon: { sales: null, sales_b2b: null, settlement: null },
     flipkart: { sales: null, settlement: null },
+    amazon_uk: { sales: null, settlement: null },
+    myntra: { sales: null, settlement: null },
   });
   // D2C files (sales and settlement)
   const [d2cFiles, setD2cFiles] = useState<Record<string, { sales: File | null; settlement: File | null }>>({});
@@ -129,7 +140,7 @@ const UploadDocuments: React.FC = () => {
   const [loadingUploads, setLoadingUploads] = useState(false);
   const normalizedReconciliationStatus = useReconciliationStatus(reconciliationStatus);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [rightPanelVendor, setRightPanelVendor] = useState<'amazon' | 'flipkart' | null>(null);
+  const [rightPanelVendor, setRightPanelVendor] = useState<'amazon' | 'flipkart' | 'myntra' | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingUpload, setPendingUpload] = useState<{ vendorId: string; kind: string; noFileYet?: boolean } | null>(null);
   const [pendingFileInputId, setPendingFileInputId] = useState<string | null>(null);
@@ -180,7 +191,7 @@ const UploadDocuments: React.FC = () => {
   const getReportType = (vendorId: string, kind?: 'sales' | 'sales_b2b' | 'settlement'): string => {
     const vendorIdLower = vendorId.toLowerCase();
     // Marketplace vendors use format: {vendorid}_{kind}
-    if (vendorIdLower === 'amazon' || vendorIdLower === 'flipkart' || vendorIdLower === 'amazon_uk') {
+    if (vendorIdLower === 'amazon' || vendorIdLower === 'flipkart' || vendorIdLower === 'amazon_uk' || vendorIdLower === 'myntra') {
       if (kind === 'sales_b2b') {
         return 'amazon_sales_b2b';
       }
@@ -241,7 +252,7 @@ const UploadDocuments: React.FC = () => {
     setHoveredMonth(null);
   };
 
-  const openRightPanel = (vendorId: 'amazon' | 'flipkart') => {
+  const openRightPanel = (vendorId: 'amazon' | 'flipkart' | 'myntra') => {
     setRightPanelVendor(vendorId);
     setRightPanelOpen(true);
   };
@@ -710,8 +721,8 @@ const UploadDocuments: React.FC = () => {
     }
   };
 
-  // Marketplace uploads (Amazon/Flipkart/Amazon UK) with separate Sales and Settlement
-  const setMarketplaceFile = (vendorId: 'amazon' | 'flipkart' | 'amazon_uk', kind: 'sales' | 'sales_b2b' | 'settlement', file: File | null) => {
+  // Marketplace uploads (Amazon/Flipkart/Amazon UK/Myntra) with separate Sales and Settlement
+  const setMarketplaceFile = (vendorId: 'amazon' | 'flipkart' | 'amazon_uk' | 'myntra', kind: 'sales' | 'sales_b2b' | 'settlement', file: File | null) => {
     setMarketplaceFiles((prev) => ({
       ...prev,
       [vendorId]: { ...prev[vendorId], [kind]: file },
@@ -739,7 +750,7 @@ const UploadDocuments: React.FC = () => {
     return true;
   };
 
-  const handleMarketplaceUploadClick = (vendorId: 'amazon' | 'flipkart' | 'amazon_uk', kind: 'sales' | 'sales_b2b' | 'settlement') => {
+  const handleMarketplaceUploadClick = (vendorId: 'amazon' | 'flipkart' | 'amazon_uk' | 'myntra', kind: 'sales' | 'sales_b2b' | 'settlement') => {
     const file = marketplaceFiles[vendorId]?.[kind];
     if (!file || selectedYear === null || selectedMonth === null) return;
 
@@ -787,7 +798,7 @@ const UploadDocuments: React.FC = () => {
     setPendingFileInputId(null);
   };
 
-  const performMarketplaceUpload = async (vendorId: 'amazon' | 'flipkart' | 'amazon_uk', kind: 'sales' | 'sales_b2b' | 'settlement', selectedFile?: File, subPlatform?: string) => {
+  const performMarketplaceUpload = async (vendorId: 'amazon' | 'flipkart' | 'amazon_uk' | 'myntra', kind: 'sales' | 'sales_b2b' | 'settlement', selectedFile?: File, subPlatform?: string) => {
     const file = selectedFile || marketplaceFiles[vendorId]?.[kind];
     if (!file || selectedYear === null || selectedMonth === null) return;
 
@@ -841,7 +852,7 @@ const UploadDocuments: React.FC = () => {
         
         const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
         if (response.status === 400) {
-          const vendorName = vendorId === 'amazon' ? 'Amazon' : vendorId === 'flipkart' ? 'Flipkart' : vendorId;
+          const vendorName = vendorId === 'amazon' ? 'Amazon' : vendorId === 'flipkart' ? 'Flipkart' : vendorId === 'myntra' ? 'Myntra' : vendorId;
           throw new Error(`Please upload the correct ${kind} file for ${vendorName}`);
         }
         throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
@@ -1308,6 +1319,11 @@ const UploadDocuments: React.FC = () => {
   const credSalesStatus = getUploadProcessingStatus(credSalesDoc);
   const credSettlementDoc = getUploadedDocument('cred', 'settlement');
   const credSettlementStatus = getUploadProcessingStatus(credSettlementDoc);
+
+  const myntraSalesDoc = getUploadedDocument('myntra', 'sales');
+  const myntraSalesStatus = getUploadProcessingStatus(myntraSalesDoc);
+  const myntraSettlementDoc = getUploadedDocument('myntra', 'settlement');
+  const myntraSettlementStatus = getUploadProcessingStatus(myntraSettlementDoc);
 
   const unicommerceDoc = getUploadedDocument('unicommerce');
   const unicommerceStatus = getUploadProcessingStatus(unicommerceDoc);
@@ -3463,6 +3479,386 @@ const UploadDocuments: React.FC = () => {
                   </Box>
                 </Paper>
               </Grid>
+
+              {/* Myntra */}
+              <Grid item xs={12}>
+                <Paper elevation={0} sx={{ p: 3, border: '2px solid #e5e7eb', borderRadius: '12px' }}>
+                  <Typography variant="h6" fontWeight={700} color="#111111" mb={4}>
+                    Myntra
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 0,
+                      position: 'relative',
+                      maxWidth: 800,
+                      mx: 'auto',
+                    }}
+                  >
+                    {/* Step 1: B2C Sales File */}
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        flex: '0 0 auto',
+                        width: 220,
+                        p: 2,
+                        border:
+                          myntraSalesStatus === 'processing'
+                            ? '2px solid #16a34a'
+                            : myntraSalesStatus === 'pending'
+                              ? '2px solid #f59e0b'
+                              : '2px solid #e5e7eb',
+                        borderRadius: '12px',
+                        background:
+                          myntraSalesStatus === 'processing'
+                            ? '#f0fdf4'
+                            : myntraSalesStatus === 'pending'
+                              ? '#fffbeb'
+                              : '#ffffff',
+                        position: 'relative',
+                        zIndex: 2,
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                        <Box
+                          sx={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            background:
+                              myntraSalesStatus === 'processing'
+                                ? '#16a34a'
+                                : myntraSalesStatus === 'pending'
+                                  ? '#f59e0b'
+                                  : '#f3f4f6',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: myntraSalesStatus !== 'none' ? 'none' : '2px solid #d1d5db',
+                          }}
+                        >
+                          {myntraSalesStatus === 'processing' ? (
+                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : myntraSalesStatus === 'pending' ? (
+                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
+                          ) : (
+                            <Typography variant="body2" fontWeight={700} color="#6b7280">
+                              1
+                            </Typography>
+                          )}
+                        </Box>
+
+                        <Typography variant="body2" fontWeight={600} color="#111111" textAlign="center">
+                          Sales File (B2C Report)
+                        </Typography>
+
+                        {myntraSalesDoc && myntraSalesStatus !== 'none' && (
+                          <Typography
+                            variant="caption"
+                            color={myntraSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            {myntraSalesDoc.filename} • {myntraSalesStatus === 'processing' ? 'Processed' : 'Pending'}
+                          </Typography>
+                        )}
+
+                        <input
+                          accept={getAcceptForVendor('myntra')}
+                          style={{ display: 'none' }}
+                          id="myntra-sales-upload"
+                          type="file"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0] || null;
+                            if (file) {
+                              if (!validateFileType(file, 'myntra', 'Myntra sales')) {
+                                e.target.value = '';
+                                return;
+                              }
+                              setMarketplaceFile('myntra', 'sales', file);
+                              await performMarketplaceUpload('myntra', 'sales', file);
+                            }
+                            e.target.value = '';
+                          }}
+                          disabled={!!uploadingVendor}
+                        />
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          {myntraSalesDoc && (
+                            <Tooltip title={`Download ${myntraSalesDoc.filename}`}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloadingDocId === myntraSalesDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                disabled={downloadingDocId === myntraSalesDoc.id}
+                                onClick={(e) => handleDownloadDocument(myntraSalesDoc, e)}
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  py: 0.75,
+                                  px: 1.2,
+                                  fontWeight: 600,
+                                  color: '#16a34a',
+                                  borderColor: '#86efac',
+                                  backgroundColor: '#f0fdf4',
+                                  textTransform: 'none',
+                                  '&:hover': {
+                                    backgroundColor: '#dcfce7',
+                                    borderColor: '#16a34a',
+                                  },
+                                }}
+                              >
+                                {downloadingDocId === myntraSalesDoc.id ? '...' : 'Download'}
+                              </Button>
+                            </Tooltip>
+                          )}
+                          <Button
+                            variant={isVendorUploaded('myntra', 'sales') ? 'outlined' : 'contained'}
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!!uploadingVendor || uploadingVendor === 'myntra_sales'}
+                            endIcon={uploadingVendor === 'myntra_sales' ? <CircularProgress size={14} /> : null}
+                            onClick={(e) => {
+                              handleFileInputClick(e, 'myntra-sales-upload', 'myntra', 'sales');
+                            }}
+                            sx={{
+                              minWidth: 80,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              px: 1.2,
+                              textTransform: 'none',
+                            }}
+                          >
+                            {uploadingVendor === 'myntra_sales' ? 'Uploading...' : isVendorUploaded('myntra', 'sales') ? 'Re-upload' : 'Upload'}
+                          </Button>
+                        </Box>
+                        {marketplaceFiles.myntra?.sales && (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            {marketplaceFiles.myntra.sales.name}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Paper>
+
+                    {/* Step Connector Line */}
+                    <Box
+                      sx={{
+                        flex: '1 1 auto',
+                        height: '2px',
+                        minWidth: 40,
+                        maxWidth: 80,
+                        background:
+                          myntraSalesStatus !== 'none'
+                            ? myntraSalesStatus === 'pending'
+                              ? '#f59e0b'
+                              : '#16a34a'
+                            : 'linear-gradient(to right, #d1d5db, #d1d5db)',
+                        position: 'relative',
+                        zIndex: 3,
+                      }}
+                    >
+                      {myntraSalesStatus !== 'none' && (
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            right: -8,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            width: 16,
+                            height: 16,
+                            borderRadius: '50%',
+                            background: myntraSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 4,
+                          }}
+                        >
+                          <ArrowForwardIcon sx={{ fontSize: 12, color: '#ffffff' }} />
+                        </Box>
+                      )}
+                    </Box>
+
+                    {/* Step 2: Settlement File */}
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        flex: '0 0 auto',
+                        width: 220,
+                        p: 2,
+                        border:
+                          myntraSettlementStatus === 'processing'
+                            ? '2px solid #16a34a'
+                            : myntraSettlementStatus === 'pending'
+                              ? '2px solid #f59e0b'
+                              : !isVendorUploaded('myntra', 'sales')
+                                ? '2px dashed #d1d5db'
+                                : '2px solid #e5e7eb',
+                        borderRadius: '12px',
+                        background:
+                          myntraSettlementStatus === 'processing'
+                            ? '#f0fdf4'
+                            : myntraSettlementStatus === 'pending'
+                              ? '#fffbeb'
+                              : !isVendorUploaded('myntra', 'sales')
+                                ? '#f9fafb'
+                                : '#ffffff',
+                        position: 'relative',
+                        zIndex: 2,
+                        opacity: isVendorUploaded('myntra', 'sales') ? 1 : 0.6,
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                        <Box
+                          sx={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            background:
+                              myntraSettlementStatus === 'processing'
+                                ? '#16a34a'
+                                : myntraSettlementStatus === 'pending'
+                                  ? '#f59e0b'
+                                  : '#f3f4f6',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border:
+                              myntraSettlementStatus !== 'none'
+                                ? 'none'
+                                : !isVendorUploaded('myntra', 'sales')
+                                  ? '2px dashed #d1d5db'
+                                  : '2px solid #d1d5db',
+                            position: 'relative',
+                          }}
+                        >
+                          {myntraSettlementStatus === 'processing' ? (
+                            <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
+                          ) : myntraSettlementStatus === 'pending' ? (
+                            <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
+                          ) : !isVendorUploaded('myntra', 'sales') ? (
+                            <LockIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
+                          ) : (
+                            <Typography variant="body2" fontWeight={700} color="#6b7280">
+                              2
+                            </Typography>
+                          )}
+                        </Box>
+
+                        <Typography
+                          variant="body2"
+                          fontWeight={600}
+                          color={isVendorUploaded('myntra', 'sales') ? '#111111' : '#9ca3af'}
+                          textAlign="center"
+                        >
+                          Settlement File
+                        </Typography>
+
+                        {myntraSettlementDoc && myntraSettlementStatus !== 'none' && (
+                          <Typography
+                            variant="caption"
+                            color={myntraSettlementStatus === 'processing' ? '#16a34a' : '#b45309'}
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            {myntraSettlementDoc.filename} • {myntraSettlementStatus === 'processing' ? 'Processed' : 'Pending'}
+                          </Typography>
+                        )}
+
+                        <input
+                          accept={getAcceptForVendor('myntra')}
+                          style={{ display: 'none' }}
+                          id="myntra-settlement-upload"
+                          type="file"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0] || null;
+                            if (file) {
+                              if (!validateFileType(file, 'myntra', 'Myntra settlement')) {
+                                e.target.value = '';
+                                return;
+                              }
+                              setMarketplaceFile('myntra', 'settlement', file);
+                              await performMarketplaceUpload('myntra', 'settlement', file);
+                            }
+                            e.target.value = '';
+                          }}
+                          disabled={!!uploadingVendor || !isVendorUploaded('myntra', 'sales')}
+                        />
+                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          {myntraSettlementDoc && (
+                            <Tooltip title={`Download ${myntraSettlementDoc.filename}`}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={downloadingDocId === myntraSettlementDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                disabled={downloadingDocId === myntraSettlementDoc.id}
+                                onClick={(e) => handleDownloadDocument(myntraSettlementDoc, e)}
+                                sx={{
+                                  fontSize: '0.75rem',
+                                  py: 0.75,
+                                  px: 1.2,
+                                  fontWeight: 600,
+                                  color: '#16a34a',
+                                  borderColor: '#86efac',
+                                  backgroundColor: '#f0fdf4',
+                                  textTransform: 'none',
+                                  '&:hover': {
+                                    backgroundColor: '#dcfce7',
+                                    borderColor: '#16a34a',
+                                  },
+                                }}
+                              >
+                                {downloadingDocId === myntraSettlementDoc.id ? '...' : 'Download'}
+                              </Button>
+                            </Tooltip>
+                          )}
+                          <Button
+                            variant={isVendorUploaded('myntra', 'settlement') ? 'outlined' : 'contained'}
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            disabled={!isVendorUploaded('myntra', 'sales') || !!uploadingVendor || uploadingVendor === 'myntra_settlement'}
+                            endIcon={uploadingVendor === 'myntra_settlement' ? <CircularProgress size={14} /> : null}
+                            onClick={(e) => {
+                              if (!isVendorUploaded('myntra', 'sales')) return;
+                              handleFileInputClick(e, 'myntra-settlement-upload', 'myntra', 'settlement');
+                            }}
+                            sx={{
+                              minWidth: 80,
+                              fontSize: '0.75rem',
+                              py: 0.75,
+                              px: 1.2,
+                              textTransform: 'none',
+                              ...(!isVendorUploaded('myntra', 'sales') && {
+                                background: '#f3f4f6',
+                                color: '#9ca3af',
+                                cursor: 'not-allowed',
+                                border: 'none',
+                                '&:hover': {
+                                  background: '#f3f4f6',
+                                },
+                              }),
+                            }}
+                          >
+                            {uploadingVendor === 'myntra_settlement' ? 'Uploading...' : isVendorUploaded('myntra', 'settlement') ? 'Re-upload' : 'Upload'}
+                          </Button>
+                        </Box>
+                        {marketplaceFiles.myntra?.settlement && (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
+                          >
+                            {marketplaceFiles.myntra.settlement.name}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Paper>
+                  </Box>
+                </Paper>
+              </Grid>
             </Grid>
           </Paper>
         )}
@@ -4658,7 +5054,7 @@ const UploadDocuments: React.FC = () => {
       <Drawer anchor="right" open={rightPanelOpen} onClose={closeRightPanel} PaperProps={{ sx: { width: { xs: '100%', sm: 480 } } }}>
         <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>
-            {rightPanelVendor ? (rightPanelVendor === 'amazon' ? 'Amazon' : 'Flipkart') : 'Marketplace'} uploads
+            {rightPanelVendor ? (rightPanelVendor === 'amazon' ? 'Amazon' : rightPanelVendor === 'myntra' ? 'Myntra' : 'Flipkart') : 'Marketplace'} uploads
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {selectedYear !== null && selectedMonth !== null ? `${months[selectedMonth]} ${selectedYear}` : 'Select a month and year'}

@@ -130,12 +130,20 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         />
       </Toolbar>
       <List sx={{ flex: 1 }}>
-        {menuItems.map((item) => (
+        {menuItems.map((item) => {
+          const orgId = session?.organization_id || tokenManager.getOrgId() || localStorage.getItem('organization_id') || '';
+          if (item.text === 'Accounting') {
+             console.log('Layout evaluation for Accounting. Current orgId:', orgId);
+          }
+          const isAccountingEnabled = item.text === 'Accounting' && (orgId.includes('4381e181-cda5-4c94-8a02-7d3092065949') || orgId.includes('d9306d0f-40f4-412c-abe2-64c0714fd8a1'));
+          const isUpcoming = isAccountingEnabled ? false : item.upcoming;
+
+          return (
           <ListItem key={item.text} disablePadding>
             <ListItemButton
               onClick={() => {
                 // Prevent navigation for upcoming features
-                if (item.upcoming) {
+                if (isUpcoming) {
                   return;
                 }
                 // Navigate without forcing platforms from localStorage
@@ -145,14 +153,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   navigate(item.path);
                 }
               }}
-              selected={location.pathname === item.path && !item.upcoming}
-              disabled={item.upcoming}
+              selected={location.pathname === item.path && !isUpcoming}
+              disabled={isUpcoming}
               sx={{
                 borderRadius: 0,
                 mr: 1.5,
                 my: 0.25,
-                opacity: item.upcoming ? 0.5 : 1,
-                cursor: item.upcoming ? 'not-allowed' : 'pointer',
+                opacity: isUpcoming ? 0.5 : 1,
+                cursor: isUpcoming ? 'not-allowed' : 'pointer',
                 '&.Mui-disabled': {
                   opacity: 0.5,
                   cursor: 'not-allowed',
@@ -164,13 +172,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   },
                 },
                 '&:hover': {
-                  backgroundColor: item.upcoming ? 'transparent' : undefined,
+                  backgroundColor: isUpcoming ? 'transparent' : undefined,
                 },
               }}
             >
               <ListItemIcon
                 sx={{
-                  color: item.upcoming 
+                  color: isUpcoming 
                     ? 'text.disabled' 
                     : location.pathname === item.path 
                       ? theme.palette.primary.main 
@@ -186,7 +194,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <ListItemText
                 primary={item.text}
                 sx={{
-                  color: item.upcoming 
+                  color: isUpcoming 
                     ? 'text.disabled' 
                     : location.pathname === item.path 
                       ? theme.palette.primary.main 
@@ -195,7 +203,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               />
             </ListItemButton>
           </ListItem>
-        ))}
+        )})}
       </List>
       <Box sx={{ mb: 2 }}>
         {/* Integrations nav button */}

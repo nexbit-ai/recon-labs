@@ -1319,7 +1319,8 @@ const BreakupsModal: React.FC<{
   orderId: string;
   anchorEl: HTMLElement | null;
   formatCurrency: (amount: number) => string;
-}> = ({ open, onClose, breakups, orderId, anchorEl, formatCurrency }) => {
+  platform?: string;
+}> = ({ open, onClose, breakups, orderId, anchorEl, formatCurrency, platform }) => {
   if (!open || !breakups || !anchorEl) return null;
 
   // Extract metadata from the row (check both originalData.metadata and metadata)
@@ -1366,6 +1367,21 @@ const BreakupsModal: React.FC<{
       label: formatKey(key),
       value: value
     }));
+
+  // Myntra specific fields extraction
+  const myntraMrp = orderValue?.mrp || 0;
+  const myntraCustomerPaidAmount = orderValue?.customer_paid_amount || 0;
+  const myntraSellerProductAmount = orderValue?.seller_product_amount || 0;
+  const myntraSellerDiscount = orderValue?.seller_discount || 0;
+  const myntraCommission = settlementValue?.commission || 0;
+  const myntraFixedFee = settlementValue?.fixed_fee || 0;
+  const myntraLogisticsFee = settlementValue?.logistics_fee || 0;
+  const myntraPickAndPackFee = settlementValue?.pick_and_pack_fee || 0;
+  const myntraTaxes = settlementValue?.taxes_tds_tcs || 0;
+  const myntraExpectedSettled = settlementValue?.expected_settled_amount || 0;
+  const myntraSjitIncentive = settlementValue?.sjit_incentive || 0;
+  const myntraCommissionDiscount = settlementValue?.commission_discount || 0;
+  const myntraSettledAmount = settlementValue?.settled_amount || 0;
 
   // Calculate smart positioning similar to TransactionDetailsPopup
   const getPopupPosition = () => {
@@ -1544,7 +1560,71 @@ const BreakupsModal: React.FC<{
         {/* Content */}
         <Box sx={{ p: 2, maxHeight: position.maxHeight ? `${position.maxHeight - 80}px` : '300px', overflowY: 'auto' }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {/* Order Value Section */}
+            {platform === 'myntra' ? (
+              <>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    p: 1.5,
+                    pl: 3,
+                    background: '#f9fafb',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#374151', fontSize: '0.75rem' }}>MRP</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.75rem' }}>{formatCurrency(myntraMrp)}</Typography>
+                </Box>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    p: 1.5,
+                    pl: 3,
+                    background: '#f9fafb',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#374151', fontSize: '0.75rem' }}>Customer Paid Amount</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.75rem' }}>{formatCurrency(myntraCustomerPaidAmount)}</Typography>
+                </Box>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    p: 1.5,
+                    pl: 3,
+                    background: '#f9fafb',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#374151', fontSize: '0.75rem' }}>Seller Product Amount</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.75rem' }}>{formatCurrency(myntraSellerProductAmount)}</Typography>
+                </Box>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    p: 1.5,
+                    pl: 3,
+                    background: '#f9fafb',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 500, color: '#374151', fontSize: '0.75rem' }}>Seller Discount (including all coupons)</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#111827', fontSize: '0.75rem' }}>{formatCurrency(myntraSellerDiscount)}</Typography>
+                </Box>
+              </>
+            ) : (
+              <>
             {/* Buyer Invoice Amount - shown first */}
             <Box
               sx={{
@@ -1616,11 +1696,77 @@ const BreakupsModal: React.FC<{
                 </Typography>
               </Box>
             ))}
+            </>
+            )}
 
             {/* Divider */}
             <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
 
             {/* Settlement Value Section */}
+            {platform === 'myntra' ? (
+              <>
+                <Box sx={{ px: 3, py: 1.5, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', mb: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', fontSize: '0.75rem', mb: 1 }}>Other Fees (For Info Only - Not Deducted from Payout)</Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>Fixed Fee</Typography>
+                    <Typography variant="body2" sx={{ color: '#374151', fontSize: '0.75rem' }}>{formatCurrency(myntraFixedFee)}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>Pick & Pack Fee</Typography>
+                    <Typography variant="body2" sx={{ color: '#374151', fontSize: '0.75rem' }}>{formatCurrency(myntraPickAndPackFee)}</Typography>
+                  </Box>
+                </Box>
+
+                <Box sx={{ px: 3, py: 1.5, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', mb: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#166534', fontSize: '0.75rem', mb: 1 }}>Myntra Payout Calculation</Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#15803d', fontSize: '0.75rem' }}>Seller Product Amount</Typography>
+                    <Typography variant="body2" sx={{ color: '#15803d', fontSize: '0.75rem' }}>{formatCurrency(myntraSellerProductAmount)}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#dc2626', fontSize: '0.75rem' }}>- Commission</Typography>
+                    <Typography variant="body2" sx={{ color: '#dc2626', fontSize: '0.75rem' }}>{formatCurrency(Math.abs(myntraCommission))}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#dc2626', fontSize: '0.75rem' }}>- Logistics Cost</Typography>
+                    <Typography variant="body2" sx={{ color: '#dc2626', fontSize: '0.75rem' }}>{formatCurrency(myntraLogisticsFee)}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#dc2626', fontSize: '0.75rem' }}>- Taxes (TDS, TCS)</Typography>
+                    <Typography variant="body2" sx={{ color: '#dc2626', fontSize: '0.75rem' }}>{formatCurrency(myntraTaxes)}</Typography>
+                  </Box>
+                  <Box sx={{ borderTop: '1px solid #bbf7d0', my: 1 }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#166534', fontSize: '0.75rem' }}>= Expected Settled Amount</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#166534', fontSize: '0.75rem' }}>{formatCurrency(myntraExpectedSettled)}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#15803d', fontSize: '0.75rem' }}>+ SJIT Incentive</Typography>
+                    <Typography variant="body2" sx={{ color: '#15803d', fontSize: '0.75rem' }}>{formatCurrency(myntraSjitIncentive)}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: '#15803d', fontSize: '0.75rem' }}>+ Commission Discount</Typography>
+                    <Typography variant="body2" sx={{ color: '#15803d', fontSize: '0.75rem' }}>{formatCurrency(myntraCommissionDiscount)}</Typography>
+                  </Box>
+                </Box>
+
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    p: 1.5,
+                    background: '#fef2f2',
+                    borderRadius: '6px',
+                    border: '1px solid #fecaca',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#991b1b', fontSize: '0.875rem' }}>Final Settled Amount</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#991b1b', fontSize: '0.875rem' }}>{formatCurrency(myntraSettledAmount)}</Typography>
+                </Box>
+              </>
+            ) : (
+              <>
             {/* Settlement Amount - shown first */}
             <Box
               sx={{
@@ -1692,6 +1838,8 @@ const BreakupsModal: React.FC<{
                 </Typography>
               </Box>
             ))}
+            </>
+            )}
 
             {/* Divider */}
             <Box sx={{ borderTop: '2px solid #e5e7eb', my: 1 }} />
@@ -1783,7 +1931,7 @@ interface TransactionSheetProps {
   statsData?: MarketplaceReconciliationResponse | null;
   initialTab?: number;
   dateRange?: { start: string; end: string };
-  initialPlatforms?: ('flipkart' | 'd2c' | 'amazon' | 'other' | 'amazon_uk')[];
+  initialPlatforms?: ('flipkart' | 'd2c' | 'amazon' | 'myntra' | 'other' | 'amazon_uk')[];
   initialFilters?: { [key: string]: any };
 }
 
@@ -1791,7 +1939,7 @@ interface TransactionSheetProps {
 const COLUMN_TO_API_PARAM_MAP: Record<string, {
   apiParam: string;
   type: 'string' | 'number' | 'date' | 'enum';
-  supportedPlatforms?: ('flipkart' | 'amazon' | 'd2c' | 'all' | 'amazon_uk')[];
+  supportedPlatforms?: ('flipkart' | 'amazon' | 'myntra' | 'd2c' | 'all' | 'amazon_uk')[];
   usesInSuffix?: boolean; // For CSV filters like status_in
 }> = {
   // Common filters (both platforms)
@@ -1799,6 +1947,7 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   'Status': { apiParam: 'status_in', type: 'enum', usesInSuffix: true },
   'Event Type': { apiParam: 'event_type', type: 'enum' },
   'Invoice Date': { apiParam: 'invoice_date', type: 'date' }, // → invoice_date_from/to
+  'Order Date': { apiParam: 'order_date', type: 'date', supportedPlatforms: ['myntra'] }, // → order_date_from/to
   'Settlement Date': { apiParam: 'settlement_date', type: 'date' },
   'Order Value': { apiParam: 'order_value', type: 'number' },
   'Settlement Value': { apiParam: 'settlement_value', type: 'number' },
@@ -1886,7 +2035,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const [headerDateRange, setHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   const [pendingHeaderDateRange, setPendingHeaderDateRange] = useState<{ start: string, end: string }>({ start: '', end: '' });
   // Platform filter state - single selection only
-  const availablePlatforms = ['flipkart', 'amazon', 'amazon_uk', 'd2c'] as const;
+  const availablePlatforms = ['flipkart', 'amazon', 'myntra', 'amazon_uk', 'd2c'] as const;
   type Platform = typeof availablePlatforms[number];
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] as Platform : 'flipkart'); // Default: flipkart only
   const [pendingSelectedPlatform, setPendingSelectedPlatform] = useState<Platform>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms[0] as Platform : 'flipkart'); // Pending platform before apply
@@ -2346,6 +2495,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
     // Always add breakup fields for filtering (regardless of API type)
     meta['Event Type'] = { type: 'enum' };
     meta['Settlement Provider'] = { type: 'enum' };
+
+    // Explicitly add Order Date filter for Myntra
+    meta['Order Date'] = { type: 'date' };
 
     // Debug logging removed
 
@@ -4666,7 +4818,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
   const formattedPlatformLabel = selectedPlatform
     ? (selectedPlatform === 'd2c'
       ? 'D2C'
-      : `${selectedPlatform.charAt(0).toUpperCase()}${selectedPlatform.slice(1)}`)
+      : selectedPlatform === 'amazon_uk'
+        ? 'Amazon UK'
+        : `${selectedPlatform.charAt(0).toUpperCase()}${selectedPlatform.slice(1)}`)
     : 'Platform';
 
   const formatExportRequestTimestamp = () => {
@@ -4953,9 +5107,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                   ? 'Flipkart'
                                   : platform === 'amazon'
                                     ? 'Amazon'
-                                    : platform === 'amazon_uk'
-                                      ? 'Amazon UK'
-                                      : 'D2C'}
+                                    : platform === 'myntra'
+                                      ? 'Myntra'
+                                      : platform === 'amazon_uk'
+                                        ? 'Amazon UK'
+                                        : 'D2C'}
                               </Typography>
                             </Box>
                           ))}
@@ -6279,7 +6435,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                             {/* Column Header */}
                             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                               <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
-                                {column === 'Status' ? 'Status' : column}
+                                {column === 'Status' ? 'Status' : 
+                                 (selectedPlatform === 'myntra' && column === 'Invoice Date' ? 'Order Date' : column)}
                               </Typography>
                               {/* Sorting button - different handlers for Sales Report vs other tabs */}
                               {activeTab === 4 ? (
@@ -7052,6 +7209,7 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
           orderId={breakupsOrderId}
           anchorEl={breakupsAnchorEl}
           formatCurrency={formatCurrency}
+          platform={selectedPlatform}
         />
 
         {/* Export Drawer */}

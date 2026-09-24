@@ -352,11 +352,11 @@ const OperationsCentrePage: React.FC = () => {
   const hasFetchedOnInitialRef = useRef(false);
 
   // Initialize platform from URL or localStorage - single platform only
-  const getInitialPlatform = (): 'flipkart' | 'amazon' | 'amazon_uk' | 'd2c' => {
+  const getInitialPlatform = (): 'flipkart' | 'amazon' | 'amazon_uk' | 'myntra' | 'd2c' => {
     const params = new URLSearchParams(window.location.search);
     const platformsParam = params.get('platforms');
     if (platformsParam) {
-      const platforms = platformsParam.split(',').filter(p => ['flipkart', 'amazon', 'amazon_uk', 'd2c'].includes(p)) as Array<'flipkart' | 'amazon' | 'amazon_uk' | 'd2c'>;
+      const platforms = platformsParam.split(',').filter(p => ['flipkart', 'amazon', 'amazon_uk', 'myntra', 'd2c'].includes(p)) as Array<'flipkart' | 'amazon' | 'amazon_uk' | 'myntra' | 'd2c'>;
       if (platforms.length > 0) {
         // Return only the first platform for single-select
         return platforms[0];
@@ -374,7 +374,7 @@ const OperationsCentrePage: React.FC = () => {
 
   // Platform selector state for dropdown (single-select) - initialize from URL params
   const [platformMenuAnchorEl, setPlatformMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedPlatform, setSelectedPlatform] = useState<'flipkart' | 'amazon' | 'amazon_uk' | 'd2c'>(getInitialPlatform());
+  const [selectedPlatform, setSelectedPlatform] = useState<'flipkart' | 'amazon' | 'amazon_uk' | 'myntra' | 'd2c'>(getInitialPlatform());
 
   // Override default platform for 'prestige' organization
   useEffect(() => {
@@ -394,7 +394,7 @@ const OperationsCentrePage: React.FC = () => {
     // Also update platform from URL params if present (use first if multiple)
     const platformsParam = params.get('platforms');
     if (platformsParam) {
-      const platforms = platformsParam.split(',').filter(p => ['flipkart', 'amazon', 'amazon_uk', 'd2c'].includes(p)) as Array<'flipkart' | 'amazon' | 'amazon_uk' | 'd2c'>;
+      const platforms = platformsParam.split(',').filter(p => ['flipkart', 'amazon', 'amazon_uk', 'myntra', 'd2c'].includes(p)) as Array<'flipkart' | 'amazon' | 'amazon_uk' | 'myntra' | 'd2c'>;
       if (platforms.length > 0) {
         setSelectedPlatform(platforms[0]); // Use first platform only
       }
@@ -585,7 +585,7 @@ const OperationsCentrePage: React.FC = () => {
   const COLUMN_TO_API_PARAM_MAP: Record<string, {
     apiParam: string;
     type: 'string' | 'number' | 'date' | 'enum';
-    supportedPlatforms?: ('flipkart' | 'amazon' | 'amazon_uk' | 'd2c' | 'all')[];
+    supportedPlatforms?: ('flipkart' | 'amazon' | 'amazon_uk' | 'myntra' | 'd2c' | 'all')[];
     usesInSuffix?: boolean; // For CSV filters like status_in
   }> = {
     // Common filters (both platforms)
@@ -2687,18 +2687,18 @@ const OperationsCentrePage: React.FC = () => {
 
             {/* Platform Selector */}
             <Button variant="outlined" endIcon={<KeyboardArrowDownIcon />} startIcon={<StorefrontIcon />} onClick={(e) => setPlatformMenuAnchorEl(e.currentTarget)} sx={{ borderColor: '#6B7280', color: '#6B7280', textTransform: 'none', minWidth: 'auto', minHeight: 36, px: 1.5, fontSize: '0.7875rem', '&:hover': { borderColor: '#4B5563', backgroundColor: 'rgba(107,114,128,0.04)' } }}>
-              {selectedPlatform === 'flipkart' ? 'Flipkart' : selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : 'D2C'}
+              {selectedPlatform === 'flipkart' ? 'Flipkart' : selectedPlatform === 'amazon' ? 'Amazon' : selectedPlatform === 'amazon_uk' ? 'Amazon UK' : selectedPlatform === 'myntra' ? 'Myntra' : 'D2C'}
             </Button>
             <Menu anchorEl={platformMenuAnchorEl} open={Boolean(platformMenuAnchorEl)} onClose={() => setPlatformMenuAnchorEl(null)} PaperProps={{ sx: { mt: 1, minWidth: 220, borderRadius: '10px', border: '1px solid #e5e7eb', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)', p: 0.75, backgroundColor: '#ffffff' } }}>
               <Box sx={{ p: 1, minWidth: 240 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827', mb: 1 }}>Select Platform</Typography>
                 <RadioGroup value={selectedPlatform} onChange={(e) => { setSelectedPlatform(e.target.value as any); setPlatformMenuAnchorEl(null); }}>
-                  {(['flipkart', 'amazon', 'amazon_uk'] as const).map((p) => (
+                  {(['flipkart', 'amazon', 'amazon_uk', 'myntra'] as const).map((p) => (
                     <MenuItem key={p} onClick={() => { setSelectedPlatform(p); setPlatformMenuAnchorEl(null); }} sx={{ py: 1, px: 1, borderRadius: '8px' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Radio size="small" checked={selectedPlatform === p} value={p} />
                         <Box>
-                          <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p === 'flipkart' ? 'Flipkart' : p === 'amazon' ? 'Amazon' : p === 'amazon_uk' ? 'Amazon UK' : 'D2C'}</Typography>
+                          <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{p === 'flipkart' ? 'Flipkart' : p === 'amazon' ? 'Amazon' : p === 'amazon_uk' ? 'Amazon UK' : p === 'myntra' ? 'Myntra' : 'D2C'}</Typography>
                           <Typography variant="caption" sx={{ color: '#6b7280' }}>E-commerce marketplace</Typography>
                         </Box>
                       </Box>
@@ -3999,7 +3999,7 @@ const OperationsCentrePage: React.FC = () => {
           dateRange={{ start: customStartDate, end: customEndDate }}
           initialPlatforms={
             selectedPlatform &&
-            (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'd2c')
+            (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'myntra' || selectedPlatform === 'd2c')
               ? [selectedPlatform]
               : undefined
           }
