@@ -3837,7 +3837,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             const gatewaysCount = sumCount(gateways);
                             const codAmount = sumAmount(cod);
                             const codCount = sumCount(cod);
-                            const settledAmount = matchedAmount;
+                            const settledAmount = Number(s?.total_settled_amount || 0);
                             // const settledCount = matchedCount;
 
                             // Providers list using raw Reconcile values
