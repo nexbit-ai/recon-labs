@@ -53,7 +53,11 @@ const AdminAnalytics = () => {
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [reportTypes, setReportTypes] = useState<string[]>([]);
 
-  const ALLOWED_ORG_ID = '7e708346-5f0d-4112-8b69-78cdab6cc1cc';
+  const ALLOWED_ORG_IDS = [
+    '7e708346-5f0d-4112-8b69-78cdab6cc1cc', // Production Admin
+    'd7c63d13-9c2c-4357-b9e4-9706c9a106ca', // Local Admin
+    '4b17527a-8a53-4c76-a18e-c31acb3fa421'  // Schrute Farm Default
+  ];
 
   useEffect(() => {
     fetchData();
@@ -126,7 +130,7 @@ const AdminAnalytics = () => {
   };
 
   // Authorization check
-  if (!organizationId || !organizationId.includes(ALLOWED_ORG_ID)) {
+  if (!organizationId || !ALLOWED_ORG_IDS.some(id => organizationId.includes(id))) {
     return (
       <Box sx={{ p: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
         <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 4, maxWidth: 500 }}>
