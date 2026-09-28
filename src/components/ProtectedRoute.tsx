@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { Box, CircularProgress, Typography } from '@mui/material';
+import { Box, LinearProgress, Typography } from '@mui/material';
 import { useStytchMemberSession } from '@stytch/react/b2b';
 import { useOrganization } from '../hooks/useOrganization';
 
@@ -18,20 +18,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   // Show loading spinner while checking authentication
   if (!isInitialized) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '100vh',
-          gap: 2,
-        }}
-      >
-        <CircularProgress size={40} />
-        <Typography variant="body2" color="text.secondary">
-          Loading...
-        </Typography>
+      <Box sx={{ width: '100%', position: 'fixed', top: 0, zIndex: 9999 }}>
+        <LinearProgress />
       </Box>
     );
   }

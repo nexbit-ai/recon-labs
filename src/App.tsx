@@ -32,6 +32,7 @@ import Integrations from './pages/Integrations';
 import ShopifyCallback from './pages/ShopifyCallback';
 import AmazonCallback from './pages/AmazonCallback';
 import FlipkartCallback from './pages/FlipkartCallback';
+import AdminAnalytics from './pages/AdminAnalytics';
 
 // Components
 import Layout from './components/Layout';
@@ -398,6 +399,11 @@ function App() {
             <Route path="/authenticate" element={<Authenticate />} />
             
             {/* Main application routes with Layout and Protection */}
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <AdminAnalytics />
+              </ProtectedRoute>
+            } />
             <Route path="/" element={
               <ProtectedRoute>
                 <Layout><MarketplaceReconciliation /></Layout>

@@ -36,6 +36,16 @@ export const authAPI = {
     apiService.post<{ tokens: any }>(API_CONFIG.ENDPOINTS.REFRESH, { refreshToken }),
 };
 
+// Admin API
+export const adminAPI = {
+  getMetrics: (reportType: string, orgId: string) =>
+    apiService.get<any>('/admin/metrics', { report_type: reportType, org_id: orgId }),
+  getOrganizations: () =>
+    apiService.get<any[]>('/admin/organizations'),
+  getReportTypes: (orgId: string) =>
+    apiService.get<string[]>('/admin/report-types', { org_id: orgId }),
+};
+
 // User API
 export const userAPI = {
   getProfile: () =>
