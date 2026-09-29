@@ -61,6 +61,8 @@ const getIngestionTable = (reportType: string): string => {
     paytm: 'd2c_paytm_collections',
     payu: 'd2c_payu_collections',
     'pay u': 'd2c_payu_collections',
+    gokwik: 'd2c_gokwik_collections',
+    'go kwik': 'd2c_gokwik_collections',
     cashfree: 'd2c_cashfree_payments',
     cashfree_payments: 'd2c_cashfree_payments',
     'zippee-loginext': 'd2c_zippee_loginext_payments',

@@ -59,6 +59,7 @@ const vendors: Vendor[] = [
   { id: 'dtdc', name: 'DTDC' },
   { id: 'paytm', name: 'Paytm' },
   { id: 'payu', name: 'PayU' },
+  { id: 'gokwik', name: 'GoKwik' },
   // D2C logistics partner - uses report_type "amazon_logistics"
   { id: 'amazon_logistics', name: 'Amazon Logistics' },
   // D2C payment gateway partner - uses report_type "cashfree"

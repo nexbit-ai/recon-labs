@@ -130,6 +130,7 @@ const PROVIDER_AGEING_DATA: ProviderAgeing[] = [
   { provider: 'Paytm', type: 'Payment Gateway', averageDaysToSettle: 2.0, distribution: { '<=1d': 40, '2-3d': 42, '4-7d': 12, '8-14d': 4, '15-30d': 2, '>30d': 0 } },
   { provider: 'Razorpay', type: 'Payment Gateway', averageDaysToSettle: 1.8, distribution: { '<=1d': 48, '2-3d': 40, '4-7d': 9, '8-14d': 2, '15-30d': 1, '>30d': 0 } },
   { provider: 'Cashfree', type: 'Payment Gateway', averageDaysToSettle: 2.5, distribution: { '<=1d': 32, '2-3d': 46, '4-7d': 17, '8-14d': 4, '15-30d': 1, '>30d': 0 } },
+  { provider: 'GoKwik', type: 'Payment Gateway', averageDaysToSettle: 2.0, distribution: { '<=1d': 40, '2-3d': 42, '4-7d': 14, '8-14d': 3, '15-30d': 1, '>30d': 0 } },
 ];
 
 // Helper function to map provider code to display name
@@ -142,6 +143,7 @@ const getProviderDisplayName = (code: string): string => {
     'paytm': 'Paytm',
     'payu': 'PayU',
     'cashfree': 'Cashfree',
+    'gokwik': 'GoKwik',
     'shadowfax': 'Shadowfax',
     'shiprocket': 'Shiprocket',
     'zippee-loginext': 'Zippee',
@@ -983,6 +985,7 @@ const MarketplaceReconciliation: React.FC = () => {
     paytm: 'Paytm',
     payu: 'PayU',
     cashfree: 'Cashfree',
+    gokwik: 'GoKwik',
     flipkart: 'Flipkart',
     myntra: 'Myntra',
     grow_simple: 'Grow Simple',
@@ -1021,12 +1024,13 @@ const MarketplaceReconciliation: React.FC = () => {
     pushOne(providers.paytm);
     pushOne(providers.payU);
     pushOne(providers.cashfree);
+    pushOne(providers.gokwik);
     pushOne(providers.flipkart);
     pushOne(providers.myntra);
     if (Array.isArray(providers.cod)) providers.cod.forEach(pushOne);
     // Any other dynamic providers
     Object.keys(providers).forEach((k) => {
-      if (k === 'paytm' || k === 'payU' || k === 'cashfree' || k === 'flipkart' || k === 'myntra' || k === 'cod') return;
+      if (k === 'paytm' || k === 'payU' || k === 'cashfree' || k === 'gokwik' || k === 'flipkart' || k === 'myntra' || k === 'cod') return;
       const val = providers[k];
       if (Array.isArray(val)) val.forEach(pushOne); else pushOne(val);
     });
@@ -4197,6 +4201,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               paytm: '#1e40af',
                               payu: '#2563eb',
                               cashfree: '#10b981',
+                              gokwik: '#8b5cf6',
                               razorpay: '#0ea5e9',
                               stripe: '#38bdf8',
                               grow_simple: '#0ea5e9',
@@ -4971,6 +4976,7 @@ const MarketplaceReconciliation: React.FC = () => {
                   'paytm': palette2[0],
                   'payu': palette2[1],
                   'cashfree': palette2[2],
+                  'gokwik': palette2[0],
                   'flipkart': palette2[3],
                   'amazon': palette2[3],
                   'myntra': palette2[4],
