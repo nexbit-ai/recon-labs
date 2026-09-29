@@ -23,7 +23,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Divider
+  Divider,
+  Alert
 } from '@mui/material';
 import { motion } from 'framer-motion';
 import {
@@ -41,6 +42,77 @@ import {
 import { useOrganization } from '../hooks/useOrganization';
 
 import { adminAPI } from '../services/api/endpoints';
+
+const getIngestionTable = (reportType: string): string => {
+  const rt = (reportType || '').toLowerCase().trim();
+  const tableMap: Record<string, string> = {
+    unicommerce: 'd2c_bigcommerce_collections',
+    growsimplee: 'd2c_grow_simple_collections',
+    grow_simple: 'd2c_grow_simple_collections',
+    blitz: 'd2c_grow_simple_collections',
+    blitznow: 'd2c_grow_simple_collections',
+    bluedart: 'd2c_bluedart_collections',
+    delhivery: 'd2c_delhivery_collections',
+    ecomexpress: 'd2c_ecom_express_collections',
+    ecom_express: 'd2c_ecom_express_collections',
+    shadowfax: 'd2c_shadowfax_collections',
+    dtdc: 'd2c_dtdc_collections',
+    shiprocket: 'd2c_shiprocket_collections',
+    paytm: 'd2c_paytm_collections',
+    payu: 'd2c_payu_collections',
+    'pay u': 'd2c_payu_collections',
+    cashfree: 'd2c_cashfree_payments',
+    cashfree_payments: 'd2c_cashfree_payments',
+    'zippee-loginext': 'd2c_zippee_loginext_payments',
+    'zippee-blaze': 'd2c_zippee_blaze_payments',
+    ekart: 'd2c_ekart_payments',
+    cred_sales: 'cred_sales',
+    cred_settlement: 'cred_settlements',
+    elastic_logistics: 'd2c_elastic_logistics_collections',
+    amazon_sales: 'amazon_sales',
+    amazon_settlement: 'amazon_settlement',
+    flipkart_sales: 'flipkart_sales',
+    flipkart_settlement: 'flipkart_settlement',
+  };
+  return tableMap[rt] || (rt ? `d2c_${rt}_collections` : 'd2c_collections');
+};
+
+const isPopulationFailed = (row: any): boolean => {
+  if (!row) return false;
+  return row.status === 'Failed' || (row.ingestionRows > 0 && row.reconUpsertRows === 0);
+};
+
+const getEffectiveStatus = (row: any): string => {
+  if (!row) return 'Unknown';
+  if (row.status === 'Failed') return 'Failed';
+  if (row.ingestionRows > 0 && row.reconUpsertRows === 0) return 'Failed (0 Reconciled)';
+  return row.status || 'Success';
+};
+
+const formatTimestamp = (raw: string | Date | undefined): string => {
+  if (!raw) return '-';
+  try {
+    let str = String(raw).trim();
+    // If backend serialized a local naive timestamp with trailing 'Z', strip it to prevent double timezone conversion
+    if (str.endsWith('Z')) {
+      str = str.slice(0, -1);
+    }
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return String(raw);
+    return d.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hour12: true
+    });
+  } catch {
+    return String(raw);
+  }
+};
 
 const AdminAnalytics = () => {
   const { organizationId } = useOrganization();
@@ -164,6 +236,14 @@ const AdminAnalytics = () => {
           <Typography variant="h1" sx={{ color: '#111827' }}>
             Uploads Tracking Analytics
           </Typography>
+          <Button
+            variant="outlined"
+            onClick={fetchData}
+            disabled={loading}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            {loading ? 'Refreshing...' : '🔄 Refresh'}
+          </Button>
         </Box>
 
         {/* Filters */}
@@ -327,63 +407,88 @@ const AdminAnalytics = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  data.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      hover
-                      onClick={() => setSelectedRow(row)}
-                      sx={{ cursor: 'pointer' }}
-                    >
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={500}>
-                          {new Date(row.timestamp).toLocaleString()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{row.id}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={row.isAsync ? 'Async' : 'Sync'}
-                          size="small"
-                          sx={{
-                            background: row.isAsync ? '#e0e7ff' : '#f3e8ff',
-                            color: row.isAsync ? '#4f46e5' : '#9333ea',
-                            fontWeight: 600
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography fontWeight={500}>{row.uploadTime} ms</Typography>
-                        {row.s3Time !== undefined && (
-                          <>
-                            <Typography variant="caption" display="block" color="text.secondary">S3: {row.s3Time}ms</Typography>
-                            <Typography variant="caption" display="block" color="text.secondary">Ingest: {row.ingestionTime}ms ({row.ingestionRows} rows)</Typography>
-                            {row.clickpostTime > 0 && <Typography variant="caption" display="block" color="text.secondary">Clickpost: {row.clickpostTime}ms</Typography>}
-                          </>
-                        )}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography fontWeight={500}>{row.reconTime} ms</Typography>
-                        {row.reconUpsertTime !== undefined && (
-                          <>
-                            <Typography variant="caption" display="block" color="text.secondary">Upsert: {row.reconUpsertTime}ms ({row.reconUpsertRows} rows)</Typography>
-                            <Typography variant="caption" display="block" color="text.secondary">Diff: {row.reconDiffTime}ms</Typography>
-                          </>
-                        )}
-                      </TableCell>
-                      <TableCell align="right">{row.cacheTime} ms</TableCell>
-                      <TableCell align="right">
-                        <Typography fontWeight={600}>{row.totalTime} ms</Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={row.status}
-                          size="small"
-                          color={row.status === 'Success' ? 'success' : 'error'}
-                          variant="outlined"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  data.map((row) => {
+                    const rowPopFailed = isPopulationFailed(row);
+                    const effectiveStatus = getEffectiveStatus(row);
+                    return (
+                      <TableRow
+                        key={row.id}
+                        hover
+                        onClick={() => setSelectedRow(row)}
+                        sx={{
+                          cursor: 'pointer',
+                          ...(rowPopFailed ? { bgcolor: '#fff5f5', borderLeft: '4px solid #ef4444' } : {})
+                        }}
+                      >
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={500}>
+                            {formatTimestamp(row.timestamp)}
+                          </Typography>
+                          {rowPopFailed && (
+                            <Typography variant="caption" color="error.main" fontWeight={700} display="block">
+                              ⚠️ Population Failed
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell>{row.id}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={row.isAsync ? 'Async' : 'Sync'}
+                            size="small"
+                            sx={{
+                              background: row.isAsync ? '#e0e7ff' : '#f3e8ff',
+                              color: row.isAsync ? '#4f46e5' : '#9333ea',
+                              fontWeight: 600
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography fontWeight={500}>
+                            {row.uploadTime > 0 ? row.uploadTime : ((row.s3Time || 0) + (row.ingestionTime || 0))} ms
+                          </Typography>
+                          {(row.s3Time !== undefined || row.ingestionTime !== undefined) && (
+                            <>
+                              <Typography variant="caption" display="block" color="text.secondary">S3: {row.s3Time || 0}ms</Typography>
+                              <Typography variant="caption" display="block" color="text.secondary">Ingest: {row.ingestionTime || 0}ms ({row.ingestionRows || 0} rows)</Typography>
+                              {row.clickpostTime > 0 && <Typography variant="caption" display="block" color="text.secondary">Clickpost: {row.clickpostTime}ms</Typography>}
+                            </>
+                          )}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography fontWeight={500}>{row.reconTime} ms</Typography>
+                          {row.reconUpsertTime !== undefined && (
+                            <>
+                              <Typography
+                                variant="caption"
+                                display="block"
+                                sx={{
+                                  color: rowPopFailed ? '#dc2626' : 'text.secondary',
+                                  fontWeight: rowPopFailed ? 700 : 400
+                                }}
+                              >
+                                Upsert: {row.reconUpsertTime}ms ({row.reconUpsertRows} rows)
+                                {rowPopFailed && ' ⚠️'}
+                              </Typography>
+                              <Typography variant="caption" display="block" color="text.secondary">Diff: {row.reconDiffTime}ms</Typography>
+                            </>
+                          )}
+                        </TableCell>
+                        <TableCell align="right">{row.cacheTime} ms</TableCell>
+                        <TableCell align="right">
+                          <Typography fontWeight={600}>{row.totalTime} ms</Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={effectiveStatus}
+                            size="small"
+                            color={rowPopFailed ? 'error' : row.status === 'Success' ? 'success' : 'warning'}
+                            variant={rowPopFailed ? 'filled' : 'outlined'}
+                            sx={{ fontWeight: 600 }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -391,38 +496,98 @@ const AdminAnalytics = () => {
         </Paper>
         {/* Detail Dialog */}
         <Dialog open={!!selectedRow} onClose={() => setSelectedRow(null)} maxWidth="md" fullWidth>
-          <DialogTitle>
-            Upload Details: {selectedRow?.id}
+          <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Upload Details: {selectedRow?.id}</span>
+            {selectedRow && (
+              <Chip
+                label={getEffectiveStatus(selectedRow)}
+                size="small"
+                color={isPopulationFailed(selectedRow) ? 'error' : selectedRow.status === 'Success' ? 'success' : 'warning'}
+                variant="filled"
+                sx={{ fontWeight: 700 }}
+              />
+            )}
           </DialogTitle>
           <DialogContent dividers>
             {selectedRow && (
               <Grid container spacing={3}>
+                {/* Warning Alert if population did not happen */}
+                {isPopulationFailed(selectedRow) && (
+                  <Grid item xs={12}>
+                    <Alert severity="error" variant="filled" sx={{ borderRadius: 2 }}>
+                      <Typography variant="subtitle2" fontWeight={700}>
+                        Reconciliation Population Failed — 0 Rows Reconciled
+                      </Typography>
+                      <Typography variant="body2" sx={{ mt: 0.5 }}>
+                        CSV Ingestion successfully saved <strong>{selectedRow.ingestionRows?.toLocaleString()} rows</strong> into <code>{getIngestionTable(selectedRow.reportType)}</code>, but <strong>0 rows</strong> were matched or populated into <code>d2c_sales_reconciliation</code>. Reconciliation was not performed on any sales records.
+                      </Typography>
+                    </Alert>
+                  </Grid>
+                )}
+
                 <Grid item xs={12} md={6}>
                   <Typography variant="h6">General</Typography>
                   <Divider sx={{ my: 1 }} />
-                  <Typography><strong>Timestamp:</strong> {new Date(selectedRow.timestamp).toLocaleString()}</Typography>
-                  <Typography><strong>Status:</strong> {selectedRow.status}</Typography>
+                  <Typography><strong>Timestamp:</strong> {formatTimestamp(selectedRow.timestamp)}</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 0.5 }}>
+                    <Typography><strong>Status:</strong></Typography>
+                    <Chip
+                      label={getEffectiveStatus(selectedRow)}
+                      size="small"
+                      color={isPopulationFailed(selectedRow) ? 'error' : selectedRow.status === 'Success' ? 'success' : 'warning'}
+                      variant={isPopulationFailed(selectedRow) ? 'filled' : 'outlined'}
+                      sx={{ fontWeight: 600 }}
+                    />
+                  </Box>
+                  <Typography><strong>Report Type:</strong> <code>{selectedRow.reportType}</code></Typography>
+                  <Typography><strong>Ingestion Table:</strong> <code>{getIngestionTable(selectedRow.reportType)}</code></Typography>
                   <Typography><strong>Processing:</strong> {selectedRow.isAsync ? 'Async' : 'Sync'}</Typography>
                   <Typography><strong>Total Latency:</strong> {selectedRow.totalTime} ms</Typography>
+                  <Typography>
+                    <strong>Population Match Rate:</strong>{' '}
+                    <span style={{ color: isPopulationFailed(selectedRow) ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
+                      {selectedRow.ingestionRows > 0
+                        ? `${selectedRow.reconUpsertRows} / ${selectedRow.ingestionRows} (${((selectedRow.reconUpsertRows / selectedRow.ingestionRows) * 100).toFixed(1)}%)`
+                        : '0 rows'}
+                    </span>
+                  </Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <Typography variant="h6">Step Breakdown</Typography>
                   <Divider sx={{ my: 1 }} />
                   <Typography><strong>S3 Upload:</strong> {selectedRow.s3Time} ms</Typography>
                   <Typography><strong>CSV Ingestion:</strong> {selectedRow.ingestionTime} ms ({selectedRow.ingestionRows} rows)</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Table: d2c_bigcommerce_collections</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Table: <code>{getIngestionTable(selectedRow.reportType)}</code></Typography>
                   {selectedRow.clickpostTime > 0 && <Typography><strong>Clickpost Sync:</strong> {selectedRow.clickpostTime} ms</Typography>}
-                  <Typography><strong>Recon Upsert:</strong> {selectedRow.reconUpsertTime} ms ({selectedRow.reconUpsertRows} rows)</Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Table: d2c_sales_reconciliation</Typography>
+                  
+                  {isPopulationFailed(selectedRow) ? (
+                    <Box sx={{ p: 1.5, my: 1, bgcolor: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 1.5 }}>
+                      <Typography color="error.main" fontWeight={700}>
+                        Recon Upsert: {selectedRow.reconUpsertTime} ms (0 rows — NOT POPULATED)
+                      </Typography>
+                      <Typography variant="caption" color="error.dark" display="block" sx={{ mt: 0.5 }}>
+                        ⚠️ Warning: 0 of {selectedRow.ingestionRows} ingested rows matched existing orders in <code>d2c_sales_reconciliation</code>.
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Table: <code>d2c_sales_reconciliation</code></Typography>
+                    </Box>
+                  ) : (
+                    <>
+                      <Typography><strong>Recon Upsert:</strong> {selectedRow.reconUpsertTime} ms ({selectedRow.reconUpsertRows} rows)</Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Table: <code>d2c_sales_reconciliation</code></Typography>
+                    </>
+                  )}
                   <Typography><strong>Recon Diff Calc:</strong> {selectedRow.reconDiffTime} ms</Typography>
                   <Typography><strong>Cache Invalidation:</strong> {selectedRow.cacheTime} ms</Typography>
                 </Grid>
-                {selectedRow.status === 'Failed' && (
+
+                {(isPopulationFailed(selectedRow) || selectedRow.status === 'Failed' || selectedRow.errorLog) && (
                   <Grid item xs={12}>
-                    <Typography variant="h6" color="error">Error Logs</Typography>
+                    <Typography variant="h6" color="error">Diagnostic / Error Details</Typography>
                     <Divider sx={{ my: 1 }} />
-                    <Paper sx={{ p: 2, background: '#fee2e2', color: '#991b1b', wordBreak: 'break-all' }}>
-                      {selectedRow.errorLog || 'No detailed error log available.'}
+                    <Paper sx={{ p: 2, background: '#fee2e2', color: '#991b1b', wordBreak: 'break-word', borderRadius: 2 }}>
+                      {selectedRow.errorLog || (isPopulationFailed(selectedRow)
+                        ? `Reconciliation population failed: 0 of ${selectedRow.ingestionRows} rows were matched/settled into d2c_sales_reconciliation. Reconciliation was not performed on any sales orders.`
+                        : 'No detailed error log available.')}
                     </Paper>
                   </Grid>
                 )}
