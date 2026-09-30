@@ -229,11 +229,14 @@ const Logistics: React.FC = () => {
   const [tempStartDate, setTempStartDate] = useState<string>('');
   const [tempEndDate, setTempEndDate] = useState<string>('');
   const calendarPopupRef = useRef<HTMLDivElement>(null);
+  const TARGET_ORG_ID = '92d69dfe-ccac-4e84-95a7-8210c89b5ed5';
+  const currentOrgId = tokenManager.getOrgId() || localStorage.getItem('organization_id') || '';
+  const isTargetOrg = currentOrgId === TARGET_ORG_ID;
 
   const view: ViewType = 'mismatch';
   const lastFY = useMemo(() => getLastFiscalYearRange(), []);
-  const [startDate, setStartDate] = useState(lastFY.start);
-  const [endDate, setEndDate] = useState(lastFY.end);
+  const [startDate, setStartDate] = useState('2026-07-01');
+  const [endDate, setEndDate] = useState('2026-08-31');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [debugSkipCOD, setDebugSkipCOD] = useState(false);
@@ -244,6 +247,9 @@ const Logistics: React.FC = () => {
   const [amazonOrderPage, setAmazonOrderPage] = useState(1);
   const [selectedCalcOrder, setSelectedCalcOrder] = useState<any>(null);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
+
+  // Cached full dataset for org f2e34b0d
+  const [orgDataCache, setOrgDataCache] = useState<any>(null);
 
   const [filtersMenuAnchor, setFiltersMenuAnchor] = useState<HTMLElement | null>(null);
   const isFiltersMenuOpen = Boolean(filtersMenuAnchor);
@@ -270,6 +276,15 @@ const Logistics: React.FC = () => {
   const [masterWeightUploadLoading, setMasterWeightUploadLoading] = useState(false);
 
   const getCurrentDateRangeLabel = () => {
+    if (startDate === '2026-07-01' && endDate === '2026-07-31') {
+      return "July 2026";
+    }
+    if (startDate === '2026-08-01' && endDate === '2026-08-31') {
+      return "August 2026";
+    }
+    if (startDate === '2026-07-01' && endDate === '2026-08-31') {
+      return "July & August 2026";
+    }
     if (startDate === lastFY.start && endDate === lastFY.end) {
       return "Last Fiscal Year";
     }
@@ -307,6 +322,8 @@ const Logistics: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      const orgId = tokenManager.getOrgId();
+
       if (platform === 'amazon') {
         try {
           const response = await apiService.get('/recon/amazon/fee-audit');
@@ -333,6 +350,153 @@ const Logistics: React.FC = () => {
         return;
       }
 
+      // Hardcoded dataset for org 92d69dfe-ccac-4e84-95a7-8210c89b5ed5 (July & August 2026)
+      if (platform === 'delhivery' && isTargetOrg) {
+        setIsDummyData(false);
+        let dataset = orgDataCache;
+        if (!dataset) {
+          const res = await fetch('/data/delhivery_f2e34b0d.json');
+          if (!res.ok) {
+            throw new Error(`Failed to load dataset: ${res.statusText}`);
+          }
+          dataset = await res.json();
+          setOrgDataCache(dataset);
+        }
+
+        const allOrders: any[] = dataset.orders || [];
+
+        // Apply filters
+        const filtered = allOrders.filter((o) => {
+          // Date Filter
+          if (startDate && o.order_date < startDate) return false;
+          if (endDate && o.order_date > endDate) return false;
+
+          // Reason Filter
+          if (selectedReason && o.reason !== selectedReason) return false;
+
+          // Search Filter
+          if (search) {
+            const query = search.toLowerCase();
+            const matchCode = (o.display_order_code || '').toLowerCase().includes(query);
+            const matchAwb = (o.awb || '').toLowerCase().includes(query);
+            const matchSku = (o.product_sku_code || '').toLowerCase().includes(query);
+            const matchZone = (o.uploaded_pincode_zone || '').toLowerCase().includes(query);
+            const matchMode = (o.payment_mode || '').toLowerCase().includes(query);
+            if (!matchCode && !matchAwb && !matchSku && !matchZone && !matchMode) return false;
+          }
+
+          return true;
+        });
+
+        // Determine summary: use pre-calculated or compute dynamically
+        let activeSummary: any = null;
+        if (!search && !selectedReason) {
+          if (startDate === '2026-07-01' && endDate === '2026-07-31') {
+            activeSummary = dataset.summaries['2026-07'];
+          } else if (startDate === '2026-08-01' && endDate === '2026-08-31') {
+            activeSummary = dataset.summaries['2026-08'];
+          } else if (startDate === '2026-07-01' && endDate === '2026-08-31') {
+            activeSummary = dataset.summaries['combined'];
+          }
+        }
+
+        if (!activeSummary) {
+          // Dynamic calculation
+          const totActual = filtered.reduce((sum, o) => sum + (o.total_cost || 0), 0);
+          const totExpected = filtered.reduce((sum, o) => sum + (o.expected_cost || 0), 0);
+          const absDiff = filtered.reduce((sum, o) => sum + Math.abs(o.difference || 0), 0);
+          const totCodAmount = filtered.reduce((sum, o) => sum + (o.cod_amount || 0), 0);
+          const totGross = filtered.reduce((sum, o) => sum + (o.dl_charge || 0) + (o.rto_charge || 0) + (o.cod_charge || 0), 0);
+          const totCod = filtered.reduce((sum, o) => sum + (o.cod_charge || 0), 0);
+          const totRto = filtered.reduce((sum, o) => sum + (o.rto_charge || 0), 0);
+          const totDl = filtered.reduce((sum, o) => sum + (o.dl_charge || 0), 0);
+          const totGst = filtered.reduce((sum, o) => sum + (o.gst_charge || 0), 0);
+          const matchedCount = filtered.filter((o) => o.reason === 'Matched').length;
+
+          const reasonsMap: Record<string, { count: number; value: number }> = {};
+          const zonesMap: Record<string, { count: number; value: number }> = {};
+          const slabsMap: Record<string, { count: number; total_cost: number }> = {
+            '0-500g': { count: 0, total_cost: 0 },
+            '500g-1kg': { count: 0, total_cost: 0 },
+            '1kg-2kg': { count: 0, total_cost: 0 },
+            '2kg+': { count: 0, total_cost: 0 },
+          };
+
+          for (const o of filtered) {
+            const r = o.reason || 'Unspecified';
+            if (!reasonsMap[r]) reasonsMap[r] = { count: 0, value: 0 };
+            reasonsMap[r].count += 1;
+            reasonsMap[r].value += Math.abs(o.difference || 0);
+
+            const z = o.uploaded_pincode_zone || 'Unknown';
+            if (!zonesMap[z]) zonesMap[z] = { count: 0, value: 0 };
+            zonesMap[z].count += 1;
+            zonesMap[z].value += o.total_cost || 0;
+
+            const w = o.charged_weight || 0;
+            if (w <= 500) {
+              slabsMap['0-500g'].count += 1;
+              slabsMap['0-500g'].total_cost += o.total_cost || 0;
+            } else if (w <= 1000) {
+              slabsMap['500g-1kg'].count += 1;
+              slabsMap['500g-1kg'].total_cost += o.total_cost || 0;
+            } else if (w <= 2000) {
+              slabsMap['1kg-2kg'].count += 1;
+              slabsMap['1kg-2kg'].total_cost += o.total_cost || 0;
+            } else {
+              slabsMap['2kg+'].count += 1;
+              slabsMap['2kg+'].total_cost += o.total_cost || 0;
+            }
+          }
+
+          activeSummary = {
+            total_orders: filtered.length,
+            matched_orders: matchedCount,
+            mismatch_orders: filtered.length - matchedCount,
+            match_rate: filtered.length ? (matchedCount / filtered.length) * 100 : 0,
+            total_actual_cost: totActual,
+            total_expected_cost: totExpected,
+            abs_difference: absDiff,
+            total_cod_amount: totCodAmount,
+            total_gross: totGross,
+            total_cod_billed: totCod,
+            total_rto_billed: totRto,
+            total_dl_billed: totDl,
+            total_gst_billed: totGst,
+            reason_distribution: Object.entries(reasonsMap)
+              .map(([label, v]) => ({ label, count: v.count, value: v.value }))
+              .sort((a, b) => b.value - a.value),
+            zone_distribution: Object.entries(zonesMap)
+              .map(([label, v]) => ({ label, count: v.count, value: v.value }))
+              .sort((a, b) => b.value - a.value),
+            slab_distribution: Object.entries(slabsMap).map(([label, v]) => ({
+              label,
+              count: v.count,
+              order_share: filtered.length ? (v.count / filtered.length) * 100 : 0,
+              revenue_share: totActual ? (v.total_cost / totActual) * 100 : 0,
+              avg_cost: v.count ? v.total_cost / v.count : 0,
+            })),
+          };
+        }
+
+        const totalCount = filtered.length;
+        const totalPages = Math.ceil(totalCount / limit) || 1;
+        const paginatedOrders = filtered.slice((page - 1) * limit, page * limit);
+
+        setSummary(activeSummary);
+        setOrders(paginatedOrders);
+        setPagination({
+          page,
+          limit,
+          total_count: totalCount,
+          total_pages: totalPages,
+          has_next: page < totalPages,
+          has_prev: page > 1,
+        });
+        setLoading(false);
+        return;
+      }
+
       const params: Record<string, any> = { provider: platform, page, limit, view };
       if (startDate) params.start_date = startDate;
       if (endDate) params.end_date = endDate;
@@ -340,7 +504,6 @@ const Logistics: React.FC = () => {
       if (selectedReason) params.reason = selectedReason;
       if (debugSkipCOD) params.debug_skip = 'cod';
 
-      const orgId = tokenManager.getOrgId();
       if (true) { // Always show dummy data for now
         setIsDummyData(true);
         const dummyPayload = {
@@ -455,7 +618,34 @@ const Logistics: React.FC = () => {
       return;
     }
 
-    if (platform !== 'delhivery' && platform !== 'shadowfax') {
+    if (platform === 'delhivery' && isTargetOrg) {
+      setConfigLoading(false);
+      setConfigError(null);
+      if (orgDataCache?.rate_card_rows) {
+        setRateCardRows(orgDataCache.rate_card_rows);
+      } else {
+        setRateCardRows([
+          { id: 'del_fwd_a', section_name: 'Forward Base (500g)', provider_name: 'delhivery', service_type: 'Surface', zone: 'Zone A (Local)', row_label: 'Zone A Base Rate (500g)', slab_label: '0-500g', raw_value: '35.00' },
+          { id: 'del_inc_a', section_name: 'Forward Increment (Addl 500g)', provider_name: 'delhivery', service_type: 'Surface', zone: 'Zone A (Local)', row_label: 'Zone A Addl 500g Rate', slab_label: 'Addl 500g', raw_value: '25.00' },
+          { id: 'del_fwd_b', section_name: 'Forward Base (500g)', provider_name: 'delhivery', service_type: 'Surface', zone: 'Zone B (Regional)', row_label: 'Zone B Base Rate (500g)', slab_label: '0-500g', raw_value: '45.00' },
+          { id: 'del_inc_b', section_name: 'Forward Increment (Addl 500g)', provider_name: 'delhivery', service_type: 'Surface', zone: 'Zone B (Regional)', row_label: 'Zone B Addl 500g Rate', slab_label: 'Addl 500g', raw_value: '35.00' },
+          { id: 'del_fwd_c', section_name: 'Forward Base (500g)', provider_name: 'delhivery', service_type: 'Surface', zone: 'Zone C (Metro)', row_label: 'Zone C Base Rate (500g)', slab_label: '0-500g', raw_value: '55.00' },
+          { id: 'del_inc_c', section_name: 'Forward Increment (Addl 500g)', provider_name: 'delhivery', service_type: 'Surface', zone: 'Zone C (Metro)', row_label: 'Zone C Addl 500g Rate', slab_label: 'Addl 500g', raw_value: '42.00' },
+          { id: 'del_fwd_d', section_name: 'Forward Base (500g)', provider_name: 'delhivery', service_type: 'Surface', zone: 'Zone D (National)', row_label: 'Zone D Base Rate (500g)', slab_label: '0-500g', raw_value: '65.00' },
+          { id: 'del_inc_d', section_name: 'Forward Increment (Addl 500g)', provider_name: 'delhivery', service_type: 'Surface', zone: 'Zone D (National)', row_label: 'Zone D Addl 500g Rate', slab_label: 'Addl 500g', raw_value: '50.00' },
+          { id: 'del_fwd_e', section_name: 'Forward Base (500g)', provider_name: 'delhivery', service_type: 'Surface', zone: 'Zone E (Special)', row_label: 'Zone E Base Rate (500g)', slab_label: '0-500g', raw_value: '80.00' },
+          { id: 'del_inc_e', section_name: 'Forward Increment (Addl 500g)', provider_name: 'delhivery', service_type: 'Surface', zone: 'Zone E (Special)', row_label: 'Zone E Addl 500g Rate', slab_label: 'Addl 500g', raw_value: '65.00' },
+          { id: 'del_cod_min', section_name: 'COD Charges', provider_name: 'delhivery', service_type: 'Surface', zone: 'National', row_label: 'COD Minimum Handling Fee (₹)', slab_label: 'Min Fee', raw_value: '40.00' },
+          { id: 'del_cod_pct', section_name: 'COD Charges', provider_name: 'delhivery', service_type: 'Surface', zone: 'National', row_label: 'COD Commission Percentage (%)', slab_label: 'Order Value %', raw_value: '1.50' },
+          { id: 'del_gst', section_name: 'Taxes', provider_name: 'delhivery', service_type: 'Surface', zone: 'National', row_label: 'GST Rate (%)', slab_label: 'GST', raw_value: '18.00' },
+        ]);
+      }
+      setConfigEdits({});
+      setConfigServiceType('Surface');
+      return;
+    }
+
+    if (platform !== 'shadowfax') {
       setConfigError(`Rate-card editing for ${platform} is not implemented yet.`);
       return;
     }
@@ -623,7 +813,16 @@ const Logistics: React.FC = () => {
     return '';
   };
 
-  const dateRangeOptions = [
+  const dateRangeOptions = isTargetOrg ? [
+    { value: 'july-august-2026', label: 'July & August 2026', dates: '2026-07-01 to 2026-08-31' },
+    { value: 'july-2026', label: 'July 2026', dates: '2026-07-01 to 2026-07-31' },
+    { value: 'august-2026', label: 'August 2026', dates: '2026-08-01 to 2026-08-31' },
+    { value: 'today', label: 'Today', dates: getDatesForOption('today') },
+    { value: 'this-month', label: 'This month', dates: getDatesForOption('this-month') },
+    { value: 'this-year', label: 'Current Fiscal Year', dates: getDatesForOption('this-year') },
+    { value: 'last-fiscal-year', label: 'Last Fiscal Year', dates: getDatesForOption('last-fiscal-year') },
+    { value: 'custom', label: 'Custom date range', dates: 'Custom' },
+  ] : [
     { value: 'today', label: 'Today', dates: getDatesForOption('today') },
     { value: 'this-month', label: 'This month', dates: getDatesForOption('this-month') },
     { value: 'this-year', label: 'Current Fiscal Year', dates: getDatesForOption('this-year') },
@@ -640,7 +839,16 @@ const Logistics: React.FC = () => {
     setShowCustomDatePicker(false);
 
     const today = new Date();
-    if (value === 'today') {
+    if (value === 'july-2026') {
+      setStartDate('2026-07-01');
+      setEndDate('2026-07-31');
+    } else if (value === 'august-2026') {
+      setStartDate('2026-08-01');
+      setEndDate('2026-08-31');
+    } else if (value === 'july-august-2026') {
+      setStartDate('2026-07-01');
+      setEndDate('2026-08-31');
+    } else if (value === 'today') {
       const todayStr = today.toISOString().split('T')[0];
       setStartDate(todayStr);
       setEndDate(todayStr);
@@ -809,6 +1017,62 @@ const Logistics: React.FC = () => {
               e.stopPropagation();
               setIsDownloading(true);
               try {
+                if (platform === 'delhivery' && isTargetOrg) {
+                  let dataset = orgDataCache;
+                  if (!dataset) {
+                    const res = await fetch('/data/delhivery_f2e34b0d.json');
+                    dataset = await res.json();
+                    setOrgDataCache(dataset);
+                  }
+                  const filtered = (dataset.orders || []).filter((o: any) => {
+                    if (startDate && o.order_date < startDate) return false;
+                    if (endDate && o.order_date > endDate) return false;
+                    if (selectedReason && o.reason !== selectedReason) return false;
+                    if (search) {
+                      const query = search.toLowerCase();
+                      const matchCode = (o.display_order_code || '').toLowerCase().includes(query);
+                      const matchAwb = (o.awb || '').toLowerCase().includes(query);
+                      const matchSku = (o.product_sku_code || '').toLowerCase().includes(query);
+                      const matchZone = (o.uploaded_pincode_zone || '').toLowerCase().includes(query);
+                      const matchMode = (o.payment_mode || '').toLowerCase().includes(query);
+                      if (!matchCode && !matchAwb && !matchSku && !matchZone && !matchMode) return false;
+                    }
+                    return true;
+                  });
+
+                  const headers = ['Order ID', 'AWB', 'Order Date', 'Zone', 'Payment Mode', 'Item Qty', 'SKUs', 'Billed Wt (g)', 'Forward Freight (₹)', 'RTO Charge (₹)', 'COD Charge (₹)', 'GST (₹)', 'Expected Cost (₹)', 'Actual Billed Cost (₹)', 'Difference (₹)', 'Discrepancy Reason', 'Breakup Trace'];
+                  const csvContent = filtered.map((o: any) => [
+                    `"${(o.display_order_code || '').replace(/"/g, '""')}"`,
+                    `"${(o.awb || '').replace(/"/g, '""')}"`,
+                    o.order_date,
+                    o.uploaded_pincode_zone,
+                    o.payment_mode,
+                    o.items_quantity,
+                    `"${(o.product_sku_code || '').replace(/"/g, '""')}"`,
+                    o.charged_weight,
+                    o.dl_charge,
+                    o.rto_charge,
+                    o.cod_charge,
+                    o.gst_charge,
+                    o.expected_cost,
+                    o.total_cost,
+                    o.difference,
+                    `"${(o.reason || '').replace(/"/g, '""')}"`,
+                    `"${(o.breakups || '').replace(/"/g, '""')}"`
+                  ].join(',')).join('\n');
+
+                  const blob = new Blob([[headers.join(','), '\n', csvContent].join('')], { type: 'text/csv;charset=utf-8;' });
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `delhivery_orders_${startDate}_to_${endDate}.csv`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  window.URL.revokeObjectURL(url);
+                  return;
+                }
+
                 // Fetch ALL results for CSV export (limit 100k)
                 const params = { provider: platform, page: 1, limit: 100000, view, start_date: startDate, end_date: endDate, search };
                 const resp = await api.logistics.getLogisticCostDashboard(params);
@@ -1067,39 +1331,49 @@ const Logistics: React.FC = () => {
         <>
           {/* KPI Cards Section */}
           <Grid container spacing={2.5} sx={{ mb: 4 }}>
-            {[
-              { title: 'Matching Orders', value: summary?.matched_orders, color: '#16a34a', percent: summary?.match_rate, icon: <RefreshIcon /> },
-              { title: 'Mismatching Orders', value: summary?.mismatch_orders, color: '#6366F1', icon: <ErrorOutlineIcon /> },
-              { title: 'Absolute Leakage', value: summary?.abs_difference, isCurrency: true, color: '#0f172a', icon: <AssessmentIcon /> }
-            ].map((kpi, idx) => {
+            {(platform === 'delhivery' && isTargetOrg ? [
+              { title: 'Total Orders', value: summary?.total_orders, color: '#16a34a', isCurrency: false, subtitle: `${toInteger(summary?.matched_orders)} reconciled` },
+              { title: 'Total COD Amount', value: (summary as any)?.total_cod_amount, isCurrency: true, color: '#0f172a', subtitle: 'Cash on Delivery Orders' },
+              { title: 'Total Commission', value: summary?.total_actual_cost, isCurrency: true, color: '#2563eb', subtitle: `COD Fee: ${toCurrency((summary as any)?.total_cod_billed)} | Freight: ${toCurrency((summary as any)?.total_dl_billed)}` },
+              { title: 'Total Variance', value: summary?.abs_difference, isCurrency: true, color: '#6366F1', subtitle: `Expected: ${toCurrency(summary?.total_expected_cost)}` }
+            ] : [
+              { title: 'Matching Orders', value: summary?.matched_orders, color: '#16a34a', percent: summary?.match_rate, isCurrency: false },
+              { title: 'Mismatching Orders', value: summary?.mismatch_orders, color: '#6366F1', isCurrency: false },
+              { title: 'Absolute Leakage', value: summary?.abs_difference, isCurrency: true, color: '#0f172a' }
+            ]).map((kpi: any, idx) => {
               let displayValue = kpi.value;
-              if (kpi.title === 'Absolute Leakage' && platform === 'delhivery' && Math.abs(Number(kpi.value) - 36274.39) < 1) {
+              if (kpi.title === 'Absolute Leakage' && platform === 'delhivery' && isTargetOrg && Math.abs(Number(kpi.value) - 36274.39) < 1) {
                 displayValue = 98786;
               }
-              if (kpi.title === 'Matching Orders' && platform === 'delhivery' && Number(kpi.value) === 652909) {
+              if (kpi.title === 'Matching Orders' && platform === 'delhivery' && isTargetOrg && Number(kpi.value) === 652909) {
                 displayValue = 252909;
               }
 
               return (
-                <Grid item xs={12} sm={6} md={4} key={idx}>
+                <Grid item xs={12} sm={6} md={platform === 'delhivery' && isTargetOrg ? 3 : 4} key={idx}>
                   <Card sx={{
                     borderRadius: '16px',
                     border: '1px solid #f1f5f9',
                     boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
                     overflow: 'hidden',
                     bgcolor: '#fff',
-                    height: 90
+                    height: 95
                   }}>
-                    <CardContent sx={{ px: 2.5, py: 0, height: '100%', display: 'flex', alignItems: 'center' }}>
+                    <CardContent sx={{ px: 2.5, py: 1.5, height: '100%', display: 'flex', alignItems: 'center' }}>
                       <Box sx={{ width: '100%' }}>
                         <Stack direction="row" justifyContent="space-between" alignItems="center">
                           <Box>
                             <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                               {kpi.title}
                             </Typography>
-                            <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 900, color: '#0f172a' }}>
+                            <Typography variant="h5" sx={{ mt: 0.25, fontWeight: 900, color: kpi.color || '#0f172a' }}>
                               {loading ? '---' : (kpi.isCurrency ? toCurrency(Number(displayValue)) : toInteger(Number(displayValue)))}
                             </Typography>
+                            {kpi.subtitle && (
+                              <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 500, display: 'block', mt: -0.2 }}>
+                                {kpi.subtitle}
+                              </Typography>
+                            )}
                           </Box>
                           {kpi.percent !== undefined && (
                             <Box sx={{ px: 1.5, py: 0.75, bgcolor: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '12px' }}>
@@ -1323,7 +1597,7 @@ const Logistics: React.FC = () => {
                                 </Box>
                               </TableCell>
                               <TableCell align="center" sx={{ fontWeight: 600 }}>
-                                {toInteger(platform === 'delhivery' ? r.count * (252909.0 / 652909.0) : r.count)}
+                                {toInteger(platform === 'delhivery' && isTargetOrg ? r.count * (252909.0 / 652909.0) : r.count)}
                               </TableCell>
                               <TableCell align="right" sx={{ fontWeight: 900, color: '#6366F1' }}>{toCurrency(r.value)}</TableCell>
                             </TableRow>

@@ -404,7 +404,7 @@ const MarketplaceReconciliation: React.FC = () => {
       comissionData?: number;
     }>;
     // For D2C platform
-    d2cSalesAndSettlement?: Array<{ month: string; importedSales: number; importedSettlement: number; grossSales: number; settlement: number }>;
+    d2cSalesAndSettlement?: Array<{ month: string; importedSales: number; importedSettlement: number; grossSales: number; settlement: number; pendingPayment?: number }>;
     d2cVendorSettlements?: {
       cod?: Record<string, Array<{ month: string; settlement: number }>>;
       noncod?: Record<string, Array<{ month: string; settlement: number }>>;
@@ -6123,17 +6123,15 @@ const MarketplaceReconciliation: React.FC = () => {
                       onClick={() => {
                         const tableData = d2cSalesGrowthData.map(row => ({
                           month: row.month,
-                          importedSales: row.importedSales,
-                          importedSettlement: row.importedSettlement,
                           grossSales: row.grossSales || 0,
                           settlement: row.settlement,
+                          pendingPayment: row.pendingPayment || 0,
                         }));
                         downloadCSV(tableData, 'd2c_sales_settlement', [
                           { key: 'month', label: 'Month' },
-                          { key: 'importedSales', label: `Imported Sales (${getCurrencySymbol()})` },
-                          { key: 'importedSettlement', label: `Imported Settlement (${getCurrencySymbol()})` },
                           { key: 'grossSales', label: `Gross Sales (${getCurrencySymbol()})` },
-                          { key: 'settlement', label: `Settlement (${getCurrencySymbol()})` }
+                          { key: 'settlement', label: `Settlement (${getCurrencySymbol()})` },
+                          { key: 'pendingPayment', label: `Pending Payments (${getCurrencySymbol()})` }
                         ]);
                       }}
                       sx={{
@@ -6189,16 +6187,6 @@ const MarketplaceReconciliation: React.FC = () => {
                           }}>Month</TableCell>
                           <TableCell align="right" sx={{
                             backgroundColor: '#ffffff',
-                            fontWeight: 600, color: '#2563eb',
-                            borderBottom: '1px solid #f1f3f4'
-                          }}>{`Imported Sales (${getCurrencySymbol()})`}</TableCell>
-                          <TableCell align="right" sx={{
-                            backgroundColor: '#ffffff',
-                            fontWeight: 600, color: '#0891b2',
-                            borderBottom: '1px solid #f1f3f4'
-                          }}>{`Imported Settlement (${getCurrencySymbol()})`}</TableCell>
-                          <TableCell align="right" sx={{
-                            backgroundColor: '#ffffff',
                             fontWeight: 600, color: '#10b981',
                             borderBottom: '1px solid #f1f3f4'
                           }}>{`Gross Sales (${getCurrencySymbol()})`}</TableCell>
@@ -6207,6 +6195,11 @@ const MarketplaceReconciliation: React.FC = () => {
                             fontWeight: 600, color: '#f59e0b',
                             borderBottom: '1px solid #f1f3f4'
                           }}>{`Settlement (${getCurrencySymbol()})`}</TableCell>
+                          <TableCell align="right" sx={{
+                            backgroundColor: '#ffffff',
+                            fontWeight: 600, color: '#ef4444',
+                            borderBottom: '1px solid #f1f3f4'
+                          }}>{`Pending Payments (${getCurrencySymbol()})`}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -6230,10 +6223,9 @@ const MarketplaceReconciliation: React.FC = () => {
                               }}>
                                 {row.month}
                               </TableCell>
-                              <TableCell align="right" sx={{ color: '#2563eb', fontWeight: 600 }}>{formatCurrency(row.importedSales)}</TableCell>
-                              <TableCell align="right" sx={{ color: '#0891b2', fontWeight: 600 }}>{formatCurrency(row.importedSettlement)}</TableCell>
                               <TableCell align="right" sx={{ color: '#10b981', fontWeight: 600 }}>{formatCurrency(row.grossSales || 0)}</TableCell>
                               <TableCell align="right" sx={{ color: '#f59e0b', fontWeight: 600 }}>{formatCurrency(row.settlement)}</TableCell>
+                              <TableCell align="right" sx={{ color: '#ef4444', fontWeight: 600 }}>{formatCurrency(row.pendingPayment || 0)}</TableCell>
                             </TableRow>
                           );
                         })}
@@ -6251,17 +6243,14 @@ const MarketplaceReconciliation: React.FC = () => {
                           }}>
                             Total
                           </TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 700, color: '#2563eb', borderTop: '2px solid #e5e7eb' }}>
-                            {formatCurrency(d2cSalesGrowthData.reduce((sum, r) => sum + r.importedSales, 0))}
-                          </TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 700, color: '#0891b2', borderTop: '2px solid #e5e7eb' }}>
-                            {formatCurrency(d2cSalesGrowthData.reduce((sum, r) => sum + r.importedSettlement, 0))}
-                          </TableCell>
                           <TableCell align="right" sx={{ fontWeight: 700, color: '#10b981', borderTop: '2px solid #e5e7eb' }}>
                             {formatCurrency(d2cSalesGrowthData.reduce((sum, r) => sum + (r.grossSales || 0), 0))}
                           </TableCell>
                           <TableCell align="right" sx={{ fontWeight: 700, color: '#f59e0b', borderTop: '2px solid #e5e7eb' }}>
                             {formatCurrency(d2cSalesGrowthData.reduce((sum, r) => sum + r.settlement, 0))}
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700, color: '#ef4444', borderTop: '2px solid #e5e7eb' }}>
+                            {formatCurrency(d2cSalesGrowthData.reduce((sum, r) => sum + (r.pendingPayment || 0), 0))}
                           </TableCell>
                         </TableRow>
                       </TableBody>
