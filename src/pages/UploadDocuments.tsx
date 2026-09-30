@@ -4913,7 +4913,7 @@ const UploadDocuments: React.FC = () => {
                   {/* Settlement Providers List */}
                   <Box sx={{ width: '100%', mt: 1 }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                      {vendors.filter(v => v.id !== 'amazon' && v.id !== 'flipkart' && v.id !== 'cred' && v.id !== 'amazon_uk' && (v.id !== 'razorpay' || hasFlipkartSubPlatforms)).map((vendor) => {
+                      {vendors.filter(v => v.id !== 'amazon' && v.id !== 'flipkart' && v.id !== 'cred' && v.id !== 'amazon_uk' && v.id !== 'myntra' && (v.id !== 'razorpay' || hasFlipkartSubPlatforms)).map((vendor) => {
                         const isSettlementUploaded = isVendorUploaded(vendor.id, 'settlement');
                         const uploadedSettlementDoc = getUploadedDocument(vendor.id, 'settlement');
                         const isSettlementUploading = uploadingVendor === `${vendor.id}_settlement`;

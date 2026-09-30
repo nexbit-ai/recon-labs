@@ -231,7 +231,10 @@ const Logistics: React.FC = () => {
   const calendarPopupRef = useRef<HTMLDivElement>(null);
   const TARGET_ORG_ID = '92d69dfe-ccac-4e84-95a7-8210c89b5ed5';
   const currentOrgId = tokenManager.getOrgId() || localStorage.getItem('organization_id') || '';
-  const isTargetOrg = currentOrgId === TARGET_ORG_ID;
+  const isTargetOrg = currentOrgId.includes(TARGET_ORG_ID);
+
+  // Debug log to see why dummy data might be shown
+  console.log('Logistics Page Debug:', { currentOrgId, TARGET_ORG_ID, isTargetOrg });
 
   const view: ViewType = 'mismatch';
   const lastFY = useMemo(() => getLastFiscalYearRange(), []);
