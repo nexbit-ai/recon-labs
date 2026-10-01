@@ -403,6 +403,7 @@ const Logistics: React.FC = () => {
               difference: difference,
               reason: reason,
               dispute_raised: i % 7 === 0,
+              breakups: `Freight: ₹${(totalCost * 0.6).toFixed(2)} | COD: ₹${(totalCost * 0.2).toFixed(2)} | Fuel Surcharge: ₹${(totalCost * 0.2).toFixed(2)}`,
             };
           }).slice((page - 1) * limit, page * limit),
           pagination: {

@@ -470,6 +470,82 @@ const OperationsCentrePage: React.FC = () => {
       total_orders: 8,
       total_gap: 9200,
       ticket_id: 'TCK-8810'
+    },
+    // Amazon
+    {
+      platform: 'amazon',
+      status: 'ELIGIBLE',
+      reason: 'FBA Inventory Lost',
+      total_orders: 24,
+      total_gap: 32500
+    },
+    {
+      platform: 'amazon',
+      status: 'ELIGIBLE',
+      reason: 'Return Item Mismatch',
+      total_orders: 8,
+      total_gap: 12400
+    },
+    {
+      platform: 'amazon',
+      status: 'FILED',
+      reason: 'Damaged in FC',
+      total_orders: 15,
+      total_gap: 18900,
+      ticket_id: 'AMZ-TCK-991'
+    },
+    {
+      platform: 'amazon',
+      status: 'APPROVED',
+      reason: 'Customer Return Not Received',
+      total_orders: 10,
+      total_gap: 14200,
+      ticket_id: 'AMZ-TCK-882'
+    },
+    {
+      platform: 'amazon',
+      status: 'ELIGIBLE',
+      reason: 'Weight Anomaly',
+      total_orders: 6,
+      total_gap: 4800
+    },
+    // Flipkart
+    {
+      platform: 'flipkart',
+      status: 'ELIGIBLE',
+      reason: 'RTO Damaged',
+      total_orders: 18,
+      total_gap: 25600
+    },
+    {
+      platform: 'flipkart',
+      status: 'ELIGIBLE',
+      reason: 'Fake Return',
+      total_orders: 12,
+      total_gap: 38400
+    },
+    {
+      platform: 'flipkart',
+      status: 'FILED',
+      reason: 'Wrong Product Returned',
+      total_orders: 9,
+      total_gap: 15200,
+      ticket_id: 'FK-TCK-102'
+    },
+    {
+      platform: 'flipkart',
+      status: 'APPROVED',
+      reason: 'Empty Box Returned',
+      total_orders: 4,
+      total_gap: 9600,
+      ticket_id: 'FK-TCK-098'
+    },
+    {
+      platform: 'flipkart',
+      status: 'ELIGIBLE',
+      reason: 'Weight Discrepancy',
+      total_orders: 11,
+      total_gap: 6500
     }
   ]);
   const filteredBatches = claimBatches.filter(b => b.platform === selectedPlatform);
@@ -1225,21 +1301,81 @@ const OperationsCentrePage: React.FC = () => {
         total_gap: 9200,
         ticket_id: 'TCK-8810'
       },
-      // Adding a few for flipkart/amazon just in case the user navigates there
+      // Amazon
       {
-        platform: 'flipkart',
+        platform: 'amazon',
         status: 'ELIGIBLE',
-        reason: 'Courier Return Mismatch',
-        total_orders: 3,
-        total_gap: 2100
+        reason: 'FBA Inventory Lost',
+        total_orders: 24,
+        total_gap: 32500
+      },
+      {
+        platform: 'amazon',
+        status: 'ELIGIBLE',
+        reason: 'Return Item Mismatch',
+        total_orders: 8,
+        total_gap: 12400
       },
       {
         platform: 'amazon',
         status: 'FILED',
-        reason: 'FBA Lost Inventory',
-        total_orders: 7,
-        total_gap: 8300,
-        ticket_id: 'AMZ-10293'
+        reason: 'Damaged in FC',
+        total_orders: 15,
+        total_gap: 18900,
+        ticket_id: 'AMZ-TCK-991'
+      },
+      {
+        platform: 'amazon',
+        status: 'APPROVED',
+        reason: 'Customer Return Not Received',
+        total_orders: 10,
+        total_gap: 14200,
+        ticket_id: 'AMZ-TCK-882'
+      },
+      {
+        platform: 'amazon',
+        status: 'ELIGIBLE',
+        reason: 'Weight Anomaly',
+        total_orders: 6,
+        total_gap: 4800
+      },
+      // Flipkart
+      {
+        platform: 'flipkart',
+        status: 'ELIGIBLE',
+        reason: 'RTO Damaged',
+        total_orders: 18,
+        total_gap: 25600
+      },
+      {
+        platform: 'flipkart',
+        status: 'ELIGIBLE',
+        reason: 'Fake Return',
+        total_orders: 12,
+        total_gap: 38400
+      },
+      {
+        platform: 'flipkart',
+        status: 'FILED',
+        reason: 'Wrong Product Returned',
+        total_orders: 9,
+        total_gap: 15200,
+        ticket_id: 'FK-TCK-102'
+      },
+      {
+        platform: 'flipkart',
+        status: 'APPROVED',
+        reason: 'Empty Box Returned',
+        total_orders: 4,
+        total_gap: 9600,
+        ticket_id: 'FK-TCK-098'
+      },
+      {
+        platform: 'flipkart',
+        status: 'ELIGIBLE',
+        reason: 'Weight Discrepancy',
+        total_orders: 11,
+        total_gap: 6500
       }
     ];
     setClaimBatches(dummyBatches);
