@@ -3361,6 +3361,10 @@ const MarketplaceReconciliation: React.FC = () => {
                     const cancellationsAmount = Math.abs(Number(s?.total_cancellations_amount || 0));
                     const cancellationsCount = Number(s?.total_cancellations_orders || 0);
 
+                    // API-provided Net Sales values
+                    const netSalesAmount = Math.abs(Number(s?.net_sales_amount || 0));
+                    const netSalesCount = Number(s?.net_sales_orders || 0);
+
                     // Previous return/cancellations metrics
                     const prevReturnOrCancelledAmount = Math.abs(Number(s?.prev_return_or_cancelled_amount || 0));
                     const prevReturnOrCancelledCount = Number(s?.prev_return_or_cancelled_orders || 0);
@@ -3405,8 +3409,14 @@ const MarketplaceReconciliation: React.FC = () => {
                       <Box sx={{ p: 3 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, flexWrap: 'wrap' }}>
                           <Metric label="Gross Sales" amount={grossSalesAmount} count={grossSalesCount} />
-                          <Metric label="Taxes" amount={taxesAmount} count={grossSalesCount} />
-                          <Metric label="Returns" amount={returnsAmount} count={returnsCount} />
+                          {selectedPlatform === 'd2c' ? (
+                            <>
+                              <Metric label="Taxes" amount={taxesAmount} count={grossSalesCount} />
+                              <Metric label="Returns" amount={returnsAmount} count={returnsCount} />
+                            </>
+                          ) : (
+                            <Metric label="Net Sales" amount={netSalesAmount} count={netSalesCount} />
+                          )}
                           <Metric label="Amount Settled" amount={Math.abs(Number(s?.total_settled_amount || 0))} count={Math.abs(Number(s?.total_settled_orders || 0))} />
                           <Metric label="Payment Due" amount={Math.abs(Number(s?.total_unsettled_amount || 0))} count={Math.abs(Number(s?.total_unsettled_orders || 0))} />
                         </Box>
