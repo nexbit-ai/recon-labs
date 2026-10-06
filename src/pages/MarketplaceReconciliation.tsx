@@ -3418,6 +3418,9 @@ const MarketplaceReconciliation: React.FC = () => {
                             <Metric label="Net Sales" amount={netSalesAmount} count={netSalesCount} />
                           )}
                           <Metric label="Amount Settled" amount={Math.abs(Number(s?.total_settled_amount || 0))} count={Math.abs(Number(s?.total_settled_orders || 0))} />
+                          {selectedPlatform === 'flipkart' && (
+                            <Metric label="CODB" amount={Math.abs(Number(s?.total_cost_of_doing_business || 0))} />
+                          )}
                           <Metric label="Payment Due" amount={Math.abs(Number(s?.total_unsettled_amount || 0))} count={Math.abs(Number(s?.total_unsettled_orders || 0))} />
                         </Box>
                       </Box>
