@@ -3352,21 +3352,20 @@ const MarketplaceReconciliation: React.FC = () => {
                     const grossSalesAmount = Math.abs(Number(s?.total_transactions_amount || 0));
                     const grossSalesCount = Number(s?.total_transaction_orders || 0);
 
+                    // Taxes from API
+                    const taxesAmount = Math.abs(Number(s?.total_taxes_amount || 0));
+
                     const returnsAmount = Math.abs(Number(s?.total_return_amount || 0));
                     const returnsCount = Number(s?.total_return_orders || 0);
 
                     const cancellationsAmount = Math.abs(Number(s?.total_cancellations_amount || 0));
                     const cancellationsCount = Number(s?.total_cancellations_orders || 0);
 
-                    // API-provided Net Sales values
-                    const netSalesAmount = Math.abs(Number(s?.net_sales_amount || 0));
-                    const netSalesCount = Number(s?.net_sales_orders || 0);
-
                     // Previous return/cancellations metrics
                     const prevReturnOrCancelledAmount = Math.abs(Number(s?.prev_return_or_cancelled_amount || 0));
                     const prevReturnOrCancelledCount = Number(s?.prev_return_or_cancelled_orders || 0);
 
-                    const Metric = ({ label, amount, count, onClick }: { label: string; amount: number; count: number; onClick?: () => void }) => (
+                    const Metric = ({ label, amount, count, onClick }: { label: string; amount: number; count?: number; onClick?: () => void }) => (
                       <Box
                         onClick={onClick}
                         sx={{
@@ -3383,14 +3382,16 @@ const MarketplaceReconciliation: React.FC = () => {
                         <Typography sx={{ fontSize: '1.5rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
                           {getCurrencySymbol()}{Math.round(Number(amount || 0)).toLocaleString(getCurrencyLocale())}
                         </Typography>
-                        <Box sx={{ display: 'flex', width: '100%', alignItems: 'baseline' }}>
-                          <Typography sx={{ flex: 1, textAlign: 'right', pr: 0.5, fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.025em', fontVariantNumeric: 'tabular-nums' }}>
-                            {Number(count || 0).toLocaleString('en-IN')}
-                          </Typography>
-                          <Typography sx={{ flex: 1, textAlign: 'left', pl: 0, fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
-                            orders
-                          </Typography>
-                        </Box>
+                        {count !== undefined && (
+                          <Box sx={{ display: 'flex', width: '100%', alignItems: 'baseline' }}>
+                            <Typography sx={{ flex: 1, textAlign: 'right', pr: 0.5, fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.025em', fontVariantNumeric: 'tabular-nums' }}>
+                              {Number(count || 0).toLocaleString('en-IN')}
+                            </Typography>
+                            <Typography sx={{ flex: 1, textAlign: 'left', pl: 0, fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
+                              orders
+                            </Typography>
+                          </Box>
+                        )}
                       </Box>
                     );
 
@@ -3404,7 +3405,8 @@ const MarketplaceReconciliation: React.FC = () => {
                       <Box sx={{ p: 3 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, flexWrap: 'wrap' }}>
                           <Metric label="Gross Sales" amount={grossSalesAmount} count={grossSalesCount} />
-                          <Metric label="Net Sales" amount={netSalesAmount} count={netSalesCount} />
+                          <Metric label="Taxes" amount={taxesAmount} count={grossSalesCount} />
+                          <Metric label="Returns" amount={returnsAmount} count={returnsCount} />
                           <Metric label="Amount Settled" amount={Math.abs(Number(s?.total_settled_amount || 0))} count={Math.abs(Number(s?.total_settled_orders || 0))} />
                           <Metric label="Payment Due" amount={Math.abs(Number(s?.total_unsettled_amount || 0))} count={Math.abs(Number(s?.total_unsettled_orders || 0))} />
                         </Box>
