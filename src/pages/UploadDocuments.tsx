@@ -153,6 +153,10 @@ const UploadDocuments: React.FC = () => {
   const allowedSubPlatformOrgs = ['3d718fbf-4e12-4be6-a79e-b66e492bd063', 'e948288b-26ba-4cff-afb2-9ff145026b96'];
   const hasFlipkartSubPlatforms = organizationId ? allowedSubPlatformOrgs.some(id => organizationId.includes(id)) : false;
 
+  const currentOrgId = organizationId || session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID;
+  const shopifySalesOrgs = ['4381e181-cda5-4c94-8a02-7d3092065949'];
+  const isShopifySalesOrg = currentOrgId ? shopifySalesOrgs.some(id => currentOrgId.includes(id)) : false;
+
   const [flipkartSubPlatform, setFlipkartSubPlatform] = useState<string>('Main Account');
   const flipkartSubPlatforms = hasFlipkartSubPlatforms 
     ? ['bengaluru', 'Guwahati', 'Hyderabad', 'Kolkata', 'Main Account'] 
@@ -773,7 +777,7 @@ const UploadDocuments: React.FC = () => {
     if (pendingUpload && !pendingUpload.noFileYet) {
       if (pendingUpload.vendorId === 'cred') {
         handleD2cUpload(pendingUpload.vendorId as any, pendingUpload.kind as any);
-      } else if (pendingUpload.vendorId === 'unicommerce') {
+      } else if (pendingUpload.vendorId === 'unicommerce' || pendingUpload.vendorId === 'shopify') {
         handleUnicommerceUpload();
       } else {
         performMarketplaceUpload(pendingUpload.vendorId as any, pendingUpload.kind as any);
@@ -1100,21 +1104,25 @@ const UploadDocuments: React.FC = () => {
     }
   };
 
-  // Unicommerce Sales Upload handler
+  // D2C Sales Upload handler (Unicommerce or Shopify based on org)
   const handleUnicommerceUpload = async (fileOverride?: File | null) => {
     const file = fileOverride || unicommerceFile;
     if (!file || selectedYear === null || selectedMonth === null) return;
 
-    setUploadingVendor('unicommerce_sales');
+    const reportType = isShopifySalesOrg ? 'shopify' : 'unicommerce';
+    const vendorLabel = isShopifySalesOrg ? 'Shopify' : 'Unicommerce';
+    const uploadingKey = isShopifySalesOrg ? 'shopify_sales' : 'unicommerce_sales';
+
+    setUploadingVendor(uploadingKey);
     setUploadStatus(null);
 
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('description', `Unicommerce sales file for ${months[selectedMonth]} ${selectedYear}`);
+      formData.append('description', `${vendorLabel} sales file for ${months[selectedMonth]} ${selectedYear}`);
       formData.append('month', months[selectedMonth]);
       formData.append('year', selectedYear.toString());
-      formData.append('report_type', 'unicommerce');
+      formData.append('report_type', reportType);
 
       let customToken: string | null = null;
       if (session) {
@@ -1147,13 +1155,13 @@ const UploadDocuments: React.FC = () => {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Upload failed' }));
         if (response.status === 400) {
-          throw new Error('Please upload the correct file for Unicommerce');
+          throw new Error(`Please upload the correct file for ${vendorLabel}`);
         }
         throw new Error(errorData.message || errorData.error || `Upload failed with status ${response.status}`);
       }
 
       await response.json();
-      setUploadStatus({ type: 'success', message: `Successfully uploaded Unicommerce sales file` });
+      setUploadStatus({ type: 'success', message: `Successfully uploaded ${vendorLabel} sales file` });
       setUnicommerceFile(null);
 
       // refresh list
@@ -1328,6 +1336,15 @@ const UploadDocuments: React.FC = () => {
 
   const unicommerceDoc = getUploadedDocument('unicommerce');
   const unicommerceStatus = getUploadProcessingStatus(unicommerceDoc);
+  const shopifyDoc = getUploadedDocument('shopify');
+  const shopifyStatus = getUploadProcessingStatus(shopifyDoc);
+
+  const d2cSalesDoc = isShopifySalesOrg ? shopifyDoc : unicommerceDoc;
+  const d2cSalesStatus = isShopifySalesOrg ? shopifyStatus : unicommerceStatus;
+  const d2cSalesVendor = isShopifySalesOrg ? 'shopify' : 'unicommerce';
+  const d2cSalesLabel = isShopifySalesOrg ? 'Shopify sales' : 'Unicommerce sales';
+  const d2cSalesTitle = isShopifySalesOrg ? 'Shopify Sales' : 'Sales File';
+  const d2cUploadingKey = isShopifySalesOrg ? 'shopify_sales' : 'unicommerce_sales';
   
   const magentoDoc = getUploadedDocument('magento_sales');
   const magentoStatus = getUploadProcessingStatus(magentoDoc);
@@ -4555,22 +4572,22 @@ const UploadDocuments: React.FC = () => {
               </Alert>
             )}
             <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 0, position: 'relative', maxWidth: 1200, mx: 'auto', flexWrap: 'wrap' }}>
-                {/* Step 1: Sales File (Unicommerce) */}
+                {/* Step 1: Sales File (Unicommerce / Shopify) */}
               <Paper 
                 elevation={0}
                 sx={{ 
                   flex: '0 0 auto',
                   width: 200,
                   p: 2,
-                  border: unicommerceStatus === 'processing'
+                  border: d2cSalesStatus === 'processing'
                     ? '2px solid #16a34a'
-                    : unicommerceStatus === 'pending'
+                    : d2cSalesStatus === 'pending'
                       ? '2px solid #f59e0b'
                       : '2px solid #e5e7eb',
                   borderRadius: '12px',
-                  background: unicommerceStatus === 'processing'
+                  background: d2cSalesStatus === 'processing'
                     ? '#f0fdf4'
-                    : unicommerceStatus === 'pending'
+                    : d2cSalesStatus === 'pending'
                       ? '#fffbeb'
                       : '#ffffff',
                   position: 'relative',
@@ -4583,19 +4600,19 @@ const UploadDocuments: React.FC = () => {
                     width: 32, 
                     height: 32, 
                     borderRadius: '50%', 
-                    background: unicommerceStatus === 'processing'
+                    background: d2cSalesStatus === 'processing'
                       ? '#16a34a'
-                      : unicommerceStatus === 'pending'
+                      : d2cSalesStatus === 'pending'
                         ? '#f59e0b'
                         : '#f3f4f6',
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
-                    border: unicommerceStatus !== 'none' ? 'none' : '2px solid #d1d5db'
+                    border: d2cSalesStatus !== 'none' ? 'none' : '2px solid #d1d5db'
                   }}>
-                      {unicommerceStatus === 'processing' ? (
+                      {d2cSalesStatus === 'processing' ? (
                       <CheckCircleIcon sx={{ fontSize: 20, color: '#ffffff' }} />
-                      ) : unicommerceStatus === 'pending' ? (
+                      ) : d2cSalesStatus === 'pending' ? (
                       <ScheduleIcon sx={{ fontSize: 18, color: '#ffffff' }} />
                       ) : (
                         <></>
@@ -4604,30 +4621,30 @@ const UploadDocuments: React.FC = () => {
                   
                   {/* Step Title */}
                   <Typography variant="body2" fontWeight={600} color="#111111" textAlign="center">
-                    Sales File
+                    {d2cSalesTitle}
                       </Typography>
                   
                   {/* Uploaded File Info */}
-                  {unicommerceDoc && unicommerceStatus !== 'none' && (
+                  {d2cSalesDoc && d2cSalesStatus !== 'none' && (
                     <Typography
                       variant="caption"
-                      color={unicommerceStatus === 'processing' ? '#16a34a' : '#b45309'}
+                      color={d2cSalesStatus === 'processing' ? '#16a34a' : '#b45309'}
                       sx={{ textAlign: 'center', display: 'block', fontSize: '10px' }}
                     >
-                      {unicommerceDoc.filename} • {unicommerceStatus === 'processing' ? 'Processed' : 'Pending'}
+                      {d2cSalesDoc.filename} • {d2cSalesStatus === 'processing' ? 'Processed' : 'Pending'}
                     </Typography>
                   )}
                   
                   {/* File Input */}
                     <input
-                      accept={getAcceptForVendor('unicommerce')}
+                      accept={getAcceptForVendor(d2cSalesVendor)}
                       style={{ display: 'none' }}
                       id="d2c-unicommerce-sales-upload"
                       type="file"
                       onChange={async (e) => {
                         const file = e.target.files?.[0] || null;
                         if (file) {
-                          if (!validateFileType(file, 'unicommerce', 'Unicommerce sales')) {
+                          if (!validateFileType(file, d2cSalesVendor, d2cSalesLabel)) {
                             e.target.value = '';
                             return;
                           }
@@ -4636,17 +4653,17 @@ const UploadDocuments: React.FC = () => {
                         }
                         e.target.value = '';
                       }}
-                      disabled={uploadingVendor === 'unicommerce_sales'}
+                      disabled={uploadingVendor === d2cUploadingKey}
                     />
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
-                      {unicommerceDoc && (
-                        <Tooltip title={`Download ${unicommerceDoc.filename}`}>
+                      {d2cSalesDoc && (
+                        <Tooltip title={`Download ${d2cSalesDoc.filename}`}>
                           <Button
                             variant="outlined"
                             size="small"
-                            startIcon={downloadingDocId === unicommerceDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
-                            disabled={downloadingDocId === unicommerceDoc.id}
-                            onClick={(e) => handleDownloadDocument(unicommerceDoc, e)}
+                            startIcon={downloadingDocId === d2cSalesDoc.id ? <CircularProgress size={12} /> : <DownloadIcon sx={{ fontSize: '0.85rem !important' }} />}
+                            disabled={downloadingDocId === d2cSalesDoc.id}
+                            onClick={(e) => handleDownloadDocument(d2cSalesDoc, e)}
                             sx={{
                               fontSize: '0.75rem',
                               py: 0.75,
@@ -4662,18 +4679,18 @@ const UploadDocuments: React.FC = () => {
                               },
                             }}
                           >
-                            {downloadingDocId === unicommerceDoc.id ? '...' : 'Download'}
+                            {downloadingDocId === d2cSalesDoc.id ? '...' : 'Download'}
                           </Button>
                         </Tooltip>
                       )}
                       <Button
-                        variant={isVendorUploaded('unicommerce') ? 'outlined' : 'contained'}
+                        variant={isVendorUploaded(d2cSalesVendor) ? 'outlined' : 'contained'}
                         size="small"
                         startIcon={<CloudUploadIcon />}
-                        disabled={uploadingVendor === 'unicommerce_sales'}
-                        endIcon={uploadingVendor === 'unicommerce_sales' ? <CircularProgress size={14} /> : null}
+                        disabled={uploadingVendor === d2cUploadingKey}
+                        endIcon={uploadingVendor === d2cUploadingKey ? <CircularProgress size={14} /> : null}
                         onClick={(e) => {
-                          handleFileInputClick(e, 'd2c-unicommerce-sales-upload', 'unicommerce' as any, 'sales' as any);
+                          handleFileInputClick(e, 'd2c-unicommerce-sales-upload', d2cSalesVendor as any, 'sales' as any);
                         }}
                         sx={{ 
                           minWidth: 80,
@@ -4681,13 +4698,13 @@ const UploadDocuments: React.FC = () => {
                           py: 0.75,
                           px: 1.2,
                           textTransform: 'none',
-                          ...(isVendorUploaded('unicommerce') && {
-                            borderColor: unicommerceStatus === 'pending' ? '#f59e0b' : '#16a34a',
-                            color: unicommerceStatus === 'pending' ? '#b45309' : '#16a34a'
+                          ...(isVendorUploaded(d2cSalesVendor) && {
+                            borderColor: d2cSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                            color: d2cSalesStatus === 'pending' ? '#b45309' : '#16a34a'
                           })
                         }}
                       >
-                        {uploadingVendor === 'unicommerce_sales' ? 'Uploading...' : isVendorUploaded('unicommerce') ? 'Re-upload' : 'Upload'}
+                        {uploadingVendor === d2cUploadingKey ? 'Uploading...' : isVendorUploaded(d2cSalesVendor) ? 'Re-upload' : 'Upload'}
                       </Button>
                     </Box>
             </Box>
@@ -4696,13 +4713,13 @@ const UploadDocuments: React.FC = () => {
               {/* Step 1b: Magento Sales File (Conditional) */}
               {hasFlipkartSubPlatforms && (
                 <>
-                {/* Connector Line between Unicommerce and Magento */}
+                {/* Connector Line between Unicommerce/Shopify and Magento */}
                 <Box sx={{ 
                   width: 40,
                   height: '3px',
-                  background: unicommerceStatus === 'processing'
+                  background: d2cSalesStatus === 'processing'
                     ? 'linear-gradient(to right, #16a34a, #16a34a)'
-                    : unicommerceStatus === 'pending'
+                    : d2cSalesStatus === 'pending'
                       ? 'linear-gradient(to right, #f59e0b, #f59e0b)'
                       : 'linear-gradient(to right, #d1d5db, #d1d5db)',
                   position: 'relative',
@@ -4845,16 +4862,16 @@ const UploadDocuments: React.FC = () => {
               <Box sx={{ 
                 width: 60,
                 height: '3px',
-                background: unicommerceStatus === 'processing'
+                background: d2cSalesStatus === 'processing'
                   ? 'linear-gradient(to right, #16a34a, #16a34a)'
-                  : unicommerceStatus === 'pending'
+                  : d2cSalesStatus === 'pending'
                     ? 'linear-gradient(to right, #f59e0b, #f59e0b)'
                     : 'linear-gradient(to right, #d1d5db, #d1d5db)',
                 position: 'relative',
                 zIndex: 3,
                 alignSelf: 'center'
               }}>
-                {unicommerceStatus !== 'none' && (
+                {d2cSalesStatus !== 'none' && (
                   <Box sx={{
                     position: 'absolute',
                     right: -8,
@@ -4863,7 +4880,7 @@ const UploadDocuments: React.FC = () => {
                     width: 16,
                     height: 16,
                     borderRadius: '50%',
-                    background: unicommerceStatus === 'pending' ? '#f59e0b' : '#16a34a',
+                    background: d2cSalesStatus === 'pending' ? '#f59e0b' : '#16a34a',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
