@@ -84,6 +84,7 @@ import {
 interface TransactionRow {
   "Order ID"?: string;
   "Order Item ID"?: string;
+  "Listing Price"?: number;
   "Order Value": number;
   "Settlement Value": number;
   "Invoice Date": string;
@@ -102,6 +103,7 @@ interface TransactionRow {
 // API Response structure based on actual data
 interface TransactionApiResponse {
   order_id: string;
+  listing_price?: number;
   order_value: number;
   settlement_amount: number;
   invoice_date: string;
@@ -241,6 +243,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   };
 
   // Extract values from the new API structure
+  const listingPrice = parseNumericValue(orderItem.listing_price);
   const orderValue = parseNumericValue(orderItem.order_value);
   const settlementValue = parseNumericValue(orderItem.settlement_amount); // Changed from settlement_value to settlement_amount
   const difference = parseNumericValue(orderItem.diff);
@@ -289,6 +292,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
   return {
     "Order ID": backendOrderId || `ORD_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
     "Order Item ID": undefined,
+    "Listing Price": listingPrice,
     "Order Value": orderValue,
     "Settlement Value": settlementValue,
     "Invoice Date": invoiceDate,
@@ -310,6 +314,7 @@ const transformOrderItemToTransactionRow = (orderItem: any): TransactionRow => {
 const mockTransactionData: TransactionData = {
   columns: [
     "Order Item ID",
+    "Listing Price",
     "Order Value",
     "Settlement Value",
     "Invoice Date",
@@ -1987,6 +1992,7 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
   'Invoice Date': { apiParam: 'invoice_date', type: 'date' }, // → invoice_date_from/to
   'Order Date': { apiParam: 'order_date', type: 'date', supportedPlatforms: ['myntra'] }, // → order_date_from/to
   'Settlement Date': { apiParam: 'settlement_date', type: 'date' },
+  'Listing Price': { apiParam: 'listing_price', type: 'number' },
   'Order Value': { apiParam: 'order_value', type: 'number' },
   'Settlement Value': { apiParam: 'settlement_value', type: 'number' },
   'Difference': { apiParam: 'diff', type: 'number' },
@@ -2001,6 +2007,7 @@ const COLUMN_TO_API_PARAM_MAP: Record<string, {
 
 // Mapping of sortable UI columns to backend sort_by values
 const COLUMN_TO_SORT_BY_MAP: Record<string, string> = {
+  'Listing Price': 'listing_price',
   'Invoice Date': 'invoice_date',
   'Settlement Date': 'settlement_date',
   'Order Value': 'order_value',
@@ -2409,6 +2416,18 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
     if (!isSpecificOrg) {
       cols = cols.filter(title => title !== 'Sub-Platform' && title !== 'Listing Price' && title !== 'GT Charge');
+    } else {
+      // Ensure "Listing Price" appears right before "Order Value" for transaction tabs (0: Matched, 1: Mismatched, 2: Unsettled, 3: All)
+      if ([0, 1, 2, 3].includes(activeTab)) {
+        const orderValueIdx = cols.indexOf('Order Value');
+        if (orderValueIdx !== -1 && !cols.includes('Listing Price')) {
+          cols = [
+            ...cols.slice(0, orderValueIdx),
+            'Listing Price',
+            ...cols.slice(orderValueIdx)
+          ];
+        }
+      }
     }
     return cols;
   };
@@ -4885,14 +4904,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
         'Commission', 'Shipping', 'Fixed Fees', 'Collection Fees', 'Pick & Pack Fees', 'Total MP Commission', 
         'Return Shipping', 'Reverse Shipping', 'Return Fixed Fees', 'Return Collection Fees', 'Return Pick & Pack', 'Total Cost of Returns', 
         'Total Cost Incl GT', 'Tax/TDS/TCS', 'MP Fee Rebate', 'SPF Received', 'Bank Settlement', 
-        'GT% on Listing Fee', 'COB % on Listing Fee', 'Tax%', 'Bank Settlement %', 
-        'Gross Profit', 'Cost Price Per Unit', 'Total Cost Price', 
-        'Net Profit', 'Net Profit / Unit', '% Of Total Sales', '% Of Total Revenue', 
-        'Customer Return %', 'Courier Return %', 'Return %'
+        'GT% on Listing Fee', 'COB % on Listing Fee'
       ];
     }
     const base = [
       "Order ID",
+      ...(isSpecificOrg ? ["Listing Price"] : []),
       "Order Value",
       "Settlement Value",
       "Invoice Date",
@@ -6906,6 +6923,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
                                         }
                                       }
+                                    } else if (column === 'Listing Price') {
+                                      value = (row as any).listing_price ?? (row as any)['Listing Price'];
                                     }
                                   } else if (useNewAPI && totalTransactionsData) {
                                     const columnDef = totalTransactionsData.columns.find(col => col.title === column);
@@ -6921,6 +6940,8 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
 
                                         }
                                       }
+                                    } else if (column === 'Listing Price') {
+                                      value = (row as any).listing_price ?? (row as any)['Listing Price'];
                                     }
                                   } else {
                                     value = (row as any)[column];
@@ -6999,7 +7020,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     if (columnDef) {
                                       switch (columnDef.type) {
                                         case 'currency':
-                                          displayValue = formatCurrency(Number(value) || 0);
+                                          if (columnDef.key === 'listing_price' && (!value || Number(value) === 0)) {
+                                            displayValue = '-';
+                                          } else {
+                                            displayValue = formatCurrency(Number(value) || 0);
+                                          }
                                           break;
                                         case 'date':
                                           // Don't format "NA" as a date
@@ -7011,6 +7036,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         default:
                                           displayValue = String(value || '');
                                       }
+                                    } else if (column === 'Listing Price') {
+                                      const num = Number(value);
+                                      displayValue = (!value || num === 0 || isNaN(num)) ? '-' : formatCurrency(num);
                                     }
                                   } else if (useNewAPI && totalTransactionsData) {
                                     // Use column type information for formatting
@@ -7018,7 +7046,11 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                     if (columnDef) {
                                       switch (columnDef.type) {
                                         case 'currency':
-                                          displayValue = formatCurrency(Number(value) || 0);
+                                          if (columnDef.key === 'listing_price' && (!value || Number(value) === 0)) {
+                                            displayValue = '-';
+                                          } else {
+                                            displayValue = formatCurrency(Number(value) || 0);
+                                          }
                                           break;
                                         case 'date':
                                           // Don't format "NA" as a date
@@ -7030,6 +7062,9 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                         default:
                                           displayValue = String(value || '');
                                       }
+                                    } else if (column === 'Listing Price') {
+                                      const num = Number(value);
+                                      displayValue = (!value || num === 0 || isNaN(num)) ? '-' : formatCurrency(num);
                                     }
                                   } else {
                                     // Old API formatting
@@ -7037,8 +7072,12 @@ const TransactionSheet: React.FC<TransactionSheetProps> = ({ onBack, open, trans
                                       // Default reason to the remark for now
                                       displayValue = (row as any)['Remark'] || value || '-';
                                     } else if (typeof value === 'number') {
-                                      if (column === 'Order Value' || column === 'Settlement Value' || column === 'Difference') {
-                                        displayValue = formatCurrency(value);
+                                      if (column === 'Listing Price' || column === 'Order Value' || column === 'Settlement Value' || column === 'Difference') {
+                                        if (column === 'Listing Price' && (!value || Number(value) === 0)) {
+                                          displayValue = '-';
+                                        } else {
+                                          displayValue = formatCurrency(value);
+                                        }
                                       } else {
                                         displayValue = value.toLocaleString(getCurrencyLocale());
                                       }

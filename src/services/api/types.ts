@@ -390,6 +390,7 @@ export interface TransactionBreakup {
 
 export interface TransactionRow {
   order_id: string;
+  listing_price?: number;
   order_value: number;
   settlement_amount: number;
   invoice_date: string;
