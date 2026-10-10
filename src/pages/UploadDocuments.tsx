@@ -154,7 +154,7 @@ const UploadDocuments: React.FC = () => {
   const hasFlipkartSubPlatforms = organizationId ? allowedSubPlatformOrgs.some(id => organizationId.includes(id)) : false;
 
   const currentOrgId = organizationId || session?.organization_id || localStorage.getItem('organization_id') || API_CONFIG.ORG_ID;
-  const shopifySalesOrgs = ['4381e181-cda5-4c94-8a02-7d3092065949'];
+  const shopifySalesOrgs = ['4381e181-cda5-4c94-8a02-7d3092065949', 'd9306d0f-40f4-412c-abe2-64c0714fd8a1'];
   const isShopifySalesOrg = currentOrgId ? shopifySalesOrgs.some(id => currentOrgId.includes(id)) : false;
 
   const [flipkartSubPlatform, setFlipkartSubPlatform] = useState<string>('Main Account');
