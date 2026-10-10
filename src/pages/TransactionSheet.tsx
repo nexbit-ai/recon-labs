@@ -1301,13 +1301,44 @@ const TransactionDetailsPopup: React.FC<{
               zIndex: 9999,
             }}
           >
-            <Box sx={{ p: 2, maxWidth: '300px', bgcolor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#0f172a', mb: 1, fontSize: '0.7rem' }}>
-                Formula
+            <Box sx={{ p: 2, maxWidth: '340px', bgcolor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.75rem' }}>
+                Calculation Formula
               </Typography>
-              <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.6rem', lineHeight: 1.5 }}>
-                abs(buyer_invoice_amount) + marketplace_fee + taxes + customer_addons_amount + total_offer_amount + seller_share_offer + offer_adjustments + refund + reverse - settlement_value
-              </Typography>
+              {(() => {
+                const comm = Number((transaction as any)?.commission_amount || (transaction as any)?.metadata?.settlement_value?.commission_amount || originalData?.commission_amount || 0);
+                const commTax = Number((transaction as any)?.commission_taxes || (transaction as any)?.metadata?.settlement_value?.commission_taxes || originalData?.commission_taxes || 0);
+                const isD2C = (transaction as any)?.platform === 'd2c' || comm > 0 || commTax > 0;
+                const settleAmt = collectionReceived || Number((transaction as any)?.settlement_amount || 0);
+
+                if (isD2C) {
+                  return (
+                    <>
+                      <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.65rem', lineHeight: 1.4 }}>
+                        Difference = Buyer Invoice Amount − (Settlement Amount + Commission + Taxes)
+                      </Typography>
+                      <Box sx={{ p: 1, bgcolor: '#f8fafc', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                        <Typography variant="caption" sx={{ color: '#0f172a', fontSize: '0.7rem', fontWeight: 600, fontFamily: 'monospace', display: 'block', wordBreak: 'break-word' }}>
+                          {formatCurrency(orderValue)} − ({formatCurrency(settleAmt)}{comm > 0 ? ` + ${formatCurrency(comm)}` : ''}{commTax > 0 ? ` + ${formatCurrency(commTax)}` : ''}) = {formatCurrency(difference)}
+                        </Typography>
+                      </Box>
+                    </>
+                  );
+                }
+
+                return (
+                  <>
+                    <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.65rem', lineHeight: 1.4 }}>
+                      abs(buyer_invoice_amount) + marketplace_fee + taxes + customer_addons_amount + total_offer_amount + seller_share_offer + offer_adjustments + refund + reverse − settlement_value
+                    </Typography>
+                    <Box sx={{ p: 1, bgcolor: '#f8fafc', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                      <Typography variant="caption" sx={{ color: '#0f172a', fontSize: '0.7rem', fontWeight: 600, fontFamily: 'monospace', display: 'block', wordBreak: 'break-word' }}>
+                        {formatCurrency(Math.abs(orderValue))} − {formatCurrency(settleAmt)} = {formatCurrency(difference)}
+                      </Typography>
+                    </Box>
+                  </>
+                );
+              })()}
             </Box>
           </Popover>
         </Box>
@@ -1334,9 +1365,10 @@ const BreakupsModal: React.FC<{
 
   // Extract order_value and settlement_value from metadata
   const orderValue = metadata?.order_value || {};
-  const settlementValue = metadata?.settlement_value || {};
-  const diff = metadata?.diff || 0;
-  const mismatchReason = metadata?.mismatch_reason || '';
+  const rawSettlementValue = metadata?.settlement_value || {};
+  const rawDiff = metadata?.diff !== undefined ? metadata.diff : ((breakups as any)?.diff ?? 0);
+  const diff = typeof rawDiff === 'number' ? rawDiff : parseFloat(rawDiff || '0') || 0;
+  const mismatchReason = metadata?.mismatch_reason || (breakups as any)?.mismatch_reason || '';
 
   // Convert snake_case keys to readable format: remove underscores and capitalize first letter
   const formatKey = (key: string) => {
@@ -1344,8 +1376,6 @@ const BreakupsModal: React.FC<{
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
   };
-
-
 
   // Format value based on type
   const formatValue = (value: any): string => {
@@ -1355,21 +1385,66 @@ const BreakupsModal: React.FC<{
     return String(value || '');
   };
 
-  // Extract buyer_invoice_amount from order_value and get remaining fields
-  const buyerInvoiceAmount = orderValue?.buyer_invoice_amount || 0;
+  // Extract commission and taxes from all potential sources (settlement_value, row, originalData, metadata)
+  const rawCommission = (rawSettlementValue as any)?.commission_amount ??
+    (rawSettlementValue as any)?.commission ??
+    (breakups as any)?.commission_amount ??
+    (breakups as any)?.originalData?.commission_amount ??
+    metadata?.commission_amount;
+  const commissionAmount = rawCommission !== undefined && rawCommission !== null ? Number(rawCommission) : 0;
+
+  const rawCommissionTaxes = (rawSettlementValue as any)?.commission_taxes ??
+    (rawSettlementValue as any)?.commission_tax ??
+    (rawSettlementValue as any)?.taxes ??
+    (breakups as any)?.commission_taxes ??
+    (breakups as any)?.originalData?.commission_taxes ??
+    metadata?.commission_taxes;
+  const commissionTaxes = rawCommissionTaxes !== undefined && rawCommissionTaxes !== null ? Number(rawCommissionTaxes) : 0;
+
+  // Build effective settlementValue ensuring commission and taxes are represented
+  const settlementValue: Record<string, any> = { ...rawSettlementValue };
+  if (commissionAmount > 0 && settlementValue.commission_amount === undefined && settlementValue.commission === undefined) {
+    settlementValue.commission_amount = commissionAmount;
+  }
+  if (commissionTaxes > 0 && settlementValue.commission_taxes === undefined && settlementValue.commission_tax === undefined) {
+    settlementValue.commission_taxes = commissionTaxes;
+  }
+
+  // Extract buyer_invoice_amount from order_value or top-level row fields
+  const buyerInvoiceAmount = Number(
+    orderValue?.buyer_invoice_amount ??
+    (breakups as any)?.order_value ??
+    (breakups as any)?.selling_price ??
+    (breakups as any)?.originalData?.selling_price ??
+    0
+  );
   const orderValueOtherFields = Object.entries(orderValue)
     .filter(([key]) => key !== 'buyer_invoice_amount')
     .map(([key, value]) => ({
+      key,
       label: formatKey(key),
       value: value
     }));
 
-  // Extract settlement_amount from settlement_value and get remaining fields
-  const settlementAmount = settlementValue?.settlement_amount || 0;
+  // Extract settlement_amount from settlement_value or top-level row fields
+  const settlementAmount = Number(
+    settlementValue?.settlement_amount ??
+    (breakups as any)?.settlement_amount ??
+    (breakups as any)?.originalData?.settlement_amount ??
+    0
+  );
+
+  const formatSettlementLabel = (key: string) => {
+    if (key === 'commission_amount' || key === 'commission') return 'Commission / Gateway Fee';
+    if (key === 'commission_taxes' || key === 'commission_tax') return 'Commission Taxes (GST)';
+    return formatKey(key);
+  };
+
   const settlementValueOtherFields = Object.entries(settlementValue)
     .filter(([key]) => key !== 'settlement_amount')
     .map(([key, value]) => ({
-      label: formatKey(key),
+      key,
+      label: formatSettlementLabel(key),
       value: value
     }));
 
@@ -1447,13 +1522,75 @@ const BreakupsModal: React.FC<{
     calculationFormulaStr = `Calculation: ${calcParts.join(' ')} = ${formatCurrency(myntraExpectedSettled)}`;
   }
 
+  // Build formula & calculation values for non-Myntra platforms (D2C, Flipkart, Amazon, etc.)
+  let nonMyntraFormulaValuesStr = '';
+
+  const platformLower = String(platform || (breakups as any)?.platform || '').toLowerCase();
+
+  if (platformLower === 'flipkart') {
+    const fkFee = Number(settlementValue?.marketplace_fee || 0);
+    const fkTaxes = Number(settlementValue?.taxes || 0);
+    const fkAddons = Number(settlementValue?.customer_addons_amount || 0);
+    const fkOffers = Number(settlementValue?.total_offer_amount || 0);
+    const fkSellerOffers = Number(settlementValue?.seller_share_offer || 0);
+    const fkAdjustments = Number(settlementValue?.offer_adjustments || 0);
+    const fkRefund = Number(settlementValue?.refund || 0);
+    const fkReverse = Number(settlementValue?.reverse || 0);
+
+    const parts: string[] = [formatCurrency(Math.abs(buyerInvoiceAmount))];
+    if (fkFee !== 0) parts.push(`${fkFee < 0 ? '−' : '+'} ${formatCurrency(Math.abs(fkFee))}`);
+    if (fkTaxes !== 0) parts.push(`${fkTaxes < 0 ? '−' : '+'} ${formatCurrency(Math.abs(fkTaxes))}`);
+    if (fkAddons !== 0) parts.push(`${fkAddons < 0 ? '−' : '+'} ${formatCurrency(Math.abs(fkAddons))}`);
+    if (fkOffers !== 0) parts.push(`${fkOffers < 0 ? '−' : '+'} ${formatCurrency(Math.abs(fkOffers))}`);
+    if (fkSellerOffers !== 0) parts.push(`${fkSellerOffers < 0 ? '−' : '+'} ${formatCurrency(Math.abs(fkSellerOffers))}`);
+    if (fkAdjustments !== 0) parts.push(`${fkAdjustments < 0 ? '−' : '+'} ${formatCurrency(Math.abs(fkAdjustments))}`);
+    if (fkRefund !== 0) parts.push(`${fkRefund < 0 ? '−' : '+'} ${formatCurrency(Math.abs(fkRefund))}`);
+    if (fkReverse !== 0) parts.push(`${fkReverse < 0 ? '−' : '+'} ${formatCurrency(Math.abs(fkReverse))}`);
+    parts.push(`− ${formatCurrency(settlementAmount)}`);
+    nonMyntraFormulaValuesStr = `${parts.join(' ')} = ${formatCurrency(diff)}`;
+  } else if (platformLower === 'amazon') {
+    const amzFee = Number(settlementValue?.marketplace_fee || 0);
+    const amzTaxes = Number(settlementValue?.taxes || 0);
+    const amzTcs = Number(settlementValue?.tcs || 0);
+    const amzTds = Number(settlementValue?.tds || 0);
+
+    const deductionValues: string[] = [formatCurrency(settlementAmount)];
+    if (amzFee !== 0) deductionValues.push(formatCurrency(Math.abs(amzFee)));
+    if (amzTaxes !== 0) deductionValues.push(formatCurrency(Math.abs(amzTaxes)));
+    if (amzTcs !== 0) deductionValues.push(formatCurrency(Math.abs(amzTcs)));
+    if (amzTds !== 0) deductionValues.push(formatCurrency(Math.abs(amzTds)));
+
+    nonMyntraFormulaValuesStr = `${formatCurrency(buyerInvoiceAmount)} − (${deductionValues.join(' + ')}) = ${formatCurrency(diff)}`;
+  } else {
+    // D2C and generic platforms
+    const feeDiff = Math.max(0, buyerInvoiceAmount - settlementAmount);
+    const hasExplicitFees = commissionAmount > 0 || commissionTaxes > 0;
+    const effectiveCommission = hasExplicitFees ? commissionAmount : (Math.abs(diff) < 0.01 && feeDiff > 0 ? feeDiff : 0);
+    const effectiveTaxes = commissionTaxes;
+
+    if (hasExplicitFees || (effectiveCommission > 0 && Math.abs(diff) < 0.01)) {
+      const deductionVals: string[] = [formatCurrency(settlementAmount)];
+
+      if (effectiveCommission > 0) {
+        deductionVals.push(formatCurrency(effectiveCommission));
+      }
+      if (effectiveTaxes > 0) {
+        deductionVals.push(formatCurrency(effectiveTaxes));
+      }
+
+      nonMyntraFormulaValuesStr = `${formatCurrency(buyerInvoiceAmount)} − (${deductionVals.join(' + ')}) = ${formatCurrency(diff)}`;
+    } else {
+      nonMyntraFormulaValuesStr = `${formatCurrency(buyerInvoiceAmount)} − ${formatCurrency(settlementAmount)} = ${formatCurrency(diff)}`;
+    }
+  }
+
   // Calculate smart positioning similar to TransactionDetailsPopup
   const getPopupPosition = () => {
     const rect = anchorEl.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
-    const popupHeight = 400; // Height for breakups popup
-    const popupWidth = 400;
+    const popupHeight = 480; // Height for breakups popup
+    const popupWidth = 440;
     const offset = 12;
 
     // Calculate vertical position with better viewport awareness
@@ -1557,7 +1694,7 @@ const BreakupsModal: React.FC<{
           position: 'fixed',
           top: position.top,
           left: position.left,
-          width: '400px',
+          width: '440px',
           maxHeight: position.maxHeight ? `${position.maxHeight}px` : 'auto',
           background: '#ffffff',
           border: '1px solid #e5e7eb',
@@ -1622,7 +1759,7 @@ const BreakupsModal: React.FC<{
         </Box>
 
         {/* Content */}
-        <Box sx={{ p: 2, maxHeight: position.maxHeight ? `${position.maxHeight - 80}px` : '300px', overflowY: 'auto' }}>
+        <Box sx={{ p: 2, maxHeight: position.maxHeight ? `${position.maxHeight - 80}px` : '420px', overflowY: 'auto' }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {platform === 'myntra' ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -1889,33 +2026,46 @@ const BreakupsModal: React.FC<{
             <Box
               sx={{
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                flexDirection: 'column',
+                gap: 0.5,
                 p: 1.5,
-                background: diff === 0 ? '#f0fdf4' : '#fef2f2',
+                background: Math.abs(diff) < 0.01 ? '#f0fdf4' : '#fef2f2',
                 borderRadius: '6px',
-                border: diff === 0 ? '1px solid #86efac' : '1px solid #fca5a5',
+                border: Math.abs(diff) < 0.01 ? '1px solid #86efac' : '1px solid #fca5a5',
               }}
             >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 700,
+                    color: Math.abs(diff) < 0.01 ? '#166534' : '#991b1b',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  Difference
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 800,
+                    color: Math.abs(diff) < 0.01 ? '#166534' : '#991b1b',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  {formatCurrency(diff)}
+                </Typography>
+              </Box>
               <Typography
-                variant="body2"
+                variant="caption"
                 sx={{
-                  fontWeight: 700,
-                  color: diff === 0 ? '#166534' : '#991b1b',
-                  fontSize: '0.875rem',
+                  color: Math.abs(diff) < 0.01 ? '#15803d' : '#991b1b',
+                  fontSize: '0.7rem',
+                  fontStyle: 'italic',
+                  wordBreak: 'break-word',
                 }}
               >
-                Difference
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: 800,
-                  color: diff === 0 ? '#166534' : '#991b1b',
-                  fontSize: '0.875rem',
-                }}
-              >
-                {formatCurrency(diff)}
+                Calculation: {nonMyntraFormulaValuesStr}
               </Typography>
             </Box>
             </>

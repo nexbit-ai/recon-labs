@@ -56,6 +56,7 @@ import {
   TextField,
   Skeleton,
   Drawer,
+  Popover,
 } from '@mui/material';
 import {
   PieChart,
@@ -182,6 +183,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
   Info as InfoIcon,
+  InfoOutlined as InfoOutlinedIcon,
   MonetizationOn as MonetizationIcon,
   AccountBalance as AccountBalanceIcon,
   SwapHoriz as SwapHorizIcon,
@@ -3387,8 +3389,13 @@ const MarketplaceReconciliation: React.FC = () => {
                     const grossSalesAmount = Math.abs(Number(s?.total_transactions_amount || 0));
                     const grossSalesCount = Number(s?.total_transaction_orders || 0);
 
-                    // Taxes from API
+                    // Taxes and Net Adjustments from API (taxes - discounts + shipping charges)
                     const taxesAmount = Math.abs(Number(s?.total_taxes_amount || 0));
+                    const netAdjustmentsAmount = Math.abs(
+                      s?.total_net_adjustments_amount !== undefined
+                        ? Number(s.total_net_adjustments_amount)
+                        : Number(s?.total_taxes_amount || 0)
+                    );
 
                     const returnsAmount = Math.abs(Number(s?.total_return_amount || 0));
                     const returnsCount = Number(s?.total_return_orders || 0);
@@ -3404,35 +3411,105 @@ const MarketplaceReconciliation: React.FC = () => {
                     const prevReturnOrCancelledAmount = Math.abs(Number(s?.prev_return_or_cancelled_amount || 0));
                     const prevReturnOrCancelledCount = Number(s?.prev_return_or_cancelled_orders || 0);
 
-                    const Metric = ({ label, amount, count, onClick }: { label: string; amount: number; count?: number; onClick?: () => void }) => (
-                      <Box
-                        onClick={onClick}
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          width: 160,
-                          cursor: onClick ? 'pointer' : 'default'
-                        }}
-                      >
-                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase', mb: 0.25 }}>
-                          {label}
-                        </Typography>
-                        <Typography sx={{ fontSize: '1.5rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
-                          {getCurrencySymbol()}{Math.round(Number(amount || 0)).toLocaleString(getCurrencyLocale())}
-                        </Typography>
-                        {count !== undefined && (
-                          <Box sx={{ display: 'flex', width: '100%', alignItems: 'baseline' }}>
-                            <Typography sx={{ flex: 1, textAlign: 'right', pr: 0.5, fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.025em', fontVariantNumeric: 'tabular-nums' }}>
-                              {Number(count || 0).toLocaleString('en-IN')}
+                    const Metric = ({
+                      label,
+                      amount,
+                      count,
+                      onClick,
+                      info,
+                    }: {
+                      label: string;
+                      amount: number;
+                      count?: number;
+                      onClick?: () => void;
+                      info?: string;
+                    }) => {
+                      const num = Number(amount || 0);
+                      const isNeg = num < 0;
+                      const formattedVal = `${isNeg ? '-' : ''}${getCurrencySymbol()}${Math.round(Math.abs(num)).toLocaleString(getCurrencyLocale())}`;
+                      return (
+                        <Box
+                          onClick={onClick}
+                          sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            width: 160,
+                            cursor: onClick ? 'pointer' : 'default',
+                            position: 'relative',
+                          }}
+                        >
+                          <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, mb: 0.25 }}>
+                            <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#6b7280', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                              {label}
                             </Typography>
-                            <Typography sx={{ flex: 1, textAlign: 'left', pl: 0, fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
-                              orders
-                            </Typography>
+                            {info && (
+                              <Tooltip
+                                title={info}
+                                arrow
+                                placement="top"
+                                enterTouchDelay={0}
+                                slotProps={{
+                                  tooltip: {
+                                    sx: {
+                                      bgcolor: '#ffffff',
+                                      color: '#1f2937',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 500,
+                                      lineHeight: 1.4,
+                                      py: 0.75,
+                                      px: 1.25,
+                                      borderRadius: '8px',
+                                      maxWidth: 320,
+                                      textAlign: 'center',
+                                      border: '1px solid #e5e7eb',
+                                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05)',
+                                    },
+                                  },
+                                  arrow: {
+                                    sx: {
+                                      color: '#ffffff',
+                                      '&::before': {
+                                        border: '1px solid #e5e7eb',
+                                      },
+                                    },
+                                  },
+                                }}
+                              >
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => e.stopPropagation()}
+                                  sx={{
+                                    p: '2px',
+                                    color: '#9ca3af',
+                                    '&:hover': {
+                                      color: '#2563eb',
+                                      backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                                    },
+                                  }}
+                                  aria-label={`Info for ${label}`}
+                                >
+                                  <InfoOutlinedIcon sx={{ fontSize: 13 }} />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           </Box>
-                        )}
-                      </Box>
-                    );
+                          <Typography sx={{ fontSize: '1.5rem', fontWeight: 300, color: '#111827', fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                            {formattedVal}
+                          </Typography>
+                          {count !== undefined && (
+                            <Box sx={{ display: 'flex', width: '100%', alignItems: 'baseline' }}>
+                              <Typography sx={{ flex: 1, textAlign: 'right', pr: 0.5, fontSize: '0.75rem', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.025em', fontVariantNumeric: 'tabular-nums' }}>
+                                {Number(count || 0).toLocaleString('en-IN')}
+                              </Typography>
+                              <Typography sx={{ flex: 1, textAlign: 'left', pl: 0, fontSize: '0.75rem', fontWeight: 300, color: '#9ca3af', letterSpacing: '0.025em' }}>
+                                orders
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      );
+                    };
 
                     const Operator = ({ symbol }: { symbol: string }) => (
                       <Typography sx={{ fontSize: '1.5rem', fontWeight: 600, color: '#6b7280', mx: 1 }}>
@@ -3443,17 +3520,47 @@ const MarketplaceReconciliation: React.FC = () => {
                     return (
                       <Box sx={{ p: 3 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, flexWrap: 'wrap' }}>
-                          <Metric label="Gross Sales" amount={grossSalesAmount} count={grossSalesCount} />
+                          <Metric
+                            label="Gross Sales"
+                            amount={grossSalesAmount}
+                            count={grossSalesCount}
+                            info="Total catalog value before discounts and returns: Σ(Item Price × Qty)"
+                          />
                           {selectedPlatform === 'd2c' ? (
                             <>
-                              <Metric label="Taxes" amount={taxesAmount} count={grossSalesCount} />
-                              <Metric label="Returns" amount={returnsAmount} count={returnsCount} />
+                              <Metric
+                                label="Net Adjustments"
+                                amount={netAdjustmentsAmount}
+                                count={grossSalesCount}
+                                info="Net order adjustments: Taxes + Shipping Charges - Discounts"
+                              />
+                              <Metric
+                                label="Returns"
+                                amount={returnsAmount}
+                                count={returnsCount}
+                                info="Total refunded and returned order values (Shopify Sales Reversals)"
+                              />
                             </>
                           ) : (
-                            <Metric label="Net Sales" amount={netSalesAmount} count={netSalesCount} />
+                            <Metric
+                              label="Net Sales"
+                              amount={netSalesAmount}
+                              count={netSalesCount}
+                              info="Realized sales: Gross Sales - Returns - Cancellations - Discounts"
+                            />
                           )}
-                          <Metric label="Amount Settled" amount={Math.abs(Number(s?.total_settled_amount || 0))} count={Math.abs(Number(s?.total_settled_orders || 0))} />
-                          <Metric label="Payment Due" amount={Math.abs(Number(s?.total_unsettled_amount || 0))} count={Math.abs(Number(s?.total_unsettled_orders || 0))} />
+                          <Metric
+                            label="Amount Settled"
+                            amount={Math.abs(Number(s?.total_settled_amount || 0))}
+                            count={Math.abs(Number(s?.total_settled_orders || 0))}
+                            info="Net payout collected in bank from gateways and COD couriers"
+                          />
+                          <Metric
+                            label="Payment Due"
+                            amount={Math.abs(Number(s?.total_unsettled_amount || 0))}
+                            count={Math.abs(Number(s?.total_unsettled_orders || 0))}
+                            info="Outstanding payment pending settlement: Order Value - Amount Settled"
+                          />
                         </Box>
                       </Box>
                     );
@@ -5018,12 +5125,13 @@ const MarketplaceReconciliation: React.FC = () => {
                 };
 
                 // Platform color mapping (extensible for all platforms)
-                const palette2 = ['#7A5DBF', '#A79CDB', '#10B981', '#F59E0B', '#0EA5E9', '#6366F1', '#EF4444'];
+                const palette2 = ['#7A5DBF', '#0284C7', '#10B981', '#F59E0B', '#0EA5E9', '#6366F1', '#EF4444'];
                 const platformColors: Record<string, string> = {
-                  'paytm': palette2[0],
-                  'payu': palette2[1],
-                  'cashfree': palette2[2],
-                  'gokwik': palette2[0],
+                  'paytm': '#00B9F5',
+                  'payu': '#84C441',
+                  'cashfree': '#10B981',
+                  'gokwik': '#7A5DBF',
+                  'razorpay': '#0284C7',
                   'flipkart': palette2[3],
                   'amazon': palette2[3],
                   'myntra': palette2[4],
@@ -5032,13 +5140,32 @@ const MarketplaceReconciliation: React.FC = () => {
                   'delhivery': palette2[6],
                 };
 
+                const providerDisplayNames: Record<string, string> = {
+                  gokwik: 'GoKwik',
+                  razorpay: 'Razorpay',
+                  payu: 'PayU',
+                  paytm: 'Paytm',
+                  cashfree: 'Cashfree',
+                  flipkart: 'Flipkart',
+                  amazon: 'Amazon',
+                  myntra: 'Myntra',
+                  shiprocket: 'Shiprocket',
+                  delhivery: 'Delhivery',
+                };
+
+                const getProviderDisplayName = (platform?: string, idx?: number) => {
+                  if (!platform) return `Platform ${(idx ?? 0) + 1}`;
+                  const lower = platform.toLowerCase();
+                  return providerDisplayNames[lower] || (platform.charAt(0).toUpperCase() + platform.slice(1));
+                };
+
                 // Build providerData dynamically from API data
                 // Commission values are typically negative (charges/deductions), so we use absolute value for display
                 const providerData = commissionArray
                   .map((item, idx) => {
                     const commissionValue = item.total_commission || 0; // Only show commission, not GST on commission
                     return {
-                      name: item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1) || `Platform ${idx + 1}`,
+                      name: getProviderDisplayName(item.platform, idx),
                       value: Math.abs(commissionValue), // Use absolute value for display
                       originalSignedValue: commissionValue, // Keep original for calculations
                       color: platformColors[item.platform?.toLowerCase() || ''] || palette2[idx % palette2.length],
@@ -5234,33 +5361,32 @@ const MarketplaceReconciliation: React.FC = () => {
                       </Grid>
                       {/* KPI cards (totals) */}
                       <Grid item xs={12} md={4}>
-                        {providerCount > 1 ? (
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
-                            <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                              <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Commission</Typography>
-                              <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
-                            </Box>
-                            <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                              <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total GST on Commission</Typography>
-                              <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalGstOnCommission)}</Typography>
-                            </Box>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
+                          <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Commission</Typography>
+                            <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
                           </Box>
-                        ) : (
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: 300 }}>
-                            <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                              <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total Commission</Typography>
-                              <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalCommissionCharges)}</Typography>
-                            </Box>
-                            <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                              <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TDS</Typography>
-                              <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTds)}</Typography>
-                            </Box>
-                            <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                              <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total TCS</Typography>
-                              <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTcs)}</Typography>
-                            </Box>
+                          <Box sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500 }}>Total GST on Commission</Typography>
+                            <Typography variant="h5" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalGstOnCommission)}</Typography>
                           </Box>
-                        )}
+                          {(totalTds > 0 || totalTcs > 0) && (
+                            <Box sx={{ display: 'flex', gap: 1.5, flex: 1 }}>
+                              {totalTds > 0 && (
+                                <Box sx={{ flex: 1, p: 2, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                  <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500, fontSize: '0.7rem' }}>Total TDS</Typography>
+                                  <Typography variant="subtitle1" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTds)}</Typography>
+                                </Box>
+                              )}
+                              {totalTcs > 0 && (
+                                <Box sx={{ flex: 1, p: 2, borderRadius: '16px', background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(229, 231, 235, 0.6)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                  <Typography variant="caption" sx={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 500, fontSize: '0.7rem' }}>Total TCS</Typography>
+                                  <Typography variant="subtitle1" sx={{ mt: 0.5, color: '#1f2937', fontWeight: 600 }}>{formatCurrency(totalTcs)}</Typography>
+                                </Box>
+                              )}
+                            </Box>
+                          )}
+                        </Box>
                       </Grid>
                     </Grid>
 
@@ -5272,7 +5398,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             <Box sx={{ p: 3, borderRadius: '14px', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(229,231,235,0.6)' }}>
                               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                                 <Typography variant="subtitle1" sx={{ color: '#374151', fontWeight: 700 }}>
-                                  {item.platform?.charAt(0).toUpperCase() + item.platform?.slice(1) || 'Unknown Platform'}
+                                  {getProviderDisplayName(item.platform, idx)}
                                 </Typography>
                                 <Tooltip
                                   title={
@@ -5283,9 +5409,26 @@ const MarketplaceReconciliation: React.FC = () => {
                                       <Typography variant="body2">
                                         <strong>Total Commission:</strong> {formatCurrency(Math.abs(item.total_commission || 0))}
                                       </Typography>
-                                      <Typography variant="body2">
-                                        <strong>Total Platform Fees:</strong> {formatCurrency(Math.abs(item.total_platform_fees || 0))}
-                                      </Typography>
+                                      {(item.total_gst_on_commission || 0) > 0 && (
+                                        <Typography variant="body2">
+                                          <strong>GST on Commission:</strong> {formatCurrency(Math.abs(item.total_gst_on_commission || 0))}
+                                        </Typography>
+                                      )}
+                                      {(item.total_tds_amount || 0) > 0 && (
+                                        <Typography variant="body2">
+                                          <strong>Total TDS:</strong> {formatCurrency(Math.abs(item.total_tds_amount || 0))}
+                                        </Typography>
+                                      )}
+                                      {(item.total_tcs_amount || 0) > 0 && (
+                                        <Typography variant="body2">
+                                          <strong>Total TCS:</strong> {formatCurrency(Math.abs(item.total_tcs_amount || 0))}
+                                        </Typography>
+                                      )}
+                                      {(item.total_platform_fees || 0) > 0 && (
+                                        <Typography variant="body2">
+                                          <strong>Total Platform Fees:</strong> {formatCurrency(Math.abs(item.total_platform_fees || 0))}
+                                        </Typography>
+                                      )}
                                     </Box>
                                   }
                                   arrow
@@ -5304,28 +5447,29 @@ const MarketplaceReconciliation: React.FC = () => {
                                   {formatCurrency(Math.abs(item.total_commission))}
                                 </Typography>
                               </Box>
-                              {providerData.length > 1 ? (
+                              {(item.total_gst_on_commission || 0) > 0 && (
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
                                   <Typography variant="body2" sx={{ color: '#374151' }}>GST on Commission</Typography>
                                   <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
                                     {formatCurrency(Math.abs(item.total_gst_on_commission || 0))}
                                   </Typography>
                                 </Box>
-                              ) : (
-                                <>
-                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                                    <Typography variant="body2" sx={{ color: '#374151' }}>TDS</Typography>
-                                    <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                                      {formatCurrency(Math.abs(item.total_tds_amount || 0))}
-                                    </Typography>
-                                  </Box>
-                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                                    <Typography variant="body2" sx={{ color: '#374151' }}>TCS</Typography>
-                                    <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
-                                      {formatCurrency(Math.abs(item.total_tcs_amount || 0))}
-                                    </Typography>
-                                  </Box>
-                                </>
+                              )}
+                              {(item.total_tds_amount || 0) > 0 && (
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                                  <Typography variant="body2" sx={{ color: '#374151' }}>TDS</Typography>
+                                  <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
+                                    {formatCurrency(Math.abs(item.total_tds_amount || 0))}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {(item.total_tcs_amount || 0) > 0 && (
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                                  <Typography variant="body2" sx={{ color: '#374151' }}>TCS</Typography>
+                                  <Typography variant="subtitle2" sx={{ color: '#1f2937', fontWeight: 700 }}>
+                                    {formatCurrency(Math.abs(item.total_tcs_amount || 0))}
+                                  </Typography>
+                                </Box>
                               )}
                               {(item.total_platform_fees || 0) > 0 && (
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>

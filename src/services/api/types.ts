@@ -102,6 +102,8 @@ export interface MainSummaryResponse {
     total_unreconciled_count: number;
     prev_return_or_cancelled_orders?: number;
     prev_return_or_cancelled_amount?: number;
+    total_taxes_amount?: number;
+    total_net_adjustments_amount?: number;
   };
   // Top-level commission summary for payment providers
   commission?: Array<{
@@ -393,6 +395,8 @@ export interface TransactionRow {
   listing_price?: number;
   order_value: number;
   settlement_amount: number;
+  commission_amount?: number;
+  commission_taxes?: number;
   invoice_date: string;
   settlement_date?: string;
   diff: number;
@@ -402,11 +406,16 @@ export interface TransactionRow {
   event_subtype: string;
   settlement_provider: string;
   metadata?: {
+    order_value?: any;
+    settlement_value?: any;
+    diff?: number;
     breakups?: {
       marketplace_fee?: number;
       taxes?: number;
       tcs?: number;
       tds?: number;
+      commission_amount?: number;
+      commission_taxes?: number;
     };
   };
   breakups?: TransactionBreakup;
