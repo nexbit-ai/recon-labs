@@ -1569,10 +1569,10 @@ const MarketplaceReconciliation: React.FC = () => {
             const rawSalesAndSettlement = data.salesAndSettlement || data.sales_and_settlement || [];
             const salesAndSettlement = Array.isArray(rawSalesAndSettlement)
               ? rawSalesAndSettlement.map((row: any) => ({
-                  ...row,
-                  importedSales: row.importedSales ?? row.sales ?? 0,
-                  importedSettlement: row.importedSettlement ?? row.settlement ?? 0,
-                }))
+                ...row,
+                importedSales: row.importedSales ?? row.sales ?? 0,
+                importedSettlement: row.importedSettlement ?? row.settlement ?? 0,
+              }))
               : [];
             const vendorSettlementsRaw = data.vendorSettlements || data.vendor_settlements || {};
 
@@ -3524,7 +3524,7 @@ const MarketplaceReconciliation: React.FC = () => {
                             label="Gross Sales"
                             amount={grossSalesAmount}
                             count={grossSalesCount}
-                            info="Total catalog value before discounts and returns: Σ(Item Price × Qty)"
+                            info="Total catalog value before discounts and returns"
                           />
                           {selectedPlatform === 'd2c' ? (
                             <>
@@ -3604,7 +3604,7 @@ const MarketplaceReconciliation: React.FC = () => {
                     const manuallyReconciledCount = Number(s?.total_manually_reconciled_or_disputed_count || 0);
                     const matchedCount = reconciledCount + manuallyReconciledCount;
                     const mismatchedCount = Number(s?.total_unreconciled_count || 0);
-                    
+
                     const settledCount = matchedCount + mismatchedCount;
                     const settledPct = totalOrders === 0 ? 0 : Math.max(0, Math.min(100, (settledCount / totalOrders) * 100));
                     const settledDeg = (settledPct / 100) * 360;
@@ -3837,7 +3837,7 @@ const MarketplaceReconciliation: React.FC = () => {
                       {/* Switch for Matched/Mismatched (only when Settled is selected) */}
                       {settledUnsettledTab === 0 && (
                         <Box sx={{ mt: 2, mb: 2, display: 'flex', alignItems: 'center', position: 'relative' }}>
-                          
+
                           {/* Centered Toggle Container */}
                           <Box
                             sx={{
@@ -3856,7 +3856,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                 Expected = Actual
                               </Typography>
                             </Box>
-                            
+
                             <Box
                               role="switch"
                               aria-checked={transactionsTab === 1}
@@ -3908,7 +3908,7 @@ const MarketplaceReconciliation: React.FC = () => {
                                 }}
                               />
                             </Box>
-                            
+
                             <Box sx={{ textAlign: 'left' }}>
                               <Typography sx={{ fontWeight: 700, color: transactionsTab === 1 ? '#991b1b' : '#6b7280' }}>
                                 Settlement Variances
@@ -3918,7 +3918,7 @@ const MarketplaceReconciliation: React.FC = () => {
                               </Typography>
                             </Box>
                           </Box>
-                          
+
                           {/* Transaction Sheet Buttons pinned to the right */}
                           <Box sx={{ position: 'absolute', right: 0 }}>
                             {transactionsTab === 0 ? (
@@ -7333,7 +7333,7 @@ const MarketplaceReconciliation: React.FC = () => {
           dateRange={effectiveDateRangeForTs}
           initialPlatforms={
             selectedPlatform &&
-            (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'myntra' || selectedPlatform === 'd2c' || selectedPlatform === 'other')
+              (selectedPlatform === 'flipkart' || selectedPlatform === 'amazon' || selectedPlatform === 'amazon_uk' || selectedPlatform === 'myntra' || selectedPlatform === 'd2c' || selectedPlatform === 'other')
               ? [selectedPlatform as 'flipkart' | 'amazon' | 'amazon_uk' | 'myntra' | 'd2c' | 'other']
               : undefined
           }
